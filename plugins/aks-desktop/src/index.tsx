@@ -239,11 +239,11 @@ if (Headlamp.isRunningAsApp()) {
     icon: 'logos:microsoft-azure',
   });
 
-  // register import existing AKS projects
+  // register import existing namespaces as projects
   registerCustomCreateProject({
     id: 'aks-import',
-    name: 'Import AKS projects',
-    description: 'Import existing AKS managed namespaces as projects',
+    name: 'Import existing namespaces',
+    description: 'Import managed namespaces and regular namespaces as AKS Desktop projects',
     component: () => <Redirect to="/projects/import-aks-projects" />,
     icon: 'mdi:import',
   });

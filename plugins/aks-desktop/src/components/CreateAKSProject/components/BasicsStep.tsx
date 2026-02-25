@@ -2,8 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { Icon } from '@iconify/react';
-import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { useClustersConf } from '@kinvolk/headlamp-plugin/lib/k8s';
+import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import {
   Alert,
   AlertTitle,
@@ -78,7 +77,7 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
   onRefreshCapabilities,
 }) => {
   const { t } = useTranslation();
-  const headlampClusters = useClustersConf();
+  const headlampClusters = K8s.useClustersConf();
   const authStatus = useAzureAuth();
 
   // Auto select default subscription
