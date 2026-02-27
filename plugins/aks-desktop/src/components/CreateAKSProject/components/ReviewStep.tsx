@@ -177,12 +177,16 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
               })}
             </Typography>
             <Box
+              tabIndex={0}
+              role="region"
+              aria-label={t('Access control assignees list')}
               sx={{
                 maxHeight: '200px',
                 overflowY: 'auto',
                 border: '1px solid #e0e0e0',
                 borderRadius: 1,
                 p: 1,
+                '&:focus': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
               }}
             >
               {formData.userAssignments.map((assignment, idx) => (
