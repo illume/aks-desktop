@@ -340,5 +340,6 @@
   "Target CPU Utilization (%)": "Target CPU Utilization (%)",
   "Number of Replicas": "Number of Replicas",
   "Set the desired number of pod replicas for this deployment": "Set the desired number of pod replicas for this deployment",
-  "Save": "Save"
+  "Save": "Save",
+  "namespace: {{namespace}}": "namespace: {{namespace}}"
 }
