@@ -6,6 +6,7 @@
 out
 dist
 node_modules
+storybook-static
 vsix
 .vscode-test/
 *.vsix

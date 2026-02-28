@@ -5,6 +5,9 @@ import { useCallback, useState } from 'react';
 import { checkNamespaceExists } from '../../../utils/azure/az-cli';
 import type { NamespaceStatus } from '../types';
 
+/** Set to `true` locally to enable verbose debug logging. Never enable in production. */
+const DEBUG = false;
+
 /**
  * Custom hook for managing namespace existence checks
  */
@@ -35,12 +38,10 @@ export const useNamespaceCheck = () => {
       try {
         setStatus(prev => ({ ...prev, checking: true, error: null }));
 
-        console.log('🔍 Checking namespace existence:', {
-          cluster: clusterName,
-          resourceGroup,
-          namespace: namespaceName,
-          subscription: subscriptionId,
-        });
+        if (DEBUG)
+          console.log('🔍 Checking namespace existence:', {
+            namespace: namespaceName,
+          });
 
         const result = await checkNamespaceExists(
           clusterName,
@@ -49,7 +50,7 @@ export const useNamespaceCheck = () => {
           subscriptionId
         );
 
-        console.log('📋 Namespace check result:', result);
+        if (DEBUG) console.log('📋 Namespace check result:', result.exists);
 
         if (result.error) {
           setStatus(prev => ({
