@@ -192,11 +192,10 @@ export default function CreateAKSProjectPure({
               AND prevents keyboard focus from reaching it while the loading overlay is active.
               inert is used instead of aria-hidden because aria-hidden alone does not prevent
               focus, which violates the aria-hidden-focus axe rule.
+              inert={true} renders the boolean HTML attribute; React omits the attribute when false.
               MDN: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/inert */}
           <CardContent
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore – inert is a valid HTML attribute; MUI CardContent typings omit it
-            {...(isCreating ? { inert: '' } : {})}
+            {...(isCreating ? { inert: true } : {})}
             sx={{
               height: '100%',
               display: 'flex',
