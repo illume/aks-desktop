@@ -90,7 +90,7 @@ export interface UseDeployWizardResult {
  * Extracted from `DeployWizard.tsx` so it can be unit-tested independently
  * and so that {@link DeployWizardPure} remains a pure presentational component.
  *
- * @param options - Cluster, namespace, initial app name, and close callback.
+ * @param options - Cluster, namespace, and initial app name configuration.
  * @returns Wizard state and handlers ready to spread into {@link DeployWizardPure}.
  */
 export function useDeployWizard({

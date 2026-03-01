@@ -242,8 +242,13 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
       setCreationError(null);
       setCreationProgress(`${t('Starting project creation')}...`);
 
+      // Guard flag: set to true if the timeout wins the race so the still-running
+      // creationPromise does not continue mutating UI state after an error is shown.
+      let aborted = false;
+
       const timeoutPromise = new Promise((_, reject) => {
         creationTimeoutId = window.setTimeout(() => {
+          aborted = true;
           reject(
             new Error(
               t(
@@ -283,6 +288,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
           );
         }
 
+        if (aborted) return;
         setCreationProgress(`${t('Namespace creation initiated! Monitoring creation status')}...`);
         if (DEBUG)
           console.log('🚀 Namespace creation initiated for namespace:', formData.projectName);
@@ -290,6 +296,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
         if (DEBUG) console.log('⏳ Waiting 5 seconds for namespace to propagate...');
         setCreationProgress(`${t('Waiting for namespace to propagate')}...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
+        if (aborted) return;
 
         let namespaceVerified = false;
         let retryCount = 0;
@@ -332,6 +339,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
                   console.log(`⏳ Namespace not found yet, retrying in ${retryDelay / 1000}s...`);
                 setCreationProgress(`${t('Waiting for namespace to be created')}...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
+                if (aborted) return;
               } else {
                 if (DEBUG) console.log(`❌ Max retries reached, namespace still not found`);
               }
