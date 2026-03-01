@@ -184,8 +184,8 @@ describe('ClusterConfigurePanel', () => {
       expect(configuringMessages.length).toBeGreaterThan(0);
     });
 
-    // Should show a progress indicator (CircularProgress renders role="progressbar")
-    expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+    // Should show the status container that announces the loading state to screen readers
+    expect(screen.getByRole('status')).toBeTruthy();
   });
 
   test('calls onConfigured callback after successful configuration and polling', async () => {
