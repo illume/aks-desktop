@@ -12,9 +12,9 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
-import { Breadcrumb } from '../CreateAKSProject/components/Breadcrumb';
-import { useContainerConfiguration } from './hooks/useContainerConfiguration';
-import { WizardStep } from './hooks/useDeployWizard';
+import { Breadcrumb } from '../../CreateAKSProject/components/Breadcrumb';
+import { useContainerConfiguration } from '../hooks/useContainerConfiguration';
+import { WizardStep } from '../hooks/useDeployWizard';
 
 /**
  * Pure presentational props for {@link DeployWizardPure}.
