@@ -170,7 +170,7 @@ export default function CreateAKSProjectPure({
                 size={60}
                 aria-label={t('Creating Project')}
               />
-              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
+              <Typography variant="h6" component="p" sx={{ mt: 2, mb: 1 }}>
                 {t('Creating Project')}...
               </Typography>
               {/* aria-live="polite" causes assistive technologies to announce each status
@@ -188,12 +188,15 @@ export default function CreateAKSProjectPure({
             </Box>
           )}
 
-          {/* aria-hidden hides the underlying interactive content from assistive technologies
-              while the loading overlay is visible, preventing screen reader users from
-              reaching controls that are visually obscured by the overlay.
-              MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
+          {/* inert hides the underlying interactive content from assistive technologies
+              AND prevents keyboard focus from reaching it while the loading overlay is active.
+              inert is used instead of aria-hidden because aria-hidden alone does not prevent
+              focus, which violates the aria-hidden-focus axe rule.
+              MDN: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/inert */}
           <CardContent
-            aria-hidden={isCreating || undefined}
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore – inert is a valid HTML attribute; MUI CardContent typings omit it
+            {...(isCreating ? { inert: '' } : {})}
             sx={{
               height: '100%',
               display: 'flex',
@@ -401,7 +404,13 @@ export default function CreateAKSProjectPure({
             />
             {t('Project Creation Failed')}
           </DialogTitle>
-          <DialogContent sx={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <DialogContent
+            // tabIndex={0} makes this scrollable region keyboard-accessible so keyboard users
+            // can scroll through long error messages. Required by the scrollable-region-focusable
+            // axe rule: https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable
+            tabIndex={0}
+            sx={{ maxHeight: '400px', overflowY: 'auto' }}
+          >
             {/* id provides the accessible description for this alertdialog via aria-describedby */}
             <Typography
               id="aksd-create-aks-project-error-desc"
