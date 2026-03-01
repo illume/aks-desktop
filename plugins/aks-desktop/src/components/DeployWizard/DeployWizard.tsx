@@ -5,8 +5,8 @@ import React from 'react';
 import ConfigureContainer from './components/ConfigureContainer';
 import ConfigureYAML from './components/ConfigureYAML';
 import Deploy from './components/Deploy';
-import SourceStep from './components/SourceStep';
 import DeployWizardPure from './components/DeployWizardPure';
+import SourceStep from './components/SourceStep';
 import { useDeployWizard, WizardStep } from './hooks/useDeployWizard';
 
 /** Options accepted by the {@link DeployWizard} connector. */
