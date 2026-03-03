@@ -70,7 +70,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             ...params.InputProps,
             endAdornment: (
               <>
-                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {/* The adornment spinner is decorative; MUI Autocomplete already manages
+                    aria-busy on the listbox via the loading prop, so this spinner
+                    would cause a duplicate announcement if not hidden.
+                    MUI: https://mui.com/material-ui/react-autocomplete/#asynchronous-requests */}
+                {loading ? <CircularProgress color="inherit" size={20} aria-hidden="true" /> : null}
                 {params.InputProps.endAdornment}
               </>
             ),
