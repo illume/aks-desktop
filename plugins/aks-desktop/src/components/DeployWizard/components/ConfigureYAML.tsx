@@ -100,7 +100,11 @@ export default function ConfigureYAML({
       </Box>
 
       {yamlError && (
-        <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+        /* role="alert" causes assistive technologies to immediately announce this error
+           when it is dynamically injected into the DOM (assertive live region), without
+           the user needing to navigate to it.
+           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/alert_role */
+        <Typography role="alert" variant="body2" color="error" sx={{ mt: 1 }}>
           {yamlError}
         </Typography>
       )}
