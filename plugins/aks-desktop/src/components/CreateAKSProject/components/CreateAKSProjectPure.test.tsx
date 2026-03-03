@@ -60,7 +60,7 @@ import {
 
 afterEach(() => cleanup());
 
-/** Render a story using its args, overriding callbacks with jest spies. */
+/** Render a story using its args, overriding callbacks with Vitest (`vi.fn()`) spies. */
 function renderStory(
   storyArgs: CreateAKSProjectPureProps,
   overrides: Partial<CreateAKSProjectPureProps> = {}

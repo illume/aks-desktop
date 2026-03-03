@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { K8s,useTranslation } from '@kinvolk/headlamp-plugin/lib';
+import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import {
@@ -158,20 +158,23 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       const azureCheck = await checkAzureCliAndAksPreview();
+      if (cancelled) {
+        return;
+      }
       if (DEBUG) console.debug('Azure CLI check results:', azureCheck);
       setCliSuggestions(azureCheck.suggestions);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    // @todo: A note from copilot to look into later:
-    // The async Azure CLI check effect can call setCliSuggestions after the
-    // component unmounts (e.g., user navigates away quickly), which triggers
-    // React "state update on unmounted component" warnings.
-    // Add an unmount guard (e.g., let cancelled=false + cleanup) before
-    // setting state, or cancel the async work if possible.
     if (formData.subscription) {
       azureResources.fetchClusters(formData.subscription);
     } else {
