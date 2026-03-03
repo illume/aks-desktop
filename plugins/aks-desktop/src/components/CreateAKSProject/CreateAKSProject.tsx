@@ -1,437 +1,89 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { Icon } from '@iconify/react';
-import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { PageGrid, SectionBox } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  TextField,
-  Typography,
-} from '@mui/material';
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { checkNamespaceExists, createManagedNamespace } from '../../utils/azure/az-cli';
-import { checkAzureCliAndAksPreview } from '../../utils/azure/checkAzureCli';
-import { assignRolesToNamespace } from '../../utils/azure/roleAssignment';
-import {
-  PROJECT_ID_LABEL,
-  PROJECT_MANAGED_BY_LABEL,
-  PROJECT_MANAGED_BY_VALUE,
-  RESOURCE_GROUP_LABEL,
-  SUBSCRIPTION_LABEL,
-} from '../../utils/constants/projectLabels';
 import AzureAuthGuard from '../AzureAuth/AzureAuthGuard';
-import AzureCliWarning from '../AzureCliWarning';
 import { AccessStep } from './components/AccessStep';
 import { BasicsStep } from './components/BasicsStep';
-import { Breadcrumb } from './components/Breadcrumb';
 import { ComputeStep } from './components/ComputeStep';
+import CreateAKSProjectPure from './components/CreateAKSProjectPure';
 import { NetworkingStep } from './components/NetworkingStep';
 import { ReviewStep } from './components/ReviewStep';
-import { useAzureResources } from './hooks/useAzureResources';
-import { useClusterCapabilities } from './hooks/useClusterCapabilities';
-import { useExtensionCheck } from './hooks/useExtensionCheck';
-import { useFeatureCheck } from './hooks/useFeatureCheck';
-import { useFormData } from './hooks/useFormData';
-import { useNamespaceCheck } from './hooks/useNamespaceCheck';
-import { useValidation } from './hooks/useValidation';
-import { STEPS } from './types';
-
-const useClusterCheck = ({ cluster }: { cluster?: string }) => {
-  const clustersConf = K8s.useClustersConf() || {};
-
-  const isClusterMissing =
-    cluster && Object.values(clustersConf).find((it: any) => it.name === cluster) === undefined;
-
-  return isClusterMissing;
-};
+import { useCreateAKSProjectWizard } from './hooks/useCreateAKSProjectWizard';
 
 /**
- * Refactored CreateAKSProject component using smaller, testable components
+ * Thin connector for the Create AKS Project wizard.
+ *
+ * Composes {@link useCreateAKSProjectWizard} (all state and async logic) with
+ * {@link CreateAKSProjectPure} (pure presentational rendering). The connector's
+ * only responsibilities are:
+ * - Rendering each step's child component via `renderStepContent`.
+ * - Mapping router actions (`history.push`) to the pure component's callbacks.
+ * - Wrapping the whole page in {@link AzureAuthGuard} to gate authentication.
  */
 function CreateAKSProject() {
   const history = useHistory();
-  const { t } = useTranslation();
-
-  // State management
-  const [activeStep, setActiveStep] = useState(0);
-  const [isCreating, setIsCreating] = useState(false);
-  const [creationProgress, setCreationProgress] = useState('');
-  const [creationError, setCreationError] = useState<string | null>(null);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [applicationName, setApplicationName] = useState('');
-  const [cliSuggestions, setCliSuggestions] = useState<string[]>([]);
-  const stepContentRef = useRef<HTMLDivElement>(null);
-
-  // Custom hooks
-  const { formData, updateFormData } = useFormData();
-  const azureResources = useAzureResources();
-  const clusterCapabilities = useClusterCapabilities();
-  const extensionStatus = useExtensionCheck();
-  const featureStatus = useFeatureCheck({ subscription: formData.subscription });
-  const namespaceCheck = useNamespaceCheck();
-  const isClusterMissing = useClusterCheck({ cluster: formData.cluster });
-
-  // Validation
-  const validation = useValidation(
-    activeStep,
-    formData,
-    extensionStatus,
-    featureStatus,
-    namespaceCheck,
-    isClusterMissing,
-    clusterCapabilities.capabilities
-  );
-
-  // Fetch subscriptions and check extension/feature on component mount
-  useEffect(() => {
-    azureResources.fetchSubscriptions();
-  }, []);
-
-  // Check Azure CLI and aks-preview extension on component mount
-  useEffect(() => {
-    (async () => {
-      const azureCheck = await checkAzureCliAndAksPreview();
-      console.debug('Azure CLI check results:', azureCheck);
-      setCliSuggestions(azureCheck.suggestions);
-    })();
-  }, []);
-
-  // Fetch clusters when subscription changes
-  useEffect(() => {
-    if (formData.subscription) {
-      azureResources.fetchClusters(formData.subscription);
-    } else {
-      azureResources.clearClusters();
-    }
-    // Clear capabilities when subscription changes
-    clusterCapabilities.clearCapabilities();
-  }, [formData.subscription]);
-
-  // Fetch cluster capabilities when cluster selection changes
-  useEffect(() => {
-    if (formData.cluster && formData.subscription && formData.resourceGroup) {
-      clusterCapabilities.fetchCapabilities(
-        formData.subscription,
-        formData.resourceGroup,
-        formData.cluster
-      );
-    } else {
-      clusterCapabilities.clearCapabilities();
-    }
-  }, [formData.cluster, formData.subscription, formData.resourceGroup]);
-
-  // Check namespace existence when project name, cluster, or subscription changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (
-        formData.projectName &&
-        formData.cluster &&
-        formData.resourceGroup &&
-        formData.subscription
-      ) {
-        namespaceCheck.checkNamespace(
-          formData.cluster,
-          formData.resourceGroup,
-          formData.projectName,
-          formData.subscription
-        );
-      }
-    }, 500); // Debounce the check
-
-    return () => clearTimeout(timeoutId);
-  }, [formData.projectName, formData.cluster, formData.resourceGroup, formData.subscription]);
-  const handleNext = () => {
-    // Clear any existing errors when proceeding
-    azureResources.clearError();
-    azureResources.clearClusterError();
-    setActiveStep(prevStep => prevStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep(prevStep => prevStep - 1);
-  };
-
-  const handleStepClick = (step: number) => {
-    setActiveStep(step);
-  };
-
-  // Focus on the content when changing steps
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      const container = stepContentRef.current;
-      if (!container) return;
-      const focusable = container.querySelector<HTMLElement>(
-        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])'
-      );
-      focusable?.focus();
-    });
-  }, [activeStep]);
-
-  const handleSubmit = async () => {
-    try {
-      console.debug('handleSubmit', formData);
-      console.debug('Selected cluster details:', {
-        name: formData.cluster,
-        resourceGroup: formData.resourceGroup,
-        subscription: formData.subscription,
-      });
-
-      setIsCreating(true);
-      setCreationError(null);
-      setCreationProgress(`${t('Starting project creation')}...`);
-
-      // Add timeout protection (10 minutes)
-      let timeoutId: ReturnType<typeof setTimeout>;
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(
-            new Error(
-              t(
-                'Project creation timed out after 10 minutes. Please check if the namespace was created and try again.'
-              )
-            )
-          );
-        }, 10 * 60 * 1000); // 10 minutes
-      });
-
-      // Create the main creation promise
-      const creationPromise = (async () => {
-        // Step 1: Create the managed namespace
-        setCreationProgress(`${t('Initiating managed namespace creation')}...`);
-        const namespaceResult = await createManagedNamespace({
-          clusterName: formData.cluster,
-          resourceGroup: formData.resourceGroup,
-          namespaceName: formData.projectName,
-          subscriptionId: formData.subscription,
-          cpuRequest: formData.cpuRequest,
-          cpuLimit: formData.cpuLimit,
-          memoryRequest: formData.memoryRequest,
-          memoryLimit: formData.memoryLimit,
-          ingressPolicy: formData.ingress,
-          egressPolicy: formData.egress,
-          labels: {
-            [PROJECT_ID_LABEL]: formData.projectName,
-            [PROJECT_MANAGED_BY_LABEL]: PROJECT_MANAGED_BY_VALUE,
-            [SUBSCRIPTION_LABEL]: formData.subscription,
-            [RESOURCE_GROUP_LABEL]: formData.resourceGroup,
-          },
-        });
-
-        if (!namespaceResult.success) {
-          throw new Error(
-            t('Namespace creation failed: {{message}}', {
-              message: namespaceResult.error || t('Unknown error'),
-            })
-          );
-        }
-
-        setCreationProgress(`${t('Namespace creation initiated! Monitoring creation status')}...`);
-
-        // Give the namespace a moment to propagate before verification
-        setCreationProgress(`${t('Waiting for namespace to propagate')}...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Step 1.5: Monitor namespace creation status with retries
-        let namespaceVerified = false;
-        let retryCount = 0;
-        const maxRetries = 8; // Reduced retries since we have initial delay
-        const retryDelay = 4000; // Increased delay between checks
-
-        while (!namespaceVerified && retryCount < maxRetries) {
-          try {
-            // Call the check function directly instead of using the hook
-            const result = await checkNamespaceExists(
-              formData.cluster,
-              formData.resourceGroup,
-              formData.projectName,
-              formData.subscription
-            );
-
-            if (result.error) {
-              throw new Error(
-                t('Namespace status check failed: {{message}}', { message: result.error })
-              );
-            }
-
-            if (result.exists === true) {
-              namespaceVerified = true;
-            } else {
-              retryCount++;
-              if (retryCount < maxRetries) {
-                setCreationProgress(`${t('Waiting for namespace to be created')}...`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-              }
-            }
-          } catch (statusError) {
-            throw new Error(
-              t('Namespace status verification failed: {{message}}', {
-                message: statusError.message,
-              })
-            );
-          }
-        }
-
-        if (!namespaceVerified) {
-          // Don't throw error, just continue - namespace creation API call succeeded
-          setCreationProgress(
-            `${t('Namespace creation API succeeded, proceeding with user assignments')}...`
-          );
-        }
-
-        setCreationProgress(
-          // Step 2: Add users to the namespace
-          `${t('Namespace creation completed successfully! Adding user access')}...`
-        );
-
-        const roleResult = await assignRolesToNamespace({
-          clusterName: formData.cluster,
-          resourceGroup: formData.resourceGroup,
-          namespaceName: formData.projectName,
-          subscriptionId: formData.subscription,
-          assignments: formData.userAssignments,
-          onProgress: msg => setCreationProgress(msg),
-          t,
-        });
-
-        if (!roleResult.success) {
-          const errorMessage = `${t(
-            'User assignment completed with errors'
-          )}\n${roleResult.errors.join('\n')}`;
-          if (roleResult.results.length > 0) {
-            console.warn('Some user assignments succeeded:', roleResult.results);
-          }
-          throw new Error(errorMessage);
-        }
-
-        setCreationProgress(t('Project creation completed successfully!'));
-
-        // Final status check - verify the namespace exists and is accessible
-        setCreationProgress(`${t('Performing final status verification')}...`);
-
-        // Final verification with a single retry
-        let finalVerified = false;
-        for (let attempt = 0; attempt < 2 && !finalVerified; attempt++) {
-          try {
-            const result = await checkNamespaceExists(
-              formData.cluster,
-              formData.resourceGroup,
-              formData.projectName,
-              formData.subscription
-            );
-
-            if (result.error) {
-              throw new Error(
-                t('Final status check failed: {{message}}', { message: result.error })
-              );
-            }
-
-            if (result.exists) {
-              finalVerified = true;
-            } else if (attempt === 0) {
-              await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-            }
-          } catch (finalError) {
-            throw new Error(
-              t('Final status verification failed: {{message}}', {
-                message: finalError.message,
-              })
-            );
-          }
-        }
-
-        setCreationProgress(t('All verifications completed successfully!'));
-      })();
-
-      // Race between creation and timeout
-      try {
-        await Promise.race([creationPromise, timeoutPromise]);
-      } finally {
-        clearTimeout(timeoutId!);
-      }
-
-      // Wait a moment to show success message
-      setTimeout(() => {
-        setIsCreating(false);
-        setShowSuccessDialog(true);
-      }, 2000);
-    } catch (error) {
-      console.error('Error creating AKS project:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        formData: formData,
-      });
-      setCreationError(error.message || t('Failed to create project'));
-      setIsCreating(false);
-      setCreationProgress(''); // Clear progress message
-    }
-  };
-
-  const onBack = () => {
-    history.push('/');
-  };
+  const wizard = useCreateAKSProjectWizard();
 
   const renderStepContent = (step: number) => {
     const commonProps = {
-      formData,
-      onFormDataChange: updateFormData,
-      validation,
-      loading: azureResources.loading,
-      error: azureResources.error,
+      formData: wizard.formData,
+      onFormDataChange: wizard.updateFormData,
+      validation: wizard.validation,
+      loading: wizard.azureResources.loading,
+      error: wizard.azureResources.error,
     };
-
     switch (step) {
-      case 0: // Basics
+      case 0:
         return (
           <BasicsStep
             {...commonProps}
-            subscriptions={azureResources.subscriptions}
-            clusters={azureResources.clusters}
-            totalClusterCount={azureResources.totalClusterCount}
-            loadingClusters={azureResources.loadingClusters}
-            clusterError={azureResources.clusterError}
-            extensionStatus={extensionStatus}
-            featureStatus={featureStatus}
-            namespaceStatus={namespaceCheck}
-            clusterCapabilities={clusterCapabilities.capabilities}
-            capabilitiesLoading={clusterCapabilities.loading}
-            onInstallExtension={extensionStatus.installExtension}
-            onRegisterFeature={featureStatus.registerFeature}
+            subscriptions={wizard.azureResources.subscriptions}
+            clusters={wizard.azureResources.clusters}
+            totalClusterCount={wizard.azureResources.totalClusterCount}
+            loadingClusters={wizard.azureResources.loadingClusters}
+            clusterError={wizard.azureResources.clusterError}
+            extensionStatus={wizard.extensionStatus}
+            featureStatus={wizard.featureStatus}
+            namespaceStatus={wizard.namespaceCheck}
+            clusterCapabilities={wizard.clusterCapabilities.capabilities}
+            capabilitiesLoading={wizard.clusterCapabilities.loading}
+            onInstallExtension={wizard.extensionStatus.installExtension}
+            onRegisterFeature={wizard.featureStatus.registerFeature}
             onRetrySubscriptions={async () => {
-              await azureResources.fetchSubscriptions();
+              await wizard.azureResources.fetchSubscriptions();
             }}
             onRetryClusters={async () => {
-              await azureResources.fetchClusters(formData.subscription);
+              await wizard.azureResources.fetchClusters(wizard.formData.subscription);
             }}
             onRefreshCapabilities={() => {
-              if (formData.cluster && formData.subscription && formData.resourceGroup) {
-                clusterCapabilities.fetchCapabilities(
-                  formData.subscription,
-                  formData.resourceGroup,
-                  formData.cluster
+              if (
+                wizard.formData.cluster &&
+                wizard.formData.subscription &&
+                wizard.formData.resourceGroup
+              ) {
+                wizard.clusterCapabilities.fetchCapabilities(
+                  wizard.formData.subscription,
+                  wizard.formData.resourceGroup,
+                  wizard.formData.cluster
                 );
               }
             }}
           />
         );
-      case 1: // Networking
+      case 1:
         return <NetworkingStep {...commonProps} />;
-      case 2: // Compute
+      case 2:
         return <ComputeStep {...commonProps} />;
-      case 3: // Access
+      case 3:
         return <AccessStep {...commonProps} />;
-      case 4: // Review
+      case 4:
         return (
           <ReviewStep
             {...commonProps}
-            subscriptions={azureResources.subscriptions}
-            clusters={azureResources.clusters}
+            subscriptions={wizard.azureResources.subscriptions}
+            clusters={wizard.azureResources.clusters}
           />
         );
       default:
@@ -441,299 +93,22 @@ function CreateAKSProject() {
 
   return (
     <AzureAuthGuard>
-      {/** @ts-ignore */}
-      <PageGrid maxWidth="lg" sx={{ margin: '0 auto' }}>
-        <SectionBox
-          title={t('New Project')}
-          subtitle={t('Set up and configure a new project in Azure Kubernetes Service (AKS)')}
-          backLink="/"
-        >
-          {cliSuggestions.length > 0 && (
-            <Box sx={{ mb: 2 }}>
-              <AzureCliWarning suggestions={cliSuggestions} />
-            </Box>
-          )}
-
-          <Card elevation={2} sx={{ position: 'relative' }}>
-            {/* Loading Overlay / Success Screen / Error Display */}
-            {(isCreating || showSuccessDialog || creationError) && (
-              <Box
-                sx={(theme: any) => ({
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: theme.palette.background.muted,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1000,
-                  borderRadius: '4px',
-                })}
-              >
-                {isCreating && !showSuccessDialog && !creationError ? (
-                  // Loading state
-                  <>
-                    <CircularProgress size={60} />
-                    <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                      {t('Creating Project')}...
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ textAlign: 'center', maxWidth: 400, px: 2 }}
-                    >
-                      {creationProgress}
-                    </Typography>
-                  </>
-                ) : creationError ? (
-                  // Error state
-                  <Box
-                    sx={{
-                      textAlign: 'center',
-                      maxWidth: 700,
-                      maxHeight: '70vh',
-                      p: 4,
-                      backgroundColor: 'background.paper',
-                      borderRadius: 2,
-                      boxShadow: 3,
-                      border: '2px solid',
-                      borderColor: 'error.main',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {/* Fixed header section */}
-                    <Box sx={{ flexShrink: 0 }}>
-                      <Icon
-                        icon="mdi:alert-circle"
-                        width={64}
-                        height={64}
-                        style={{
-                          marginBottom: 12,
-                          color: 'var(--color-error, #d32f2f)',
-                        }}
-                      />
-                      <Typography
-                        variant="h5"
-                        sx={{ mb: 2, color: 'error.main', fontWeight: 'bold' }}
-                      >
-                        {t('Project Creation Failed')}
-                      </Typography>
-                    </Box>
-                    {/* Scrollable error content */}
-                    <Box
-                      sx={{
-                        flex: 1,
-                        overflowY: 'auto',
-                        mb: 2,
-                        minHeight: '100px',
-                        maxHeight: '400px',
-                      }}
-                    >
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          whiteSpace: 'pre-wrap',
-                          wordWrap: 'break-word',
-                          wordBreak: 'break-word',
-                          overflowWrap: 'break-word',
-                          fontFamily: 'monospace',
-                          fontSize: '0.8rem',
-                          lineHeight: 1.4,
-                          backgroundColor: theme =>
-                            theme.palette.mode === 'dark'
-                              ? 'rgba(211, 47, 47, 0.15)'
-                              : 'rgba(211, 47, 47, 0.08)',
-                          color: 'text.primary',
-                          padding: 2,
-                          borderRadius: 1,
-                          border: '1px solid',
-                          borderColor: theme =>
-                            theme.palette.mode === 'dark'
-                              ? 'rgba(211, 47, 47, 0.5)'
-                              : 'rgba(211, 47, 47, 0.3)',
-                          textAlign: 'left',
-                          width: '100%',
-                          boxSizing: 'border-box',
-                        }}
-                      >
-                        {creationError}
-                      </Typography>
-                    </Box>
-                    {/* Fixed button section */}
-                    <Box sx={{ flexShrink: 0, display: 'flex', gap: 2, justifyContent: 'center' }}>
-                      <Button
-                        variant="outlined"
-                        color="inherit"
-                        onClick={() => {
-                          setCreationError(null);
-                          setCreationProgress('');
-                          onBack();
-                        }}
-                        sx={{ minWidth: 120 }}
-                      >
-                        Cancel
-                      </Button>
-                    </Box>
-                  </Box>
-                ) : showSuccessDialog ? (
-                  // Success state
-                  <Box
-                    sx={{
-                      textAlign: 'center',
-                      maxWidth: 500,
-                      p: 4,
-                      backgroundColor: 'background.paper',
-                      borderRadius: 2,
-                      boxShadow: 3,
-                      border: '1px solid',
-                      borderColor: 'success.main',
-                    }}
-                  >
-                    <Icon
-                      icon="mdi:check-circle"
-                      width={80}
-                      height={80}
-                      color="success.main"
-                      style={{ marginBottom: 16 }}
-                    />
-                    <Typography
-                      variant="h4"
-                      sx={{ mb: 2, color: 'success.main', fontWeight: 'bold' }}
-                    >
-                      {t('Project Created Successfully!')}
-                    </Typography>
-                    <Typography variant="h6" sx={{ mb: 3, color: 'text.secondary' }}>
-                      {t(
-                        'Your AKS project "{{projectName}}" has been created and is ready to use.',
-                        {
-                          projectName: formData.projectName,
-                        }
-                      )}
-                    </Typography>
-                    <Box sx={{ mb: 3 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={applicationName}
-                        onChange={e => setApplicationName(e.target.value)}
-                        placeholder={`${t('Enter application name')}...`}
-                        sx={{ mb: 1 }}
-                      />
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'left' }}>
-                        {t(
-                          'Enter a name for your first application to get started with deployment.'
-                        )}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                      <Button
-                        variant="outlined"
-                        onClick={() => {
-                          setShowSuccessDialog(false);
-                          onBack();
-                        }}
-                        sx={{ minWidth: 120 }}
-                      >
-                        {t('Cancel')}
-                      </Button>
-                      <Button
-                        variant="contained"
-                        onClick={() => {
-                          if (applicationName.trim()) {
-                            // Navigate to project page with deploy parameters using React Router
-                            const projectName = encodeURIComponent(formData.projectName);
-                            const appName = encodeURIComponent(applicationName.trim());
-                            const projectUrl = `/project/${projectName}?openDeploy=true&applicationName=${appName}`;
-                            console.debug('navigating to project page', projectUrl);
-                            history.push(projectUrl);
-                          }
-                        }}
-                        disabled={!applicationName.trim()}
-                        sx={{ minWidth: 180 }}
-                      >
-                        {t('Create Application')}
-                      </Button>
-                    </Box>
-                  </Box>
-                ) : null}
-              </Box>
-            )}
-
-            <CardContent
-              sx={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                p: 0,
-              }}
-            >
-              {/* Breadcrumbs */}
-              <Breadcrumb
-                steps={STEPS.map(step => t(step))}
-                activeStep={activeStep}
-                onStepClick={handleStepClick}
-              />
-
-              {/* Step Content */}
-              <Box ref={stepContentRef} sx={{ p: 3 }}>
-                {renderStepContent(activeStep)}
-              </Box>
-
-              {/* Footer with navigation buttons */}
-              <Box sx={{ p: 3, display: 'flex', alignItems: 'center' }}>
-                {/* Left side - Back and Cancel buttons */}
-                <Box>
-                  {activeStep > 0 && (
-                    <Button variant="contained" color="secondary" onClick={handleBack}>
-                      {t('Back')}
-                    </Button>
-                  )}
-                  {activeStep === 0 && (
-                    <Button variant="contained" color="secondary" onClick={onBack}>
-                      {t('Cancel')}
-                    </Button>
-                  )}
-                </Box>
-
-                {/* Right side - Next/Create Project button */}
-                <Box sx={{ ml: 'auto' }}>
-                  {activeStep === STEPS.length - 1 ? (
-                    <Button
-                      size="large"
-                      variant="contained"
-                      onClick={handleSubmit}
-                      disabled={!validation.isValid}
-                    >
-                      {t('Create Project')}
-                    </Button>
-                  ) : (
-                    <Button
-                      size="large"
-                      variant="contained"
-                      onClick={handleNext}
-                      disabled={azureResources.loading || !validation.isValid}
-                    >
-                      {azureResources.loading ? (
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <CircularProgress size={16} color="inherit" />
-                          {t('Loading')}...
-                        </Box>
-                      ) : (
-                        t('Next')
-                      )}
-                    </Button>
-                  )}
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </SectionBox>
-      </PageGrid>
+      <CreateAKSProjectPure
+        {...wizard}
+        azureResourcesLoading={wizard.azureResources.loading}
+        projectName={wizard.formData.projectName}
+        onNavigateToProject={url => history.push(url)}
+        onDismissError={() => {
+          wizard.setCreationError(null);
+          wizard.setCreationProgress('');
+          wizard.onBack();
+        }}
+        onCancelSuccess={() => {
+          wizard.setShowSuccessDialog(false);
+          wizard.onBack();
+        }}
+        stepContent={renderStepContent(wizard.activeStep)}
+      />
     </AzureAuthGuard>
   );
 }
