@@ -316,24 +316,56 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
         </Alert>
       )}
 
-      {/* Polling progress */}
+      {/* Polling progress — visual indicator */}
       {polling && (
         <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
-          <CircularProgress size={16} />
-          <Typography variant="body2" color="text.secondary">
+          <CircularProgress size={16} aria-hidden="true" />
+          <Typography variant="body2" color="text.secondary" aria-hidden="true">
             Configuring cluster... This may take a few minutes.
           </Typography>
         </Box>
       )}
 
+      {/* Persistent live region for polling status announcements.
+          This element stays in the DOM at all times so that screen readers register
+          it before content changes.  Placing role="status" inside a conditional
+          block ({polling && …}) caused Narrator to miss or cut off the announcement
+          because the region and its text appeared in the same React commit.
+          MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role */}
+      <Box
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        sx={{
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: 0,
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        {polling ? 'Configuring cluster... This may take a few minutes.' : ''}
+      </Box>
+
       {/* Configure button */}
       {!success && (
+        /* aria-busy signals to AT that the button is performing an async operation.
+           The CircularProgress spinner is decorative and hidden from AT with aria-hidden
+           because the button text ("Enabling Addons...") already conveys the busy state.
+           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy */
         <Button
           variant="contained"
           onClick={handleConfigure}
           disabled={enabling || polling || selectedAddons.size === 0}
           sx={{ mt: 2 }}
-          startIcon={enabling ? <CircularProgress size={16} color="inherit" /> : undefined}
+          aria-busy={enabling || polling || undefined}
+          startIcon={
+            enabling ? <CircularProgress size={16} color="inherit" aria-hidden="true" /> : undefined
+          }
         >
           {enabling ? 'Enabling Addons...' : polling ? 'Configuring...' : 'Configure Cluster'}
         </Button>
