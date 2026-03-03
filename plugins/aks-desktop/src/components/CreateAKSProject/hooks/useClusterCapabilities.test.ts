@@ -31,10 +31,12 @@ const defaultCapabilities: ClusterCapabilities = {
 describe('useClusterCapabilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Silence console.error so error-path tests don't pollute the test output.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('has correct initial state', () => {

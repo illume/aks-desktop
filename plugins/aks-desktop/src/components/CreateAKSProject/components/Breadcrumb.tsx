@@ -3,15 +3,16 @@
 
 import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme } from '@mui/material';
 import React from 'react';
 import type { BreadcrumbProps } from '../types';
 
 /**
- * Breadcrumb navigation component for multi-step forms
+ * Breadcrumb navigation component for multi-step forms.
  */
 export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onStepClick }) => {
   const { t } = useTranslation();
+  const theme = useTheme();
 
   return (
     <Box
@@ -52,7 +53,17 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
               alignItems: 'center',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
+              borderRadius: 1,
               '&:hover': { opacity: 0.8 },
+              /* Visible focus ring for keyboard navigation — ensures keyboard
+                 users can see which breadcrumb step is currently focused.
+                 :focus-visible targets only keyboard (not mouse) focus so that
+                 mouse users don't see an outline on click.
+                 MDN: https://developer.mozilla.org/en-US/docs/Web/CSS/:focus-visible */
+              '&:focus-visible': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px',
+              },
             }}
           >
             <Box
@@ -63,6 +74,8 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
                 mr: 2,
               }}
             >
+              {/* aria-hidden: decorative step-number icon — the adjacent text label
+                  already conveys the step name to screen readers */}
               <Icon
                 icon={
                   index === activeStep
@@ -72,6 +85,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
                 width={24}
                 height={24}
                 color={index === activeStep ? 'primary.main' : 'text.secondary'}
+                aria-hidden="true"
               />
             </Box>
 
