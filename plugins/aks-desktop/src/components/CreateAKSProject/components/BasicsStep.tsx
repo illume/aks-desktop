@@ -3,7 +3,7 @@
 
 import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { useClustersConf } from '@kinvolk/headlamp-plugin/lib/k8s';
+import { useClustersConf } from '@kinvolk/headlamp-plugin/lib/lib/k8s';
 import {
   Alert,
   AlertTitle,
@@ -11,6 +11,8 @@ import {
   Button,
   CircularProgress,
   FormControl,
+  IconButton,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
@@ -22,6 +24,9 @@ import { ClusterConfigurePanel } from './ClusterConfigurePanel';
 import { FormField } from './FormField';
 import { SearchableSelect, SearchableSelectOption } from './SearchableSelect';
 import { ValidationAlert } from './ValidationAlert';
+
+/** Set to `true` locally to enable verbose debug logging. Never enable in production. */
+const DEBUG = false;
 
 // Helper to check if there are addons that can be enabled post-creation
 const hasConfigurableAddons = (cap: ClusterCapabilities | null): boolean => {
@@ -80,6 +85,9 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
   const { t } = useTranslation();
   const headlampClusters = useClustersConf();
   const authStatus = useAzureAuth();
+
+  // Ref used by the edit-icon button to focus the Project Name input
+  const projectNameInputRef = useRef<HTMLInputElement>(null);
 
   // Auto select default subscription
   const autoSelected = useRef(false);
@@ -201,15 +209,21 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
             </Box>
           }
           action={
+            /* aria-busy signals to AT that this button is performing an async operation.
+               The CircularProgress spinner is hidden with aria-hidden because the button
+               text ("Installing...") already conveys the busy state to screen readers.
+               MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy
+               MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */
             <Button
               color="inherit"
               size="small"
               onClick={onInstallExtension}
               disabled={extensionStatus.installing}
+              aria-busy={extensionStatus.installing || undefined}
             >
               {extensionStatus.installing ? (
                 <Box display="flex" alignItems="center" gap={1}>
-                  <CircularProgress size={16} color="inherit" />
+                  <CircularProgress size={16} color="inherit" aria-hidden="true" />
                   {`${t('Installing')}...`}
                 </Box>
               ) : (
@@ -250,17 +264,21 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
                   {featureStatus.error}
                 </Typography>
               )}
-
+              {/* Same aria-busy + aria-hidden pattern: button text ("Registering...") conveys the
+              busy state, so the spinner is decorative and hidden from AT. MDN:
+              https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy
+              */}
               <Button
                 variant="contained"
                 onClick={onRegisterFeature}
                 disabled={featureStatus.registering}
                 sx={{ alignSelf: 'flex-start' }}
                 size="large"
+                aria-busy={featureStatus.registering || undefined}
               >
                 {featureStatus.registering ? (
                   <Box display="flex" alignItems="center" gap={1}>
-                    <CircularProgress size={16} color="inherit" />
+                    <CircularProgress size={16} color="inherit" aria-hidden="true" />
                     {t('Registering')}...
                   </Box>
                 ) : (
@@ -304,7 +322,28 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
                     'Project name must contain only lowercase letters, numbers, and hyphens (no spaces)'
                   )
             }
-            endAdornment={<Icon icon="mdi:edit" />}
+            endAdornment={
+              /* Tooltip surfaces the button's purpose visually on hover (icon-only button pattern).
+                 aria-label provides the accessible name for AT; aria-hidden on the Icon prevents
+                 the SVG from being double-announced alongside the button label. */
+              <Tooltip title={t('Edit project name')}>
+                <IconButton
+                  aria-label={t('Edit project name')}
+                  size="small"
+                  onClick={() =>
+                    /* A11y fix: clicking the icon button explicitly moves focus into the
+                       text input. Without this, a keyboard or switch-access user who
+                       activates the button is left with focus stranded on the button
+                       instead of inside the field they intend to edit — violating
+                       WCAG 2.1 SC 2.4.3 (Focus Order) and SC 3.2.2 (On Input). */
+                    projectNameInputRef.current?.focus()
+                  }
+                >
+                  <Icon icon="mdi:edit" aria-hidden="true" />
+                </IconButton>
+              </Tooltip>
+            }
+            inputRef={projectNameInputRef}
           />
         </FormControl>
 
@@ -401,15 +440,19 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
                     }
                     // refresh button to reload clusters
                     action={
+                      /* Same aria-busy + aria-hidden pattern: button text ("Refreshing...") conveys
+                         the busy state, so the spinner is decorative and hidden from AT.
+                         MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy */
                       <Button
                         color="inherit"
                         size="small"
                         onClick={onRetryClusters}
                         disabled={loadingClusters}
+                        aria-busy={loadingClusters || undefined}
                       >
                         {loadingClusters ? (
                           <Box display="flex" alignItems="center" gap={1}>
-                            <CircularProgress size={16} color="inherit" />
+                            <CircularProgress size={16} color="inherit" aria-hidden="true" />
                             {t('Refreshing')}...
                           </Box>
                         ) : (
@@ -501,16 +544,16 @@ function RegisterCluster({
 
     try {
       // Register the cluster by running az aks get-credentials and setting up kubeconfig
-      console.debug('[AKS] Registering cluster...');
+      if (DEBUG) console.debug('[AKS] Registering cluster...');
       const result = await registerAKSCluster(subscription, resourceGroup, cluster);
-      console.debug('[AKS] Register cluster result:', result);
+      if (DEBUG) console.debug('[AKS] Register cluster result:', result.success);
       if (!result.success) {
         setError(result.message);
         setLoading(false);
         return;
       }
 
-      console.debug('[AKS] Cluster registered successfully:', result.message);
+      if (DEBUG) console.debug('[AKS] Cluster registered successfully.', result.message);
       setSuccess(t("Cluster '{{cluster}}' successfully merged in kubeconfig", { cluster }));
       setLoading(false);
     } catch (err) {
@@ -551,11 +594,21 @@ function RegisterCluster({
 
       {/* Hide button when success is shown */}
       {!success && (
+        /* Same aria-busy + aria-hidden pattern: button text ("Registering cluster...") conveys
+           the busy state, so the spinner is decorative and hidden from AT.
+           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy */
         <Button
           onClick={handleRegister}
           variant="contained"
-          startIcon={loading ? <CircularProgress /> : <Icon icon="mdi:plus" />}
+          startIcon={
+            loading ? (
+              <CircularProgress aria-hidden="true" />
+            ) : (
+              <Icon icon="mdi:plus" aria-hidden="true" />
+            )
+          }
           disabled={loading}
+          aria-busy={loading || undefined}
         >
           {loading ? `${t('Registering cluster')}...` : t('Register Cluster')}
         </Button>
