@@ -9,7 +9,7 @@ function runCommandAsync(
   command: 'az',
   args: string[]
 ): Promise<{ stdout: string; stderr: string }> {
-  console.log('command called:', command, args);
+  console.debug('command called:', command, args);
   return new Promise(resolve => {
     try {
       const cmd = pluginRunCommand(command, args, {});

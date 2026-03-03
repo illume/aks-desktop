@@ -15,7 +15,7 @@ const DEBUG_LOGS = process.env.NODE_ENV === 'development' || process.env.DEBUG_A
 // Helper function for debug logging
 const debugLog = (...args: any[]) => {
   if (DEBUG_LOGS) {
-    console.log(...args);
+    console.debug(...args);
   }
 };
 
@@ -50,8 +50,7 @@ export function runCommandAsync(
 export async function isAzCliInstalled(): Promise<boolean> {
   try {
     const { stdout, stderr } = await runCommandAsync('az', ['version']);
-    console.debug('Azure CLI version check:', stderr, stdout);
-    console.log('Azure CLI version check:', stderr, stdout);
+    debugLog('Azure CLI version check:', stderr, stdout);
 
     // Check if stderr contains "command not found" or "not found" messages
     if (
@@ -60,7 +59,7 @@ export async function isAzCliInstalled(): Promise<boolean> {
         stderr.includes('not found') ||
         stderr.includes('Azure CLI (az) command not found'))
     ) {
-      console.log('Azure CLI not found in PATH');
+      debugLog('Azure CLI not found in PATH');
       return false;
     }
 
@@ -69,18 +68,18 @@ export async function isAzCliInstalled(): Promise<boolean> {
       try {
         const versionData = JSON.parse(stdout);
         if (versionData['azure-cli']) {
-          console.log('Azure CLI found, version:', versionData['azure-cli']);
+          debugLog('Azure CLI found, version:', versionData['azure-cli']);
           return true; // Azure CLI is installed
         } else {
-          console.log('Azure CLI version not detected in JSON output');
+          debugLog('Azure CLI version not detected in JSON output');
           return false;
         }
       } catch (parseError) {
-        console.log('Failed to parse Azure CLI version JSON:', parseError);
+        debugLog('Failed to parse Azure CLI version JSON:', parseError);
         return false;
       }
     } else {
-      console.log('Azure CLI version not detected in output');
+      debugLog('Azure CLI version not detected in output');
       return false; // Azure CLI not found
     }
   } catch (error) {
@@ -167,19 +166,19 @@ export async function isAlertsManagementExtensionInstalled(): Promise<{
       'alertsmanagement',
     ]);
 
-    console.log('[AZ-CLI] alertsmanagement extension check - stdout:', stdout);
-    console.log('[AZ-CLI] alertsmanagement extension check - stderr:', stderr);
+    debugLog('[AZ-CLI] alertsmanagement extension check - stdout:', stdout);
+    debugLog('[AZ-CLI] alertsmanagement extension check - stderr:', stderr);
 
     if (stderr && stderr.includes('not installed')) {
-      console.log('[AZ-CLI] alertsmanagement extension is NOT installed');
+      debugLog('[AZ-CLI] alertsmanagement extension is NOT installed');
       return { installed: false };
     }
 
-    console.log('[AZ-CLI] alertsmanagement extension is installed');
+    debugLog('[AZ-CLI] alertsmanagement extension is installed');
     return { installed: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log('[AZ-CLI] alertsmanagement extension check - error:', errorMessage);
+    debugLog('[AZ-CLI] alertsmanagement extension check - error:', errorMessage);
     if (errorMessage.includes('not installed')) {
       return { installed: false };
     }
@@ -195,7 +194,7 @@ export async function installAlertsManagementExtension(): Promise<{
   error?: string;
 }> {
   try {
-    console.log('[AZ-CLI] Installing alertsmanagement extension...');
+    debugLog('[AZ-CLI] Installing alertsmanagement extension...');
     const { stdout, stderr } = await runCommandAsync('az', [
       'extension',
       'add',
@@ -205,11 +204,11 @@ export async function installAlertsManagementExtension(): Promise<{
       'true',
     ]);
 
-    console.log('[AZ-CLI] alertsmanagement extension install - stdout:', stdout);
-    console.log('[AZ-CLI] alertsmanagement extension install - stderr:', stderr);
+    debugLog('[AZ-CLI] alertsmanagement extension install - stdout:', stdout);
+    debugLog('[AZ-CLI] alertsmanagement extension install - stderr:', stderr);
 
     if (stderr && (stderr.includes('ERROR') || stderr.includes('error'))) {
-      console.log('[AZ-CLI] alertsmanagement extension installation FAILED');
+      debugLog('[AZ-CLI] alertsmanagement extension installation FAILED');
       return {
         success: false,
         stdout,
@@ -218,7 +217,7 @@ export async function installAlertsManagementExtension(): Promise<{
       };
     }
 
-    console.log('[AZ-CLI] alertsmanagement extension installed successfully');
+    debugLog('[AZ-CLI] alertsmanagement extension installed successfully');
     return {
       success: true,
       stdout,
@@ -226,7 +225,7 @@ export async function installAlertsManagementExtension(): Promise<{
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log('[AZ-CLI] alertsmanagement extension install - error:', errorMessage);
+    debugLog('[AZ-CLI] alertsmanagement extension install - error:', errorMessage);
     return {
       success: false,
       stdout: '',
@@ -242,14 +241,14 @@ export async function configureAzureCliExtensions(): Promise<{
   error?: string;
 }> {
   try {
-    console.log('[AZ-CLI] Configuring Azure CLI to auto-install extensions...');
+    debugLog('[AZ-CLI] Configuring Azure CLI to auto-install extensions...');
 
     const result1 = await runCommandAsync('az', [
       'config',
       'set',
       'extension.use_dynamic_install=yes_without_prompt',
     ]);
-    console.log(
+    debugLog(
       '[AZ-CLI] Config set use_dynamic_install - stdout:',
       result1.stdout,
       'stderr:',
@@ -261,18 +260,18 @@ export async function configureAzureCliExtensions(): Promise<{
       'set',
       'extension.dynamic_install_allow_preview=true',
     ]);
-    console.log(
+    debugLog(
       '[AZ-CLI] Config set allow_preview - stdout:',
       result2.stdout,
       'stderr:',
       result2.stderr
     );
 
-    console.log('[AZ-CLI] Azure CLI extension auto-install configured successfully');
+    debugLog('[AZ-CLI] Azure CLI extension auto-install configured successfully');
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log('[AZ-CLI] Failed to configure Azure CLI extensions:', errorMessage);
+    debugLog('[AZ-CLI] Failed to configure Azure CLI extensions:', errorMessage);
     return {
       success: false,
       error: `Failed to configure Azure CLI extensions: ${errorMessage}`,
@@ -429,7 +428,7 @@ export async function isAzCliLoggedIn(): Promise<boolean> {
         stderr.includes('not found') ||
         stderr.includes('Azure CLI (az) command not found'))
     ) {
-      console.log('Azure CLI not found when checking login status');
+      debugLog('Azure CLI not found when checking login status');
       return false;
     }
 
@@ -784,7 +783,7 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
 }
 
 export async function getResourceGroups(subscriptionId: string): Promise<any[]> {
-  console.log('Fetching resource groups for subscription:', subscriptionId);
+  debugLog('Fetching resource groups for subscription:', subscriptionId);
   const { stdout } = await runCommandAsync('az', [
     'group',
     'list',
@@ -820,7 +819,7 @@ export async function getResourceGroups(subscriptionId: string): Promise<any[]> 
 }
 
 export async function getLocations(subscriptionId: string): Promise<any[]> {
-  console.log('Fetching Azure locations for subscription:', subscriptionId);
+  debugLog('Fetching Azure locations for subscription:', subscriptionId);
   const { stdout, stderr } = await runCommandAsync('az', [
     'account',
     'list-locations',
@@ -864,7 +863,7 @@ export async function getLocations(subscriptionId: string): Promise<any[]> {
 }
 
 export async function getVmSizes(subscriptionId: string, location: string): Promise<any[]> {
-  console.log('Fetching VM sizes for location:', location);
+  debugLog('Fetching VM sizes for location:', location);
   const { stdout, stderr } = await runCommandAsync('az', [
     'vm',
     'list-sizes',
@@ -938,7 +937,7 @@ export async function getAksClusterStatus(options: {
     'json',
   ];
 
-  console.log('Checking AKS cluster status:', 'az', args.join(' '));
+  debugLog('Checking AKS cluster status:', 'az', args.join(' '));
 
   const { stdout, stderr } = await runCommandAsync('az', args);
 
@@ -958,7 +957,7 @@ export async function getAksClusterStatus(options: {
     const kubernetesVersion = result.kubernetesVersion || 'Unknown';
     const ready = provisioningState === 'Succeeded' && powerState === 'Running';
 
-    console.log(
+    debugLog(
       `Cluster status: provisioningState=${provisioningState}, powerState=${powerState}, ready=${ready}`
     );
 
@@ -1104,7 +1103,7 @@ export async function getAksKubeconfig(options: {
     args.push('--file', `~/.kube/config-${clusterName}`);
   }
 
-  console.log('Getting AKS kubeconfig:', 'az', args.join(' '));
+  debugLog('Getting AKS kubeconfig:', 'az', args.join(' '));
 
   const { stderr } = await runCommandAsync('az', args);
 
@@ -1240,7 +1239,7 @@ async function getImagesFromRegistry(subscriptionId: string, registryName: strin
     try {
       // Early termination if we have enough images
       if (allImages.length >= MAX_IMAGES_TOTAL) {
-        console.log(`Limiting results to ${MAX_IMAGES_TOTAL} images for performance`);
+        debugLog(`Limiting results to ${MAX_IMAGES_TOTAL} images for performance`);
         break;
       }
 
@@ -1322,7 +1321,7 @@ export async function getManagedNamespaces(options: {
 
   args.push('--output', 'json');
 
-  console.log('Getting managed namespaces:', 'az', args.join(' '));
+  debugLog('Getting managed namespaces:', 'az', args.join(' '));
 
   const { stdout, stderr } = await runCommandAsync('az', args);
 
@@ -1367,7 +1366,7 @@ export async function getManagedNamespacesForSubscription(subscriptionId: string
 > {
   const args = ['aks', 'namespace', 'list', '--subscription', subscriptionId, '--output', 'json'];
 
-  console.log('Getting managed namespaces for subscription:', 'az', args.join(' '));
+  debugLog('Getting managed namespaces for subscription:', 'az', args.join(' '));
 
   const { stdout, stderr } = await runCommandAsync('az', args);
 
@@ -1381,16 +1380,12 @@ export async function getManagedNamespacesForSubscription(subscriptionId: string
   }
 
   try {
-    console.log('Raw stdout from az aks namespace list:', stdout);
     const result = JSON.parse(stdout || '[]');
-    console.log('Parsed result:', JSON.stringify(result, null, 2));
 
     if (Array.isArray(result)) {
       // Parse the response to extract namespace details
       // The name field is in format "clusterName/namespaceName"
       const mapped = result.map((ns: any) => {
-        console.log('Processing namespace object:', JSON.stringify(ns, null, 2));
-
         // Split the name to get cluster and namespace
         const nameParts = (ns.name || '').split('/');
         const clusterName = nameParts.length > 1 ? nameParts[0] : '';
@@ -1403,14 +1398,11 @@ export async function getManagedNamespacesForSubscription(subscriptionId: string
           properties: ns.properties || {},
         };
       });
-      console.log('Mapped namespaces:', JSON.stringify(mapped, null, 2));
 
       const filtered = mapped.filter(ns => ns.name && ns.clusterName);
-      console.log('Filtered namespaces:', JSON.stringify(filtered, null, 2));
       return filtered;
     }
 
-    console.log('Result is not an array, returning empty array');
     return [];
   } catch (error) {
     console.error('Failed to parse managed namespaces response:', error);
@@ -1447,7 +1439,7 @@ export async function getManagedNamespaceDetails(options: {
 
   args.push('--output', 'json');
 
-  console.log('Getting managed namespace details:', 'az', args.join(' '));
+  debugLog('Getting managed namespace details:', 'az', args.join(' '));
 
   const { stdout, stderr } = await runCommandAsync('az', args);
 
@@ -1596,7 +1588,7 @@ export async function getClusterResourceGroupViaGraph(
     ]);
 
     if (stderr) {
-      console.debug(stderr);
+      debugLog(stderr);
     }
 
     if (stderr && needsRelogin(stderr)) {
@@ -1805,7 +1797,7 @@ export async function getClusterInfo(clusterName?: string): Promise<{
           if (clusters.length > 0) {
             result.clusterName = clusters[0].name;
             result.resourceGroup = clusters[0].resourceGroup;
-            console.log(`Found cluster info for ${clusterName}:`, result);
+            debugLog(`Found cluster info for ${clusterName}:`, result);
           } else {
             console.warn(
               `Cluster ${clusterName} not found in subscription ${result.subscriptionId}`
@@ -1860,7 +1852,7 @@ export async function getClusterInfo(clusterName?: string): Promise<{
           if (clusters.length > 0) {
             result.clusterName = clusters[0].name;
             result.resourceGroup = clusters[0].resourceGroup;
-            console.log('Using first available cluster:', result);
+            debugLog('Using first available cluster:', result);
           }
         }
       } catch (azError) {
@@ -1868,7 +1860,7 @@ export async function getClusterInfo(clusterName?: string): Promise<{
       }
     }
 
-    console.log('Cluster info resolved:', result);
+    debugLog('Cluster info resolved:', result);
     return result;
   } catch (error) {
     console.error('Failed to get cluster info:', error);
@@ -1891,7 +1883,7 @@ export async function getClusterResourceIdAndGroup(
   subscription: string
 ): Promise<{ resourceId: string; resourceGroup: string } | null> {
   if (!clusterName) return null;
-  console.log('cluster name:', clusterName, 'subscription:', subscription);
+  debugLog('cluster name:', clusterName, 'subscription:', subscription);
   const { stdout, stderr } = await runCommandAsync('az', [
     'aks',
     'list',
@@ -1903,8 +1895,8 @@ export async function getClusterResourceIdAndGroup(
     subscription,
   ]);
 
-  console.log('stdout:', stdout);
-  console.log('stderr:', stderr);
+  debugLog('stdout:', stdout);
+  debugLog('stderr:', stderr);
   if (stderr && needsRelogin(stderr)) {
     throw new Error('Authentication required. Please log in to Azure CLI: az login');
   }
@@ -1929,7 +1921,7 @@ export async function getClusterResourceIdAndGroup(
     if (!resourceId) return null;
     return { resourceId, resourceGroup };
   } catch (parseError) {
-    console.log('parseError:', parseError);
+    debugLog('parseError:', parseError);
     throw new Error('Failed to parse AKS list response');
   }
 }

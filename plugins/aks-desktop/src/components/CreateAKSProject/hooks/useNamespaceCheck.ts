@@ -35,7 +35,7 @@ export const useNamespaceCheck = () => {
       try {
         setStatus(prev => ({ ...prev, checking: true, error: null }));
 
-        console.log('🔍 Checking namespace existence:', {
+        console.debug('Checking namespace existence:', {
           cluster: clusterName,
           resourceGroup,
           namespace: namespaceName,
@@ -49,7 +49,7 @@ export const useNamespaceCheck = () => {
           subscriptionId
         );
 
-        console.log('📋 Namespace check result:', result);
+        console.debug('Namespace check result:', result);
 
         if (result.error) {
           setStatus(prev => ({

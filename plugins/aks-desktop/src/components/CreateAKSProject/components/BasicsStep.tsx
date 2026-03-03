@@ -501,16 +501,16 @@ function RegisterCluster({
 
     try {
       // Register the cluster by running az aks get-credentials and setting up kubeconfig
-      console.log('[AKS] Registering cluster...');
+      console.debug('[AKS] Registering cluster...');
       const result = await registerAKSCluster(subscription, resourceGroup, cluster);
-      console.log('[AKS] Register cluster result:', result);
+      console.debug('[AKS] Register cluster result:', result);
       if (!result.success) {
         setError(result.message);
         setLoading(false);
         return;
       }
 
-      console.log('[AKS] Cluster registered successfully:', result.message);
+      console.debug('[AKS] Cluster registered successfully:', result.message);
       setSuccess(t("Cluster '{{cluster}}' successfully merged in kubeconfig", { cluster }));
       setLoading(false);
     } catch (err) {

@@ -64,7 +64,7 @@ const AKSProjectDeleteButton: React.FC<AKSProjectDeleteButtonProps> = ({ project
           const editable = updateAuth?.status?.allowed ?? false;
           const deletable = deleteAuth?.status?.allowed ?? false;
 
-          console.log(`Namespace permissions for ${namespaceName}:`, {
+          console.debug(`Namespace permissions for ${namespaceName}:`, {
             namespace: namespaceName,
             update: updateAuth,
             delete: deleteAuth,

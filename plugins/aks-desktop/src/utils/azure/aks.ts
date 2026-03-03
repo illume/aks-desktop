@@ -98,7 +98,7 @@ export async function registerAKSCluster(
   message: string;
 }> {
   try {
-    console.log(
+    console.debug(
       '[AKS] Registering cluster:',
       clusterName,
       managedNamespace ? `with managed namespace: ${managedNamespace}` : ''
@@ -123,7 +123,7 @@ export async function registerAKSCluster(
       managedNamespace
     );
 
-    console.log('[AKS] Registration result:', result);
+    console.debug('[AKS] Registration result:', result);
     return result;
   } catch (error) {
     console.error('[AKS] Error registering AKS cluster:', error);

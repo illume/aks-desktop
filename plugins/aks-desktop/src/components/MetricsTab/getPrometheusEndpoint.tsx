@@ -13,11 +13,11 @@ export async function getPrometheusEndpoint(
   try {
     // Configure Azure CLI to auto-install extensions without prompts
     // This allows the az alerts-management command to automatically install the extension if needed
-    console.log('Configuring Azure CLI for automatic extension installation...');
+    console.debug('Configuring Azure CLI for automatic extension installation...');
     await configureAzureCliExtensions();
 
-    console.log('[getPrometheusEndpoint] Querying prometheus rule groups...');
-    console.log('[getPrometheusEndpoint] Parameters:', {
+    console.debug('[getPrometheusEndpoint] Querying prometheus rule groups...');
+    console.debug('[getPrometheusEndpoint] Parameters:', {
       resourceGroup,
       clusterName,
       subscription,
@@ -37,9 +37,9 @@ export async function getPrometheusEndpoint(
       subscription,
     ]);
 
-    console.log('[getPrometheusEndpoint] All rule groups query result:');
-    console.log('[getPrometheusEndpoint]   stdout length:', allGroupsStdout.length);
-    console.log('[getPrometheusEndpoint]   stderr:', allGroupsStderr);
+    console.debug('[getPrometheusEndpoint] All rule groups query result:');
+    console.debug('[getPrometheusEndpoint]   stdout length:', allGroupsStdout.length);
+    console.debug('[getPrometheusEndpoint]   stderr:', allGroupsStderr);
 
     if (!allGroupsStdout.trim()) {
       throw new Error(
@@ -52,8 +52,8 @@ export async function getPrometheusEndpoint(
     let ruleGroups;
     try {
       ruleGroups = JSON.parse(allGroupsStdout);
-      console.log('[getPrometheusEndpoint] Found', ruleGroups.length, 'rule groups');
-      console.log(
+      console.debug('[getPrometheusEndpoint] Found', ruleGroups.length, 'rule groups');
+      console.debug(
         '[getPrometheusEndpoint] Rule group names:',
         ruleGroups.map((rg: any) => ({
           name: rg.name,
@@ -82,7 +82,7 @@ export async function getPrometheusEndpoint(
       );
     }
 
-    console.log('[getPrometheusEndpoint] Found matching rule group:', matchingGroup.name);
+    console.debug('[getPrometheusEndpoint] Found matching rule group:', matchingGroup.name);
 
     // Get the workspace scope from the first scope
     const workspaceScope = matchingGroup.scopes?.[0];
@@ -90,7 +90,7 @@ export async function getPrometheusEndpoint(
       throw new Error('Rule group has no scopes defined');
     }
 
-    console.log('[getPrometheusEndpoint] Found workspace scope:', workspaceScope);
+    console.debug('[getPrometheusEndpoint] Found workspace scope:', workspaceScope);
 
     const { stdout: endpointStdout } = await runCommandWithOutput('az', [
       'monitor',
@@ -106,7 +106,7 @@ export async function getPrometheusEndpoint(
       subscription,
     ]);
 
-    console.log('[getPrometheusEndpoint] Prometheus endpoint:', endpointStdout.trim());
+    console.debug('[getPrometheusEndpoint] Prometheus endpoint:', endpointStdout.trim());
 
     return endpointStdout.trim();
   } catch (error) {

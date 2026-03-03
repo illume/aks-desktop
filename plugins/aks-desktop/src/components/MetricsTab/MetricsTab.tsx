@@ -209,7 +209,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
             .map(([key, value]) => `${key}=${value}`)
             .join(',');
 
-          console.log('MetricsTab: Using label selector for pods:', labelSelector);
+          console.debug('MetricsTab: Using label selector for pods:', labelSelector);
 
           // Now use the deployment's selector to find pods
           K8s.ResourceClasses.Pod.apiList(

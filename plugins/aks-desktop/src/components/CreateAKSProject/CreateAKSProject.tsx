@@ -87,7 +87,7 @@ function CreateAKSProject() {
   useEffect(() => {
     (async () => {
       const azureCheck = await checkAzureCliAndAksPreview();
-      console.log('Azure CLI check results:', azureCheck);
+      console.debug('Azure CLI check results:', azureCheck);
       setCliSuggestions(azureCheck.suggestions);
     })();
   }, []);
@@ -153,8 +153,8 @@ function CreateAKSProject() {
 
   const handleSubmit = async () => {
     try {
-      console.log('handleSubmit', formData);
-      console.log('Selected cluster details:', {
+      console.debug('handleSubmit', formData);
+      console.debug('Selected cluster details:', {
         name: formData.cluster,
         resourceGroup: formData.resourceGroup,
         subscription: formData.subscription,
@@ -209,15 +209,8 @@ function CreateAKSProject() {
         }
 
         setCreationProgress(`${t('Namespace creation initiated! Monitoring creation status')}...`);
-        console.log('🚀 Namespace creation initiated for:', {
-          cluster: formData.cluster,
-          resourceGroup: formData.resourceGroup,
-          namespace: formData.projectName,
-          subscription: formData.subscription,
-        });
 
         // Give the namespace a moment to propagate before verification
-        console.log('⏳ Waiting 5 seconds for namespace to propagate...');
         setCreationProgress(`${t('Waiting for namespace to propagate')}...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
 
@@ -229,12 +222,6 @@ function CreateAKSProject() {
 
         while (!namespaceVerified && retryCount < maxRetries) {
           try {
-            console.log(`🔍 Verification attempt ${retryCount + 1}:`);
-            console.log(`   Cluster: ${formData.cluster}`);
-            console.log(`   Resource Group: ${formData.resourceGroup}`);
-            console.log(`   Namespace: ${formData.projectName}`);
-            console.log(`   Subscription: ${formData.subscription}`);
-
             // Call the check function directly instead of using the hook
             const result = await checkNamespaceExists(
               formData.cluster,
@@ -243,11 +230,7 @@ function CreateAKSProject() {
               formData.subscription
             );
 
-            console.log(`   Direct result exists: ${result.exists}`);
-            console.log(`   Direct result error: ${result.error || 'None'}`);
-
             if (result.error) {
-              console.log(`   ❌ Namespace check error: ${result.error}`);
               throw new Error(
                 t('Namespace status check failed: {{message}}', { message: result.error })
               );
@@ -255,19 +238,14 @@ function CreateAKSProject() {
 
             if (result.exists === true) {
               namespaceVerified = true;
-              console.log('✅ Namespace verified successfully');
             } else {
               retryCount++;
               if (retryCount < maxRetries) {
-                console.log(`⏳ Namespace not found yet, retrying in ${retryDelay / 1000}s...`);
                 setCreationProgress(`${t('Waiting for namespace to be created')}...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
-              } else {
-                console.log(`❌ Max retries reached, namespace still not found`);
               }
             }
           } catch (statusError) {
-            console.log(`❌ Verification attempt failed:`, statusError.message);
             throw new Error(
               t('Namespace status verification failed: {{message}}', {
                 message: statusError.message,
@@ -277,10 +255,7 @@ function CreateAKSProject() {
         }
 
         if (!namespaceVerified) {
-          console.log('⚠️ Namespace verification failed, but continuing with creation process...');
-          console.log('   This might be due to timing issues with Azure API propagation.');
-          console.log('   The namespace creation API call succeeded, so we will proceed.');
-          // Don't throw error, just log warning and continue
+          // Don't throw error, just continue - namespace creation API call succeeded
           setCreationProgress(
             `${t('Namespace creation API succeeded, proceeding with user assignments')}...`
           );
@@ -455,9 +430,7 @@ function CreateAKSProject() {
 
             if (result.exists) {
               finalVerified = true;
-              console.log('✅ Final namespace verification successful');
             } else if (attempt === 0) {
-              console.log('⏳ Final verification: namespace not found, retrying once...');
               await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
             }
           } catch (finalError) {
@@ -467,13 +440,6 @@ function CreateAKSProject() {
               })
             );
           }
-        }
-
-        if (!finalVerified) {
-          console.log('⚠️ Final verification failed, but namespace creation API succeeded');
-          console.log('   This might be due to timing issues with Azure API propagation.');
-          console.log('   The project creation process will be marked as successful.');
-          // Don't throw error, just log warning and continue
         }
 
         setCreationProgress(t('All verifications completed successfully!'));
@@ -781,7 +747,7 @@ function CreateAKSProject() {
                             const projectName = encodeURIComponent(formData.projectName);
                             const appName = encodeURIComponent(applicationName.trim());
                             const projectUrl = `/project/${projectName}?openDeploy=true&applicationName=${appName}`;
-                            console.log('navigating to project page', projectUrl);
+                            console.debug('navigating to project page', projectUrl);
                             history.push(projectUrl);
                           }
                         }}
