@@ -318,8 +318,12 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
 
       {/* Polling progress */}
       {polling && (
-        <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
-          <CircularProgress size={16} />
+        /* role="status" causes assistive technologies to announce the "Configuring cluster"
+           message when this Box is dynamically inserted into the DOM (polite live region).
+           The CircularProgress spinner is decorative and hidden from AT with aria-hidden.
+           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role */
+        <Box role="status" display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
+          <CircularProgress size={16} aria-hidden="true" />
           <Typography variant="body2" color="text.secondary">
             Configuring cluster... This may take a few minutes.
           </Typography>
@@ -328,12 +332,19 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
 
       {/* Configure button */}
       {!success && (
+        /* aria-busy signals to AT that the button is performing an async operation.
+           The CircularProgress spinner is decorative and hidden from AT with aria-hidden
+           because the button text ("Enabling Addons...") already conveys the busy state.
+           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy */
         <Button
           variant="contained"
           onClick={handleConfigure}
           disabled={enabling || polling || selectedAddons.size === 0}
           sx={{ mt: 2 }}
-          startIcon={enabling ? <CircularProgress size={16} color="inherit" /> : undefined}
+          aria-busy={enabling || polling || undefined}
+          startIcon={
+            enabling ? <CircularProgress size={16} color="inherit" aria-hidden="true" /> : undefined
+          }
         >
           {enabling ? 'Enabling Addons...' : polling ? 'Configuring...' : 'Configure Cluster'}
         </Button>
