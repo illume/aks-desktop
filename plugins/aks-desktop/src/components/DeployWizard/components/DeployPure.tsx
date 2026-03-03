@@ -5,6 +5,7 @@ import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import MonacoEditor from '@monaco-editor/react';
 import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
 import React from 'react';
+import { enableMonacoTabFocusMode } from '../../../utils/shared/monacoTabFocus';
 import { K8sObject } from '../hooks/useYamlObjects';
 
 /**
@@ -106,6 +107,9 @@ export default function DeployPure({
               language="yaml"
               value={containerPreviewYaml}
               onChange={() => {}}
+              /* enableMonacoTabFocusMode sets Monaco's global TabFocus singleton so Tab
+                 moves browser focus out of this read-only preview editor. */
+              onMount={enableMonacoTabFocusMode}
               options={{
                 readOnly: true,
                 minimap: { enabled: false },
@@ -115,9 +119,6 @@ export default function DeployPure({
                 scrollBeyondLastLine: false,
                 renderWhitespace: 'selection',
                 automaticLayout: true,
-                /* tabFocusMode lets the Tab key move browser focus out of the editor
-                   (read-only here, so Tab-to-indent is never needed). */
-                tabFocusMode: true,
               }}
             />
           </Box>

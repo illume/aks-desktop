@@ -5,6 +5,7 @@ import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import MonacoEditor from '@monaco-editor/react';
 import { Box, Button, Typography } from '@mui/material';
 import React from 'react';
+import { enableMonacoTabFocusMode } from '../../../utils/shared/monacoTabFocus';
 
 export interface ConfigureYAMLProps {
   yamlEditorValue: string;
@@ -87,6 +88,11 @@ export default function ConfigureYAML({
           language="yaml"
           value={yamlEditorValue}
           onChange={val => onYamlChange(val || '')}
+          /* enableMonacoTabFocusMode sets Monaco's global TabFocus singleton so Tab
+             moves browser focus out of the editor. The `tabFocusMode` IEditorOption
+             is overridden by that singleton at runtime (codeEditorWidget.js:1528) and
+             has no effect — see src/utils/shared/monacoTabFocus.ts for details. */
+          onMount={enableMonacoTabFocusMode}
           options={{
             minimap: { enabled: false },
             wordWrap: 'on',
@@ -95,11 +101,6 @@ export default function ConfigureYAML({
             scrollBeyondLastLine: false,
             renderWhitespace: 'selection',
             automaticLayout: true,
-            /* tabFocusMode lets the Tab key move browser focus out of the editor instead
-               of inserting a tab/indent character, so keyboard-only users can navigate
-               past the editor to reach the Back/Next buttons.
-               Indent is still available via Ctrl+] / Cmd+] or the editor's context menu. */
-            tabFocusMode: true,
           }}
         />
       </Box>
