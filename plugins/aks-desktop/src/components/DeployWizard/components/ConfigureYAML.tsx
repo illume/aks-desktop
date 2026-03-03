@@ -95,6 +95,11 @@ export default function ConfigureYAML({
             scrollBeyondLastLine: false,
             renderWhitespace: 'selection',
             automaticLayout: true,
+            /* tabFocusMode lets the Tab key move browser focus out of the editor instead
+               of inserting a tab/indent character, so keyboard-only users can navigate
+               past the editor to reach the Back/Next buttons.
+               Indent is still available via Ctrl+] / Cmd+] or the editor's context menu. */
+            tabFocusMode: true,
           }}
         />
       </Box>

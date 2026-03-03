@@ -115,6 +115,9 @@ export default function DeployPure({
                 scrollBeyondLastLine: false,
                 renderWhitespace: 'selection',
                 automaticLayout: true,
+                /* tabFocusMode lets the Tab key move browser focus out of the editor
+                   (read-only here, so Tab-to-indent is never needed). */
+                tabFocusMode: true,
               }}
             />
           </Box>
