@@ -72,6 +72,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
                 width={24}
                 height={24}
                 color={index === activeStep ? 'primary.main' : 'text.secondary'}
+                aria-hidden="true"
               />
             </Box>
 

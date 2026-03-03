@@ -44,6 +44,7 @@
     "react-redux": "^9.1.0"
   },
   "devDependencies": {
+    "@guidepup/virtual-screen-reader": "^0.32.1",
     "@kinvolk/headlamp-plugin": "^0.13.1",
     "@testing-library/react": "^16.3.2",
     "@types/libsodium-wrappers": "^0.7.14",
