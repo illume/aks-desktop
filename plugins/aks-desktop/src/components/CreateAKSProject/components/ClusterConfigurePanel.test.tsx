@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ClusterCapabilities } from '../../../types/ClusterCapabilities';
 
 // Mock the az-cli functions, import more afterwards
-vi.mock('../../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-cli', () => ({
   enableClusterAddon: vi.fn(),
   getClusterCapabilities: vi.fn(),
 }));
