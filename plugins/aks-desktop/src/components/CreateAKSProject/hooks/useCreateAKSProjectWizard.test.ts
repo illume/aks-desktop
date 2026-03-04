@@ -103,25 +103,7 @@ vi.mock('./useNamespaceCheck', () => ({
 }));
 
 vi.mock('./useFormData', () => ({
-  useFormData: () => ({
-    formData: {
-      subscription: '',
-      cluster: '',
-      resourceGroup: '',
-      projectName: 'test-project',
-      description: '',
-      cpuRequest: 2000,
-      cpuLimit: 2000,
-      memoryRequest: 4096,
-      memoryLimit: 4096,
-      ingress: 'AllowSameNamespace',
-      egress: 'AllowAll',
-      userAssignments: [],
-    },
-    updateFormData: vi.fn(),
-    resetFormData: vi.fn(),
-    setFormDataField: vi.fn(),
-  }),
+  useFormData: vi.fn(),
 }));
 
 vi.mock('./useValidation', () => ({
@@ -132,12 +114,39 @@ vi.mock('@kinvolk/headlamp-plugin/lib/lib/k8s', () => ({
   useClustersConf: () => ({}),
 }));
 
-import { checkNamespaceExists, createManagedNamespace } from '../../../utils/azure/az-cli';
+import {
+  checkNamespaceExists,
+  createManagedNamespace,
+  createNamespaceRoleAssignment,
+  verifyNamespaceAccess,
+} from '../../../utils/azure/az-cli';
+import { useFormData } from './useFormData';
 import { useCreateAKSProjectWizard } from './useCreateAKSProjectWizard';
+
+const defaultFormData = {
+  subscription: '',
+  cluster: '',
+  resourceGroup: '',
+  projectName: 'test-project',
+  description: '',
+  cpuRequest: 2000,
+  cpuLimit: 2000,
+  memoryRequest: 4096,
+  memoryLimit: 4096,
+  ingress: 'AllowSameNamespace',
+  egress: 'AllowAll',
+  userAssignments: [],
+};
 
 describe('useCreateAKSProjectWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useFormData).mockReturnValue({
+      formData: defaultFormData,
+      updateFormData: vi.fn(),
+      resetFormData: vi.fn(),
+      setFormDataField: vi.fn(),
+    } as any);
   });
 
   afterEach(() => {
@@ -231,6 +240,135 @@ describe('useCreateAKSProjectWizard', () => {
       await result.current.handleSubmit();
     });
 
+    expect(result.current.isCreating).toBe(false);
+  });
+
+  it('handleSubmit timeout: sets creationError when timeout fires during createNamespaceRoleAssignment', async () => {
+    vi.useFakeTimers();
+    vi.mocked(useFormData).mockReturnValue({
+      formData: {
+        ...defaultFormData,
+        userAssignments: [{ email: 'user@example.com', role: 'Admin' }],
+      },
+      updateFormData: vi.fn(),
+      resetFormData: vi.fn(),
+      setFormDataField: vi.fn(),
+    } as any);
+    vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
+    vi.mocked(checkNamespaceExists).mockResolvedValue({ exists: true } as any);
+    // Role assignment hangs so the 10-minute timeout fires while it is in-flight
+    vi.mocked(createNamespaceRoleAssignment).mockReturnValue(new Promise(() => {}) as any);
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+    expect(result.current.isCreating).toBe(false);
+  });
+
+  it('handleSubmit timeout: sets creationError when timeout fires during verifyNamespaceAccess', async () => {
+    vi.useFakeTimers();
+    vi.mocked(useFormData).mockReturnValue({
+      formData: {
+        ...defaultFormData,
+        userAssignments: [{ email: 'user@example.com', role: 'Admin' }],
+      },
+      updateFormData: vi.fn(),
+      resetFormData: vi.fn(),
+      setFormDataField: vi.fn(),
+    } as any);
+    vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
+    vi.mocked(checkNamespaceExists).mockResolvedValue({ exists: true } as any);
+    vi.mocked(createNamespaceRoleAssignment).mockResolvedValue({ success: true } as any);
+    // Access verification hangs so the 10-minute timeout fires while it is in-flight
+    vi.mocked(verifyNamespaceAccess).mockReturnValue(new Promise(() => {}) as any);
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+    expect(result.current.isCreating).toBe(false);
+  });
+
+  it('handleSubmit timeout: sets creationError when timeout fires during final checkNamespaceExists', async () => {
+    vi.useFakeTimers();
+    vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
+    // Initial verification resolves; final verification hangs so the timeout fires
+    vi.mocked(checkNamespaceExists)
+      .mockResolvedValueOnce({ exists: true } as any)
+      .mockReturnValue(new Promise(() => {}) as any);
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+    expect(result.current.isCreating).toBe(false);
+  });
+
+  it('handleSubmit timeout: sets creationError when timeout fires during final verification 2s retry', async () => {
+    vi.useFakeTimers();
+    vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
+    // Initial verification: exists; final attempt 0: not found (triggers 2s retry); attempt 1: hangs
+    vi.mocked(checkNamespaceExists)
+      .mockResolvedValueOnce({ exists: true } as any)
+      .mockResolvedValueOnce({ exists: false } as any)
+      .mockReturnValue(new Promise(() => {}) as any);
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+    expect(result.current.isCreating).toBe(false);
+  });
+
+  it('creationPromise.catch() suppresses unhandled rejection when timeout wins the race', async () => {
+    vi.useFakeTimers();
+    let rejectCreation!: (err: Error) => void;
+    vi.mocked(createManagedNamespace).mockReturnValue(
+      new Promise((_, reject) => {
+        rejectCreation = reject;
+      }) as any
+    );
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      // Fire the 10-minute timeout; Promise.race resolves with the timeout error
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+
+    // Reject the still-running creationPromise after handleSubmit has already settled.
+    // Without creationPromise.catch(() => {}), this would be an unhandled rejection.
+    await act(async () => {
+      rejectCreation(new Error('late rejection'));
+      await Promise.resolve();
+    });
+
+    // Reaching here means the late rejection was silently swallowed
     expect(result.current.isCreating).toBe(false);
   });
 });
