@@ -200,6 +200,7 @@ describe('useCreateAKSProjectWizard', () => {
     });
 
     expect(result.current.isCreating).toBe(false);
+    expect(result.current.showSuccessDialog).toBe(true);
   }, 10000);
 
   it('handleSubmit error path: sets creationError when createManagedNamespace fails', async () => {

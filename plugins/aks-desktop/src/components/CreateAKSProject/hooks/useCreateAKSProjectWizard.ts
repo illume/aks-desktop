@@ -371,6 +371,8 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
           }
         }
 
+        if (aborted) return;
+
         if (!namespaceVerified) {
           if (DEBUG)
             console.debug('⚠️ Namespace verification failed, continuing (timing issue likely).');
@@ -428,6 +430,8 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
                   subscriptionId: formData.subscription,
                 });
 
+                if (aborted) return;
+
                 if (!roleResult.success) {
                   const errorDetails = roleResult.stderr || roleResult.error || t('Unknown error');
                   roleAssignmentResults.push({
@@ -469,6 +473,8 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
                 assignee: assignment.email,
                 subscriptionId: formData.subscription,
               });
+
+              if (aborted) return;
 
               if (!verifyResult.success) {
                 assignmentErrors.push(
@@ -526,6 +532,8 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
               formData.subscription
             );
 
+            if (aborted) return;
+
             if (result.error) {
               throw new Error(
                 t('Final status check failed: {{message}}', { message: result.error })
@@ -539,6 +547,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
               if (DEBUG)
                 console.debug('⏳ Final verification: namespace not found, retrying once...');
               await new Promise(resolve => setTimeout(resolve, 2000));
+              if (aborted) return;
             }
           } catch (finalError) {
             const finalErrorMessage =
@@ -558,6 +567,10 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
 
         setCreationProgress(t('All verifications completed successfully!'));
       })();
+
+      // Attach a no-op rejection handler to prevent an unhandled promise rejection if
+      // the timeout wins the race while creationPromise is still running and later rejects.
+      creationPromise.catch(() => {});
 
       await Promise.race([creationPromise, timeoutPromise]);
 
