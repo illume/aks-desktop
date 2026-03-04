@@ -569,9 +569,17 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
         setCreationProgress(t('All verifications completed successfully!'));
       })();
 
-      // Attach a no-op rejection handler to prevent an unhandled promise rejection if
+      // Attach a rejection handler to prevent an unhandled promise rejection if
       // the timeout wins the race while creationPromise is still running and later rejects.
-      creationPromise.catch(() => {});
+      // When DEBUG is enabled, log the late rejection for post-timeout diagnostics.
+      creationPromise.catch(err => {
+        if (DEBUG) {
+          console.debug(
+            'Namespace creation promise rejected after timeout or component unmount:',
+            err
+          );
+        }
+      });
 
       await Promise.race([creationPromise, timeoutPromise]);
 
