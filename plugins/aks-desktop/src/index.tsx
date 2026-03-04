@@ -33,8 +33,13 @@ import MetricsTab from './components/MetricsTab/MetricsTab';
 import ScalingCard from './components/Scaling/ScalingCard';
 import ScalingTab from './components/ScalingTab/ScalingTab';
 import { getLoginStatus } from './utils/azure/az-cli';
+import { injectAccessibilityStyles } from './utils/shared/accessibilityStyles';
 import { isAksProject } from './utils/shared/isAksProject';
 import { azureTheme } from './utils/shared/theme';
+
+// Fix: prevent horizontal scroll when tabbing through Map/Network panels at 200%+ zoom.
+// See utils/shared/accessibilityStyles.ts for details.
+injectAccessibilityStyles();
 
 Headlamp.setAppMenu(menus => {
   // Find the Help menu
