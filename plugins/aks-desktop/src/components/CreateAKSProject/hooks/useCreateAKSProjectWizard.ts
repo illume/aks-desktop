@@ -331,6 +331,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
               formData.projectName,
               formData.subscription
             );
+            if (aborted) return;
 
             if (DEBUG) {
               console.debug(`   Direct result exists: ${result.exists}`);
