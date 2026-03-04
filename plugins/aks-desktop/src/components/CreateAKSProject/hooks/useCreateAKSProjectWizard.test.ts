@@ -300,6 +300,24 @@ describe('useCreateAKSProjectWizard', () => {
     expect(result.current.isCreating).toBe(false);
   });
 
+  it('handleSubmit timeout: sets creationError when timeout fires during initial namespace verification loop', async () => {
+    vi.useFakeTimers();
+    vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
+    // checkNamespaceExists hangs on the very first call inside the initial verification loop
+    vi.mocked(checkNamespaceExists).mockReturnValue(new Promise(() => {}) as any);
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+    expect(result.current.isCreating).toBe(false);
+  });
+
   it('handleSubmit timeout: sets creationError when timeout fires during final checkNamespaceExists', async () => {
     vi.useFakeTimers();
     vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
