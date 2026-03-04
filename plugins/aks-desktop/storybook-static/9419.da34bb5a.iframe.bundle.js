@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkaks_desktop=self.webpackChunkaks_desktop||[]).push([[9419],{"./node_modules/@kinvolk/headlamp-plugin/lib/i18n/locales/hi/translation_old.json?import=default"(module){module.exports=JSON.parse('{"Collapse Sidebar":""}')}}]);
