@@ -158,17 +158,10 @@ describe('BasicsStep — Project Name Edit button', () => {
     render(<BasicsStep {...defaultProps} />);
     const editBtn = screen.getByRole('button', { name: /edit project name/i });
 
-    // MUI Tooltip injects a title attribute on the wrapped element (or an
-    // aria-describedby pointing to the tooltip). Checking that the button is
-    // wrapped inside a Tooltip container is sufficient to confirm the tooltip exists.
-    // The data-mui-internal-clone-element attribute is added by MUI Tooltip to its
-    // child when it clones it; alternatively we can check for aria-describedby.
-    // The most reliable approach: the Tooltip renders its title into a hidden element
-    // identified by aria-describedby on the button.
-    expect(editBtn.closest('[class]')).not.toBeNull();
-    // Tooltip always sets title on the trigger element or aria-describedby; check either.
-    const hasTooltipHook =
-      editBtn.hasAttribute('aria-describedby') || editBtn.hasAttribute('title');
-    expect(hasTooltipHook).toBe(true);
+    // Open the MUI Tooltip by simulating a hover on the trigger button.
+    fireEvent.mouseOver(editBtn);
+
+    // When opened, MUI Tooltip renders an element with role="tooltip".
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
   });
 });
