@@ -43,7 +43,7 @@ import { useValidation } from './hooks/useValidation';
 import { STEPS } from './types';
 
 const useClusterCheck = ({ cluster }: { cluster?: string }) => {
-  const clustersConf = K8s.useClustersConf();
+  const clustersConf = K8s.useClustersConf() || {};
 
   const isClusterMissing =
     cluster && Object.values(clustersConf).find((it: any) => it.name === cluster) === undefined;

@@ -299,7 +299,7 @@ describe('ImportAKSProjects', () => {
     fireEvent.click(screen.getByText('Confirm & Import'));
 
     await waitFor(() => {
-      expect(screen.getByText(/permissions/i)).toBeInTheDocument();
+      expect(screen.getByText(/Failed to convert namespace/)).toBeInTheDocument();
     });
   });
 
@@ -453,6 +453,6 @@ describe('ImportAKSProjects', () => {
       expect(screen.getByText(/converted and imported/)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/permissions/i)).toBeInTheDocument();
+    expect(screen.getByText(/Failed to convert namespace/)).toBeInTheDocument();
   });
 });

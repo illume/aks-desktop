@@ -122,6 +122,19 @@ function ImportAKSProjectsContent() {
       message: string;
     }> = [];
 
+    // Build a lookup of cluster -> Azure metadata from ALL discovered namespaces
+    // (not just selected). This ensures we have Azure metadata for clusters even
+    // when the user only selects namespaces that were discovered via K8s API.
+    const clusterAzureMeta = new Map<string, { resourceGroup: string; subscriptionId: string }>();
+    for (const ns of discovered) {
+      if (ns.resourceGroup && ns.subscriptionId && !clusterAzureMeta.has(ns.clusterName)) {
+        clusterAzureMeta.set(ns.clusterName, {
+          resourceGroup: ns.resourceGroup,
+          subscriptionId: ns.subscriptionId,
+        });
+      }
+    }
+
     // Step 1: Group all selected namespaces by cluster, preferring managed namespace metadata
     const clusterMap = new Map<
       string,
@@ -132,13 +145,14 @@ function ImportAKSProjectsContent() {
     >();
     for (const item of selectedNamespaces) {
       const ns = item.namespace;
+      const meta = clusterAzureMeta.get(ns.clusterName);
       const existing = clusterMap.get(ns.clusterName);
       if (!existing) {
         clusterMap.set(ns.clusterName, {
           key: {
             clusterName: ns.clusterName,
-            resourceGroup: ns.resourceGroup,
-            subscriptionId: ns.subscriptionId,
+            resourceGroup: ns.resourceGroup || meta?.resourceGroup || '',
+            subscriptionId: ns.subscriptionId || meta?.subscriptionId || '',
           },
           namespaces: [ns],
         });
@@ -186,7 +200,7 @@ function ImportAKSProjectsContent() {
           }
 
           setImportProgress(
-            `${t('Merging cluster {{clusterName}} ({{count}} namespace)', {
+            `${t('Merging cluster {{clusterName}} ({{count}} namespace(s))', {
               clusterName,
               count: namespacesInCluster.length,
             })}...`
@@ -195,8 +209,7 @@ function ImportAKSProjectsContent() {
           const registerResult = await registerAKSCluster(
             subscriptionId,
             resourceGroup,
-            clusterName,
-            namespacesInCluster[0].name
+            clusterName
           );
 
           if (!registerResult.success) {
@@ -215,37 +228,41 @@ function ImportAKSProjectsContent() {
         }
 
         // 2b: Apply project labels to namespaces that need conversion.
-        // This must happen after cluster registration so the K8s API is reachable.
+        // The project-id label is required for Headlamp to recognize the namespace as a project,
+        // so we must wait for this to complete before importing.
         const failedNames = new Set<string>();
         for (const ns of namespacesInCluster) {
           if (ns.isAksProject) continue;
 
-          setImportProgress(t('Converting {{name}} to AKS project...', { name: ns.name }));
+          setImportProgress(
+            t('Converting {{name}} to AKS project (this may take a moment)...', {
+              name: ns.name,
+            })
+          );
           try {
+            // For managed namespaces, fall back to cluster-level Azure metadata
+            // (from other managed namespaces on the same cluster) so applyProjectLabels
+            // uses the ARM API. For regular namespaces, use their own (empty) metadata
+            // so applyProjectLabels uses the K8s API — the ARM API would reject them
+            // because they don't exist as managed namespace resources.
             await applyProjectLabels({
               namespaceName: ns.name,
               clusterName: ns.clusterName,
-              subscriptionId: ns.subscriptionId,
-              resourceGroup: ns.resourceGroup,
+              subscriptionId: ns.isManagedNamespace
+                ? ns.subscriptionId || subscriptionId
+                : ns.subscriptionId,
+              resourceGroup: ns.isManagedNamespace
+                ? ns.resourceGroup || resourceGroup
+                : ns.resourceGroup,
             });
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            const isPermissionError =
-              message.includes('Forbidden') ||
-              message.includes('403') ||
-              message.includes('denied');
-
             failedNames.add(ns.name);
             results.push({
               namespace: `${ns.name} (${clusterName})`,
               clusterName,
               success: false,
-              message: isPermissionError
-                ? t(
-                    "You don't have write permissions to convert namespace '{{name}}'. Contact your cluster administrator.",
-                    { name: ns.name }
-                  )
-                : t('Failed to convert namespace: {{message}}', { message }),
+              message: t('Failed to convert namespace: {{message}}', { message }),
             });
           }
         }
@@ -306,10 +323,10 @@ function ImportAKSProjectsContent() {
     const successfulClusters = new Set(results.filter(r => r.success).map(r => r.clusterName)).size;
 
     if (successCount > 0) {
-      const clusterText = t('Successfully merged {{count}} cluster', {
+      const clusterText = t('Successfully merged {{count}} cluster(s)', {
         count: successfulClusters,
       });
-      const projectText = t('with {{count}} project', { count: successCount });
+      const projectText = t('with {{count}} project(s)', { count: successCount });
       const failureSuffix =
         failureCount > 0 ? ` ${t('{{count}} failed.', { count: failureCount })}` : '.';
       setSuccess(`${clusterText} ${projectText}${failureSuffix}`);
