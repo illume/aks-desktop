@@ -101,14 +101,17 @@ process.on('SIGINT', () => {
   process.exit(1);
 });
 
-// Check if already installed
+// Check if already installed (skip this early-exit when USE_SYSTEM_AZ=1 so the wrapper can be updated)
 const azWrapperPath = path.join(TARGET_DIR, 'bin', CURRENT_PLATFORM === 'win32' ? 'az.cmd' : 'az-wrapper');
-if (fs.existsSync(azWrapperPath)) {
+if (fs.existsSync(azWrapperPath) && process.env['USE_SYSTEM_AZ'] !== '1') {
   console.log(`✅ Azure CLI already installed for ${CURRENT_PLATFORM}`);
   console.log(`   Location: ${TARGET_DIR}`);
   console.log('');
   console.log('To force re-download, remove the directory first:');
-  console.log(`   rm -rf ${TARGET_DIR}`);
+  const deleteCommand = CURRENT_PLATFORM === 'win32'
+    ? `rmdir /s /q "${TARGET_DIR}"`
+    : `rm -rf "${TARGET_DIR}"`;
+  console.log(`   ${deleteCommand}`);
   process.exit(0);
 }
 
@@ -520,7 +523,10 @@ async function main() {
       if (systemAzPath) {
         console.log(`ℹ️  USE_SYSTEM_AZ=1 — using system Azure CLI at: ${systemAzPath}`);
         console.log('   To switch back to a downloaded copy, unset USE_SYSTEM_AZ and remove:');
-        console.log(`   rm -rf ${TARGET_DIR}`);
+        const deleteCmd = CURRENT_PLATFORM === 'win32'
+          ? `rmdir /s /q "${TARGET_DIR}"`
+          : `rm -rf "${TARGET_DIR}"`;
+        console.log(`   ${deleteCmd}`);
         setupSystemAzWrapper(systemAzPath);
         console.log('');
         console.log('==========================================');

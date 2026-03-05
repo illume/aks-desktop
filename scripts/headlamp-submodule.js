@@ -88,14 +88,6 @@ if (resetFlag) {
   mode = 'update';
 }
 
-// Validate ref early so the error appears before any git operations
-if (ref) {
-  if (!/^[a-zA-Z0-9_./@\-]+$/.test(ref)) {
-    console.error('Error: <ref> contains invalid characters: ' + ref);
-    process.exit(1);
-  }
-}
-
 if (mode === 'reset') {
   console.log('[info] Resetting headlamp submodule to superproject recorded commit');
 } else if (mode === 'commit-only') {
@@ -123,6 +115,18 @@ function run(cmd, opts) {
  */
 function git(gitArgs, opts) {
   const result = spawnSync('git', gitArgs, Object.assign({ stdio: 'inherit' }, opts));
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      throw new Error(
+        'Failed to run "git": executable not found in PATH. ' +
+        'Please install Git and ensure it is available on your PATH.'
+      );
+    }
+    throw new Error('Failed to start git: ' + result.error.message);
+  }
+  if (result.signal) {
+    throw new Error('git ' + gitArgs.join(' ') + ' terminated by signal ' + result.signal);
+  }
   if (result.status !== 0) {
     throw new Error('git ' + gitArgs.join(' ') + ' exited with status ' + result.status);
   }
@@ -152,12 +156,21 @@ function validateRef(value, label) {
 }
 
 /**
- * Validate a remote URL: must start with https:// or git@.
+ * Validate a remote URL: must be an https:// or git@ URL with no whitespace or control characters.
  * @param {string} value
  */
 function validateUrl(value) {
-  if (!/^(https:\/\/|git@)/.test(value)) {
-    console.error('Error: HEADLAMP_URL must start with https:// or git@ — got: ' + value);
+  if (typeof value !== 'string') {
+    console.error('Error: HEADLAMP_URL must be a string — got: ' + String(value));
+    process.exit(1);
+  }
+  if (value !== value.trim()) {
+    console.error('Error: HEADLAMP_URL must not contain leading or trailing whitespace — got: ' + JSON.stringify(value));
+    process.exit(1);
+  }
+  // Disallow control characters/whitespace and require https:// or git@ prefix
+  if (!/^(?!.*[\x00-\x1F\x7F])(https:\/\/\S+|git@\S+)$/.test(value)) {
+    console.error('Error: HEADLAMP_URL must be an https:// or git@ URL with no whitespace or control characters — got: ' + value);
     process.exit(1);
   }
 }
@@ -225,7 +238,8 @@ if (mode === 'reset') {
   } else {
     const msg = 'headlamp: rebase to ' + ref;
     try {
-      git(['commit', '-m', msg]);
+      // Pass '-- headlamp' pathspec to avoid accidentally committing unrelated staged changes.
+      git(['commit', '-m', msg, '--', 'headlamp']);
       console.log('[done] ' + msg);
     } catch (_err) {
       console.warn('[warn] Commit failed; please review.');

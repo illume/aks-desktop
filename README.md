@@ -24,7 +24,11 @@ npm run setup
 npm start
 ```
 
+> After some time everything will be downloaded and built, and you should see AKS desktop start in development mode.
+
 ### Step-by-step
+
+> The quickstart should be enough, but if you want to know the details of each step, read on.
 
 1. Clone the repository:
 
@@ -48,8 +52,22 @@ npm start
    > **Tip (slow connections):** If you already have the Azure CLI installed, set
    > `USE_SYSTEM_AZ=1` before building to skip the bundled-az download:
    >
+   > Bash (macOS/Linux/WSL/Git Bash):
+   >
    > ```bash
    > USE_SYSTEM_AZ=1 npm run build
+   > ```
+   >
+   > Windows CMD:
+   >
+   > ```cmd
+   > set USE_SYSTEM_AZ=1 && npm run build
+   > ```
+   >
+   > PowerShell:
+   >
+   > ```powershell
+   > $env:USE_SYSTEM_AZ=1; npm run build
    > ```
 
 ## How to Build
