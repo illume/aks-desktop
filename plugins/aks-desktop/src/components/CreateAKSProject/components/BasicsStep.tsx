@@ -11,6 +11,8 @@ import {
   Button,
   CircularProgress,
   FormControl,
+  IconButton,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
@@ -83,6 +85,9 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
   const { t } = useTranslation();
   const headlampClusters = useClustersConf();
   const authStatus = useAzureAuth();
+
+  // Ref used by the edit-icon button to focus the Project Name input
+  const projectNameInputRef = useRef<HTMLInputElement>(null);
 
   // Auto select default subscription
   const autoSelected = useRef(false);
@@ -317,7 +322,28 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
                     'Project name must contain only lowercase letters, numbers, and hyphens (no spaces)'
                   )
             }
-            endAdornment={<Icon icon="mdi:edit" />}
+            endAdornment={
+              /* Tooltip surfaces the button's purpose visually on hover (icon-only button pattern).
+                 aria-label provides the accessible name for AT; aria-hidden on the Icon prevents
+                 the SVG from being double-announced alongside the button label. */
+              <Tooltip title={t('Edit project name')}>
+                <IconButton
+                  aria-label={t('Edit project name')}
+                  size="small"
+                  onClick={() =>
+                    /* A11y fix: clicking the icon button explicitly moves focus into the
+                       text input. Without this, a keyboard or switch-access user who
+                       activates the button is left with focus stranded on the button
+                       instead of inside the field they intend to edit — violating
+                       WCAG 2.1 SC 2.4.3 (Focus Order) and SC 3.2.2 (On Input). */
+                    projectNameInputRef.current?.focus()
+                  }
+                >
+                  <Icon icon="mdi:edit" aria-hidden="true" />
+                </IconButton>
+              </Tooltip>
+            }
+            inputRef={projectNameInputRef}
           />
         </FormControl>
 
