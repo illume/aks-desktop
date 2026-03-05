@@ -144,12 +144,10 @@ describe('CreateAKSProjectPure — LoadingOverlay story interactions', () => {
   });
 
   it('Create Project button is absent during loading (last step not rendered in overlay)', () => {
-    // During loading the overlay replaces step content; the Create Project button
-    // on the last step is disabled while isCreating is true.
+    // During loading the overlay replaces step content; LoadingOverlay uses
+    // activeStep 0, so the Create Project button (only on the last step) is not rendered.
     renderStory(LoadingOverlay.args!);
-    // On step 0 Next is rendered but disabled while isCreating + !validation.isValid
-    const btn = screen.queryByRole('button', { name: /create project/i });
-    if (btn) expect(btn).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /create project/i })).toBeNull();
   });
 });
 
