@@ -21,14 +21,8 @@ Please download the latest release for your platform from the [Releases](https:/
 git clone --recurse-submodules https://github.com/Azure/aks-desktop.git
 cd aks-desktop
 npm run setup
-cd headlamp && make backend && cd ..
 npm run dev
 ```
-
-`npm run setup` works from any state of the repository — fresh clone, partially
-set up, or after pulling new commits. It resets the Headlamp submodule, installs
-the root dependencies, and then installs the frontend, app, and plugin packages
-**in parallel** using `concurrently`.
 
 ### Step-by-step
 
@@ -44,7 +38,7 @@ the root dependencies, and then installs the frontend, app, and plugin packages
    cd aks-desktop
    ```
 
-3. Install all dependencies:
+3. Install all dependencies and build the backend:
 
    ```bash
    npm run setup
@@ -54,13 +48,15 @@ the root dependencies, and then installs the frontend, app, and plugin packages
    - Resets the Headlamp submodule to the pinned commit (`npm run submodule:reset`)
    - Installs root dev-dependencies (`npm ci`)
    - Installs the Headlamp frontend, Headlamp app, and plugin packages in parallel (`npm run install:all`)
+   - Builds the Headlamp backend server (`npm run headlamp:build:backend`)
 
    You can also run each step individually if needed:
 
    ```bash
-   npm run submodule:reset   # reset the Headlamp submodule
-   npm ci                    # install root dependencies
-   npm run install:all       # install all sub-package dependencies in parallel
+   npm run submodule:reset          # reset the Headlamp submodule
+   npm ci                           # install root dependencies
+   npm run install:all              # install all sub-package dependencies in parallel
+   npm run headlamp:build:backend   # build the Headlamp backend server
    ```
 
    > **Tip (slow connections):** If you already have the Azure CLI installed, set
@@ -70,13 +66,7 @@ the root dependencies, and then installs the frontend, app, and plugin packages
    > USE_SYSTEM_AZ=1 npm run build
    > ```
 
-4. Build the Headlamp backend server:
-
-   ```bash
-   cd headlamp && make backend && cd ..
-   ```
-
-5. Start the application in development mode:
+4. Start the application in development mode:
 
    ```bash
    npm run dev

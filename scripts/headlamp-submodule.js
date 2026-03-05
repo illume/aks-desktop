@@ -4,7 +4,6 @@
 // Licensed under the Apache 2.0.
 
 /**
- * Node.js equivalent of headlamp-submodule.sh
  * Manages the Headlamp submodule without requiring Git Bash on Windows.
  * Uses only Node.js built-in modules (child_process, fs, path).
  *
