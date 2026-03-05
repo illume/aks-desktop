@@ -4,6 +4,7 @@
   "description": "AKS desktop - Headlamp Plugin Monorepo",
   "private": true,
   "scripts": {
+    "start": "npm run dev",
     "build": "npm run plugin:setup && make -C headlamp app",
     "build:linux": "npm run plugin:setup && make -C headlamp app-linux",
     "build:mac": "npm run plugin:setup && make -C headlamp app-mac",

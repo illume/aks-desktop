@@ -21,7 +21,7 @@ Please download the latest release for your platform from the [Releases](https:/
 git clone --recurse-submodules https://github.com/Azure/aks-desktop.git
 cd aks-desktop
 npm run setup
-npm run dev
+npm start
 ```
 
 ### Step-by-step
@@ -38,25 +38,11 @@ npm run dev
    cd aks-desktop
    ```
 
-3. Install all dependencies and build the backend:
+3. Install all dependencies, build the backend, and start the application:
 
    ```bash
    npm run setup
-   ```
-
-   This runs the following in order:
-   - Resets the Headlamp submodule to the pinned commit (`npm run submodule:reset`)
-   - Installs root dev-dependencies (`npm ci`)
-   - Installs the Headlamp frontend, Headlamp app, and plugin packages in parallel (`npm run install:all`)
-   - Builds the Headlamp backend server (`npm run headlamp:build:backend`)
-
-   You can also run each step individually if needed:
-
-   ```bash
-   npm run submodule:reset          # reset the Headlamp submodule
-   npm ci                           # install root dependencies
-   npm run install:all              # install all sub-package dependencies in parallel
-   npm run headlamp:build:backend   # build the Headlamp backend server
+   npm start
    ```
 
    > **Tip (slow connections):** If you already have the Azure CLI installed, set
@@ -65,12 +51,6 @@ npm run dev
    > ```bash
    > USE_SYSTEM_AZ=1 npm run build
    > ```
-
-4. Start the application in development mode:
-
-   ```bash
-   npm run dev
-   ```
 
 ## How to Build
 
