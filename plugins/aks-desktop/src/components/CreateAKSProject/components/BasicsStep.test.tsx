@@ -12,7 +12,7 @@
  *   - A Tooltip is present on the button (visual discoverability for sighted users).
  */
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,7 +33,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   return { useTranslation };
 });
 
-vi.mock('@kinvolk/headlamp-plugin/lib/k8s', () => ({
+vi.mock('@kinvolk/headlamp-plugin/lib/lib/k8s', () => ({
   useClustersConf: () => ({}),
 }));
 
@@ -154,14 +154,26 @@ describe('BasicsStep — Project Name Edit button', () => {
     expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('the Edit button has a Tooltip for sighted-user discoverability', () => {
-    render(<BasicsStep {...defaultProps} />);
-    const editBtn = screen.getByRole('button', { name: /edit project name/i });
+  it('the Edit button has a Tooltip for sighted-user discoverability', async () => {
+    // MUI Tooltip has an enterDelay (default 100ms) before showing its content.
+    // Use fake timers so we can advance past that delay synchronously.
+    vi.useFakeTimers();
+    try {
+      render(<BasicsStep {...defaultProps} />);
+      const editBtn = screen.getByRole('button', { name: /edit project name/i });
 
-    // Open the MUI Tooltip by simulating a hover on the trigger button.
-    fireEvent.mouseOver(editBtn);
+      // MUI Tooltip listens on mouseover; this starts the enterDelay timer.
+      fireEvent.mouseOver(editBtn);
 
-    // When opened, MUI Tooltip renders an element with role="tooltip".
-    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      // Advance past MUI Tooltip's default enterDelay (100ms) and flush React state.
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+      });
+
+      // The tooltip content should now be rendered in the document.
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
