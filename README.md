@@ -15,7 +15,22 @@ Please download the latest release for your platform from the [Releases](https:/
 
 ## Development
 
-To run AKS desktop locally, follow these steps:
+### Quick start
+
+```bash
+git clone --recurse-submodules https://github.com/Azure/aks-desktop.git
+cd aks-desktop
+npm run setup
+cd headlamp && make backend && cd ..
+npm run dev
+```
+
+`npm run setup` works from any state of the repository — fresh clone, partially
+set up, or after pulling new commits. It resets the Headlamp submodule, installs
+the root dependencies, and then installs the frontend, app, and plugin packages
+**in parallel** using `concurrently`.
+
+### Step-by-step
 
 1. Clone the repository:
 
@@ -29,35 +44,39 @@ To run AKS desktop locally, follow these steps:
    cd aks-desktop
    ```
 
-3. Install the dependencies:
+3. Install all dependencies:
 
    ```bash
-   ./scripts/headlamp-submodule.sh --reset
-   npm install
-   npm run install:all
+   npm run setup
    ```
 
-4. Check for the resource folder:
+   This runs the following in order:
+   - Resets the Headlamp submodule to the pinned commit (`npm run submodule:reset`)
+   - Installs root dev-dependencies (`npm ci`)
+   - Installs the Headlamp frontend, Headlamp app, and plugin packages in parallel (`npm run install:all`)
 
-   Ensure that the `resources` folder exists in the `headlamp/app` directory.
-   If `headlamp/app/resources` does not exist, run the following command from the root directory.
+   You can also run each step individually if needed:
 
    ```bash
-   npm run plugin:setup
+   npm run submodule:reset   # reset the Headlamp submodule
+   npm ci                    # install root dependencies
+   npm run install:all       # install all sub-package dependencies in parallel
    ```
 
-5. Build the Headlamp backend server:
+   > **Tip (slow connections):** If you already have the Azure CLI installed, set
+   > `USE_SYSTEM_AZ=1` before building to skip the bundled-az download:
+   >
+   > ```bash
+   > USE_SYSTEM_AZ=1 npm run build
+   > ```
 
-   Navigate to the `headlamp` directory and build the backend server
+4. Build the Headlamp backend server:
 
    ```bash
-   cd headlamp
-   make backend
+   cd headlamp && make backend && cd ..
    ```
 
-6. Start the application at the root directory:
-
-   Navigate back to the root directory and start the application in development mode:
+5. Start the application in development mode:
 
    ```bash
    npm run dev
@@ -65,8 +84,6 @@ To run AKS desktop locally, follow these steps:
 
 ## How to Build
 
-To get started with AKS desktop, follow these steps:
-
 1. Clone the repository:
 
    ```bash
@@ -79,15 +96,14 @@ To get started with AKS desktop, follow these steps:
    cd aks-desktop
    ```
 
-3. Install the dependencies:
+3. Install all dependencies:
 
    ```bash
-   ./scripts/headlamp-submodule.sh --reset
-   npm install
-   npm run install:all
+   npm run setup
    ```
 
 4. Build the project:
+
    ```bash
    npm run build
    ```

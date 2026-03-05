@@ -113,6 +113,55 @@ if (fs.existsSync(azWrapperPath)) {
 }
 
 /**
+ * Locate a system-installed Azure CLI executable.
+ * Returns the resolved path, or null if not found.
+ */
+function findSystemAz(): string | null {
+  try {
+    const cmd = CURRENT_PLATFORM === 'win32' ? 'where az' : 'which az';
+    const result = execSync(cmd, { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    // `where` can return multiple lines on Windows; take the first one
+    return result.split(/\r?\n/)[0].trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Create lightweight wrapper scripts that delegate to the system-installed az CLI.
+ */
+function setupSystemAzWrapper(systemAzPath: string): void {
+  const binDir = path.join(TARGET_DIR, 'bin');
+  fs.mkdirSync(binDir, { recursive: true });
+
+  if (CURRENT_PLATFORM === 'win32') {
+    // Batch wrapper that forwards all arguments to the system az
+    const azCmd = path.join(binDir, 'az.cmd');
+    fs.writeFileSync(azCmd, `@echo off\n"${systemAzPath}" %*\n`);
+    console.log(`✅ Created az.cmd wrapper → ${systemAzPath}`);
+  } else {
+    // POSIX shell wrapper
+    const azWrapper = path.join(binDir, 'az-wrapper');
+    fs.writeFileSync(azWrapper, `#!/bin/sh\nexec "${systemAzPath}" "$@"\n`, { mode: 0o755 });
+
+    // 'az' symlink (same convention as the downloaded install)
+    const azSymlink = path.join(binDir, 'az');
+    if (fs.existsSync(azSymlink)) {
+      fs.unlinkSync(azSymlink);
+    }
+    fs.symlinkSync('az-wrapper', azSymlink);
+    console.log(`✅ Created az wrapper → ${systemAzPath}`);
+  }
+
+  // Minimal README so the directory is recognisable
+  const readmePath = path.join(TARGET_DIR, 'README.md');
+  fs.writeFileSync(
+    readmePath,
+    `# Azure CLI (system)\n\nUsing the system-installed Azure CLI.\n\nPath: ${systemAzPath}\n`
+  );
+}
+
+/**
  * Download a file from a URL
  */
 async function downloadFile(url: string, outputPath: string): Promise<void> {
@@ -463,6 +512,25 @@ async function installAzCliWindows(): Promise<void> {
  */
 async function main() {
   try {
+    // When USE_SYSTEM_AZ=1 is set, prefer the system-installed az CLI over
+    // downloading a bundled copy.  This is useful on slow network connections
+    // where a developer already has az installed globally.
+    if (process.env['USE_SYSTEM_AZ'] === '1') {
+      const systemAzPath = findSystemAz();
+      if (systemAzPath) {
+        console.log(`ℹ️  USE_SYSTEM_AZ=1 — using system Azure CLI at: ${systemAzPath}`);
+        console.log('   To switch back to a downloaded copy, unset USE_SYSTEM_AZ and remove:');
+        console.log(`   rm -rf ${TARGET_DIR}`);
+        setupSystemAzWrapper(systemAzPath);
+        console.log('');
+        console.log('==========================================');
+        console.log('✅ Setup Complete (system Azure CLI)');
+        console.log('==========================================');
+        return;
+      }
+      console.log('⚠️  USE_SYSTEM_AZ=1 set but no system az found in PATH — falling back to download.');
+    }
+
     switch (CURRENT_PLATFORM) {
       case 'win32':
         await installAzCliWindows();
