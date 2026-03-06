@@ -355,6 +355,58 @@ describe('useCreateAKSProjectWizard', () => {
     expect(result.current.isCreating).toBe(false);
   });
 
+  describe('PII redaction in non-debug error logging', () => {
+    it('redacts email addresses from the error message before logging', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(createManagedNamespace).mockRejectedValue(
+        new Error('Access denied for user admin@contoso.com')
+      );
+
+      const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+      await act(async () => {
+        await result.current.handleSubmit();
+      });
+
+      // flat(1): mock.calls is array-of-arrays (one entry per call); flatten one level to get individual args
+      const allArgs = consoleSpy.mock.calls
+        .flat(1)
+        .map(a => (typeof a === 'string' ? a : JSON.stringify(a)));
+      const combined = allArgs.join(' ');
+      expect(combined).not.toMatch(/admin@contoso\.com/);
+      expect(combined).toMatch(/<redacted>/);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('redacts email addresses from the error stack before logging', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const err = new Error('Access denied for user secret@example.org');
+      // Inject an email into the stack trace so it mirrors a realistic JS stack.
+      // The line:column numbers (42:11) are synthetic — they exist only to give the stack a
+      // plausible shape; their exact values are not significant.
+      err.stack = `Error: Access denied for user secret@example.org\n    at handleSubmit (useCreateAKSProjectWizard.ts:42:11)`;
+      vi.mocked(createManagedNamespace).mockRejectedValue(err);
+
+      const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+      await act(async () => {
+        await result.current.handleSubmit();
+      });
+
+      // Collect every argument passed to console.error and stringify objects
+      const allArgs = consoleSpy.mock.calls.flatMap(callArgs =>
+        callArgs.map(a => (typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)))
+      );
+      const combined = allArgs.join(' ');
+      expect(combined).not.toMatch(/secret@example\.org/);
+      expect(combined).toMatch(/<redacted>/);
+
+      consoleSpy.mockRestore();
+    });
+  });
+
   it('creationPromise.catch() suppresses unhandled rejection when timeout wins the race', async () => {
     vi.useFakeTimers();
     let rejectCreation!: (err: Error) => void;

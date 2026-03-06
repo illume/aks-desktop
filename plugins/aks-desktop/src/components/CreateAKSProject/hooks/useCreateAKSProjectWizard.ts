@@ -600,10 +600,16 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
     } catch (error) {
       const rawErrorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
-      // Sanitize potential PII (e.g., email addresses) from the error message for non-debug logging.
+      // Sanitize potential PII (e.g., email addresses) from the error message and stack
+      // for non-debug logging.  JS stack traces include the message on the first line, so
+      // the stack must be redacted with the same pattern as the message.
+      const PII_REDACT_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
       const sanitizedErrorMessage = rawErrorMessage
-        ? rawErrorMessage.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '<redacted>')
+        ? rawErrorMessage.replace(PII_REDACT_RE, '<redacted>')
         : '';
+      const sanitizedErrorStack = errorStack
+        ? errorStack.replace(PII_REDACT_RE, '<redacted>')
+        : undefined;
 
       if (DEBUG) {
         // In debug mode, log full error details for troubleshooting.
@@ -614,11 +620,11 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
           formDataRedacted: true,
         });
       } else {
-        // In non-debug/production, avoid logging raw PII-bearing messages.
+        // In non-debug/production, avoid logging raw PII-bearing messages or stacks.
         console.error('Error creating AKS project:', sanitizedErrorMessage || 'Unknown error');
         console.error('Error details (sanitized):', {
           message: sanitizedErrorMessage || 'Unknown error',
-          stack: errorStack,
+          stack: sanitizedErrorStack,
           formDataRedacted: true,
         });
       }
