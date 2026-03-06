@@ -5,16 +5,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { ClusterCapabilities } from '../../../../types/ClusterCapabilities';
+import type { ClusterCapabilities } from '../../../types/ClusterCapabilities';
 
-// Mock the az-cli functions
-vi.mock('../../../../utils/azure/az-cli', () => ({
+// Mock the az-cli functions, import more afterwards
+vi.mock('../../../utils/azure/az-cli', () => ({
   enableClusterAddon: vi.fn(),
   getClusterCapabilities: vi.fn(),
 }));
 
-import { enableClusterAddon, getClusterCapabilities } from '../../../../utils/azure/az-cli';
-import { ClusterConfigurePanel } from '../ClusterConfigurePanel';
+import { enableClusterAddon, getClusterCapabilities } from '../../../utils/azure/az-cli';
+import { ClusterConfigurePanel } from './ClusterConfigurePanel';
 
 const mockEnableClusterAddon = vi.mocked(enableClusterAddon);
 const mockGetClusterCapabilities = vi.mocked(getClusterCapabilities);
@@ -184,8 +184,8 @@ describe('ClusterConfigurePanel', () => {
       expect(configuringMessages.length).toBeGreaterThan(0);
     });
 
-    // Should show a progress indicator (CircularProgress renders role="progressbar")
-    expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+    // Should show the status container that announces the loading state to screen readers
+    expect(screen.getByRole('status')).toBeTruthy();
   });
 
   test('calls onConfigured callback after successful configuration and polling', async () => {
