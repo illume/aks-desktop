@@ -375,5 +375,9 @@
   "{{minutes}} min ago": "",
   "{{hours}}h ago": "",
   "{{days}}d ago": "",
-  "{{weeks}}w ago": ""
+  "{{weeks}}w ago": "",
+  "Preview Features": "",
+  "Enable or disable features that are still in development. Preview features may change or be removed in future releases.": "",
+  "GitHub Pipelines": "",
+  "Enable GitHub-based deployment pipelines for AKS projects.": ""
 }
