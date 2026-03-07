@@ -4,6 +4,7 @@
 import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import {
+  Box,
   Button,
   CircularProgress,
   Dialog,
@@ -142,9 +143,9 @@ export const ScalingEditDialog: React.FC<ScalingEditDialogProps> = ({
               {/* A11y: Visually hidden text ensures the button always has discernible text
                   even when the visible label is replaced by a spinner (WCAG 4.1.2).
                   MUI button-name: https://dequeuniversity.com/rules/axe/4.11/button-name */}
-              <span style={visuallyHidden}>
+              <Box component="span" sx={visuallyHidden}>
                 {t('Save')}
-              </span>
+              </Box>
             </>
           ) : (
             t('Save')
