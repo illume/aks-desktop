@@ -44,7 +44,7 @@ afterEach(() => {
 
 describe('ScalingEditDialog a11y', () => {
   test('has no axe violations in HPA mode', async () => {
-    const { container } = render(
+    render(
       <ScalingEditDialog
         open
         hpaInfo={hpaInfo}
@@ -55,12 +55,14 @@ describe('ScalingEditDialog a11y', () => {
         onSave={async () => {}}
       />
     );
-    const results = await axe.run(container);
+    // MUI Dialog renders into a portal on document.body, outside the render container.
+    // axe.run(document.body) ensures the dialog's actual DOM content is scanned.
+    const results = await axe.run(document.body);
     expect(results.violations).toEqual([]);
   });
 
   test('has no axe violations in manual mode', async () => {
-    const { container } = render(
+    render(
       <ScalingEditDialog
         open
         hpaInfo={null}
@@ -71,12 +73,12 @@ describe('ScalingEditDialog a11y', () => {
         onSave={async () => {}}
       />
     );
-    const results = await axe.run(container);
+    const results = await axe.run(document.body);
     expect(results.violations).toEqual([]);
   });
 
   test('has no axe violations while saving', async () => {
-    const { container } = render(
+    render(
       <ScalingEditDialog
         open
         hpaInfo={hpaInfo}
@@ -87,7 +89,7 @@ describe('ScalingEditDialog a11y', () => {
         onSave={async () => {}}
       />
     );
-    const results = await axe.run(container);
+    const results = await axe.run(document.body);
     expect(results.violations).toEqual([]);
   });
 });

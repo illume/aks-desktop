@@ -11,6 +11,11 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// Stub Iconify so tests focus on structure/behavior rather than icon loading (and avoid network calls)
+vi.mock('@iconify/react', () => ({
+  Icon: (props: React.ComponentProps<'span'>) => <span {...props} />,
+}));
+
 import { ScalingMetrics } from './ScalingMetrics';
 
 const sampleDeployments = [

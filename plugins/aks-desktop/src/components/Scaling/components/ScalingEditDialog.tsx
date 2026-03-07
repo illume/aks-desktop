@@ -132,7 +132,22 @@ export const ScalingEditDialog: React.FC<ScalingEditDialogProps> = ({
           disabled={saving}
           startIcon={saving ? undefined : <Icon icon="mdi:content-save" />}
         >
-          {saving ? <CircularProgress size={20} /> : t('Save')}
+          {saving ? (
+            <>
+              {/* A11y: CircularProgress renders role="progressbar"; an accessible name
+                  is required so screen readers announce the saving state.
+                  MUI Progress accessibility: https://mui.com/material-ui/react-progress/#accessibility */}
+              <CircularProgress size={20} aria-label={t('Saving')} />
+              {/* A11y: Visually hidden text ensures the button always has discernible text
+                  even when the visible label is replaced by a spinner (WCAG 4.1.2).
+                  MUI button-name: https://dequeuniversity.com/rules/axe/4.11/button-name */}
+              <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>
+                {t('Save')}
+              </span>
+            </>
+          ) : (
+            t('Save')
+          )}
         </Button>
       </DialogActions>
     </Dialog>
