@@ -3,11 +3,11 @@
 
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import React from 'react';
+import { ScalingTabPure } from './components/ScalingTabPure';
 import { useChartData } from './hooks/useChartData';
 import { useDeployments } from './hooks/useDeployments';
 import { useEditDialog } from './hooks/useEditDialog';
 import { useHPAInfo } from './hooks/useHPAInfo';
-import { ScalingTabPure } from './ScalingTabPure';
 
 /**
  * Props for the {@link ScalingTab} component.

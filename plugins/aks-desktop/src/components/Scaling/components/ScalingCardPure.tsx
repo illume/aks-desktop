@@ -5,12 +5,12 @@ import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Box, Typography } from '@mui/material';
 import React from 'react';
-import { DeploymentSelector } from './components/DeploymentSelector';
-import { ScalingChart } from './components/ScalingChart';
-import { ScalingMetrics } from './components/ScalingMetrics';
-import type { ChartDataPoint } from './hooks/useChartData';
-import type { DeploymentInfo } from './hooks/useDeployments';
-import type { HPAInfo } from './hooks/useHPAInfo';
+import type { ChartDataPoint } from '../hooks/useChartData';
+import type { DeploymentInfo } from '../hooks/useDeployments';
+import type { HPAInfo } from '../hooks/useHPAInfo';
+import { DeploymentSelector } from './DeploymentSelector';
+import { ScalingChart } from './ScalingChart';
+import { ScalingMetrics } from './ScalingMetrics';
 
 /**
  * Props for the {@link ScalingCardPure} component.

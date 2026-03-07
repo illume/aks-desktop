@@ -115,6 +115,9 @@ describe('DeploymentSelector guidepup screen reader', () => {
     const phrases = await collectPhrases();
 
     expect(phrases.some(p => p.includes('Select Deployment'))).toBe(true);
+    // The native <select> mock renders disabled={true} during loading;
+    // the virtual screen reader announces this as "dimmed" or "disabled".
+    expect(phrases.some(p => /dimmed|disabled/i.test(p))).toBe(true);
   });
 
   /**

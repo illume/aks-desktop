@@ -13,7 +13,9 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
 
 // Stub Iconify so the test focuses on metrics structure rather than icon loading
 vi.mock('@iconify/react', () => ({
-  Icon: (props: React.ComponentProps<'span'>) => <span {...props} />,
+  Icon: ({ icon }: { icon: string }) => (
+    <span data-testid={`icon-${icon}`} aria-hidden="true" />
+  ),
 }));
 
 import { ScalingMetrics } from './ScalingMetrics';

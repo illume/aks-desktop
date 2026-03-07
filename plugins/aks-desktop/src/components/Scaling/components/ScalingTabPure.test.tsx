@@ -16,7 +16,7 @@ vi.mock('@iconify/react', () => ({
     ariaHidden ? null : <span>{icon}</span>,
 }));
 
-import type { EditValues } from './hooks/useEditDialog';
+import type { EditValues } from '../hooks/useEditDialog';
 import { ScalingTabPure } from './ScalingTabPure';
 
 const sampleDeployments = [
@@ -157,7 +157,7 @@ describe('ScalingTabPure a11y', () => {
   });
 
   test('has no axe violations with edit dialog open', async () => {
-    const { container } = render(
+    render(
       <ScalingTabPure
         deployments={sampleDeployments}
         selectedDeployment="frontend"
@@ -178,7 +178,9 @@ describe('ScalingTabPure a11y', () => {
         onSave={async () => {}}
       />
     );
-    const results = await axe.run(container);
+    // MUI Dialog renders into a portal on document.body, outside the render container.
+    // axe.run(document.body) ensures the dialog's actual DOM content is scanned.
+    const results = await axe.run(document.body);
     expect(results.violations).toEqual([]);
   });
 });

@@ -20,9 +20,9 @@ vi.mock('@iconify/react', () => ({
 // to fail with "Cannot read properties of undefined (reading 'escape')".
 // Mock DeploymentSelector to avoid MUI Select's aria-controls referencing a
 // non-existent listbox DOM element, which also causes the same guidepup error.
-// The guidepup tests focus on the card-level structure (heading, selector, metrics,
-// error alerts) rather than the chart internals.
-vi.mock('./components/ScalingChart', () => ({
+// The guidepup tests focus on the tab-level structure (heading, selector, buttons,
+// metrics, error alerts) rather than chart internals.
+vi.mock('./ScalingChart', () => ({
   ScalingChart: () => <div data-testid="scaling-chart" />,
 }));
 
@@ -30,7 +30,7 @@ vi.mock('./components/ScalingChart', () => ({
 // accessible without needing extra ARIA attributes (aria-controls, aria-expanded).
 // Native <select> already has implicit combobox semantics understood by all browsers
 // and screen readers: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/select
-vi.mock('./components/DeploymentSelector', () => ({
+vi.mock('./DeploymentSelector', () => ({
   DeploymentSelector: ({ selectedDeployment }: { selectedDeployment: string }) => (
     <label>
       Select Deployment
@@ -41,7 +41,8 @@ vi.mock('./components/DeploymentSelector', () => ({
   ),
 }));
 
-import { ScalingCardPure } from './ScalingCardPure';
+import type { EditValues } from '../hooks/useEditDialog';
+import { ScalingTabPure } from './ScalingTabPure';
 
 const sampleDeployments = [
   { name: 'frontend', namespace: 'default', replicas: 3, availableReplicas: 3, readyReplicas: 3 },
@@ -57,6 +58,13 @@ const hpaInfo = {
   currentCPUUtilization: 45,
   currentReplicas: 3,
   desiredReplicas: 3,
+};
+
+const defaultEditValues: EditValues = {
+  minReplicas: 2,
+  maxReplicas: 10,
+  targetCPU: 60,
+  replicas: 3,
 };
 
 const sampleChartData = [
@@ -81,14 +89,14 @@ afterEach(async () => {
   cleanup();
 });
 
-describe('ScalingCardPure guidepup screen reader', () => {
+describe('ScalingTabPure guidepup screen reader', () => {
   /**
-   * Tests that the heading "Scaling" is reachable by screen reader navigation
-   * when a deployment is selected and metrics are shown.
+   * Tests that the "Scaling" page heading is reachable when a deployment is active,
+   * confirming screen reader users can identify the page section.
    */
-  test('announces the Scaling heading when a deployment is selected', async () => {
+  test('announces the Scaling heading', async () => {
     const { container } = render(
-      <ScalingCardPure
+      <ScalingTabPure
         deployments={sampleDeployments}
         selectedDeployment="frontend"
         loading={false}
@@ -97,7 +105,15 @@ describe('ScalingCardPure guidepup screen reader', () => {
         chartData={sampleChartData}
         chartLoading={false}
         chartError={null}
+        editDialogOpen={false}
+        editValues={defaultEditValues}
+        saving={false}
+        saveError={null}
         onDeploymentChange={() => {}}
+        onEditClick={() => {}}
+        onEditDialogClose={() => {}}
+        onEditValuesChange={() => {}}
+        onSave={async () => {}}
       />
     );
 
@@ -109,12 +125,11 @@ describe('ScalingCardPure guidepup screen reader', () => {
 
   /**
    * Tests that the "Select a deployment to view scaling metrics" prompt is
-   * announced when no deployment is selected, so screen reader users know
-   * what action is required.
+   * announced when no deployment is selected, guiding the user to act.
    */
   test('announces prompt when no deployment is selected', async () => {
     const { container } = render(
-      <ScalingCardPure
+      <ScalingTabPure
         deployments={sampleDeployments}
         selectedDeployment=""
         loading={false}
@@ -123,7 +138,15 @@ describe('ScalingCardPure guidepup screen reader', () => {
         chartData={[]}
         chartLoading={false}
         chartError={null}
+        editDialogOpen={false}
+        editValues={defaultEditValues}
+        saving={false}
+        saveError={null}
         onDeploymentChange={() => {}}
+        onEditClick={() => {}}
+        onEditDialogClose={() => {}}
+        onEditValuesChange={() => {}}
+        onSave={async () => {}}
       />
     );
 
@@ -134,27 +157,72 @@ describe('ScalingCardPure guidepup screen reader', () => {
   });
 
   /**
-   * Tests that a deployment error alert is announced by the screen reader
-   * so users are aware of the failure state.
+   * Tests that the "Loading deployments" progress bar is announced during the
+   * initial load state, so screen reader users know data is being fetched.
    */
-  test('announces error alert when deployment fetch fails', async () => {
+  test('announces loading state with accessible progress bar label', async () => {
     const { container } = render(
-      <ScalingCardPure
+      <ScalingTabPure
         deployments={[]}
         selectedDeployment=""
-        loading={false}
-        error="Failed to fetch deployments"
+        loading
+        error={null}
         hpaInfo={null}
         chartData={[]}
         chartLoading={false}
         chartError={null}
+        editDialogOpen={false}
+        editValues={defaultEditValues}
+        saving={false}
+        saveError={null}
         onDeploymentChange={() => {}}
+        onEditClick={() => {}}
+        onEditDialogClose={() => {}}
+        onEditValuesChange={() => {}}
+        onSave={async () => {}}
+      />
+    );
+
+    await virtual.start({ container });
+    // Use collectPhrases with a bounded limit — the progressbar role may cause
+    // the virtual screen reader to walk sub-nodes indefinitely
+    const phrases = await collectPhrases(20);
+
+    // The CircularProgress has aria-label="Loading deployments"; the virtual screen reader
+    // should announce it as a progressbar with that label.
+    expect(phrases.some(p => p.includes('Loading deployments'))).toBe(true);
+  });
+
+  /**
+   * Tests that the "Edit Configuration" button is reachable via screen reader
+   * navigation when a deployment is selected, so users can trigger the edit flow.
+   */
+  test('announces Edit Configuration button when deployment is selected', async () => {
+    const { container } = render(
+      <ScalingTabPure
+        deployments={sampleDeployments}
+        selectedDeployment="frontend"
+        loading={false}
+        error={null}
+        hpaInfo={hpaInfo}
+        chartData={sampleChartData}
+        chartLoading={false}
+        chartError={null}
+        editDialogOpen={false}
+        editValues={defaultEditValues}
+        saving={false}
+        saveError={null}
+        onDeploymentChange={() => {}}
+        onEditClick={() => {}}
+        onEditDialogClose={() => {}}
+        onEditValuesChange={() => {}}
+        onSave={async () => {}}
       />
     );
 
     await virtual.start({ container });
     const phrases = await collectPhrases();
 
-    expect(phrases.some(p => p.includes('Failed to fetch deployments'))).toBe(true);
+    expect(phrases.some(p => p.includes('Edit Configuration'))).toBe(true);
   });
 });
