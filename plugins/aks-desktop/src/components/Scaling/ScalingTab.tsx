@@ -89,7 +89,10 @@ const ScalingTab: React.FC<ScalingTabProps> = ({ project }) => {
   if (loading && deployments.length === 0) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
+        {/* A11y: CircularProgress renders role="progressbar"; aria-label provides the
+            accessible name so screen readers announce what is loading.
+            MUI Progress accessibility: https://mui.com/material-ui/react-progress/#accessibility */}
+        <CircularProgress aria-label={t('Loading deployments')} />
       </Box>
     );
   }

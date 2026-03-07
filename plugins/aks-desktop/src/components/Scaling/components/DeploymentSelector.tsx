@@ -24,10 +24,16 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  // A11y: The InputLabel id and Select labelId must be explicitly linked so that
+  // the combobox element receives an accessible name via aria-labelledby.
+  // MUI 5 Select accessibility: https://mui.com/material-ui/react-select/#accessibility
+  const labelId = 'deployment-selector-label';
+
   return (
     <FormControl sx={{ minWidth: 200 }} size="small" variant="outlined">
-      <InputLabel>{t('Select Deployment')}</InputLabel>
+      <InputLabel id={labelId}>{t('Select Deployment')}</InputLabel>
       <Select
+        labelId={labelId}
         value={selectedDeployment || ''}
         onChange={e => onDeploymentChange(e.target.value as string)}
         label={t('Select Deployment')}
