@@ -60,6 +60,7 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
                   height={20}
                   color="#4caf50"
                   style={{ marginRight: 8 }}
+                  aria-hidden="true"
                 />
               }
               endAdornment={
@@ -88,6 +89,7 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
                   height={20}
                   color="#f44336"
                   style={{ marginRight: 8 }}
+                  aria-hidden="true"
                 />
               }
               endAdornment={
@@ -121,6 +123,7 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
                   height={20}
                   color="#4caf50"
                   style={{ marginRight: 8 }}
+                  aria-hidden="true"
                 />
               }
               endAdornment={
@@ -149,6 +152,7 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
                   height={20}
                   color="#f44336"
                   style={{ marginRight: 8 }}
+                  aria-hidden="true"
                 />
               }
               endAdornment={
