@@ -12,6 +12,7 @@ import {
   DialogTitle,
   TextField,
 } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import React from 'react';
 import type { EditValues } from '../hooks/useEditDialog';
 import type { HPAInfo } from '../hooks/useHPAInfo';
@@ -141,7 +142,7 @@ export const ScalingEditDialog: React.FC<ScalingEditDialogProps> = ({
               {/* A11y: Visually hidden text ensures the button always has discernible text
                   even when the visible label is replaced by a spinner (WCAG 4.1.2).
                   MUI button-name: https://dequeuniversity.com/rules/axe/4.11/button-name */}
-              <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>
+              <span style={visuallyHidden}>
                 {t('Save')}
               </span>
             </>
