@@ -51,6 +51,27 @@
  *  ├── CpuRequestError — single-field error; sibling fields remain "not invalid"
  *  └── Loading         — all 4 spinbuttons announced as disabled
  *
+ *  Breadcrumb
+ *  ├── FirstStep       — nav landmark; 5 step buttons; first step aria-current="step"
+ *  ├── MiddleStep      — Compute Quota step has aria-current
+ *  └── LastStep        — Review step has aria-current
+ *
+ *  FormField
+ *  ├── Default         — labeled textbox with value
+ *  ├── WithError       — textbox announced "invalid" with helper text
+ *  ├── NumberField     — spinbutton role with value and helper text
+ *  └── Disabled        — textbox announced as disabled
+ *
+ *  SearchableSelect
+ *  ├── Default         — labeled combobox with placeholder
+ *  └── WithSelection   — combobox announces selected value
+ *
+ *  ValidationAlert
+ *  ├── Error           — alert severity "error" with message
+ *  ├── Warning         — alert severity "warning"
+ *  ├── Success         — alert severity "success"
+ *  └── Hidden          — no alert when show=false
+ *
  * A11y fixes included in this PR:
  *  - ResourceCard: added aria-hidden="true" to decorative title Icon
  *  - ComputeStep: added aria-hidden="true" to all startAdornment Icons (arrow-up/down)
@@ -98,11 +119,24 @@ vi.mock('@iconify/react', () => ({
 import CreateAKSProjectPure from './CreateAKSProjectPure';
 import type { CreateAKSProjectPureProps } from './CreateAKSProjectPure';
 import { AccessStep } from './AccessStep';
+import { Breadcrumb } from './Breadcrumb';
+import { FormField } from './FormField';
 import { NetworkingStep } from './NetworkingStep';
 import { ComputeStep } from './ComputeStep';
 import { ReviewStep } from './ReviewStep';
+import { SearchableSelect } from './SearchableSelect';
+import { ValidationAlert } from './ValidationAlert';
 import { STEPS } from '../types';
-import type { ReviewStepProps, NetworkingStepProps, ComputeStepProps } from '../types';
+import type {
+  AccessStepProps,
+  BreadcrumbProps,
+  FormFieldProps,
+  ReviewStepProps,
+  NetworkingStepProps,
+  ComputeStepProps,
+  ValidationAlertProps,
+} from '../types';
+import type { SearchableSelectProps } from './SearchableSelect';
 
 // ── Base props (matches Storybook baseArgs) ───────────────────────────────────
 const BASE_PROPS: CreateAKSProjectPureProps = {
@@ -1472,5 +1506,213 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
     const spinbuttons = ps.filter(p => /spinbutton/i.test(p));
     expect(spinbuttons).toHaveLength(4);
     spinbuttons.forEach(s => expect(s).toMatch(/disabled/i));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Breadcrumb
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BREADCRUMB_BASE: BreadcrumbProps = {
+  steps: ['Basics', 'Networking Policies', 'Compute Quota', 'Access', 'Review'],
+  activeStep: 0,
+  onStepClick: () => {},
+};
+
+describe('SR: Breadcrumb — FirstStep', () => {
+  it('announces navigation landmark "Wizard steps"', async () => {
+    render(<Breadcrumb {...BREADCRUMB_BASE} />);
+    await virtual.start({ container: document.body });
+    expect(await phrases()).toContain('navigation, Wizard steps');
+  });
+
+  it('announces the first step as current', async () => {
+    render(<Breadcrumb {...BREADCRUMB_BASE} />);
+    await virtual.start({ container: document.body });
+    expect(await phrases()).toContain('button, Basics, current step');
+  });
+
+  it('announces all five step buttons', async () => {
+    render(<Breadcrumb {...BREADCRUMB_BASE} />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    for (const label of ['Basics', 'Networking Policies', 'Compute Quota', 'Access', 'Review']) {
+      expect(ps.some(p => p.includes(`button, ${label}`))).toBe(true);
+    }
+  });
+});
+
+describe('SR: Breadcrumb — MiddleStep', () => {
+  it('announces Compute Quota as the current step', async () => {
+    render(<Breadcrumb {...BREADCRUMB_BASE} activeStep={2} />);
+    await virtual.start({ container: document.body });
+    expect(await phrases()).toContain('button, Compute Quota, current step');
+  });
+
+  it('Basics step is no longer aria-current', async () => {
+    render(<Breadcrumb {...BREADCRUMB_BASE} activeStep={2} />);
+    await virtual.start({ container: document.body });
+    expect(await phrases()).not.toContain('button, Basics, current step');
+  });
+});
+
+describe('SR: Breadcrumb — LastStep', () => {
+  it('announces Review as the current step', async () => {
+    render(<Breadcrumb {...BREADCRUMB_BASE} activeStep={4} />);
+    await virtual.start({ container: document.body });
+    expect(await phrases()).toContain('button, Review, current step');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FormField
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FORMFIELD_BASE: FormFieldProps = {
+  label: 'Project Name',
+  value: 'my-project',
+  onChange: () => {},
+};
+
+describe('SR: FormField — Default', () => {
+  it('announces a labeled textbox with its value', async () => {
+    render(<FormField {...FORMFIELD_BASE} />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
+    expect(textbox).toBeTruthy();
+  });
+});
+
+describe('SR: FormField — WithError', () => {
+  it('announces the textbox as invalid', async () => {
+    render(
+      <FormField
+        {...FORMFIELD_BASE}
+        value=""
+        error={true}
+        helperText="Project name is required"
+        required={true}
+      />
+    );
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
+    expect(textbox).toMatch(/invalid/i);
+    expect(textbox).not.toMatch(/not invalid/i);
+  });
+
+  it('announces the error helper text', async () => {
+    render(
+      <FormField
+        {...FORMFIELD_BASE}
+        value=""
+        error={true}
+        helperText="Project name is required"
+      />
+    );
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    // The helper text is linked via aria-describedby and announced as part of the textbox
+    const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
+    expect(textbox).toMatch(/Project name is required/i);
+  });
+});
+
+describe('SR: FormField — NumberField', () => {
+  it('announces a spinbutton role', async () => {
+    render(<FormField {...FORMFIELD_BASE} label="CPU Request" type="number" value={2000} />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    expect(ps.some(p => /spinbutton/i.test(p) && /cpu request/i.test(p))).toBe(true);
+  });
+});
+
+describe('SR: FormField — Disabled', () => {
+  it('announces the textbox as disabled', async () => {
+    render(<FormField {...FORMFIELD_BASE} disabled={true} />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
+    expect(textbox).toMatch(/disabled/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SearchableSelect
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SEARCHABLE_OPTIONS = [
+  { value: 'sub-123', label: 'Production Subscription', subtitle: 'sub-123' },
+  { value: 'sub-456', label: 'Development Subscription', subtitle: 'sub-456' },
+];
+
+const SEARCHABLE_BASE: SearchableSelectProps = {
+  label: 'Subscription',
+  value: '',
+  onChange: () => {},
+  options: SEARCHABLE_OPTIONS,
+};
+
+describe('SR: SearchableSelect — Default', () => {
+  it('announces a labeled combobox', async () => {
+    render(<SearchableSelect {...SEARCHABLE_BASE} />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    expect(ps.some(p => /combobox/i.test(p) && /subscription/i.test(p))).toBe(true);
+  });
+});
+
+describe('SR: SearchableSelect — WithSelection', () => {
+  it('announces the selected value in the combobox', async () => {
+    render(<SearchableSelect {...SEARCHABLE_BASE} value="sub-123" />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    const combobox = ps.find(p => /combobox/i.test(p) && /subscription/i.test(p));
+    expect(combobox).toMatch(/Production Subscription/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ValidationAlert
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('SR: ValidationAlert — Error', () => {
+  it('announces an alert with the error message', async () => {
+    render(<ValidationAlert type="error" message="Namespace creation failed" />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    expect(ps.some(p => /alert/i.test(p))).toBe(true);
+    expect(ps.some(p => /Namespace creation failed/i.test(p))).toBe(true);
+  });
+});
+
+describe('SR: ValidationAlert — Warning', () => {
+  it('announces a warning alert', async () => {
+    render(<ValidationAlert type="warning" message="Cluster resources are running low" />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    expect(ps.some(p => /alert/i.test(p))).toBe(true);
+    expect(ps.some(p => /Cluster resources are running low/i.test(p))).toBe(true);
+  });
+});
+
+describe('SR: ValidationAlert — Success', () => {
+  it('announces a success alert', async () => {
+    render(<ValidationAlert type="success" message="Project created successfully" />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    expect(ps.some(p => /alert/i.test(p))).toBe(true);
+    expect(ps.some(p => /Project created successfully/i.test(p))).toBe(true);
+  });
+});
+
+describe('SR: ValidationAlert — Hidden', () => {
+  it('renders nothing when show=false', async () => {
+    const { container } = render(
+      <ValidationAlert type="error" message="should not appear" show={false} />
+    );
+    // The component returns null, so the container should be empty
+    expect(container.innerHTML).toBe('');
   });
 });
