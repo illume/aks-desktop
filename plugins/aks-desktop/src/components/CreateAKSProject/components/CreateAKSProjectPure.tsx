@@ -415,9 +415,15 @@ export default function CreateAKSProjectPure({
             tabIndex={0}
             sx={{ maxHeight: '400px', overflowY: 'auto' }}
           >
-            {/* id provides the accessible description for this alertdialog via aria-describedby */}
+            {/* id provides the accessible description for this alertdialog via aria-describedby.
+                role="alert" makes the error text an assertive live region so screen readers
+                announce it immediately when the dialog renders, even if focus has already moved
+                to the Cancel button. Without this, some screen readers skip aria-describedby
+                content once autoFocus fires.
+                MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/alert_role */}
             <Typography
               id="aksd-create-aks-project-error-desc"
+              role="alert"
               variant="body2"
               sx={{
                 whiteSpace: 'pre-wrap',
