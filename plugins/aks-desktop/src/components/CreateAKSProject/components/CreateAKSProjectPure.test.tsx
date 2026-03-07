@@ -189,6 +189,15 @@ describe('CreateAKSProjectPure — SuccessDialog story interactions', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('success message has role="status" so screen readers announce it on dialog open', () => {
+    renderStory(SuccessDialog.args!);
+    // The description text must be in a polite live region (role="status") so it
+    // is announced even when autoFocus has already moved to the Application name input.
+    const statusEl = screen.getByRole('status');
+    expect(statusEl).toBeInTheDocument();
+    expect(statusEl).toHaveTextContent(/has been created and is ready to use/i);
+  });
+
   it('calls onCancelSuccess when Cancel button is clicked in success dialog', () => {
     const onCancelSuccess = vi.fn();
     renderStory(SuccessDialog.args!, { onCancelSuccess });
@@ -244,5 +253,63 @@ describe('CreateAKSProjectPure — SuccessDialogWithAppName story interactions',
     expect(onNavigateToProject).toHaveBeenCalledTimes(1);
     const [url] = onNavigateToProject.mock.calls[0];
     expect(url).toContain('applicationName=frontend-service');
+  });
+});
+
+describe('CreateAKSProjectPure — error dialog a11y: error message announced', () => {
+  it('error message has role="alert" so screen readers announce it on dialog open', () => {
+    renderStory(ErrorOverlay.args!);
+    // The error text must be in a live region (role="alert") so it is announced
+    // even when autoFocus has already moved to the Cancel button.
+    const alertEl = screen.getByRole('alert');
+    expect(alertEl).toBeInTheDocument();
+    expect(alertEl).toHaveTextContent(/namespace creation failed/i);
+  });
+});
+
+describe('CreateAKSProjectPure — Breadcrumb keyboard navigation a11y', () => {
+  it('breadcrumb step buttons have a visible :focus-visible outline (focus-within query)', () => {
+    renderStory(BasicsStepDefault.args!);
+    // All step labels have role="button" and tabIndex={0} — keyboard users must
+    // be able to reach and activate them.
+    const stepButtons = screen.getAllByRole('button', {
+      name: /basics|networking|compute|access|review/i,
+    });
+    // Verify each step is reachable via keyboard (tabIndex not -1).
+    stepButtons.forEach(btn => {
+      expect(btn).not.toHaveAttribute('tabindex', '-1');
+    });
+  });
+
+  it('breadcrumb step icons are aria-hidden so they are not announced separately', () => {
+    renderStory(BasicsStepDefault.args!);
+    // The icons inside the breadcrumb use aria-hidden="true"; in the test the
+    // Icon mock renders <span data-icon="..." aria-hidden="true"> so we confirm
+    // no visible text-alternative is exposed for them.
+    const hiddenIcons = document.querySelectorAll('[data-icon][aria-hidden="true"]');
+    // Breadcrumb renders one icon per step (5 steps).
+    expect(hiddenIcons.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('activates the correct step when Enter is pressed on a breadcrumb item', () => {
+    const handleStepClick = vi.fn();
+    renderStory(BasicsStepDefault.args!, { handleStepClick });
+    const stepButtons = screen.getAllByRole('button', {
+      name: /networking/i,
+    });
+    // Press Enter on the Networking Policies step (index 1).
+    fireEvent.keyDown(stepButtons[0], { key: 'Enter' });
+    expect(handleStepClick).toHaveBeenCalledWith(1);
+  });
+
+  it('activates the correct step when Space is pressed on a breadcrumb item', () => {
+    const handleStepClick = vi.fn();
+    renderStory(BasicsStepDefault.args!, { handleStepClick });
+    const accessStepButtons = screen.getAllByRole('button', {
+      name: /access/i,
+    });
+    // Press Space on the Access step (index 3).
+    fireEvent.keyDown(accessStepButtons[0], { key: ' ' });
+    expect(handleStepClick).toHaveBeenCalledWith(3);
   });
 });

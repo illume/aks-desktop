@@ -13,7 +13,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({ title, icon, iconCol
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Icon icon={icon} width={24} height={24} color={iconColor} style={{ marginRight: 12 }} />
+        <Icon icon={icon} width={24} height={24} color={iconColor} style={{ marginRight: 12 }} aria-hidden="true" />
         <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
           {title}
         </Typography>

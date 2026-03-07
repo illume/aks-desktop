@@ -33,7 +33,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12}>
           <Card variant="outlined" sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
-              <Icon icon="mdi:project" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon icon="mdi:project" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Project Basics')}
             </Typography>
             <Grid container spacing={2}>
@@ -75,7 +75,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12} md={6}>
           <Card variant="outlined" sx={{ p: 2, mb: 2, height: '200px' }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
-              <Icon icon="mdi:network" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon icon="mdi:network" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Networking Policies')}
             </Typography>
             <Grid container spacing={2}>
@@ -98,7 +98,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12} md={6}>
           <Card variant="outlined" sx={{ p: 2, mb: 2, height: '200px' }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
-              <Icon icon="mdi:cpu-64-bit" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon icon="mdi:cpu-64-bit" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Compute Quota')}
             </Typography>
             <Grid container spacing={2}>
@@ -118,7 +118,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
                     color="text.secondary"
                     sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}
                   >
-                    <Icon icon="mdi:cpu-64-bit" style={{ marginRight: 4, fontSize: 16 }} />
+                    <Icon icon="mdi:cpu-64-bit" aria-hidden="true" style={{ marginRight: 4, fontSize: 16 }} />
                     {t('CPU')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -148,7 +148,7 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
                     color="text.secondary"
                     sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}
                   >
-                    <Icon icon="mdi:memory" style={{ marginRight: 4, fontSize: 16 }} />
+                    <Icon icon="mdi:memory" aria-hidden="true" style={{ marginRight: 4, fontSize: 16 }} />
                     {t('Memory')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -171,12 +171,16 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12}>
           <Card variant="outlined" sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
-              <Icon icon="mdi:account-group" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon icon="mdi:account-group" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Access Control ({{count}} assignee)', {
                 count: formData.userAssignments.length,
               })}
             </Typography>
+            {/* tabIndex={0} satisfies the scrollable-region-focusable axe rule (WCAG 2.1.1):
+                keyboard users must be able to reach scrollable regions that may contain
+                content not visible in the viewport. */}
             <Box
+              tabIndex={0}
               sx={{
                 maxHeight: '200px',
                 overflowY: 'auto',
