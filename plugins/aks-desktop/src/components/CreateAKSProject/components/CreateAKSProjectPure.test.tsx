@@ -189,6 +189,15 @@ describe('CreateAKSProjectPure — SuccessDialog story interactions', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('success message has role="status" so screen readers announce it on dialog open', () => {
+    renderStory(SuccessDialog.args!);
+    // The description text must be in a polite live region (role="status") so it
+    // is announced even when autoFocus has already moved to the Application name input.
+    const statusEl = screen.getByRole('status');
+    expect(statusEl).toBeInTheDocument();
+    expect(statusEl).toHaveTextContent(/has been created and is ready to use/i);
+  });
+
   it('calls onCancelSuccess when Cancel button is clicked in success dialog', () => {
     const onCancelSuccess = vi.fn();
     renderStory(SuccessDialog.args!, { onCancelSuccess });

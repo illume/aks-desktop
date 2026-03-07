@@ -317,9 +317,15 @@ export default function CreateAKSProjectPure({
           <DialogContent>
             {/* id provides the accessible description for this dialog via aria-describedby.
                 component="p" keeps h6 visual styling but renders as a <p> element so the
-                heading hierarchy (DialogTitle=h2 → this) stays valid. */}
+                heading hierarchy (DialogTitle=h2 → this) stays valid.
+                role="status" makes this an aria-live="polite" region so the success message
+                is announced by screen readers when the dialog renders, even though autoFocus
+                has already moved to the Application name input. Without a live region, some
+                AT skip aria-describedby content once focus has landed elsewhere.
+                MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role */}
             <Typography
               id="aksd-create-aks-project-success-desc"
+              role="status"
               variant="h6"
               component="p"
               sx={{ mb: 3, color: 'text.secondary' }}
