@@ -427,3 +427,9 @@ FodyWeavers.xsd
 *.msp
 
 .eslintcache
+
+# Storybook build output
+storybook-static/
+
+# Generated screenshots
+__screenshots__/
