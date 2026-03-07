@@ -60,7 +60,10 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
         justifyContent="center"
         height="100%"
       >
-        <CircularProgress size={32} sx={{ mb: 1 }} />
+        {/* A11y: CircularProgress renders role="progressbar"; an accessible name is required
+            so that screen readers announce what is loading.
+            MUI Progress accessibility: https://mui.com/material-ui/react-progress/#accessibility */}
+        <CircularProgress size={32} sx={{ mb: 1 }} aria-label={t('Loading scaling metrics')} />
         <Typography variant="body2" color="text.secondary">
           {t('Loading scaling metrics from Prometheus')}...
         </Typography>
