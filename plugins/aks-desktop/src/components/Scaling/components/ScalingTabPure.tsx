@@ -111,7 +111,7 @@ export const ScalingTabPure: React.FC<ScalingTabPureProps> = ({
 
       {(error || saveError) && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {error ?? saveError}
+          {error || saveError}
         </Alert>
       )}
 
