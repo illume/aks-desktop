@@ -53,10 +53,7 @@ export const MultipleAssignees: StoryFn<AccessStepProps> = () => (
 
 /** Empty state with no assignees. */
 export const NoAssignees: StoryFn<AccessStepProps> = () => (
-  <AccessStep
-    {...BASE_PROPS}
-    formData={{ ...BASE_FORM_DATA, userAssignments: [] }}
-  />
+  <AccessStep {...BASE_PROPS} formData={{ ...BASE_FORM_DATA, userAssignments: [] }} />
 );
 
 /** Invalid email triggers validation error. */
@@ -71,6 +68,4 @@ export const InvalidEmail: StoryFn<AccessStepProps> = () => (
 );
 
 /** Loading state disables all controls. */
-export const Loading: StoryFn<AccessStepProps> = () => (
-  <AccessStep {...BASE_PROPS} loading />
-);
+export const Loading: StoryFn<AccessStepProps> = () => <AccessStep {...BASE_PROPS} loading />;

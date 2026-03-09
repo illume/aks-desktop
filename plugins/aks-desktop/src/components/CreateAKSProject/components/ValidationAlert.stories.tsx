@@ -38,7 +38,11 @@ export const WithAction: StoryFn<ValidationAlertProps> = () => (
   <ValidationAlert
     type="error"
     message="Failed to connect to cluster"
-    action={<Button color="inherit" size="small">Retry</Button>}
+    action={
+      <Button color="inherit" size="small">
+        Retry
+      </Button>
+    }
   />
 );
 

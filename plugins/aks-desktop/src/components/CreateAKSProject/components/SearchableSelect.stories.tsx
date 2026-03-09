@@ -40,11 +40,7 @@ export const Loading: StoryFn<SearchableSelectProps> = () => (
 
 /** Error state. */
 export const WithError: StoryFn<SearchableSelectProps> = () => (
-  <SearchableSelect
-    {...BASE_PROPS}
-    error
-    helperText="Please select a subscription"
-  />
+  <SearchableSelect {...BASE_PROPS} error helperText="Please select a subscription" />
 );
 
 /** Disabled state. */

@@ -23,13 +23,7 @@ export const Default: StoryFn<FormFieldProps> = () => <FormField {...BASE_PROPS}
 
 /** Field with error. */
 export const WithError: StoryFn<FormFieldProps> = () => (
-  <FormField
-    {...BASE_PROPS}
-    value=""
-    error
-    helperText="Project name is required"
-    required
-  />
+  <FormField {...BASE_PROPS} value="" error helperText="Project name is required" required />
 );
 
 /** Number field. */

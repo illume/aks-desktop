@@ -36,7 +36,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
               {/* aria-hidden: decorative section icon — the adjacent heading text already
                   conveys the section name to screen readers.
                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-              <Icon icon="mdi:project" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon
+                icon="mdi:project"
+                aria-hidden="true"
+                style={{ marginRight: 8, verticalAlign: 'middle' }}
+              />
               {t('Project Basics')}
             </Typography>
             <Grid container spacing={2}>
@@ -80,7 +84,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
               {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-              <Icon icon="mdi:network" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon
+                icon="mdi:network"
+                aria-hidden="true"
+                style={{ marginRight: 8, verticalAlign: 'middle' }}
+              />
               {t('Networking Policies')}
             </Typography>
             <Grid container spacing={2}>
@@ -105,7 +113,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
               {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-              <Icon icon="mdi:cpu-64-bit" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon
+                icon="mdi:cpu-64-bit"
+                aria-hidden="true"
+                style={{ marginRight: 8, verticalAlign: 'middle' }}
+              />
               {t('Compute Quota')}
             </Typography>
             <Grid container spacing={2}>
@@ -127,7 +139,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
                   >
                     {/* aria-hidden: decorative inline icon — see comment on "Project Basics" above.
                         MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-                    <Icon icon="mdi:cpu-64-bit" aria-hidden="true" style={{ marginRight: 4, fontSize: 16 }} />
+                    <Icon
+                      icon="mdi:cpu-64-bit"
+                      aria-hidden="true"
+                      style={{ marginRight: 4, fontSize: 16 }}
+                    />
                     {t('CPU')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -159,7 +175,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
                   >
                     {/* aria-hidden: decorative inline icon — see comment on "Project Basics" above.
                         MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-                    <Icon icon="mdi:memory" aria-hidden="true" style={{ marginRight: 4, fontSize: 16 }} />
+                    <Icon
+                      icon="mdi:memory"
+                      aria-hidden="true"
+                      style={{ marginRight: 4, fontSize: 16 }}
+                    />
                     {t('Memory')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -184,7 +204,11 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
               {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-              <Icon icon="mdi:account-group" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              <Icon
+                icon="mdi:account-group"
+                aria-hidden="true"
+                style={{ marginRight: 8, verticalAlign: 'middle' }}
+              />
               {t('Access Control ({{count}} assignee)', {
                 count: formData.userAssignments.length,
               })}

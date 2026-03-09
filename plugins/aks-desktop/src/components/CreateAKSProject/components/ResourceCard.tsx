@@ -16,7 +16,14 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({ title, icon, iconCol
         {/* aria-hidden: decorative icon — the adjacent heading already conveys the
             section name to screen readers. Hiding it prevents duplicate announcements.
             MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
-        <Icon icon={icon} width={24} height={24} color={iconColor} style={{ marginRight: 12 }} aria-hidden="true" />
+        <Icon
+          icon={icon}
+          width={24}
+          height={24}
+          color={iconColor}
+          style={{ marginRight: 12 }}
+          aria-hidden="true"
+        />
         <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
           {title}
         </Typography>

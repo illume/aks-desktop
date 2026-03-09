@@ -648,7 +648,10 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the textbox with "invalid" state when email is malformed', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'bad-email', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -665,7 +668,10 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the error helper text immediately after the invalid textbox', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'bad-email', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -681,7 +687,10 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the Remove assignee button with its aria-label', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'bad-email', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -694,7 +703,10 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces "Add assignee" as disabled while invalid assignments exist', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'bad-email', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -707,7 +719,10 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the Role combobox', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'bad-email', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -725,7 +740,10 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the textbox as "not invalid" when email is valid', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Reader' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -739,7 +757,10 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the entered email address as the textbox value', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Reader' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -753,7 +774,10 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the Role combobox with its current value', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Reader' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -768,7 +792,10 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces "Add assignee" as enabled when all assignments are valid', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Reader' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -782,7 +809,10 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the Remove assignee button', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Reader' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
       />
@@ -799,7 +829,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the email textbox as disabled', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
         loading
@@ -814,7 +847,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the Role combobox as disabled', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
         loading
@@ -829,7 +865,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the Remove assignee button as disabled', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
         loading
@@ -842,7 +881,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the Add assignee button as disabled', async () => {
     render(
       <AccessStep
-        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{
+          ...ACCESS_FORM_DATA,
+          userAssignments: [{ email: 'user@example.com', role: 'Writer' }],
+        }}
         onFormDataChange={() => {}}
         validation={ACCESS_VALIDATION}
         loading
@@ -1504,7 +1546,9 @@ describe('SR: ComputeStep — CpuRequestError (isolated single-field)', () => {
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const spinbuttons = ps.filter(p => /spinbutton/i.test(p));
-    const invalidCount = spinbuttons.filter(s => /\binvalid\b/i.test(s) && !/not invalid/i.test(s)).length;
+    const invalidCount = spinbuttons.filter(
+      s => /\binvalid\b/i.test(s) && !/not invalid/i.test(s)
+    ).length;
     expect(invalidCount).toBe(1);
   });
 
@@ -1512,9 +1556,7 @@ describe('SR: ComputeStep — CpuRequestError (isolated single-field)', () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={SINGLE_ERROR} />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
-    const others = ps.filter(
-      p => /spinbutton/i.test(p) && !/cpu requests/i.test(p)
-    );
+    const others = ps.filter(p => /spinbutton/i.test(p) && !/cpu requests/i.test(p));
     others.forEach(s => expect(s).toMatch(/not invalid/i));
   });
 });
@@ -1657,14 +1699,7 @@ describe('SR: FormField — WithError', () => {
   });
 
   it('announces the error helper text', async () => {
-    render(
-      <FormField
-        {...FORMFIELD_BASE}
-        value=""
-        error
-        helperText="Project name is required"
-      />
-    );
+    render(<FormField {...FORMFIELD_BASE} value="" error helperText="Project name is required" />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     // The helper text is linked via aria-describedby and announced as part of the textbox
