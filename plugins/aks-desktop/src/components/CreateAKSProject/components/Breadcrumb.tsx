@@ -58,8 +58,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
                  mouse users don't see an outline on click.
                  MDN: https://developer.mozilla.org/en-US/docs/Web/CSS/:focus-visible */
               '&:focus-visible': {
-                outline: '2px solid',
-                outlineColor: 'primary.main',
+                outline: `2px solid ${theme.palette.primary.main}`,
                 outlineOffset: '2px',
               },
             }}

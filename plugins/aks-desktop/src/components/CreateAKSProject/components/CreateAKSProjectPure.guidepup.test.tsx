@@ -111,9 +111,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
 }));
 
 vi.mock('@iconify/react', () => ({
-  Icon: ({ icon, 'aria-hidden': ariaHidden }: any) => (
-    <span data-icon={icon} aria-hidden={ariaHidden ?? 'true'} />
-  ),
+  Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
 }));
 
 import CreateAKSProjectPure from './CreateAKSProjectPure';

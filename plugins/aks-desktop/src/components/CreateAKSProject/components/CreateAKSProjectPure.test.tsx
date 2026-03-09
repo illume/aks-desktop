@@ -44,7 +44,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib/CommonComponents', () => ({
 }));
 
 vi.mock('@iconify/react', () => ({
-  Icon: ({ icon }: any) => <span data-icon={icon} aria-hidden="true" />,
+  Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
 }));
 
 import CreateAKSProjectPure, { CreateAKSProjectPureProps } from './CreateAKSProjectPure';
@@ -268,7 +268,7 @@ describe('CreateAKSProjectPure — error dialog a11y: error message announced', 
 });
 
 describe('CreateAKSProjectPure — Breadcrumb keyboard navigation a11y', () => {
-  it('breadcrumb step buttons have a visible :focus-visible outline (focus-within query)', () => {
+  it('breadcrumb step buttons are keyboard-reachable (tabIndex is not -1)', () => {
     renderStory(BasicsStepDefault.args!);
     // All step labels have role="button" and tabIndex={0} — keyboard users must
     // be able to reach and activate them.
