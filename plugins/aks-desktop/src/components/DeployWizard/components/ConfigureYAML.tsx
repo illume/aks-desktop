@@ -102,7 +102,6 @@ export default function ConfigureYAML({
               tabFocusToggleCounter++;
               try {
                 editor.trigger('keyboard', 'editor.action.toggleTabFocusMode', undefined);
-                alert(tabFocusToggleCounter);
                 if (tabFocusToggleCounter >= 2) {
                   // If we've already toggled once, toggle back so the editor's state isn't changed by this check.
                   editor.trigger('keyboard', 'editor.action.toggleTabFocusMode', undefined);

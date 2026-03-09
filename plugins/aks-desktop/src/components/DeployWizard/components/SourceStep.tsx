@@ -131,7 +131,7 @@ export default function SourceStep({ sourceType, onSourceTypeChange }: SourceSte
                       transition: 'all 0.3s ease',
                     }}
                   >
-                    <Icon icon={iconName} width={36} height={36} color="contrastText" />
+                    <Icon icon={iconName} width={36} height={36} color="contrastText" aria-hidden="true" />
                   </Box>
                   {selected && (
                     <Box
@@ -155,6 +155,7 @@ export default function SourceStep({ sourceType, onSourceTypeChange }: SourceSte
                         color={theme.palette.getContrastText(theme.palette.primary.main)}
                         width={18}
                         height={18}
+                        aria-hidden="true"
                       />
                     </Box>
                   )}

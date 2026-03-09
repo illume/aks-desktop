@@ -70,6 +70,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
                 width={24}
                 height={24}
                 color={index === activeStep ? 'primary.main' : 'text.secondary'}
+                aria-hidden="true"
               />
             </Box>
 
@@ -87,7 +88,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, activeStep, onSte
           </Box>
 
           {index < steps.length - 1 && (
-            <Typography variant="body1" sx={{ mx: 2, color: 'text.secondary' }}>
+            <Typography variant="body1" aria-hidden="true" sx={{ mx: 2, color: 'text.secondary' }}>
               &gt;
             </Typography>
           )}
