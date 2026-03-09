@@ -286,7 +286,10 @@ describe('CreateAKSProjectPure — Breadcrumb keyboard navigation a11y', () => {
     // The icons inside the breadcrumb use aria-hidden="true"; in the test the
     // Icon mock renders <span data-icon="..." aria-hidden="true"> so we confirm
     // no visible text-alternative is exposed for them.
-    const hiddenIcons = document.querySelectorAll('[data-icon][aria-hidden="true"]');
+    // Scope to the breadcrumb nav so the assertion doesn't false-pass from other
+    // aria-hidden icons elsewhere in the tree.
+    const wizardNav = screen.getByRole('navigation', { name: /wizard steps/i });
+    const hiddenIcons = wizardNav.querySelectorAll('[data-icon][aria-hidden="true"]');
     // Breadcrumb renders one icon per step (5 steps).
     expect(hiddenIcons.length).toBeGreaterThanOrEqual(5);
   });
