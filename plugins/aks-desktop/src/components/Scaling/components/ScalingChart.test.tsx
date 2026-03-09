@@ -47,11 +47,7 @@ describe('ScalingChart a11y', () => {
   test('has no axe violations with error state', async () => {
     const { container } = render(
       <div style={{ height: 400 }}>
-        <ScalingChart
-          chartData={[]}
-          loading={false}
-          error="Unable to connect to Prometheus"
-        />
+        <ScalingChart chartData={[]} loading={false} error="Unable to connect to Prometheus" />
       </div>
     );
     const results = await axe.run(container);

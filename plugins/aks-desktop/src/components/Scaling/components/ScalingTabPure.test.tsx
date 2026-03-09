@@ -156,6 +156,32 @@ describe('ScalingTabPure a11y', () => {
     expect(results.violations).toEqual([]);
   });
 
+  test('has no axe violations in fetch error state', async () => {
+    const { container } = render(
+      <ScalingTabPure
+        deployments={[]}
+        selectedDeployment=""
+        loading={false}
+        error="Failed to fetch deployments from cluster"
+        hpaInfo={null}
+        chartData={[]}
+        chartLoading={false}
+        chartError={null}
+        editDialogOpen={false}
+        editValues={defaultEditValues}
+        saving={false}
+        saveError={null}
+        onDeploymentChange={() => {}}
+        onEditClick={() => {}}
+        onEditDialogClose={() => {}}
+        onEditValuesChange={() => {}}
+        onSave={async () => {}}
+      />
+    );
+    const results = await axe.run(container);
+    expect(results.violations).toEqual([]);
+  });
+
   test('has no axe violations with edit dialog open', async () => {
     render(
       <ScalingTabPure
