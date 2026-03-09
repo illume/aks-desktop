@@ -114,27 +114,25 @@ vi.mock('@iconify/react', () => ({
   Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
 }));
 
-import CreateAKSProjectPure from './CreateAKSProjectPure';
-import type { CreateAKSProjectPureProps } from './CreateAKSProjectPure';
+import type {
+  BreadcrumbProps,
+  ComputeStepProps,
+  FormFieldProps,
+  NetworkingStepProps,
+  ReviewStepProps,
+} from '../types';
+import { STEPS } from '../types';
 import { AccessStep } from './AccessStep';
 import { Breadcrumb } from './Breadcrumb';
+import { ComputeStep } from './ComputeStep';
+import type { CreateAKSProjectPureProps } from './CreateAKSProjectPure';
+import CreateAKSProjectPure from './CreateAKSProjectPure';
 import { FormField } from './FormField';
 import { NetworkingStep } from './NetworkingStep';
-import { ComputeStep } from './ComputeStep';
 import { ReviewStep } from './ReviewStep';
+import type { SearchableSelectProps } from './SearchableSelect';
 import { SearchableSelect } from './SearchableSelect';
 import { ValidationAlert } from './ValidationAlert';
-import { STEPS } from '../types';
-import type {
-  AccessStepProps,
-  BreadcrumbProps,
-  FormFieldProps,
-  ReviewStepProps,
-  NetworkingStepProps,
-  ComputeStepProps,
-  ValidationAlertProps,
-} from '../types';
-import type { SearchableSelectProps } from './SearchableSelect';
 
 // ── Base props (matches Storybook baseArgs) ───────────────────────────────────
 const BASE_PROPS: CreateAKSProjectPureProps = {
@@ -566,24 +564,62 @@ describe('SR: SuccessDialogWithAppName — enabled Create Application', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// AccessStep fixtures
+// ═══════════════════════════════════════════════════════════════════════════
+const ACCESS_FORM_DATA = {
+  projectName: 'azure-microservices-demo',
+  description: '',
+  subscription: 'sub-123',
+  cluster: 'aks-prod-eastus',
+  resourceGroup: 'rg-prod',
+  ingress: 'AllowSameNamespace' as const,
+  egress: 'AllowAll' as const,
+  cpuRequest: 2000,
+  memoryRequest: 4096,
+  cpuLimit: 4000,
+  memoryLimit: 8192,
+  userAssignments: [{ email: 'alice@example.com', role: 'Admin' }],
+};
+
+const ACCESS_VALIDATION = { isValid: true, errors: [] as string[], warnings: [] as string[] };
+
+// ═══════════════════════════════════════════════════════════════════════════
 // AccessStep — empty state
 // ═══════════════════════════════════════════════════════════════════════════
 describe('SR: AccessStep — empty (no assignments)', () => {
   it('announces the "Access" heading at level 2', async () => {
-    render(<AccessStep formData={{ userAssignments: [] }} onFormDataChange={() => {}} />);
+    render(
+      <AccessStep
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [] }}
+        onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
+      />
+    );
     await virtual.start({ container: document.body });
     expect(await phrases()).toContain('heading, Access, level 2');
   });
 
   it('announces the introductory description paragraph', async () => {
-    render(<AccessStep formData={{ userAssignments: [] }} onFormDataChange={() => {}} />);
+    render(
+      <AccessStep
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [] }}
+        onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
+      />
+    );
     await virtual.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /assign permissions/i.test(p))).toBe(true);
   });
 
   it('announces the "Add assignee" button as enabled', async () => {
-    render(<AccessStep formData={{ userAssignments: [] }} onFormDataChange={() => {}} />);
+    render(
+      <AccessStep
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [] }}
+        onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
+      />
+    );
     await virtual.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('button, Add assignee');
@@ -591,7 +627,13 @@ describe('SR: AccessStep — empty (no assignments)', () => {
   });
 
   it('does NOT announce any textbox or Remove button when empty', async () => {
-    render(<AccessStep formData={{ userAssignments: [] }} onFormDataChange={() => {}} />);
+    render(
+      <AccessStep
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [] }}
+        onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
+      />
+    );
     await virtual.start({ container: document.body });
     const ps = await phrases();
     expect(ps.every(p => !/textbox/i.test(p))).toBe(true);
@@ -606,8 +648,9 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the textbox with "invalid" state when email is malformed', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -622,8 +665,9 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the error helper text immediately after the invalid textbox', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -637,8 +681,9 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the Remove assignee button with its aria-label', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -649,8 +694,9 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces "Add assignee" as disabled while invalid assignments exist', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -661,8 +707,9 @@ describe('SR: AccessStep — invalid email entered', () => {
   it('announces the Role combobox', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'bad-email', role: 'Writer' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -678,8 +725,9 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the textbox as "not invalid" when email is valid', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -691,8 +739,9 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the entered email address as the textbox value', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -704,8 +753,9 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the Role combobox with its current value', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -718,8 +768,9 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces "Add assignee" as enabled when all assignments are valid', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -731,8 +782,9 @@ describe('SR: AccessStep — valid email entered', () => {
   it('announces the Remove assignee button', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Reader' }] }}
         onFormDataChange={() => {}}
+        validation={ACCESS_VALIDATION}
       />
     );
     await virtual.start({ container: document.body });
@@ -747,9 +799,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the email textbox as disabled', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
         onFormDataChange={() => {}}
-        loading={true}
+        validation={ACCESS_VALIDATION}
+        loading
       />
     );
     await virtual.start({ container: document.body });
@@ -761,9 +814,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the Role combobox as disabled', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
         onFormDataChange={() => {}}
-        loading={true}
+        validation={ACCESS_VALIDATION}
+        loading
       />
     );
     await virtual.start({ container: document.body });
@@ -775,9 +829,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the Remove assignee button as disabled', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
         onFormDataChange={() => {}}
-        loading={true}
+        validation={ACCESS_VALIDATION}
+        loading
       />
     );
     await virtual.start({ container: document.body });
@@ -787,9 +842,10 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
   it('announces the Add assignee button as disabled', async () => {
     render(
       <AccessStep
-        formData={{ userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
+        formData={{ ...ACCESS_FORM_DATA, userAssignments: [{ email: 'user@example.com', role: 'Writer' }] }}
         onFormDataChange={() => {}}
-        loading={true}
+        validation={ACCESS_VALIDATION}
+        loading
       />
     );
     await virtual.start({ container: document.body });
@@ -1204,7 +1260,7 @@ describe('SR: NetworkingStep — AllowAll', () => {
 // ── NetworkingStep — Loading ───────────────────────────────────────────────────
 describe('SR: NetworkingStep — Loading (both selects disabled)', () => {
   it('announces the Ingress combobox as disabled', async () => {
-    render(<NetworkingStep {...NET_BASE_PROPS} loading={true} />);
+    render(<NetworkingStep {...NET_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const ingress = ps.find(p => /combobox/i.test(p) && /ingress/i.test(p));
@@ -1212,7 +1268,7 @@ describe('SR: NetworkingStep — Loading (both selects disabled)', () => {
   });
 
   it('announces the Egress combobox as disabled', async () => {
-    render(<NetworkingStep {...NET_BASE_PROPS} loading={true} />);
+    render(<NetworkingStep {...NET_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const egress = ps.find(p => /combobox/i.test(p) && /egress/i.test(p));
@@ -1466,7 +1522,7 @@ describe('SR: ComputeStep — CpuRequestError (isolated single-field)', () => {
 // ── ComputeStep — Loading ─────────────────────────────────────────────────────
 describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
   it('announces the CPU Requests spinbutton as disabled', async () => {
-    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading={true} />);
+    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu requests/i.test(p));
@@ -1474,7 +1530,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
   });
 
   it('announces the CPU Limits spinbutton as disabled', async () => {
-    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading={true} />);
+    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu limits/i.test(p));
@@ -1482,7 +1538,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
   });
 
   it('announces the Memory Requests spinbutton as disabled', async () => {
-    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading={true} />);
+    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory requests/i.test(p));
@@ -1490,7 +1546,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
   });
 
   it('announces the Memory Limits spinbutton as disabled', async () => {
-    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading={true} />);
+    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory limits/i.test(p));
@@ -1498,7 +1554,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
   });
 
   it('announces all four spinbuttons as disabled', async () => {
-    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading={true} />);
+    render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const spinbuttons = ps.filter(p => /spinbutton/i.test(p));
@@ -1588,9 +1644,9 @@ describe('SR: FormField — WithError', () => {
       <FormField
         {...FORMFIELD_BASE}
         value=""
-        error={true}
+        error
         helperText="Project name is required"
-        required={true}
+        required
       />
     );
     await virtual.start({ container: document.body });
@@ -1605,7 +1661,7 @@ describe('SR: FormField — WithError', () => {
       <FormField
         {...FORMFIELD_BASE}
         value=""
-        error={true}
+        error
         helperText="Project name is required"
       />
     );
@@ -1628,7 +1684,7 @@ describe('SR: FormField — NumberField', () => {
 
 describe('SR: FormField — Disabled', () => {
   it('announces the textbox as disabled', async () => {
-    render(<FormField {...FORMFIELD_BASE} disabled={true} />);
+    render(<FormField {...FORMFIELD_BASE} disabled />);
     await virtual.start({ container: document.body });
     const ps = await phrases();
     const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));

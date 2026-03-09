@@ -26,9 +26,9 @@ export const WithError: StoryFn<FormFieldProps> = () => (
   <FormField
     {...BASE_PROPS}
     value=""
-    error={true}
+    error
     helperText="Project name is required"
-    required={true}
+    required
   />
 );
 
@@ -45,7 +45,7 @@ export const NumberField: StoryFn<FormFieldProps> = () => (
 
 /** Disabled field. */
 export const Disabled: StoryFn<FormFieldProps> = () => (
-  <FormField {...BASE_PROPS} disabled={true} helperText="This field is disabled" />
+  <FormField {...BASE_PROPS} disabled helperText="This field is disabled" />
 );
 
 /** Multiline textarea. */
@@ -54,7 +54,7 @@ export const Multiline: StoryFn<FormFieldProps> = () => (
     {...BASE_PROPS}
     label="Description"
     value="A multi-line description for the project"
-    multiline={true}
+    multiline
     rows={4}
   />
 );

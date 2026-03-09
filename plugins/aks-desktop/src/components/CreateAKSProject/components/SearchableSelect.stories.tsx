@@ -35,19 +35,19 @@ export const WithSelection: StoryFn<SearchableSelectProps> = () => (
 
 /** Loading state. */
 export const Loading: StoryFn<SearchableSelectProps> = () => (
-  <SearchableSelect {...BASE_PROPS} loading={true} />
+  <SearchableSelect {...BASE_PROPS} loading />
 );
 
 /** Error state. */
 export const WithError: StoryFn<SearchableSelectProps> = () => (
   <SearchableSelect
     {...BASE_PROPS}
-    error={true}
+    error
     helperText="Please select a subscription"
   />
 );
 
 /** Disabled state. */
 export const Disabled: StoryFn<SearchableSelectProps> = () => (
-  <SearchableSelect {...BASE_PROPS} value="sub-123" disabled={true} />
+  <SearchableSelect {...BASE_PROPS} value="sub-123" disabled />
 );

@@ -72,5 +72,5 @@ export const InvalidEmail: StoryFn<AccessStepProps> = () => (
 
 /** Loading state disables all controls. */
 export const Loading: StoryFn<AccessStepProps> = () => (
-  <AccessStep {...BASE_PROPS} loading={true} />
+  <AccessStep {...BASE_PROPS} loading />
 );
