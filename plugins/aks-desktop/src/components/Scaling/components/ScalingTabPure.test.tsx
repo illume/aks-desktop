@@ -182,6 +182,32 @@ describe('ScalingTabPure a11y', () => {
     expect(results.violations).toEqual([]);
   });
 
+  test('has no axe violations with saveError', async () => {
+    const { container } = render(
+      <ScalingTabPure
+        deployments={sampleDeployments}
+        selectedDeployment="frontend"
+        loading={false}
+        error={null}
+        hpaInfo={hpaInfo}
+        chartData={sampleChartData}
+        chartLoading={false}
+        chartError={null}
+        editDialogOpen={false}
+        editValues={defaultEditValues}
+        saving={false}
+        saveError="Failed to save scaling configuration"
+        onDeploymentChange={() => {}}
+        onEditClick={() => {}}
+        onEditDialogClose={() => {}}
+        onEditValuesChange={() => {}}
+        onSave={async () => {}}
+      />
+    );
+    const results = await axe.run(container);
+    expect(results.violations).toEqual([]);
+  });
+
   test('has no axe violations with edit dialog open', async () => {
     render(
       <ScalingTabPure

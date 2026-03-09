@@ -11,9 +11,11 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-// Stub Iconify so the test focuses on metrics structure rather than icon loading
+// Stub Iconify so the test focuses on metrics structure rather than icon loading.
+// Forward aria-hidden so guidepup assertions reflect the real component's accessibility attributes.
 vi.mock('@iconify/react', () => ({
-  Icon: ({ icon }: { icon: string }) => <span data-testid={`icon-${icon}`} aria-hidden="true" />,
+  Icon: ({ icon, 'aria-hidden': ariaHidden }: { icon: string; 'aria-hidden'?: string | boolean }) =>
+    ariaHidden ? null : <span>{icon}</span>,
 }));
 
 import { ScalingMetrics } from './ScalingMetrics';

@@ -132,7 +132,14 @@ export const ScalingEditDialog: React.FC<ScalingEditDialogProps> = ({
           onClick={onSave}
           variant="contained"
           disabled={saving}
-          startIcon={saving ? undefined : <Icon icon="mdi:content-save" />}
+          startIcon={
+            saving ? undefined : (
+              // A11y: Icon is purely decorative (the button text "Save" provides meaning) —
+              // aria-hidden hides it from the accessibility tree.
+              // MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden
+              <Icon icon="mdi:content-save" aria-hidden="true" />
+            )
+          }
         >
           {saving ? (
             <>

@@ -11,10 +11,11 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-// @iconify/react renders an inline SVG — stub it with a simple presentational span
-// so the test focuses on dialog structure rather than icon loading
+// @iconify/react renders an inline SVG — stub it so the test focuses on dialog structure.
+// Forward aria-hidden so axe tests can detect missing aria-hidden on decorative icons in production code.
 vi.mock('@iconify/react', () => ({
-  Icon: ({ icon }: { icon: string }) => <span data-testid={`icon-${icon}`} aria-hidden="true" />,
+  Icon: ({ icon, 'aria-hidden': ariaHidden }: { icon: string; 'aria-hidden'?: string | boolean }) =>
+    ariaHidden ? null : <span>{icon}</span>,
 }));
 
 import type { EditValues } from '../hooks/useEditDialog';
