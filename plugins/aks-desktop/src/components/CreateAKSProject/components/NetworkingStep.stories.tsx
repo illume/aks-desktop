@@ -6,8 +6,6 @@ import React from 'react';
 import type { NetworkingStepProps } from '../types';
 import { NetworkingStep } from './NetworkingStep';
 
-// ── Shared base form data ─────────────────────────────────────────────────────
-
 const BASE_FORM_DATA = {
   projectName: 'azure-microservices-demo',
   description: '',
@@ -29,16 +27,12 @@ const BASE_PROPS: NetworkingStepProps = {
   validation: { isValid: true, errors: [], warnings: [] },
 };
 
-// ── Meta ─────────────────────────────────────────────────────────────────────
-
 export default {
   title: 'CreateAKSProject/NetworkingStep',
   component: NetworkingStep,
 } as Meta;
 
 const Template: StoryFn<NetworkingStepProps> = args => <NetworkingStep {...args} />;
-
-// ── Stories ──────────────────────────────────────────────────────────────────
 
 /**
  * Default state — ingress set to "Allow same namespace", egress set to "Allow all".

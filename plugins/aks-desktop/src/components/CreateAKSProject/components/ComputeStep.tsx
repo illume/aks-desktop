@@ -54,6 +54,10 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
               }
               error={!!getFieldError('cpuRequest')}
               startAdornment={
+                /* aria-hidden: decorative adornment icon — the input label already
+                   identifies the field; hiding the icon avoids screen readers announcing
+                   "image" or the icon name for each field.
+                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */
                 <Icon
                   icon="mdi:arrow-down"
                   width={20}
@@ -83,6 +87,8 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
               }
               error={!!getFieldError('cpuLimit')}
               startAdornment={
+                /* aria-hidden: decorative adornment icon — see comment on CPU Requests above.
+                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */
                 <Icon
                   icon="mdi:arrow-up"
                   width={20}
@@ -117,6 +123,8 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
               }
               error={!!getFieldError('memoryRequest')}
               startAdornment={
+                /* aria-hidden: decorative adornment icon — see comment on CPU Requests above.
+                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */
                 <Icon
                   icon="mdi:arrow-down"
                   width={20}
@@ -146,6 +154,8 @@ export const ComputeStep: React.FC<ComputeStepProps> = ({
               }
               error={!!getFieldError('memoryLimit')}
               startAdornment={
+                /* aria-hidden: decorative adornment icon — see comment on CPU Requests above.
+                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */
                 <Icon
                   icon="mdi:arrow-up"
                   width={20}

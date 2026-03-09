@@ -6,8 +6,6 @@ import React from 'react';
 import type { AccessStepProps } from '../types';
 import { AccessStep } from './AccessStep';
 
-// ── Shared base form data ─────────────────────────────────────────────────────
-
 const BASE_FORM_DATA = {
   projectName: 'azure-microservices-demo',
   description: '',
@@ -29,15 +27,11 @@ const BASE_PROPS: AccessStepProps = {
   validation: { isValid: true, errors: [], warnings: [] },
 };
 
-// ── Meta ──────────────────────────────────────────────────────────────────────
-
 const meta: Meta<typeof AccessStep> = {
   title: 'CreateAKSProject/AccessStep',
   component: AccessStep,
 };
 export default meta;
-
-// ── Stories ───────────────────────────────────────────────────────────────────
 
 /** Default state with one valid assignee. */
 export const Default: StoryFn<AccessStepProps> = () => <AccessStep {...BASE_PROPS} />;

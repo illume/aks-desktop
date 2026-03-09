@@ -12,15 +12,11 @@ const BASE_PROPS: FormFieldProps = {
   onChange: () => {},
 };
 
-// ── Meta ──────────────────────────────────────────────────────────────────────
-
 const meta: Meta<typeof FormField> = {
   title: 'CreateAKSProject/FormField',
   component: FormField,
 };
 export default meta;
-
-// ── Stories ───────────────────────────────────────────────────────────────────
 
 /** Default text field. */
 export const Default: StoryFn<FormFieldProps> = () => <FormField {...BASE_PROPS} />;

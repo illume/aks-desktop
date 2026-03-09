@@ -14,15 +14,11 @@ const BASE_PROPS: BreadcrumbProps = {
   onStepClick: () => {},
 };
 
-// ── Meta ──────────────────────────────────────────────────────────────────────
-
 const meta: Meta<typeof Breadcrumb> = {
   title: 'CreateAKSProject/Breadcrumb',
   component: Breadcrumb,
 };
 export default meta;
-
-// ── Stories ───────────────────────────────────────────────────────────────────
 
 /** First step active. */
 export const FirstStep: StoryFn<BreadcrumbProps> = () => <Breadcrumb {...BASE_PROPS} />;

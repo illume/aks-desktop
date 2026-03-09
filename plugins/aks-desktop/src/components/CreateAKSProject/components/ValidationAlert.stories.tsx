@@ -7,15 +7,11 @@ import React from 'react';
 import type { ValidationAlertProps } from '../types';
 import { ValidationAlert } from './ValidationAlert';
 
-// ── Meta ──────────────────────────────────────────────────────────────────────
-
 const meta: Meta<typeof ValidationAlert> = {
   title: 'CreateAKSProject/ValidationAlert',
   component: ValidationAlert,
 };
 export default meta;
-
-// ── Stories ───────────────────────────────────────────────────────────────────
 
 /** Error alert. */
 export const Error: StoryFn<ValidationAlertProps> = () => (

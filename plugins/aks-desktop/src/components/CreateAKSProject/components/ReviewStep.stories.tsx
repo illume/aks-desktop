@@ -6,8 +6,6 @@ import React from 'react';
 import type { ReviewStepProps } from '../types';
 import { ReviewStep } from './ReviewStep';
 
-// ── Shared fixtures ──────────────────────────────────────────────────────────
-
 const SUBSCRIPTION = {
   id: 'sub-123',
   name: 'Production Subscription',
@@ -51,16 +49,12 @@ const BASE_PROPS: ReviewStepProps = {
   validation: { isValid: true, errors: [], warnings: [] },
 };
 
-// ── Meta ─────────────────────────────────────────────────────────────────────
-
 export default {
   title: 'CreateAKSProject/ReviewStep',
   component: ReviewStep,
 } as Meta;
 
 const Template: StoryFn<ReviewStepProps> = args => <ReviewStep {...args} />;
-
-// ── Stories ──────────────────────────────────────────────────────────────────
 
 /**
  * Full configuration — two assignees, description filled, cluster resolved from

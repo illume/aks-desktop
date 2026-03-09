@@ -33,6 +33,9 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12}>
           <Card variant="outlined" sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
+              {/* aria-hidden: decorative section icon — the adjacent heading text already
+                  conveys the section name to screen readers.
+                  MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
               <Icon icon="mdi:project" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Project Basics')}
             </Typography>
@@ -75,6 +78,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12} md={6}>
           <Card variant="outlined" sx={{ p: 2, mb: 2, height: '200px' }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
+              {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
+                  MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
               <Icon icon="mdi:network" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Networking Policies')}
             </Typography>
@@ -98,6 +103,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12} md={6}>
           <Card variant="outlined" sx={{ p: 2, mb: 2, height: '200px' }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
+              {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
+                  MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
               <Icon icon="mdi:cpu-64-bit" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Compute Quota')}
             </Typography>
@@ -118,6 +125,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
                     color="text.secondary"
                     sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}
                   >
+                    {/* aria-hidden: decorative inline icon — see comment on "Project Basics" above.
+                        MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
                     <Icon icon="mdi:cpu-64-bit" aria-hidden="true" style={{ marginRight: 4, fontSize: 16 }} />
                     {t('CPU')}
                   </Typography>
@@ -148,6 +157,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
                     color="text.secondary"
                     sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}
                   >
+                    {/* aria-hidden: decorative inline icon — see comment on "Project Basics" above.
+                        MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
                     <Icon icon="mdi:memory" aria-hidden="true" style={{ marginRight: 4, fontSize: 16 }} />
                     {t('Memory')}
                   </Typography>
@@ -171,6 +182,8 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         <Grid item xs={12}>
           <Card variant="outlined" sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
+              {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
+                  MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
               <Icon icon="mdi:account-group" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }} />
               {t('Access Control ({{count}} assignee)', {
                 count: formData.userAssignments.length,
@@ -178,9 +191,15 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
             </Typography>
             {/* tabIndex={0} satisfies the scrollable-region-focusable axe rule (WCAG 2.1.1):
                 keyboard users must be able to reach scrollable regions that may contain
-                content not visible in the viewport. */}
+                content not visible in the viewport.
+                role="region" + aria-label give this container an accessible name so AT
+                announces it as a named landmark instead of an unnamed group.
+                MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/region_role
+                Deque: https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable */}
             <Box
               tabIndex={0}
+              role="region"
+              aria-label={t('Assignees')}
               sx={{
                 maxHeight: '200px',
                 overflowY: 'auto',

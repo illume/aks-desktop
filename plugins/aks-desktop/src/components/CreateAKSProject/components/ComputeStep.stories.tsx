@@ -6,8 +6,6 @@ import React from 'react';
 import type { ComputeStepProps } from '../types';
 import { ComputeStep } from './ComputeStep';
 
-// ── Shared base form data ─────────────────────────────────────────────────────
-
 const BASE_FORM_DATA = {
   projectName: 'azure-microservices-demo',
   description: '',
@@ -29,16 +27,12 @@ const BASE_PROPS: ComputeStepProps = {
   validation: { isValid: true, errors: [], warnings: [] },
 };
 
-// ── Meta ─────────────────────────────────────────────────────────────────────
-
 export default {
   title: 'CreateAKSProject/ComputeStep',
   component: ComputeStep,
 } as Meta;
 
 const Template: StoryFn<ComputeStepProps> = args => <ComputeStep {...args} />;
-
-// ── Stories ──────────────────────────────────────────────────────────────────
 
 /**
  * Default state — CPU request 2 cores / limit 4 cores, memory request 4 GiB / limit 8 GiB.

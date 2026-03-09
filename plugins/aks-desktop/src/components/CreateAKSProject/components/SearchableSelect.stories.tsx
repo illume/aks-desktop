@@ -19,15 +19,11 @@ const BASE_PROPS: SearchableSelectProps = {
   options: SUBSCRIPTION_OPTIONS,
 };
 
-// ── Meta ──────────────────────────────────────────────────────────────────────
-
 const meta: Meta<typeof SearchableSelect> = {
   title: 'CreateAKSProject/SearchableSelect',
   component: SearchableSelect,
 };
 export default meta;
-
-// ── Stories ───────────────────────────────────────────────────────────────────
 
 /** Default empty state. */
 export const Default: StoryFn<SearchableSelectProps> = () => <SearchableSelect {...BASE_PROPS} />;
