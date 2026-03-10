@@ -195,14 +195,14 @@ export default function CreateAKSProjectPure({
               AND prevents keyboard focus from reaching it while the loading overlay is active.
               inert is used instead of aria-hidden because aria-hidden alone does not prevent
               focus, which violates the aria-hidden-focus axe rule.
-              inert="" (empty string) is the correct way to set the boolean HTML attribute in
-              React 18: React 18 does not recognise inert as a boolean prop, so passing true
-              triggers a "Received `true` for a non-boolean attribute" warning. The empty-string
-              form is equivalent to <div inert> in plain HTML.
+              inert="" (empty string) is the correct HTML boolean form and avoids the React 18
+              "Received `true` for a non-boolean attribute" runtime warning.  @types/react@19
+              types this prop as `boolean`, so the cast is required to satisfy the type checker
+              while keeping the correct runtime value.
               When isCreating is false, no inert prop is spread so the attribute is absent.
               MDN: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/inert */}
           <CardContent
-            {...(isCreating ? { inert: '' } : {})}
+            {...(isCreating ? { inert: '' as unknown as boolean } : {})}
             sx={{
               height: '100%',
               display: 'flex',
