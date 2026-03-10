@@ -35,7 +35,9 @@ vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
 });
 
 vi.mock('@iconify/react', () => ({
-  Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
+  Icon: ({ icon, ...props }: any) => (
+    <span role="img" aria-label={icon} data-icon={icon} {...props} />
+  ),
 }));
 
 import SourceStep, { SourceStepProps } from './SourceStep';
@@ -105,6 +107,13 @@ describe('SourceStep — NoSelection (guidepup)', () => {
     expect(phrases.some(p => p.includes('list'))).toBe(true);
     expect(phrases.some(p => p.includes('listitem'))).toBe(true);
   });
+
+  it('does not announce decorative icon names (aria-hidden regression)', async () => {
+    renderStory(NoSelection.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('mdi:'))).toBe(false);
+  });
 });
 
 describe('SourceStep — ContainerSelected (guidepup)', () => {
@@ -121,6 +130,13 @@ describe('SourceStep — ContainerSelected (guidepup)', () => {
 
     expect(phrases).toContain('button, Kubernetes YAML, not pressed');
   });
+
+  it('does not announce decorative icon names (aria-hidden regression)', async () => {
+    renderStory(ContainerSelected.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('mdi:'))).toBe(false);
+  });
 });
 
 describe('SourceStep — YamlSelected (guidepup)', () => {
@@ -136,5 +152,12 @@ describe('SourceStep — YamlSelected (guidepup)', () => {
     const phrases = await collect();
 
     expect(phrases).toContain('button, Container Image, not pressed');
+  });
+
+  it('does not announce decorative icon names (aria-hidden regression)', async () => {
+    renderStory(YamlSelected.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('mdi:'))).toBe(false);
   });
 });

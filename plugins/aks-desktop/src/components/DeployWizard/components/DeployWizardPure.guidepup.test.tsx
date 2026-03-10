@@ -35,7 +35,9 @@ vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
 });
 
 vi.mock('@iconify/react', () => ({
-  Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
+  Icon: ({ icon, ...props }: any) => (
+    <span role="img" aria-label={icon} data-icon={icon} {...props} />
+  ),
 }));
 
 import DeployWizardPure, { DeployWizardPureProps } from './DeployWizardPure';
@@ -99,6 +101,13 @@ describe('DeployWizardPure — SourceStep (guidepup)', () => {
     expect(phrases).not.toContain('button, Configure, current step');
     expect(phrases).not.toContain('button, Deploy, current step');
   });
+
+  it('does not announce decorative icon names (aria-hidden regression)', async () => {
+    renderStory(SourceStep.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('mdi:'))).toBe(false);
+  });
 });
 
 describe('DeployWizardPure — SourceStepYamlSelected (guidepup)', () => {
@@ -155,6 +164,13 @@ describe('DeployWizardPure — DeployStepSuccess (guidepup)', () => {
     const phrases = await collect();
 
     expect(phrases).toContain('button, Deploy, current step');
+  });
+
+  it('does not announce decorative icon names (aria-hidden regression)', async () => {
+    renderStory(DeployStepSuccess.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('mdi:'))).toBe(false);
   });
 });
 
