@@ -404,8 +404,12 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
           namespaceName: formData.projectName,
           subscriptionId: formData.subscription,
           assignments: formData.userAssignments,
-          onProgress: msg => setCreationProgress(msg),
+          onProgress: msg => {
+            if (!aborted) setCreationProgress(msg);
+          },
         });
+
+        if (aborted) return;
 
         if (!roleResult.success) {
           const errorMessage = `${t(

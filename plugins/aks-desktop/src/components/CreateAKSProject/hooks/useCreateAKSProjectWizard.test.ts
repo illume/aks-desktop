@@ -432,6 +432,55 @@ describe('useCreateAKSProjectWizard', () => {
     });
   });
 
+  it('handleSubmit timeout: onProgress callback does not update creationProgress after timeout fires', async () => {
+    vi.useFakeTimers();
+    let resolveRoleAssignment!: () => void;
+
+    vi.mocked(useFormData).mockReturnValue({
+      formData: {
+        ...defaultFormData,
+        userAssignments: [{ email: 'user@example.com', role: 'Admin' }],
+      },
+      updateFormData: vi.fn(),
+      resetFormData: vi.fn(),
+      setFormDataField: vi.fn(),
+    } as any);
+    vi.mocked(createManagedNamespace).mockResolvedValue({ success: true } as any);
+    vi.mocked(checkNamespaceExists).mockResolvedValue({ exists: true } as any);
+    // First role assignment call hangs until manually resolved; remaining calls succeed immediately.
+    vi.mocked(createNamespaceRoleAssignment)
+      .mockReturnValueOnce(
+        new Promise<any>(resolve => {
+          resolveRoleAssignment = () => resolve({ success: true });
+        })
+      )
+      .mockResolvedValue({ success: true } as any);
+    vi.mocked(verifyNamespaceAccess).mockResolvedValue({ success: true, hasAccess: true } as any);
+
+    const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+    await act(async () => {
+      const submitPromise = result.current.handleSubmit();
+      // Fire the 10-minute timeout while createNamespaceRoleAssignment is still pending
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
+      await submitPromise;
+    });
+
+    expect(result.current.creationError).toContain('timed out');
+    const progressAtTimeout = result.current.creationProgress;
+
+    // Unblock the hanging role assignment so assignRolesToNamespace resumes and
+    // calls onProgress multiple times — all of which must be no-ops because
+    // aborted is already true.
+    await act(async () => {
+      resolveRoleAssignment();
+      await Promise.resolve();
+    });
+
+    // creationProgress must be unchanged — the guard prevents state updates after timeout
+    expect(result.current.creationProgress).toBe(progressAtTimeout);
+  });
+
   it('creationPromise.catch() suppresses unhandled rejection when timeout wins the race', async () => {
     vi.useFakeTimers();
     let rejectCreation!: (err: Error) => void;
