@@ -195,10 +195,14 @@ export default function CreateAKSProjectPure({
               AND prevents keyboard focus from reaching it while the loading overlay is active.
               inert is used instead of aria-hidden because aria-hidden alone does not prevent
               focus, which violates the aria-hidden-focus axe rule.
-              inert={true} renders the boolean HTML attribute; React omits the attribute when false.
+              inert="" (empty string) is the correct way to set the boolean HTML attribute in
+              React 18: React 18 does not recognise inert as a boolean prop, so passing true
+              triggers a "Received `true` for a non-boolean attribute" warning. The empty-string
+              form is equivalent to <div inert> in plain HTML.
+              When isCreating is false, no inert prop is spread so the attribute is absent.
               MDN: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/inert */}
           <CardContent
-            {...(isCreating ? { inert: true } : {})}
+            {...(isCreating ? { inert: '' } : {})}
             sx={{
               height: '100%',
               display: 'flex',
@@ -380,11 +384,18 @@ export default function CreateAKSProjectPure({
             role is set via PaperProps so it lands on the same Paper element that MUI
             puts aria-labelledby on; if set on the Dialog root prop it goes to the
             outer MuiModal-root div which has no aria-labelledby (axe: aria-dialog-name).
+            disableEscapeKeyDown + onClose no-op for backdropClick ensure the only way
+            to dismiss is via the explicit Cancel button, matching alertdialog semantics.
             MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/alertdialog_role
             MUI: https://mui.com/material-ui/react-dialog/#accessibility */}
         <Dialog
           open={!!creationError}
-          onClose={onDismissError}
+          onClose={(_event, reason) => {
+            if (reason !== 'backdropClick') {
+              onDismissError();
+            }
+          }}
+          disableEscapeKeyDown
           aria-labelledby="aksd-create-aks-project-error-title"
           aria-describedby="aksd-create-aks-project-error-desc"
           maxWidth="md"

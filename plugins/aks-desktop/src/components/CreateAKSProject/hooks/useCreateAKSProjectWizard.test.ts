@@ -137,6 +137,10 @@ const defaultFormData = {
 describe('useCreateAKSProjectWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Silence console.error so error-path tests don't pollute the test output.
+    // Individual tests that need to assert on console.error output create their
+    // own spy on top and restore it themselves before this one is cleaned up.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(useFormData).mockReturnValue({
       formData: defaultFormData,
       updateFormData: vi.fn(),
@@ -147,6 +151,7 @@ describe('useCreateAKSProjectWizard', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('has initial activeStep of 0', () => {
@@ -404,6 +409,26 @@ describe('useCreateAKSProjectWizard', () => {
       expect(combined).toMatch(/<redacted>/);
 
       consoleSpy.mockRestore();
+    });
+
+    it('exposes the raw (un-redacted) error message in creationError for the user-visible dialog', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(createManagedNamespace).mockRejectedValue(
+        new Error('Role assignment failed for user ops@contoso.com')
+      );
+
+      const { result } = renderHook(() => useCreateAKSProjectWizard());
+
+      await act(async () => {
+        await result.current.handleSubmit();
+      });
+
+      // The user-visible error dialog should show the full message so the operator
+      // can see which email caused the failure — it must NOT be redacted.
+      expect(result.current.creationError).toContain('ops@contoso.com');
+      expect(result.current.creationError).not.toContain('<redacted>');
+
+      vi.restoreAllMocks();
     });
   });
 

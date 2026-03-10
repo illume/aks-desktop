@@ -76,10 +76,11 @@
  *  - ResourceCard: added aria-hidden="true" to decorative title Icon
  *  - ComputeStep: added aria-hidden="true" to all startAdornment Icons (arrow-up/down)
  *
- * Note on `inert` + jsdom: jsdom does not implement the HTML `inert` attribute,
- * so during LoadingOverlay the buttons behind the overlay still appear in the
- * virtual SR tree (as disabled).  Real browsers remove them from AT entirely.
- * This is documented in the LoadingOverlay section below.
+ * Note on `inert` + jsdom: jsdom 24+ implements the HTML `inert` attribute when
+ * it is written as `inert=""` (the standard boolean form).  With the correct
+ * `inert=""` form, the card content is hidden from the virtual SR tree entirely
+ * during the LoadingOverlay, which is the intended behaviour.  This is verified
+ * by the LoadingOverlay test below.
  */
 
 import '@testing-library/jest-dom/vitest';
@@ -358,19 +359,17 @@ describe('SR: LoadingOverlay — aria-busy card, progressbar, progress text', ()
   });
 
   /**
-   * Note: jsdom does not implement the HTML `inert` attribute.
-   * In real browsers, `inert` removes the card content from the AT entirely.
-   * In jsdom the underlying Cancel button still appears (as disabled).
-   * This test documents the jsdom limitation; the real behaviour is verified
-   * by the Playwright accessibility-tree check in the CI a11y job.
+   * With `inert=""` (the correct HTML boolean form), jsdom 24+ properly removes
+   * the inert subtree from the virtual AT entirely.  The Cancel button behind
+   * the overlay must NOT appear in the spoken-phrase log.
    */
-  it('[jsdom] Cancel behind overlay is announced as disabled (inert not supported in jsdom)', async () => {
+  it('with correct inert="": Cancel behind overlay is absent from AT (jsdom 24+ supports inert)', async () => {
     await mountWizard({ isCreating: true, creationProgress: 'Creating namespace...' });
     const ps = await phrases();
-    // In real browsers this button would be absent (inert).
-    // In jsdom it is present but marked disabled.
+    // The Cancel button lives inside the inert CardContent; jsdom 24+ honours
+    // inert="" and removes it from the accessibility tree entirely.
     const cancelPhrase = ps.find(p => /cancel/i.test(p) && /button/i.test(p));
-    expect(cancelPhrase).toMatch(/disabled/i);
+    expect(cancelPhrase).toBeUndefined();
   });
 });
 

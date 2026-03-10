@@ -166,7 +166,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
         return;
       }
       if (DEBUG) console.debug('Azure CLI check results:', azureCheck);
-      setCliSuggestions(azureCheck.suggestions);
+      setCliSuggestions(azureCheck?.suggestions ?? []);
     })();
 
     return () => {
@@ -455,7 +455,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
                 }
               }
 
-              const failedRoles = roleAssignmentResults.filter(r => !r.success && !r.skipped);
+              const failedRoles = roleAssignmentResults.filter(r => !r.success);
               if (failedRoles.length > 0) {
                 const failedRoleDetails = failedRoles
                   .map(r => {
@@ -629,7 +629,10 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
         });
       }
 
-      setCreationError(sanitizedErrorMessage || t('Failed to create project'));
+      // Use the raw (un-redacted) message for the user-visible error dialog so
+      // actionable details (e.g., the assignee email that failed) are visible.
+      // Sanitization is only applied to console logging above.
+      setCreationError(rawErrorMessage || t('Failed to create project'));
       setIsCreating(false);
       setCreationProgress('');
     } finally {
