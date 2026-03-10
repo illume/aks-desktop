@@ -13,8 +13,8 @@
  * Uses `@guidepup/virtual-screen-reader` to walk the accessibility tree and
  * assert on the spoken phrases that a screen reader would announce.
  */
-import { cleanup, render } from '@testing-library/react';
 import { virtual } from '@guidepup/virtual-screen-reader';
+import { cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -84,9 +84,7 @@ describe('ConfigureYAML — Empty (guidepup)', () => {
     renderStory(Empty.args!);
     const phrases = await collect();
 
-    expect(
-      phrases.some(p => p.includes('Add one or more Kubernetes manifests'))
-    ).toBe(true);
+    expect(phrases.some(p => p.includes('Add one or more Kubernetes manifests'))).toBe(true);
   });
 
   it('announces Upload files and Clear editor buttons', async () => {
@@ -140,9 +138,7 @@ describe('ConfigureYAML — WithError (guidepup)', () => {
     renderStory(WithError.args!);
     const phrases = await collect();
 
-    expect(
-      phrases.some(p => p.includes('Invalid YAML'))
-    ).toBe(true);
+    expect(phrases.some(p => p.includes('Invalid YAML'))).toBe(true);
   });
 
   it('still announces the YAML editor region', async () => {

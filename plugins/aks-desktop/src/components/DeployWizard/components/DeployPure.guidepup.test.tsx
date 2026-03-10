@@ -13,8 +13,8 @@
  * Uses `@guidepup/virtual-screen-reader` to walk the accessibility tree and
  * assert on the spoken phrases that a screen reader would announce.
  */
-import { cleanup, render } from '@testing-library/react';
 import { virtual } from '@guidepup/virtual-screen-reader';
+import { cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -70,7 +70,7 @@ function renderStory(storyArgs: DeployPureProps, overrides: Partial<DeployPurePr
  * ensure all content is visited (the SR wraps around, which is fine — we
  * just need every element to appear at least once).
  */
-async function collect(container: Node): Promise<string[]> {
+async function collect(): Promise<string[]> {
   await virtual.start({ container: document.body });
 
   for (let i = 0; i < 60; i++) {
@@ -85,45 +85,45 @@ async function collect(container: Node): Promise<string[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — Idle (guidepup)', () => {
   it('announces the Review & Deploy heading', async () => {
-    const { container } = renderStory(Idle.args!);
-    const phrases = await collect(container);
+    renderStory(Idle.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('heading, Review & Deploy, level 6');
   });
 
   it('announces the resource count', async () => {
-    const { container } = renderStory(Idle.args!);
-    const phrases = await collect(container);
+    renderStory(Idle.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('2 object'))).toBe(true);
   });
 
   it('announces resource kinds', async () => {
-    const { container } = renderStory(Idle.args!);
-    const phrases = await collect(container);
+    renderStory(Idle.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Deployment');
     expect(phrases).toContain('Service');
   });
 
   it('announces resource names', async () => {
-    const { container } = renderStory(Idle.args!);
-    const phrases = await collect(container);
+    renderStory(Idle.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('my-app');
     expect(phrases).toContain('my-app-svc');
   });
 
   it('announces namespace chips', async () => {
-    const { container } = renderStory(Idle.args!);
-    const phrases = await collect(container);
+    renderStory(Idle.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('namespace: default'))).toBe(true);
   });
 
   it('does not announce any status or alert region', async () => {
-    const { container } = renderStory(Idle.args!);
-    const phrases = await collect(container);
+    renderStory(Idle.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.startsWith('status'))).toBe(false);
     expect(phrases.some(p => p.startsWith('alert'))).toBe(false);
@@ -133,23 +133,23 @@ describe('DeployPure — Idle (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — DeploySuccess (guidepup)', () => {
   it('announces a polite status live region', async () => {
-    const { container } = renderStory(DeploySuccess.args!);
-    const phrases = await collect(container);
+    renderStory(DeploySuccess.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('status');
     expect(phrases).toContain('end of status');
   });
 
   it('announces the success message', async () => {
-    const { container } = renderStory(DeploySuccess.args!);
-    const phrases = await collect(container);
+    renderStory(DeploySuccess.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('Applied 5 resources successfully'))).toBe(true);
   });
 
   it('does not announce an alert region', async () => {
-    const { container } = renderStory(DeploySuccess.args!);
-    const phrases = await collect(container);
+    renderStory(DeploySuccess.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.startsWith('alert'))).toBe(false);
   });
@@ -158,23 +158,23 @@ describe('DeployPure — DeploySuccess (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — DeployError (guidepup)', () => {
   it('announces an assertive alert live region', async () => {
-    const { container } = renderStory(DeployError.args!);
-    const phrases = await collect(container);
+    renderStory(DeployError.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('alert');
     expect(phrases).toContain('end of alert');
   });
 
   it('announces the error message', async () => {
-    const { container } = renderStory(DeployError.args!);
-    const phrases = await collect(container);
+    renderStory(DeployError.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('ECONNREFUSED'))).toBe(true);
   });
 
   it('does not announce a status region', async () => {
-    const { container } = renderStory(DeployError.args!);
-    const phrases = await collect(container);
+    renderStory(DeployError.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.startsWith('status'))).toBe(false);
   });
@@ -183,8 +183,8 @@ describe('DeployPure — DeployError (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — YamlWithObjects (guidepup)', () => {
   it('announces all three resource kinds', async () => {
-    const { container } = renderStory(YamlWithObjects.args!);
-    const phrases = await collect(container);
+    renderStory(YamlWithObjects.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Deployment');
     expect(phrases).toContain('Service');
@@ -192,8 +192,8 @@ describe('DeployPure — YamlWithObjects (guidepup)', () => {
   });
 
   it('announces all three resource names', async () => {
-    const { container } = renderStory(YamlWithObjects.args!);
-    const phrases = await collect(container);
+    renderStory(YamlWithObjects.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('api-server');
     expect(phrases).toContain('api-server-svc');
@@ -201,8 +201,8 @@ describe('DeployPure — YamlWithObjects (guidepup)', () => {
   });
 
   it('announces the 3-object resource count', async () => {
-    const { container } = renderStory(YamlWithObjects.args!);
-    const phrases = await collect(container);
+    renderStory(YamlWithObjects.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('3 object'))).toBe(true);
   });
@@ -211,16 +211,16 @@ describe('DeployPure — YamlWithObjects (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — EmptyResourceList (guidepup)', () => {
   it('announces the heading with zero-object count', async () => {
-    const { container } = renderStory(EmptyResourceList.args!);
-    const phrases = await collect(container);
+    renderStory(EmptyResourceList.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('heading, Review & Deploy, level 6');
     expect(phrases.some(p => p.includes('0 object'))).toBe(true);
   });
 
   it('does not announce any resource kinds', async () => {
-    const { container } = renderStory(EmptyResourceList.args!);
-    const phrases = await collect(container);
+    renderStory(EmptyResourceList.args!);
+    const phrases = await collect();
 
     expect(phrases).not.toContain('Deployment');
     expect(phrases).not.toContain('Service');
@@ -230,23 +230,23 @@ describe('DeployPure — EmptyResourceList (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — SingleResource (guidepup)', () => {
   it('announces the singular object count', async () => {
-    const { container } = renderStory(SingleResource.args!);
-    const phrases = await collect(container);
+    renderStory(SingleResource.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('1 object'))).toBe(true);
   });
 
   it('announces the single resource name and kind', async () => {
-    const { container } = renderStory(SingleResource.args!);
-    const phrases = await collect(container);
+    renderStory(SingleResource.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Deployment');
     expect(phrases).toContain('web-frontend');
   });
 
   it('announces the namespace chip', async () => {
-    const { container } = renderStory(SingleResource.args!);
-    const phrases = await collect(container);
+    renderStory(SingleResource.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('namespace: production'))).toBe(true);
   });
@@ -255,15 +255,15 @@ describe('DeployPure — SingleResource (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — ManyResourceTypes (guidepup)', () => {
   it('announces the 5-object count', async () => {
-    const { container } = renderStory(ManyResourceTypes.args!);
-    const phrases = await collect(container);
+    renderStory(ManyResourceTypes.args!);
+    const phrases = await collect();
 
     expect(phrases.some(p => p.includes('5 object'))).toBe(true);
   });
 
   it('announces all five resource kinds', async () => {
-    const { container } = renderStory(ManyResourceTypes.args!);
-    const phrases = await collect(container);
+    renderStory(ManyResourceTypes.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Deployment');
     expect(phrases).toContain('Service');
@@ -273,8 +273,8 @@ describe('DeployPure — ManyResourceTypes (guidepup)', () => {
   });
 
   it('announces all five resource names', async () => {
-    const { container } = renderStory(ManyResourceTypes.args!);
-    const phrases = await collect(container);
+    renderStory(ManyResourceTypes.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('web-frontend');
     expect(phrases).toContain('web-frontend-svc');
@@ -287,22 +287,22 @@ describe('DeployPure — ManyResourceTypes (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — container sourceType (guidepup)', () => {
   it('announces the Monaco editor region', async () => {
-    const { container } = renderStory(Idle.args!, {
+    renderStory(Idle.args!, {
       sourceType: 'container',
       containerPreviewYaml: 'apiVersion: apps/v1\nkind: Deployment',
     });
-    const phrases = await collect(container);
+    const phrases = await collect();
 
     expect(phrases).toContain('region, YAML editor');
   });
 
   it('announces the generated manifests subtitle with namespace', async () => {
-    const { container } = renderStory(Idle.args!, {
+    renderStory(Idle.args!, {
       sourceType: 'container',
       containerPreviewYaml: 'apiVersion: apps/v1',
       namespace: 'production',
     });
-    const phrases = await collect(container);
+    const phrases = await collect();
 
     expect(
       phrases.some(p => p.includes('Generated Kubernetes manifests') && p.includes('production'))
@@ -310,11 +310,11 @@ describe('DeployPure — container sourceType (guidepup)', () => {
   });
 
   it('does not announce YAML resource cards', async () => {
-    const { container } = renderStory(Idle.args!, {
+    renderStory(Idle.args!, {
       sourceType: 'container',
       containerPreviewYaml: 'apiVersion: apps/v1',
     });
-    const phrases = await collect(container);
+    const phrases = await collect();
 
     expect(phrases).not.toContain('Deployment');
     expect(phrases).not.toContain('my-app');

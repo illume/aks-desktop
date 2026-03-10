@@ -13,8 +13,8 @@
  * Uses `@guidepup/virtual-screen-reader` to walk the accessibility tree and
  * assert on the spoken phrases that a screen reader would announce.
  */
-import { cleanup, render } from '@testing-library/react';
 import { virtual } from '@guidepup/virtual-screen-reader';
+import { cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -100,12 +100,8 @@ describe('SourceStep — NoSelection (guidepup)', () => {
     renderStory(NoSelection.args!);
     const phrases = await collect();
 
-    expect(
-      phrases.some(p => p.includes('Deploy from Azure Container Registry'))
-    ).toBe(true);
-    expect(
-      phrases.some(p => p.includes('Bring your own Kubernetes manifests'))
-    ).toBe(true);
+    expect(phrases.some(p => p.includes('Deploy from Azure Container Registry'))).toBe(true);
+    expect(phrases.some(p => p.includes('Bring your own Kubernetes manifests'))).toBe(true);
   });
 
   it('announces feature lists', async () => {

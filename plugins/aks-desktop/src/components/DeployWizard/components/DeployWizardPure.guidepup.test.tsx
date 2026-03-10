@@ -13,8 +13,8 @@
  * Uses `@guidepup/virtual-screen-reader` to walk the accessibility tree and
  * assert on the spoken phrases that a screen reader would announce.
  */
-import { cleanup, render } from '@testing-library/react';
 import { virtual } from '@guidepup/virtual-screen-reader';
+import { cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -69,7 +69,7 @@ function renderStory(storyArgs: DeployWizardPureProps) {
  * ensure all content is visited (the SR wraps around, which is fine — we
  * just need every element to appear at least once).
  */
-async function collect(container: Node): Promise<string[]> {
+async function collect(): Promise<string[]> {
   await virtual.start({ container: document.body });
 
   for (let i = 0; i < 60; i++) {
@@ -84,8 +84,8 @@ async function collect(container: Node): Promise<string[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — SourceStep (guidepup)', () => {
   it('announces the heading, breadcrumb navigation, step content, and Next button', async () => {
-    const { container } = renderStory(SourceStep.args!);
-    const phrases = await collect(container);
+    renderStory(SourceStep.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('heading, Deploy Application, level 4');
     expect(phrases).toContain('navigation, Wizard steps');
@@ -97,8 +97,8 @@ describe('DeployWizardPure — SourceStep (guidepup)', () => {
   });
 
   it('marks the Source breadcrumb as current step', async () => {
-    const { container } = renderStory(SourceStep.args!);
-    const phrases = await collect(container);
+    renderStory(SourceStep.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Source, current step');
     // Configure and Deploy are not current
@@ -110,8 +110,8 @@ describe('DeployWizardPure — SourceStep (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — SourceStepYamlSelected (guidepup)', () => {
   it('announces YAML selected step content and an enabled Next button', async () => {
-    const { container } = renderStory(SourceStepYamlSelected.args!);
-    const phrases = await collect(container);
+    renderStory(SourceStepYamlSelected.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Source step — YAML selected');
     expect(phrases).toContain('button, Next');
@@ -123,8 +123,8 @@ describe('DeployWizardPure — SourceStepYamlSelected (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — ContainerSourceSelected (guidepup)', () => {
   it('announces container selected step content', async () => {
-    const { container } = renderStory(ContainerSourceSelected.args!);
-    const phrases = await collect(container);
+    renderStory(ContainerSourceSelected.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Source step — Container selected');
     expect(phrases).toContain('button, Next');
@@ -134,15 +134,15 @@ describe('DeployWizardPure — ContainerSourceSelected (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — NextButtonDisabled (guidepup)', () => {
   it('announces the Next button as disabled', async () => {
-    const { container } = renderStory(NextButtonDisabled.args!);
-    const phrases = await collect(container);
+    renderStory(NextButtonDisabled.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Next, disabled');
   });
 
   it('announces the step content for no source selected', async () => {
-    const { container } = renderStory(NextButtonDisabled.args!);
-    const phrases = await collect(container);
+    renderStory(NextButtonDisabled.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('Source step — no source selected');
   });
@@ -151,8 +151,8 @@ describe('DeployWizardPure — NextButtonDisabled (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — DeployStepSuccess (guidepup)', () => {
   it('announces the Close button (replaces Deploy footer action)', async () => {
-    const { container } = renderStory(DeployStepSuccess.args!);
-    const phrases = await collect(container);
+    renderStory(DeployStepSuccess.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Close');
     // The breadcrumb still has a "Deploy" step button, but the footer action
@@ -161,8 +161,8 @@ describe('DeployWizardPure — DeployStepSuccess (guidepup)', () => {
   });
 
   it('marks the Deploy breadcrumb as current step', async () => {
-    const { container } = renderStory(DeployStepSuccess.args!);
-    const phrases = await collect(container);
+    renderStory(DeployStepSuccess.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Deploy, current step');
   });
@@ -171,15 +171,15 @@ describe('DeployWizardPure — DeployStepSuccess (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — DeployStepError (guidepup)', () => {
   it('announces the Close button after an error result', async () => {
-    const { container } = renderStory(DeployStepError.args!);
-    const phrases = await collect(container);
+    renderStory(DeployStepError.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Close');
   });
 
   it('marks the Deploy breadcrumb as current step', async () => {
-    const { container } = renderStory(DeployStepError.args!);
-    const phrases = await collect(container);
+    renderStory(DeployStepError.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Deploy, current step');
   });
@@ -188,15 +188,15 @@ describe('DeployWizardPure — DeployStepError (guidepup)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — DeployStepDeploying (guidepup)', () => {
   it('announces the Deploying button as busy and disabled', async () => {
-    const { container } = renderStory(DeployStepDeploying.args!);
-    const phrases = await collect(container);
+    renderStory(DeployStepDeploying.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Deploying..., busy, disabled');
   });
 
   it('marks the Deploy breadcrumb as current step', async () => {
-    const { container } = renderStory(DeployStepDeploying.args!);
-    const phrases = await collect(container);
+    renderStory(DeployStepDeploying.args!);
+    const phrases = await collect();
 
     expect(phrases).toContain('button, Deploy, current step');
   });
