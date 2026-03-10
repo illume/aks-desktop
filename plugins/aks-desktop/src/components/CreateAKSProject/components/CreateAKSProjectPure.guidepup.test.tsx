@@ -20,7 +20,7 @@
  *  ├── LoadingOverlay     — aria-busy "busy"; progressbar name; progress text
  *  ├── ErrorOverlay       — alertdialog title+desc; role=alert live region; Cancel enabled
  *  ├── LongErrorMessage   — same structure as ErrorOverlay with multi-line error
- *  ├── SuccessDialog      — dialog title+desc; role=status live region; textbox; Create App disabled
+ *  ├── SuccessDialog      — dialog title+desc; role=status live region; textbox; Create App disabled; single status region
  *  ├── SuccessDialogWithAppName — Create Application enabled; textbox value announced
  *  ├── StepOnReview       — Back button; "Create Project" button; Review step aria-current
  *  ├── StepOnAccess       — Back + Next buttons; Access step aria-current
@@ -497,15 +497,22 @@ describe('SR: SuccessDialog — dialog + role=status', () => {
   it('announces the success message via the role=status polite live region', async () => {
     await mountWizard({ showSuccessDialog: true, projectName: 'my-project' });
     const ps = await phrases();
-    // role="status" fires independently of autoFocus on the Application name textbox
+    // role="status" on the dialog description fires independently of autoFocus on
+    // the Application name textbox, ensuring Narrator announces the success message
+    // even after focus has moved to the input.
     expect(ps).toContain('status');
     expect(ps.some(p => /has been created|ready to use/i.test(p))).toBe(true);
   });
 
-  it('announces "status" open and "end of status" close boundary tokens', async () => {
+  it('contains exactly one status region — the success description (not the creation-progress live region)', async () => {
+    // When the success dialog is open isCreating is false, so the persistent
+    // creation-progress Box has aria-live but no role="status".  Only the
+    // success description Typography carries role="status", giving exactly one
+    // status open-boundary token in the spoken phrase log.
     await mountWizard({ showSuccessDialog: true });
     const ps = await phrases();
-    expect(ps).toContain('status');
+    const statusTokens = ps.filter(p => p === 'status');
+    expect(statusTokens).toHaveLength(1);
     expect(ps).toContain('end of status');
   });
 
@@ -550,7 +557,7 @@ describe('SR: SuccessDialogWithAppName — enabled Create Application', () => {
     expect(ps).not.toContain('button, Create Application, disabled');
   });
 
-  it('includes the project name in the status live region', async () => {
+  it('includes the project name in the dialog description', async () => {
     await mountWizard({
       showSuccessDialog: true,
       applicationName: 'frontend-service',

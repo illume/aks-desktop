@@ -195,9 +195,19 @@ export default function CreateAKSProjectPure({
               Keeping it outside the conditional ensures the announcement completes even
               after the overlay is removed.  The visual progress text is in the overlay
               above (aria-hidden); this region is visually hidden but available to AT.
+              aria-live/aria-atomic are always present so NVDA pre-registers the region
+              before the first content change (NVDA requires the live region to exist in
+              the DOM before content is updated, otherwise the first announcement is
+              silently dropped — https://tetralogical.com/blog/2024/05/01/why-are-my-live-regions-not-working/).
+              role="status" is only set while isCreating is true so there is never more
+              than one status landmark in the accessibility tree: when the success dialog
+              is open isCreating is false and the success description carries the sole
+              role="status" instead (needed for Windows Narrator, which does not reliably
+              read aria-describedby content when autoFocus moves to an input inside the
+              dialog — https://github.com/microsoft/fluentui/issues/7150).
               MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-live */}
           <Box
-            role="status"
+            {...(isCreating ? { role: 'status' } : {})}
             aria-live="polite"
             aria-atomic="true"
             sx={{
@@ -346,10 +356,15 @@ export default function CreateAKSProjectPure({
             {/* id provides the accessible description for this dialog via aria-describedby.
                 component="p" keeps h6 visual styling but renders as a <p> element so the
                 heading hierarchy (DialogTitle=h2 → this) stays valid.
-                role="status" makes this an aria-live="polite" region so the success message
-                is announced by screen readers when the dialog renders, even though autoFocus
-                has already moved to the Application name input. Without a live region, some
-                AT skip aria-describedby content once focus has landed elsewhere.
+                role="status" (aria-live="polite") is needed here for Windows Narrator:
+                Narrator does not reliably read aria-describedby content when autoFocus
+                has already moved to an input inside the dialog
+                (https://github.com/microsoft/fluentui/issues/7150), so the live region
+                ensures the success message is still announced independently of focus.
+                This is safe because the persistent creation-progress live region above
+                only carries role="status" while isCreating is true; once the success
+                dialog opens isCreating is false, so there is never more than one
+                role="status" landmark in the accessibility tree at the same time.
                 MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role */}
             <Typography
               id="aksd-create-aks-project-success-desc"
