@@ -316,19 +316,40 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
         </Alert>
       )}
 
-      {/* Polling progress */}
+      {/* Polling progress — visual indicator */}
       {polling && (
-        /* role="status" causes assistive technologies to announce the "Configuring cluster"
-           message when this Box is dynamically inserted into the DOM (polite live region).
-           The CircularProgress spinner is decorative and hidden from AT with aria-hidden.
-           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role */
-        <Box role="status" display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
+        <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
           <CircularProgress size={16} aria-hidden="true" />
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" aria-hidden="true">
             Configuring cluster... This may take a few minutes.
           </Typography>
         </Box>
       )}
+
+      {/* Persistent live region for polling status announcements.
+          This element stays in the DOM at all times so that screen readers register
+          it before content changes.  Placing role="status" inside a conditional
+          block ({polling && …}) caused Narrator to miss or cut off the announcement
+          because the region and its text appeared in the same React commit.
+          MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role */}
+      <Box
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        sx={{
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: 0,
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        {polling ? 'Configuring cluster... This may take a few minutes.' : ''}
+      </Box>
 
       {/* Configure button */}
       {!success && (
