@@ -106,3 +106,27 @@ SingleAssignee.args = {
     userAssignments: [{ email: 'charlie@example.com', role: 'Writer' }],
   },
 };
+
+/**
+ * Many assignees — the Access Control region overflows its 200 px max-height,
+ * making it keyboard-scrollable (Tab to focus the region, then ↑/↓ to scroll).
+ * Use this story to verify that the scrollable-region-focusable a11y requirement
+ * is satisfied and that all assignees are reachable by keyboard.
+ */
+export const ManyAssignees = Template.bind({});
+ManyAssignees.args = {
+  ...BASE_PROPS,
+  formData: {
+    ...BASE_FORM_DATA,
+    userAssignments: [
+      { email: 'alice@example.com', role: 'Admin' },
+      { email: 'bob@example.com', role: 'Reader' },
+      { email: 'charlie@example.com', role: 'Writer' },
+      { email: 'diana@example.com', role: 'Admin' },
+      { email: 'evan@example.com', role: 'Reader' },
+      { email: 'fiona@example.com', role: 'Writer' },
+      { email: 'george@example.com', role: 'Reader' },
+      { email: 'hannah@example.com', role: 'Admin' },
+    ],
+  },
+};
