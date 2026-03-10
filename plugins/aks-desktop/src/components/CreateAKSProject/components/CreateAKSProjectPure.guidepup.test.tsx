@@ -1055,6 +1055,16 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
     expect(headings[3]).toBe('heading, Compute Quota, level 3');
     expect(headings[4]).toMatch(/heading, Access Control/);
   });
+
+  it('announces the assignees region with the heading text via aria-labelledby', async () => {
+    render(<ReviewStep {...REVIEW_BASE_PROPS} />);
+    await virtual.start({ container: document.body });
+    const ps = await phrases();
+    // aria-labelledby links the region to the "Access Control (2 assignee)" heading,
+    // so the region landmark should include that label in its announcement.
+    const regionPhrase = ps.find(p => /region/i.test(p) && /access control/i.test(p));
+    expect(regionPhrase).toBeDefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

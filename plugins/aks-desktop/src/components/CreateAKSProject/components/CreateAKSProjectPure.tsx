@@ -176,20 +176,44 @@ export default function CreateAKSProjectPure({
               <Typography variant="h6" component="p" sx={{ mt: 2, mb: 1 }}>
                 {t('Creating Project')}...
               </Typography>
-              {/* aria-live="polite" causes assistive technologies to announce each status
-                  message update after the current AT output finishes, keeping users informed
-                  of progress without interrupting them.
-                  MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-live */}
               <Typography
-                aria-live="polite"
                 variant="body2"
                 color="text.secondary"
+                aria-hidden="true"
                 sx={{ textAlign: 'center', maxWidth: 400, px: 2 }}
               >
                 {creationProgress}
               </Typography>
             </Box>
           )}
+
+          {/* Persistent live region for creation progress announcements.
+              This element is always in the DOM so that screen readers track content
+              changes reliably.  Placing aria-live inside a conditionally mounted
+              block ({isCreating && …}) caused announcements to be cut off when the
+              overlay unmounted — the region disappeared before the AT finished speaking.
+              Keeping it outside the conditional ensures the announcement completes even
+              after the overlay is removed.  The visual progress text is in the overlay
+              above (aria-hidden); this region is visually hidden but available to AT.
+              MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-live */}
+          <Box
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            sx={{
+              position: 'absolute',
+              width: '1px',
+              height: '1px',
+              padding: 0,
+              margin: '-1px',
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: 0,
+            }}
+          >
+            {creationProgress}
+          </Box>
 
           {/* inert hides the underlying interactive content from assistive technologies
               AND prevents keyboard focus from reaching it while the loading overlay is active.

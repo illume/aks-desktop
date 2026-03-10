@@ -201,7 +201,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
         {/* Access Section with Scroll */}
         <Grid item xs={12}>
           <Card variant="outlined" sx={{ p: 2, mb: 2 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={sectionTitleSx}>
+            <Typography
+              id="aksd-review-access-heading"
+              variant="h6"
+              component="h3"
+              gutterBottom
+              sx={sectionTitleSx}
+            >
               {/* aria-hidden: decorative section icon — see comment on "Project Basics" above.
                   MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-hidden */}
               <Icon
@@ -216,14 +222,17 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData, subscriptions,
             {/* tabIndex={0} satisfies the scrollable-region-focusable axe rule (WCAG 2.1.1):
                 keyboard users must be able to reach scrollable regions that may contain
                 content not visible in the viewport.
-                role="region" + aria-label give this container an accessible name so AT
-                announces it as a named landmark instead of an unnamed group.
+                role="region" + aria-labelledby give this container an accessible name so AT
+                announces it as a named landmark (e.g. "Access Control (2 assignee), region")
+                instead of an unnamed group.  aria-labelledby is preferred over aria-label
+                because it reuses the existing heading text, keeping the announced name
+                consistent with what sighted users see.
                 MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/region_role
                 Deque: https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable */}
             <Box
               tabIndex={0}
               role="region"
-              aria-label={t('Assignees')}
+              aria-labelledby="aksd-review-access-heading"
               sx={{
                 maxHeight: '200px',
                 overflowY: 'auto',

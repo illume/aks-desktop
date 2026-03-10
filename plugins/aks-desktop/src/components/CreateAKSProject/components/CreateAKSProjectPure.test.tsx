@@ -140,7 +140,16 @@ describe('CreateAKSProjectPure — NextButtonLoading story interactions', () => 
 describe('CreateAKSProjectPure — LoadingOverlay story interactions', () => {
   it('renders the loading progress text', () => {
     renderStory(LoadingOverlay.args!);
-    expect(screen.getByText(/creating namespace/i)).toBeInTheDocument();
+    // The progress text appears both in the visual overlay (aria-hidden) and in the
+    // persistent role="status" live region, so multiple elements match.
+    const matches = screen.getAllByText(/creating namespace/i);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has a persistent role="status" live region with progress text', () => {
+    renderStory(LoadingOverlay.args!);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(/creating namespace/i);
   });
 
   it('Create Project button is absent during loading (last step not rendered in overlay)', () => {
