@@ -58,7 +58,7 @@ describe('useYamlObjects', () => {
   });
 
   it('returns [] on invalid YAML without throwing', () => {
-    const { result } = renderHook(() => useYamlObjects('yaml', '{{invalid: yaml: :', ''));
+    const { result } = renderHook(() => useYamlObjects('yaml', 'invalid: yaml: [unterminated', ''));
     expect(result.current).toEqual([]);
   });
 
