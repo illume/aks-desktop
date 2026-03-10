@@ -19,7 +19,6 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// ── module mocks ─────────────────────────────────────────────────────────────
 vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   const i18n = (await import('i18next')).default;
   const { initReactI18next, useTranslation } = await import('react-i18next');
@@ -39,14 +38,10 @@ vi.mock('@iconify/react', () => ({
   Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
 }));
 
-// ── component + stories ───────────────────────────────────────────────────────
 import SourceStep, { SourceStepProps } from './SourceStep';
 import { ContainerSelected, NoSelection, YamlSelected } from './SourceStep.stories';
 
 afterEach(() => cleanup());
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 function renderStory(storyArgs: SourceStepProps) {
   return render(
     <MemoryRouter>
@@ -71,7 +66,6 @@ async function collect(): Promise<string[]> {
   return log;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('SourceStep — NoSelection (guidepup)', () => {
   it('announces the Select Source heading', async () => {
     renderStory(NoSelection.args!);
@@ -113,7 +107,6 @@ describe('SourceStep — NoSelection (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('SourceStep — ContainerSelected (guidepup)', () => {
   it('announces Container Image button as pressed', async () => {
     renderStory(ContainerSelected.args!);
@@ -130,7 +123,6 @@ describe('SourceStep — ContainerSelected (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('SourceStep — YamlSelected (guidepup)', () => {
   it('announces Kubernetes YAML button as pressed', async () => {
     renderStory(YamlSelected.args!);

@@ -19,7 +19,6 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// ── module mocks ─────────────────────────────────────────────────────────────
 vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   const i18n = (await import('i18next')).default;
   const { initReactI18next, useTranslation } = await import('react-i18next');
@@ -39,7 +38,6 @@ vi.mock('@iconify/react', () => ({
   Icon: ({ icon, ...props }: any) => <span data-icon={icon} {...props} />,
 }));
 
-// ── component + stories ───────────────────────────────────────────────────────
 import DeployWizardPure, { DeployWizardPureProps } from './DeployWizardPure';
 import {
   ContainerSourceSelected,
@@ -52,9 +50,6 @@ import {
 } from './DeployWizardPure.stories';
 
 afterEach(() => cleanup());
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 function renderStory(storyArgs: DeployWizardPureProps) {
   return render(
     <MemoryRouter>
@@ -81,7 +76,6 @@ async function collect(): Promise<string[]> {
   return log;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — SourceStep (guidepup)', () => {
   it('announces the heading, breadcrumb navigation, step content, and Next button', async () => {
     renderStory(SourceStep.args!);
@@ -107,7 +101,6 @@ describe('DeployWizardPure — SourceStep (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — SourceStepYamlSelected (guidepup)', () => {
   it('announces YAML selected step content and an enabled Next button', async () => {
     renderStory(SourceStepYamlSelected.args!);
@@ -120,7 +113,6 @@ describe('DeployWizardPure — SourceStepYamlSelected (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — ContainerSourceSelected (guidepup)', () => {
   it('announces container selected step content', async () => {
     renderStory(ContainerSourceSelected.args!);
@@ -131,7 +123,6 @@ describe('DeployWizardPure — ContainerSourceSelected (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — NextButtonDisabled (guidepup)', () => {
   it('announces the Next button as disabled', async () => {
     renderStory(NextButtonDisabled.args!);
@@ -148,7 +139,6 @@ describe('DeployWizardPure — NextButtonDisabled (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — DeployStepSuccess (guidepup)', () => {
   it('announces the Close button (replaces Deploy footer action)', async () => {
     renderStory(DeployStepSuccess.args!);
@@ -168,7 +158,6 @@ describe('DeployWizardPure — DeployStepSuccess (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — DeployStepError (guidepup)', () => {
   it('announces the Close button after an error result', async () => {
     renderStory(DeployStepError.args!);
@@ -185,7 +174,6 @@ describe('DeployWizardPure — DeployStepError (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployWizardPure — DeployStepDeploying (guidepup)', () => {
   it('announces the Deploying button as busy and disabled', async () => {
     renderStory(DeployStepDeploying.args!);

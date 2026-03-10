@@ -19,7 +19,6 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// ── module mocks ─────────────────────────────────────────────────────────────
 vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   const i18n = (await import('i18next')).default;
   const { initReactI18next, useTranslation } = await import('react-i18next');
@@ -39,14 +38,10 @@ vi.mock('@monaco-editor/react', () => ({
   default: () => <div data-testid="monaco-editor" role="region" aria-label="YAML editor" />,
 }));
 
-// ── component + stories ───────────────────────────────────────────────────────
 import ConfigureYAML, { ConfigureYAMLProps } from './ConfigureYAML';
 import { Empty, WithContent, WithError } from './ConfigureYAML.stories';
 
 afterEach(() => cleanup());
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 function renderStory(storyArgs: ConfigureYAMLProps) {
   return render(
     <MemoryRouter>
@@ -71,7 +66,6 @@ async function collect(): Promise<string[]> {
   return log;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('ConfigureYAML — Empty (guidepup)', () => {
   it('announces the Kubernetes YAML heading', async () => {
     renderStory(Empty.args!);
@@ -110,7 +104,6 @@ describe('ConfigureYAML — Empty (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('ConfigureYAML — WithContent (guidepup)', () => {
   it('announces the same structure as Empty (no error)', async () => {
     renderStory(WithContent.args!);
@@ -124,7 +117,6 @@ describe('ConfigureYAML — WithContent (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('ConfigureYAML — WithError (guidepup)', () => {
   it('announces an error alert live region', async () => {
     renderStory(WithError.args!);

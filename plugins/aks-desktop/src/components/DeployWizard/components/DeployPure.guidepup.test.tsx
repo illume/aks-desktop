@@ -19,7 +19,6 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// ── module mocks ─────────────────────────────────────────────────────────────
 vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   const i18n = (await import('i18next')).default;
   const { initReactI18next, useTranslation } = await import('react-i18next');
@@ -39,7 +38,6 @@ vi.mock('@monaco-editor/react', () => ({
   default: () => <div data-testid="monaco-editor" role="region" aria-label="YAML editor" />,
 }));
 
-// ── component + stories ───────────────────────────────────────────────────────
 import DeployPure, { DeployPureProps } from './DeployPure';
 import {
   DeployError,
@@ -52,9 +50,6 @@ import {
 } from './DeployPure.stories';
 
 afterEach(() => cleanup());
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 function renderStory(storyArgs: DeployPureProps, overrides: Partial<DeployPureProps> = {}) {
   const props: DeployPureProps = { ...storyArgs, ...overrides };
   return render(
@@ -82,7 +77,6 @@ async function collect(): Promise<string[]> {
   return log;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — Idle (guidepup)', () => {
   it('announces the Review & Deploy heading', async () => {
     renderStory(Idle.args!);
@@ -130,7 +124,6 @@ describe('DeployPure — Idle (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — DeploySuccess (guidepup)', () => {
   it('announces a polite status live region', async () => {
     renderStory(DeploySuccess.args!);
@@ -155,7 +148,6 @@ describe('DeployPure — DeploySuccess (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — DeployError (guidepup)', () => {
   it('announces an assertive alert live region', async () => {
     renderStory(DeployError.args!);
@@ -180,7 +172,6 @@ describe('DeployPure — DeployError (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — YamlWithObjects (guidepup)', () => {
   it('announces all three resource kinds', async () => {
     renderStory(YamlWithObjects.args!);
@@ -208,7 +199,6 @@ describe('DeployPure — YamlWithObjects (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — EmptyResourceList (guidepup)', () => {
   it('announces the heading with zero-object count', async () => {
     renderStory(EmptyResourceList.args!);
@@ -227,7 +217,6 @@ describe('DeployPure — EmptyResourceList (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — SingleResource (guidepup)', () => {
   it('announces the singular object count', async () => {
     renderStory(SingleResource.args!);
@@ -252,7 +241,6 @@ describe('DeployPure — SingleResource (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — ManyResourceTypes (guidepup)', () => {
   it('announces the 5-object count', async () => {
     renderStory(ManyResourceTypes.args!);
@@ -284,7 +272,6 @@ describe('DeployPure — ManyResourceTypes (guidepup)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe('DeployPure — container sourceType (guidepup)', () => {
   it('announces the Monaco editor region', async () => {
     renderStory(Idle.args!, {
