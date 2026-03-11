@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Setup VoiceOver screen reader
-        uses: guidepup/setup-action@v1
+        run: npx @guidepup/setup
 
       - name: Run guidepup screen reader tests
         run: npm test
