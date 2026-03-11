@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import {
   Alert,
   AlertTitle,
@@ -52,12 +53,8 @@ const ADDON_OPTIONS: AddonOption[] = [
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 10000;
 
-const NETWORK_POLICY_INFO = (
-  <>
-    Network policy engine cannot be changed after cluster creation. Create a new cluster with{' '}
-    <code>--network-policy cilium</code> for full network policy support.
-  </>
-);
+const NETWORK_POLICY_INFO =
+  'Network policy engine cannot be changed after cluster creation. Create a new cluster with --network-policy cilium for full network policy support.';
 
 /**
  * Panel for enabling missing addons on a Standard AKS cluster.
@@ -71,6 +68,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
   clusterName,
   onConfigured,
 }) => {
+  const { t } = useTranslation();
   const [selectedAddons, setSelectedAddons] = useState<Set<AddonKey>>(new Set());
   const [enabling, setEnabling] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -141,8 +139,9 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
     if (attempt >= MAX_POLL_ATTEMPTS) {
       setPolling(false);
       setError(
-        'Configuration is taking longer than expected. ' +
-          'Please check the Azure portal for the current status of your cluster.'
+        t(
+          'Configuration is taking longer than expected. Please check the Azure portal for the current status of your cluster.'
+        )
       );
       return;
     }
@@ -205,7 +204,9 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
       if (settled.status === 'rejected') {
         const err = settled.reason;
         errors.push(
-          `Failed to enable addon: ${err instanceof Error ? err.message : 'Unknown error'}`
+          `${t('Failed to enable addon: ')}${
+            err instanceof Error ? err.message : t('Unknown error')
+          }`
         );
       } else if (!settled.value.result.success) {
         errors.push(settled.value.result.error || `Failed to enable ${settled.value.addonKey}`);
@@ -241,10 +242,10 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
         }}
       >
         <Typography variant="subtitle2" gutterBottom>
-          Cluster Configuration
+          {t('Cluster Configuration')}
         </Typography>
         <Alert severity="info" sx={{ mt: 1 }}>
-          {NETWORK_POLICY_INFO}
+          {t(NETWORK_POLICY_INFO)}
         </Alert>
       </Box>
     );
@@ -260,10 +261,10 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
       }}
     >
       <Typography variant="subtitle2" gutterBottom>
-        Cluster Configuration
+        {t('Cluster Configuration')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        The following addons can be enabled on this cluster:
+        {t('The following addons can be enabled on this cluster:')}
       </Typography>
 
       {/* Addon checkboxes */}
@@ -279,7 +280,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
                 size="small"
               />
             }
-            label={<Typography variant="body2">{addon.label}</Typography>}
+            label={<Typography variant="body2">{t(addon.label)}</Typography>}
           />
         ))}
       </Box>
@@ -287,21 +288,21 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
       {/* Network policy info (non-actionable) */}
       {hasNetworkPolicyWarning && (
         <Alert severity="info" sx={{ mt: 1 }}>
-          {NETWORK_POLICY_INFO}
+          {t(NETWORK_POLICY_INFO)}
         </Alert>
       )}
 
       {/* Cost warning */}
       <Alert severity="warning" sx={{ mt: 1 }} icon={false}>
         <Typography variant="body2">
-          Enabling these addons may incur additional Azure costs.
+          {t('Enabling these addons may incur additional Azure costs.')}
         </Typography>
       </Alert>
 
       {/* Error message */}
       {error && (
         <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError(null)}>
-          <AlertTitle>Configuration Error</AlertTitle>
+          <AlertTitle>{t('Configuration Error')}</AlertTitle>
           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
             {error}
           </Typography>
@@ -311,8 +312,8 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
       {/* Success message */}
       {success && (
         <Alert severity="success" sx={{ mt: 1 }}>
-          <AlertTitle>Configuration Complete</AlertTitle>
-          All selected addons have been enabled successfully.
+          <AlertTitle>{t('Configuration Complete')}</AlertTitle>
+          {t('All selected addons have been enabled successfully.')}
         </Alert>
       )}
 
@@ -321,7 +322,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
         <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
           <CircularProgress size={16} aria-hidden="true" />
           <Typography variant="body2" color="text.secondary" aria-hidden="true">
-            Configuring cluster... This may take a few minutes.
+            {t('Configuring cluster... This may take a few minutes.')}
           </Typography>
         </Box>
       )}
@@ -348,7 +349,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
           border: 0,
         }}
       >
-        {polling ? 'Configuring cluster... This may take a few minutes.' : ''}
+        {polling ? t('Configuring cluster... This may take a few minutes.') : ''}
       </Box>
 
       {/* Configure button */}
@@ -367,7 +368,11 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
             enabling ? <CircularProgress size={16} color="inherit" aria-hidden="true" /> : undefined
           }
         >
-          {enabling ? 'Enabling Addons...' : polling ? 'Configuring...' : 'Configure Cluster'}
+          {enabling
+            ? t('Enabling Addons...')
+            : polling
+            ? t('Configuring...')
+            : t('Configure Cluster')}
         </Button>
       )}
     </Box>
