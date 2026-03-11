@@ -84,13 +84,16 @@
  */
 
 import '@testing-library/jest-dom/vitest';
-import { virtual } from '@guidepup/virtual-screen-reader';
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { getScreenReader } from '../../../utils/test/screenReaderAdapter';
 
-// ── Mocks ────────────────────────────────────────────────────────────────────
+// Resolved once before all tests — defaults to @guidepup/virtual-screen-reader
+// unless SCREEN_READER=voiceover|nvda is set.
+let sr: Awaited<ReturnType<typeof getScreenReader>>;
+
 vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   const i18n = (await import('i18next')).default;
   const { initReactI18next, useTranslation } = await import('react-i18next');
@@ -163,10 +166,18 @@ const BASE_PROPS: CreateAKSProjectPureProps = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+beforeAll(async () => {
+  sr = await getScreenReader();
+});
+
 /**
- * Mount CreateAKSProjectPure and start the virtual SR on document.body.
+ * Mount CreateAKSProjectPure and start the SR on document.body.
  * We use document.body (not the render container) because MUI Dialogs render
  * into a portal at document.body and would be invisible otherwise.
+ *
+ * The extra `act()` flush after render lets MUI Dialog's Fade/Transition
+ * finish their asynchronous state updates, preventing React "not wrapped in
+ * act(...)" warnings on macOS CI.
  */
 async function mountWizard(overrides: Partial<CreateAKSProjectPureProps> = {}) {
   render(
@@ -174,23 +185,25 @@ async function mountWizard(overrides: Partial<CreateAKSProjectPureProps> = {}) {
       <CreateAKSProjectPure {...BASE_PROPS} {...overrides} />
     </MemoryRouter>
   );
-  await virtual.start({ container: document.body });
+  // Flush pending MUI Dialog transition state updates
+  await act(async () => {});
+  await sr.start({ container: document.body });
 }
 
 /** Collect all spoken phrases to "end of document" (bounded to avoid infinite loops). */
 async function phrases(maxSteps = 300): Promise<string[]> {
   const log: string[] = [];
   for (let i = 0; i < maxSteps; i++) {
-    const p = await virtual.lastSpokenPhrase();
+    const p = await sr.lastSpokenPhrase();
     log.push(p);
     if (p === 'end of document') break;
-    await virtual.next();
+    await sr.next();
   }
   return log;
 }
 
 afterEach(async () => {
-  await virtual.stop();
+  await sr.stop();
   cleanup();
 });
 
@@ -601,7 +614,7 @@ describe('SR: AccessStep — empty (no assignments)', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Access, level 2');
   });
 
@@ -613,7 +626,7 @@ describe('SR: AccessStep — empty (no assignments)', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /assign permissions/i.test(p))).toBe(true);
   });
@@ -626,7 +639,7 @@ describe('SR: AccessStep — empty (no assignments)', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('button, Add assignee');
     expect(ps).not.toContain('button, Add assignee, disabled');
@@ -640,7 +653,7 @@ describe('SR: AccessStep — empty (no assignments)', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.every(p => !/textbox/i.test(p))).toBe(true);
     expect(ps.every(p => !/remove assignee/i.test(p))).toBe(true);
@@ -662,7 +675,7 @@ describe('SR: AccessStep — invalid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const input = ps.find(p => /textbox/i.test(p) && /assignee/i.test(p));
     // aria-invalid → SR announces "invalid" — critical for screen reader users to
@@ -682,7 +695,7 @@ describe('SR: AccessStep — invalid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // MUI helperText is linked via aria-describedby and announced as part of the
     // textbox phrase, immediately accessible without extra Tab key presses
@@ -701,7 +714,7 @@ describe('SR: AccessStep — invalid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     // IconButton aria-label="Remove assignee" must be announced by name
     expect(await phrases()).toContain('button, Remove assignee');
   });
@@ -717,7 +730,7 @@ describe('SR: AccessStep — invalid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     // Cannot add more assignees until existing ones are valid
     expect(await phrases()).toContain('button, Add assignee, disabled');
   });
@@ -733,7 +746,7 @@ describe('SR: AccessStep — invalid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /combobox/i.test(p) && /role/i.test(p))).toBe(true);
   });
@@ -754,7 +767,7 @@ describe('SR: AccessStep — valid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const input = ps.find(p => /textbox/i.test(p) && /assignee/i.test(p));
     expect(input).toMatch(/not invalid/i);
@@ -771,7 +784,7 @@ describe('SR: AccessStep — valid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const input = ps.find(p => /textbox/i.test(p) && /assignee/i.test(p));
     expect(input).toMatch(/user@example\.com/);
@@ -788,7 +801,7 @@ describe('SR: AccessStep — valid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // MUI Select with label="Role" and value="Reader"
     expect(ps.some(p => /combobox/i.test(p) && /role/i.test(p))).toBe(true);
@@ -806,7 +819,7 @@ describe('SR: AccessStep — valid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('button, Add assignee');
     expect(ps).not.toContain('button, Add assignee, disabled');
@@ -823,7 +836,7 @@ describe('SR: AccessStep — valid email entered', () => {
         validation={ACCESS_VALIDATION}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('button, Remove assignee');
   });
 });
@@ -844,7 +857,7 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
         loading
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const input = ps.find(p => /textbox/i.test(p) && /assignee/i.test(p));
     expect(input).toMatch(/disabled/i);
@@ -862,7 +875,7 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
         loading
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const combo = ps.find(p => /combobox/i.test(p) && /role/i.test(p));
     expect(combo).toMatch(/disabled/i);
@@ -880,7 +893,7 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
         loading
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('button, Remove assignee, disabled');
   });
 
@@ -896,7 +909,7 @@ describe('SR: AccessStep — loading state (all controls disabled)', () => {
         loading
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('button, Add assignee, disabled');
   });
 });
@@ -952,32 +965,32 @@ const REVIEW_BASE_PROPS: ReviewStepProps = {
 describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
   it('announces the top-level heading "Review Project Configuration" at h2', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Review Project Configuration, level 2');
   });
 
   it('announces the introductory instruction paragraph', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /please review all the settings/i.test(p))).toBe(true);
   });
 
   it('announces the "Project Basics" section heading at h3', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Project Basics, level 3');
   });
 
   it('announces the project name value', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('azure-microservices-demo');
   });
 
   it('announces the resolved subscription name (not the raw ID)', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('Production Subscription');
     // Raw ID must not appear — that would be meaningless to screen reader users
@@ -986,25 +999,25 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
 
   it('announces the cluster name with location and version', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('aks-prod-eastus (eastus, 1.28.3)');
   });
 
   it('announces the description text', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('Demo project for microservices on AKS');
   });
 
   it('announces the "Networking Policies" section heading at h3', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Networking Policies, level 3');
   });
 
   it('announces ingress and egress policy values', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('AllowSameNamespace');
     expect(ps).toContain('AllowAll');
@@ -1012,13 +1025,13 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
 
   it('announces the "Compute Quota" section heading at h3', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Compute Quota, level 3');
   });
 
   it('announces CPU request and limit as human-readable values', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // formatCpuValue(2000) → "2.0 CPU", formatCpuValue(4000) → "4.0 CPU"
     expect(ps).toContain('2.0 CPU');
@@ -1027,7 +1040,7 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
 
   it('announces memory request and limit as human-readable GiB values', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // formatMemoryValue(4096) → "4.0 GiB", formatMemoryValue(8192) → "8.0 GiB"
     expect(ps).toContain('4.0 GiB');
@@ -1036,14 +1049,14 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
 
   it('announces the "Access Control" section heading with the assignee count', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     // Count of 2 assignees is embedded in the heading text
     expect(await phrases()).toContain('heading, Access Control (2 assignee), level 3');
   });
 
   it('announces each assignee email and role in order', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('alice@example.com');
     expect(ps).toContain('Admin');
@@ -1053,7 +1066,7 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
 
   it('announces all four section headings in document order', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const headings = ps.filter(p => /^heading,/.test(p));
     expect(headings[0]).toBe('heading, Review Project Configuration, level 2');
@@ -1065,7 +1078,7 @@ describe('SR: ReviewStep — FullConfiguration (all sections)', () => {
 
   it('announces the assignees region with the heading text via aria-labelledby', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // aria-labelledby links the region to the "Access Control (2 assignee)" heading,
     // so the region landmark should include that label in its announcement.
@@ -1085,7 +1098,7 @@ describe('SR: ReviewStep — NoAssignees', () => {
         formData={{ ...REVIEW_BASE_PROPS.formData, userAssignments: [] }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Access Control (0 assignee), level 3');
   });
 
@@ -1096,7 +1109,7 @@ describe('SR: ReviewStep — NoAssignees', () => {
         formData={{ ...REVIEW_BASE_PROPS.formData, userAssignments: [] }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.every(p => !/@example\.com/.test(p))).toBe(true);
   });
@@ -1113,7 +1126,7 @@ describe('SR: ReviewStep — NoDescription', () => {
         formData={{ ...REVIEW_BASE_PROPS.formData, description: '' }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     // Blank value would be silent — the fallback ensures AT users hear something meaningful
     expect(await phrases()).toContain('No description provided');
   });
@@ -1125,7 +1138,7 @@ describe('SR: ReviewStep — NoDescription', () => {
         formData={{ ...REVIEW_BASE_PROPS.formData, description: '' }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // Empty string would never appear as a spoken phrase, but the placeholder must
     expect(ps.filter(p => p === '')).toHaveLength(0);
@@ -1138,14 +1151,14 @@ describe('SR: ReviewStep — NoDescription', () => {
 describe('SR: ReviewStep — UnresolvedResources (subscription/cluster not in lists)', () => {
   it('falls back to "N/A" when subscription cannot be resolved', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} subscriptions={[]} clusters={[]} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     // Graceful degradation: "N/A" is more meaningful than silence or an ID
     expect(await phrases()).toContain('N/A');
   });
 
   it('shows the raw cluster name (without location/version) when cluster cannot be resolved', async () => {
     render(<ReviewStep {...REVIEW_BASE_PROPS} subscriptions={[]} clusters={[]} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // Without a matching cluster object only the name is shown
     expect(ps).toContain('aks-prod-eastus');
@@ -1168,7 +1181,7 @@ describe('SR: ReviewStep — SingleAssignee', () => {
         }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Access Control (1 assignee), level 3');
   });
 
@@ -1182,7 +1195,7 @@ describe('SR: ReviewStep — SingleAssignee', () => {
         }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps).toContain('charlie@example.com');
     expect(ps).toContain('Writer');
@@ -1218,46 +1231,46 @@ const NET_BASE_PROPS: NetworkingStepProps = {
 describe('SR: NetworkingStep — Default', () => {
   it('announces the "Networking Policies" heading at h2', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Networking Policies, level 2');
   });
 
   it('announces the introductory description paragraph', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /security.*communication|communication.*access/i.test(p))).toBe(true);
   });
 
   it('announces the Ingress combobox with its label', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /combobox/i.test(p) && /ingress/i.test(p))).toBe(true);
   });
 
   it('announces the Egress combobox with its label', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /combobox/i.test(p) && /egress/i.test(p))).toBe(true);
   });
 
   it('announces the current Ingress value "Allow traffic within same namespace"', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('Allow traffic within same namespace');
   });
 
   it('announces the current Egress value "Allow all traffic"', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('Allow all traffic');
   });
 
   it('announces comboboxes as "not expanded" when closed', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const ingress = ps.find(p => /combobox/i.test(p) && /ingress/i.test(p));
     expect(ingress).toMatch(/not expanded/i);
@@ -1265,7 +1278,7 @@ describe('SR: NetworkingStep — Default', () => {
 
   it('does NOT announce decorative section icons', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // No icon names should leak into spoken output
     expect(ps.every(p => !/mdi:network/i.test(p))).toBe(true);
@@ -1281,7 +1294,7 @@ describe('SR: NetworkingStep — DenyAll', () => {
         formData={{ ...NET_FORM_DATA, ingress: 'DenyAll', egress: 'DenyAll' }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // Both comboboxes show "Deny all traffic" — verify at least one is present
     expect(ps.filter(p => /deny all traffic/i.test(p)).length).toBeGreaterThanOrEqual(1);
@@ -1294,7 +1307,7 @@ describe('SR: NetworkingStep — DenyAll', () => {
         formData={{ ...NET_FORM_DATA, ingress: 'DenyAll', egress: 'DenyAll' }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.filter(p => /deny all traffic/i.test(p)).length).toBe(2);
   });
@@ -1309,7 +1322,7 @@ describe('SR: NetworkingStep — AllowAll', () => {
         formData={{ ...NET_FORM_DATA, ingress: 'AllowAll', egress: 'AllowAll' }}
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.filter(p => /allow all traffic/i.test(p)).length).toBe(2);
   });
@@ -1319,7 +1332,7 @@ describe('SR: NetworkingStep — AllowAll', () => {
 describe('SR: NetworkingStep — Loading (both selects disabled)', () => {
   it('announces the Ingress combobox as disabled', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const ingress = ps.find(p => /combobox/i.test(p) && /ingress/i.test(p));
     expect(ingress).toMatch(/disabled/i);
@@ -1327,7 +1340,7 @@ describe('SR: NetworkingStep — Loading (both selects disabled)', () => {
 
   it('announces the Egress combobox as disabled', async () => {
     render(<NetworkingStep {...NET_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const egress = ps.find(p => /combobox/i.test(p) && /egress/i.test(p));
     expect(egress).toMatch(/disabled/i);
@@ -1363,32 +1376,32 @@ const COMPUTE_BASE_PROPS: ComputeStepProps = {
 describe('SR: ComputeStep — Default', () => {
   it('announces the "Compute Quota" heading at h2', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Compute Quota, level 2');
   });
 
   it('announces the introductory description paragraph', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /quota limits|overuse|cluster stability/i.test(p))).toBe(true);
   });
 
   it('announces the "CPU Resources" section heading at h3', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, CPU Resources, level 3');
   });
 
   it('announces the "Memory Resources" section heading at h3', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('heading, Memory Resources, level 3');
   });
 
   it('announces both section headings in document order (CPU before Memory)', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const cpuIdx = ps.indexOf('heading, CPU Resources, level 3');
     const memIdx = ps.indexOf('heading, Memory Resources, level 3');
@@ -1398,7 +1411,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces the CPU Requests spinbutton with its current value', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu requests/i.test(p));
     expect(field).toBeTruthy();
@@ -1407,7 +1420,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces the CPU Limits spinbutton with its current value', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu limits/i.test(p));
     expect(field).toMatch(/4000/);
@@ -1415,7 +1428,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces the Memory Requests spinbutton with its current value', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory requests/i.test(p));
     expect(field).toMatch(/4096/);
@@ -1423,7 +1436,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces the Memory Limits spinbutton with its current value', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory limits/i.test(p));
     expect(field).toMatch(/8192/);
@@ -1431,7 +1444,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces helper text for CPU Requests as part of the spinbutton phrase', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu requests/i.test(p));
     // helperText is linked via aria-describedby and included in the spinbutton announcement
@@ -1440,7 +1453,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces helper text for Memory Requests as part of the spinbutton phrase', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory requests/i.test(p));
     expect(field).toMatch(/minimum memory guaranteed/i);
@@ -1448,7 +1461,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces all four spinbuttons as "not invalid" when validation passes', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const spinbuttons = ps.filter(p => /spinbutton/i.test(p));
     expect(spinbuttons).toHaveLength(4);
@@ -1457,21 +1470,21 @@ describe('SR: ComputeStep — Default', () => {
 
   it('announces the "millicores" unit for CPU spinbuttons', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.filter(p => /millicores/i.test(p)).length).toBeGreaterThanOrEqual(2);
   });
 
   it('announces the "MiB" unit for Memory spinbuttons', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.filter(p => /^MiB$/.test(p)).length).toBeGreaterThanOrEqual(2);
   });
 
   it('does NOT announce decorative startAdornment icons (arrow-up / arrow-down)', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // Icons have aria-hidden="true" — must not appear as named images in spoken log
     expect(ps.every(p => !/mdi:arrow/i.test(p))).toBe(true);
@@ -1479,7 +1492,7 @@ describe('SR: ComputeStep — Default', () => {
 
   it('does NOT announce decorative ResourceCard title icons', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.every(p => !/mdi:cpu-64-bit|mdi:memory/i.test(p))).toBe(true);
   });
@@ -1499,7 +1512,7 @@ describe('SR: ComputeStep — WithFieldErrors', () => {
 
   it('announces CPU Requests spinbutton as "invalid" when it has a field error', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={ERRORS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu requests/i.test(p));
     expect(field).toMatch(/\binvalid\b/i);
@@ -1508,7 +1521,7 @@ describe('SR: ComputeStep — WithFieldErrors', () => {
 
   it('announces the CPU Requests error message instead of the normal helper text', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={ERRORS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu requests/i.test(p));
     expect(field).toMatch(/must be less than or equal/i);
@@ -1516,7 +1529,7 @@ describe('SR: ComputeStep — WithFieldErrors', () => {
 
   it('announces Memory Limits spinbutton as "invalid" when it has a field error', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={ERRORS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory limits/i.test(p));
     expect(field).toMatch(/\binvalid\b/i);
@@ -1524,7 +1537,7 @@ describe('SR: ComputeStep — WithFieldErrors', () => {
 
   it('announces the Memory Limits error message', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={ERRORS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory limits/i.test(p));
     expect(field).toMatch(/cannot exceed cluster node capacity/i);
@@ -1532,7 +1545,7 @@ describe('SR: ComputeStep — WithFieldErrors', () => {
 
   it('does NOT announce CPU Limits as invalid (it has no error)', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={ERRORS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu limits/i.test(p));
     // Error on cpuRequest must not bleed into cpuLimit
@@ -1541,7 +1554,7 @@ describe('SR: ComputeStep — WithFieldErrors', () => {
 
   it('does NOT announce Memory Requests as invalid (it has no error)', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={ERRORS} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory requests/i.test(p));
     expect(field).toMatch(/not invalid/i);
@@ -1559,7 +1572,7 @@ describe('SR: ComputeStep — CpuRequestError (isolated single-field)', () => {
 
   it('marks only CPU Requests as invalid', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={SINGLE_ERROR} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const spinbuttons = ps.filter(p => /spinbutton/i.test(p));
     const invalidCount = spinbuttons.filter(
@@ -1570,7 +1583,7 @@ describe('SR: ComputeStep — CpuRequestError (isolated single-field)', () => {
 
   it('keeps all other three spinbuttons as "not invalid"', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} validation={SINGLE_ERROR} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const others = ps.filter(p => /spinbutton/i.test(p) && !/cpu requests/i.test(p));
     others.forEach(s => expect(s).toMatch(/not invalid/i));
@@ -1581,7 +1594,7 @@ describe('SR: ComputeStep — CpuRequestError (isolated single-field)', () => {
 describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
   it('announces the CPU Requests spinbutton as disabled', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu requests/i.test(p));
     expect(field).toMatch(/disabled/i);
@@ -1589,7 +1602,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
 
   it('announces the CPU Limits spinbutton as disabled', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /cpu limits/i.test(p));
     expect(field).toMatch(/disabled/i);
@@ -1597,7 +1610,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
 
   it('announces the Memory Requests spinbutton as disabled', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory requests/i.test(p));
     expect(field).toMatch(/disabled/i);
@@ -1605,7 +1618,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
 
   it('announces the Memory Limits spinbutton as disabled', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const field = ps.find(p => /spinbutton/i.test(p) && /memory limits/i.test(p));
     expect(field).toMatch(/disabled/i);
@@ -1613,7 +1626,7 @@ describe('SR: ComputeStep — Loading (all spinbuttons disabled)', () => {
 
   it('announces all four spinbuttons as disabled', async () => {
     render(<ComputeStep {...COMPUTE_BASE_PROPS} loading />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const spinbuttons = ps.filter(p => /spinbutton/i.test(p));
     expect(spinbuttons).toHaveLength(4);
@@ -1634,19 +1647,19 @@ const BREADCRUMB_BASE: BreadcrumbProps = {
 describe('SR: Breadcrumb — FirstStep', () => {
   it('announces navigation landmark "Wizard steps"', async () => {
     render(<Breadcrumb {...BREADCRUMB_BASE} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('navigation, Wizard steps');
   });
 
   it('announces the first step as current', async () => {
     render(<Breadcrumb {...BREADCRUMB_BASE} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('button, Basics, current step');
   });
 
   it('announces all five step buttons', async () => {
     render(<Breadcrumb {...BREADCRUMB_BASE} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     for (const label of ['Basics', 'Networking Policies', 'Compute Quota', 'Access', 'Review']) {
       expect(ps.some(p => p.includes(`button, ${label}`))).toBe(true);
@@ -1657,13 +1670,13 @@ describe('SR: Breadcrumb — FirstStep', () => {
 describe('SR: Breadcrumb — MiddleStep', () => {
   it('announces Compute Quota as the current step', async () => {
     render(<Breadcrumb {...BREADCRUMB_BASE} activeStep={2} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('button, Compute Quota, current step');
   });
 
   it('Basics step is no longer aria-current', async () => {
     render(<Breadcrumb {...BREADCRUMB_BASE} activeStep={2} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).not.toContain('button, Basics, current step');
   });
 });
@@ -1671,7 +1684,7 @@ describe('SR: Breadcrumb — MiddleStep', () => {
 describe('SR: Breadcrumb — LastStep', () => {
   it('announces Review as the current step', async () => {
     render(<Breadcrumb {...BREADCRUMB_BASE} activeStep={4} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     expect(await phrases()).toContain('button, Review, current step');
   });
 });
@@ -1689,7 +1702,7 @@ const FORMFIELD_BASE: FormFieldProps = {
 describe('SR: FormField — Default', () => {
   it('announces a labeled textbox with its value', async () => {
     render(<FormField {...FORMFIELD_BASE} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
     expect(textbox).toBeTruthy();
@@ -1707,7 +1720,7 @@ describe('SR: FormField — WithError', () => {
         required
       />
     );
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
     expect(textbox).toMatch(/invalid/i);
@@ -1716,7 +1729,7 @@ describe('SR: FormField — WithError', () => {
 
   it('announces the error helper text', async () => {
     render(<FormField {...FORMFIELD_BASE} value="" error helperText="Project name is required" />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     // The helper text is linked via aria-describedby and announced as part of the textbox
     const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
@@ -1727,7 +1740,7 @@ describe('SR: FormField — WithError', () => {
 describe('SR: FormField — NumberField', () => {
   it('announces a spinbutton role', async () => {
     render(<FormField {...FORMFIELD_BASE} label="CPU Request" type="number" value={2000} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /spinbutton/i.test(p) && /cpu request/i.test(p))).toBe(true);
   });
@@ -1736,7 +1749,7 @@ describe('SR: FormField — NumberField', () => {
 describe('SR: FormField — Disabled', () => {
   it('announces the textbox as disabled', async () => {
     render(<FormField {...FORMFIELD_BASE} disabled />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const textbox = ps.find(p => /textbox/i.test(p) && /project name/i.test(p));
     expect(textbox).toMatch(/disabled/i);
@@ -1762,7 +1775,7 @@ const SEARCHABLE_BASE: SearchableSelectProps = {
 describe('SR: SearchableSelect — Default', () => {
   it('announces a labeled combobox', async () => {
     render(<SearchableSelect {...SEARCHABLE_BASE} />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /combobox/i.test(p) && /subscription/i.test(p))).toBe(true);
   });
@@ -1771,7 +1784,7 @@ describe('SR: SearchableSelect — Default', () => {
 describe('SR: SearchableSelect — WithSelection', () => {
   it('announces the selected value in the combobox', async () => {
     render(<SearchableSelect {...SEARCHABLE_BASE} value="sub-123" />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     const combobox = ps.find(p => /combobox/i.test(p) && /subscription/i.test(p));
     expect(combobox).toMatch(/Production Subscription/i);
@@ -1785,7 +1798,7 @@ describe('SR: SearchableSelect — WithSelection', () => {
 describe('SR: ValidationAlert — Error', () => {
   it('announces an alert with the error message', async () => {
     render(<ValidationAlert type="error" message="Namespace creation failed" />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /alert/i.test(p))).toBe(true);
     expect(ps.some(p => /Namespace creation failed/i.test(p))).toBe(true);
@@ -1795,7 +1808,7 @@ describe('SR: ValidationAlert — Error', () => {
 describe('SR: ValidationAlert — Warning', () => {
   it('announces a warning alert', async () => {
     render(<ValidationAlert type="warning" message="Cluster resources are running low" />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /alert/i.test(p))).toBe(true);
     expect(ps.some(p => /Cluster resources are running low/i.test(p))).toBe(true);
@@ -1805,7 +1818,7 @@ describe('SR: ValidationAlert — Warning', () => {
 describe('SR: ValidationAlert — Success', () => {
   it('announces a success alert', async () => {
     render(<ValidationAlert type="success" message="Project created successfully" />);
-    await virtual.start({ container: document.body });
+    await sr.start({ container: document.body });
     const ps = await phrases();
     expect(ps.some(p => /alert/i.test(p))).toBe(true);
     expect(ps.some(p => /Project created successfully/i.test(p))).toBe(true);
