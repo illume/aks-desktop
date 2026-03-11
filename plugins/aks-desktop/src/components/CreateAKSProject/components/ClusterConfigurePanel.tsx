@@ -139,51 +139,54 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
     });
   };
 
-  const pollForCompletion = useCallback(async (addonsToCheck: Set<AddonKey>, attempt: number) => {
-    if (attempt >= MAX_POLL_ATTEMPTS) {
-      setPolling(false);
-      setError(
-        t(
-          'Configuration is taking longer than expected. Please check the Azure portal for the current status of your cluster.'
-        )
-      );
-      return;
-    }
-
-    try {
-      const params = clusterParamsRef.current;
-      const updatedCapabilities = await getClusterCapabilities({
-        subscriptionId: params.subscriptionId,
-        resourceGroup: params.resourceGroup,
-        clusterName: params.clusterName,
-      });
-
-      // Check if all selected addons are now enabled
-      const allEnabled = Array.from(addonsToCheck).every(addonKey => {
-        const option = ADDON_OPTIONS.find(o => o.key === addonKey);
-        if (!option) return true;
-        return updatedCapabilities[option.capabilityField] === true;
-      });
-
-      if (allEnabled) {
+  const pollForCompletion = useCallback(
+    async (addonsToCheck: Set<AddonKey>, attempt: number) => {
+      if (attempt >= MAX_POLL_ATTEMPTS) {
         setPolling(false);
-        setSuccess(true);
-        onConfiguredRef.current();
+        setError(
+          t(
+            'Configuration is taking longer than expected. Please check the Azure portal for the current status of your cluster.'
+          )
+        );
         return;
       }
 
-      // Schedule next poll
-      pollingTimerRef.current = setTimeout(() => {
-        pollForCompletion(addonsToCheck, attempt + 1);
-      }, POLL_INTERVAL_MS);
-    } catch (pollError) {
-      // Don't stop polling on transient errors, just log and continue
-      console.error('Error polling cluster capabilities:', pollError);
-      pollingTimerRef.current = setTimeout(() => {
-        pollForCompletion(addonsToCheck, attempt + 1);
-      }, POLL_INTERVAL_MS);
-    }
-  }, []);
+      try {
+        const params = clusterParamsRef.current;
+        const updatedCapabilities = await getClusterCapabilities({
+          subscriptionId: params.subscriptionId,
+          resourceGroup: params.resourceGroup,
+          clusterName: params.clusterName,
+        });
+
+        // Check if all selected addons are now enabled
+        const allEnabled = Array.from(addonsToCheck).every(addonKey => {
+          const option = ADDON_OPTIONS.find(o => o.key === addonKey);
+          if (!option) return true;
+          return updatedCapabilities[option.capabilityField] === true;
+        });
+
+        if (allEnabled) {
+          setPolling(false);
+          setSuccess(true);
+          onConfiguredRef.current();
+          return;
+        }
+
+        // Schedule next poll
+        pollingTimerRef.current = setTimeout(() => {
+          pollForCompletion(addonsToCheck, attempt + 1);
+        }, POLL_INTERVAL_MS);
+      } catch (pollError) {
+        // Don't stop polling on transient errors, just log and continue
+        console.error('Error polling cluster capabilities:', pollError);
+        pollingTimerRef.current = setTimeout(() => {
+          pollForCompletion(addonsToCheck, attempt + 1);
+        }, POLL_INTERVAL_MS);
+      }
+    },
+    [t]
+  );
 
   const handleConfigure = async () => {
     if (selectedAddons.size === 0) return;
@@ -208,9 +211,9 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
       if (settled.status === 'rejected') {
         const err = settled.reason;
         errors.push(
-          `${t('Failed to enable addon: ')}${
-            err instanceof Error ? err.message : t('Unknown error')
-          }`
+          t('Failed to enable addon: {{error}}', {
+            error: err instanceof Error ? err.message : t('Unknown error'),
+          })
         );
       } else if (!settled.value.result.success) {
         errors.push(settled.value.result.error || `Failed to enable ${settled.value.addonKey}`);

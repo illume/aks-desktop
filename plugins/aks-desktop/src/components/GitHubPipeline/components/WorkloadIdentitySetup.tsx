@@ -126,10 +126,11 @@ export function WorkloadIdentitySetup({
                   {t('Federated Credential')}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {t('OIDC trust for {{ownerRepo}} (branch: {{branch}})', {
-                    ownerRepo: `${repo.owner}/${repo.repo}`,
-                    branch: repo.defaultBranch,
-                  })}
+                  {t('OIDC trust for')}{' '}
+                  <code>
+                    {repo.owner}/{repo.repo}
+                  </code>{' '}
+                  ({t('branch')}: <code>{repo.defaultBranch}</code>)
                 </Typography>
               </Box>
             </Box>

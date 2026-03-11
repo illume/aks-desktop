@@ -23,10 +23,8 @@ export function PipelineConfiguredScreen({ repoFullName }: PipelineConfiguredScr
         {t('Pipeline Configured')}
       </Typography>
       <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-        {t(
-          'CI/CD pipeline for {{repoFullName}} is ready. Trigger deployments from the Deploy tab.',
-          { repoFullName }
-        )}
+        {t('CI/CD pipeline for')} <strong>{repoFullName}</strong>{' '}
+        {t('is ready. Trigger deployments from the Deploy tab.')}
       </Typography>
     </Box>
   );
