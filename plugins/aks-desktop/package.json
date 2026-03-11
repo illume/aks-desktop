@@ -13,6 +13,8 @@
     "storybook": "headlamp-plugin storybook",
     "storybook-build": "headlamp-plugin storybook-build",
     "test": "headlamp-plugin test",
+    "test:nvda": "cross-env SCREEN_READER=nvda vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
+    "test:voiceover": "cross-env SCREEN_READER=voiceover vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
     "prettier": "prettier --write .",
     "i18n": "headlamp-plugin i18n"
   },
@@ -50,6 +52,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/libsodium-wrappers": "^0.7.14",
     "@types/react": "^19.2.0",
+    "cross-env": "^10.1.0",
     "eslint-plugin-no-barrel-files": "^1.2.2",
     "jsdom": "^24.1.3",
     "react": "^18.3.1",
