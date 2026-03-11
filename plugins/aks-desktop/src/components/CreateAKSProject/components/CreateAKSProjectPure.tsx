@@ -326,10 +326,17 @@ export default function CreateAKSProjectPure({
         {/* Success dialog — uses MUI Dialog so focus management and focus trapping
             are handled automatically, satisfying the role="dialog" accessibility
             requirements without any custom autoFocus or inert-background logic.
+            Escape and backdrop-click dismissal are disabled so the only dismiss
+            actions are the explicit Cancel / Create Application buttons.
             MUI: https://mui.com/material-ui/react-dialog/#accessibility */}
         <Dialog
           open={showSuccessDialog}
-          onClose={onCancelSuccess}
+          onClose={(_event, reason) => {
+            if (reason !== 'backdropClick') {
+              onCancelSuccess();
+            }
+          }}
+          disableEscapeKeyDown
           aria-labelledby="aksd-create-aks-project-success-title"
           aria-describedby="aksd-create-aks-project-success-desc"
           maxWidth="sm"

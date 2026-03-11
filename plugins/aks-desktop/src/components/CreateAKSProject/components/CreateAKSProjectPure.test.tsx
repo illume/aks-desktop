@@ -218,6 +218,22 @@ describe('CreateAKSProjectPure — SuccessDialog story interactions', () => {
     expect(onCancelSuccess).toHaveBeenCalledTimes(1);
   });
 
+  it('does not dismiss success dialog on Escape key', () => {
+    const onCancelSuccess = vi.fn();
+    renderStory(SuccessDialog.args!, { onCancelSuccess });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onCancelSuccess).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss success dialog on backdrop click', () => {
+    const onCancelSuccess = vi.fn();
+    renderStory(SuccessDialog.args!, { onCancelSuccess });
+    const backdrop = document.querySelector('.MuiBackdrop-root');
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop!);
+    expect(onCancelSuccess).not.toHaveBeenCalled();
+  });
+
   it('Create Application button is disabled when application name is empty', () => {
     renderStory(SuccessDialog.args!, { applicationName: '' });
     expect(screen.getByRole('button', { name: /create application/i })).toBeDisabled();
