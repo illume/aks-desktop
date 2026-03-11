@@ -12,7 +12,6 @@ permissions:
 
 env:
   NODE_VERSION: '20'
-  SCREEN_READER: nvda
 
 jobs:
   sr-test-nvda:
@@ -36,27 +35,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup NVDA screen reader
-        uses: guidepup/setup-action@v1
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium
-
-      - name: Build Storybook
-        run: npm run storybook-build
-
-      - name: Run screen reader tests
-        run: npx playwright test --config playwright.config.ts
+      - name: Run guidepup screen reader tests
+        run: npm test
         env:
           SCREEN_READER: nvda
-          CI: true
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: sr-test-results-nvda
-          path: |
-            plugins/aks-desktop/test-results/
-            plugins/aks-desktop/playwright-report/
-          retention-days: 30
