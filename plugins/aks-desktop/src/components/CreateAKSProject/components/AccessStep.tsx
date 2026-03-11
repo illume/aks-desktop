@@ -25,6 +25,10 @@ function getRoleDescription(t: (key: string) => string, role: RoleType): string 
       return t(
         'Read/write access to most resources in a namespace. Can create roles and role bindings within the namespace. Cannot write to resource quota or the namespace itself.'
       );
+    default: {
+      const _exhaustive: never = role;
+      return String(_exhaustive);
+    }
   }
 }
 

@@ -94,7 +94,7 @@ export function WizardShell({
         {/* Stepper */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2.5 }}>
           {getStepLabels(t).map((label, i) => (
-            <React.Fragment key={label}>
+            <React.Fragment key={i}>
               {i > 0 && (
                 <Box
                   component={Icon}

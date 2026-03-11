@@ -45,6 +45,10 @@ function getAddonLabel(t: (key: string) => string, key: AddonKey): string {
       return t('KEDA (Event-Driven Autoscaling)');
     case 'vpa':
       return t('VPA (Vertical Pod Autoscaler)');
+    default: {
+      const _exhaustive: never = key;
+      return String(_exhaustive);
+    }
   }
 }
 
