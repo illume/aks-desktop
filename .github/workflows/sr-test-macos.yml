@@ -39,6 +39,7 @@ jobs:
         uses: guidepup/setup-action@4aa2ebd687ff687a31d7c17184beac3c606d64cd # 0.19.0
 
       - name: Run guidepup screen reader tests
-        run: npm test
+        run: npx vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs "guidepup"
         env:
           SCREEN_READER: voiceover
+          UNDER_TEST: 'true'

@@ -94,7 +94,6 @@ import { getScreenReader } from '../../../utils/test/screenReaderAdapter';
 // unless SCREEN_READER=voiceover|nvda is set.
 let sr: Awaited<ReturnType<typeof getScreenReader>>;
 
-// ── Mocks ────────────────────────────────────────────────────────────────────
 vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
   const i18n = (await import('i18next')).default;
   const { initReactI18next, useTranslation } = await import('react-i18next');
