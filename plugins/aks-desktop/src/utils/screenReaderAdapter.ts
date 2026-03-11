@@ -40,4 +40,3 @@ export async function getScreenReader() {
   const guidepup = await import('@guidepup/guidepup');
   return activeDriver === 'nvda' ? guidepup.nvda : guidepup.voiceOver;
 }
-
