@@ -13,8 +13,8 @@
     "storybook": "headlamp-plugin storybook",
     "storybook-build": "headlamp-plugin storybook-build",
     "test": "headlamp-plugin test",
-    "test:nvda": "cross-env SCREEN_READER=nvda vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
-    "test:voiceover": "cross-env SCREEN_READER=voiceover vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
+    "test:nvda": "npx @guidepup/setup --ci && cross-env SCREEN_READER=nvda vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
+    "test:voiceover": "npx @guidepup/setup --ci && cross-env SCREEN_READER=voiceover vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
     "prettier": "prettier --write .",
     "i18n": "headlamp-plugin i18n"
   },
