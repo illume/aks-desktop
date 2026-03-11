@@ -138,7 +138,7 @@ export default function DeployPure({
                   }
                 });
               }}
-              // set tabFocusMode the second time it is used
+              // tabFocusMode: true ensures Tab key moves focus out of the editor
               options={{
                 readOnly: true,
                 minimap: { enabled: false },
