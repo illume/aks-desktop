@@ -69,12 +69,15 @@ export async function getScreenReader() {
           `[screenReaderAdapter] ${activeDriver} unavailable (${msg}), falling back to virtual`
         );
         usingVirtualFallback = true;
-        await virtual.start(options!);
+        if (options) {
+          await virtual.start(options);
+        }
       }
     },
     stop: async () => {
       if (usingVirtualFallback) {
         await virtual.stop();
+        usingVirtualFallback = false;
       } else {
         await realDriver.stop();
       }
