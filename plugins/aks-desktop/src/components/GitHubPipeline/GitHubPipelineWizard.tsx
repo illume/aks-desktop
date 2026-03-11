@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
 import React, { useEffect, useRef } from 'react';
 import type { GitHubRepo } from '../../types/github';
@@ -116,6 +117,7 @@ export function GitHubPipelineWizard({
   containerConfig,
   mode = 'deploy',
 }: GitHubPipelineWizardProps) {
+  const { t } = useTranslation();
   const localContainerConfig = useContainerConfiguration(appName);
 
   useEffect(() => {
@@ -201,7 +203,7 @@ export function GitHubPipelineWizard({
           gitHubAuth.authState.isAuthenticated &&
           gitHubAuth.octokit
         ) {
-          return <LoadingSpinner message="Initializing..." />;
+          return <LoadingSpinner message={t('Initializing...')} />;
         }
         return (
           <ConnectSourceStep
@@ -218,10 +220,10 @@ export function GitHubPipelineWizard({
       }
 
       case 'CheckingRepo':
-        return <LoadingSpinner message="Checking repository readiness..." />;
+        return <LoadingSpinner message={t('Checking repository readiness...')} />;
 
       case 'WorkloadIdentitySetup': {
-        if (!selectedRepo) return <LoadingSpinner message="Loading..." />;
+        if (!selectedRepo) return <LoadingSpinner message={t('Loading...')} />;
         return (
           <WorkloadIdentitySetup
             subscriptionId={subscriptionId}
@@ -234,7 +236,8 @@ export function GitHubPipelineWizard({
       }
 
       case 'ReadyForSetup': {
-        if (!pipeline.state.config) return <LoadingSpinner message="Loading configuration..." />;
+        if (!pipeline.state.config)
+          return <LoadingSpinner message={t('Loading configuration...')} />;
 
         const readiness = pipeline.state.repoReadiness;
         const filesAlreadyExist = !!(readiness?.hasSetupWorkflow && readiness?.hasAgentConfig);
@@ -251,7 +254,7 @@ export function GitHubPipelineWizard({
       }
 
       case 'SetupPRCreating':
-        return <LoadingSpinner message="Creating setup PR..." />;
+        return <LoadingSpinner message={t('Creating setup PR...')} />;
 
       case 'SetupPRAwaitingMerge':
         return (
@@ -268,7 +271,7 @@ export function GitHubPipelineWizard({
         );
 
       case 'AgentTaskCreating':
-        return <LoadingSpinner message="Creating agent task..." />;
+        return <LoadingSpinner message={t('Creating agent task...')} />;
 
       case 'AgentRunning':
         return (
@@ -337,10 +340,10 @@ export function GitHubPipelineWizard({
         return (
           <Box>
             <Alert severity="error" sx={{ mb: 2 }}>
-              {pipeline.state.error ?? 'Unknown error'}
+              {pipeline.state.error ?? t('Unknown error')}
             </Alert>
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-              {getRecoveryHint(pipeline.state.error ?? '')}
+              {t(getRecoveryHint(pipeline.state.error ?? ''))}
             </Typography>
             {(pipeline.state.setupPr.url ||
               pipeline.state.triggerIssue.url ||
@@ -355,7 +358,7 @@ export function GitHubPipelineWizard({
                   if (url) openExternalUrl(url);
                 }}
               >
-                View on GitHub
+                {t('View on GitHub')}
               </Button>
             )}
           </Box>
@@ -380,7 +383,7 @@ export function GitHubPipelineWizard({
             onClick={() => canProceed && checkRepoAndApp()}
             sx={{ textTransform: 'none' }}
           >
-            Next
+            {t('Next')}
           </Button>
         );
       }
@@ -393,10 +396,15 @@ export function GitHubPipelineWizard({
             variant="contained"
             disabled={needsApp}
             onClick={handleCreateSetupPR}
-            startIcon={<Icon icon={filesExist ? 'mdi:robot-outline' : 'mdi:source-pull'} />}
+            startIcon={
+              <Icon
+                icon={filesExist ? 'mdi:robot-outline' : 'mdi:source-pull'}
+                aria-hidden="true"
+              />
+            }
             sx={{ textTransform: 'none' }}
           >
-            {filesExist ? 'Trigger Copilot Agent' : 'Create Setup PR'}
+            {filesExist ? t('Trigger Copilot Agent') : t('Create Setup PR')}
           </Button>
         );
       }
@@ -404,21 +412,21 @@ export function GitHubPipelineWizard({
       case 'Deployed':
         return (
           <Button variant="contained" onClick={onClose} sx={{ textTransform: 'none' }}>
-            Done
+            {t('Done')}
           </Button>
         );
       case 'Failed':
         return (
           <>
             <Button variant="outlined" onClick={onClose} sx={{ textTransform: 'none' }}>
-              Back
+              {t('Back')}
             </Button>
             <Button
               variant="contained"
               onClick={() => pipeline.retry()}
               sx={{ textTransform: 'none' }}
             >
-              Retry
+              {t('Retry')}
             </Button>
           </>
         );

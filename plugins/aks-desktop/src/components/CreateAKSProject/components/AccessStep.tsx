@@ -77,7 +77,7 @@ export const AccessStep: React.FC<AccessStepProps> = ({
                   type="email"
                   value={assignment.email}
                   onChange={value => handleAssignmentChange(idx, 'email', value as string)}
-                  placeholder="user@example.com"
+                  placeholder={t('user@example.com')}
                   disabled={loading}
                   error={assignment.email.trim() === '' || !isValidEmail(assignment.email.trim())}
                   helperText={

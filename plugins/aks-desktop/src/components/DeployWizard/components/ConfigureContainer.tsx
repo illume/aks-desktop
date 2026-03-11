@@ -39,8 +39,8 @@ function LabelWithInfo({ label, infoText }: { label: string; infoText: string })
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       <span>{t(label)}</span>
       <Tooltip title={t(infoText)} arrow>
-        <IconButton aria-label={`Information about ${label}`}>
-          <Icon icon="mdi:information-outline" width="16px" height="16px" />
+        <IconButton aria-label={t('Information about {{label}}', { label: t(label) })}>
+          <Icon icon="mdi:information-outline" width="16px" height="16px" aria-hidden={true} />
         </IconButton>
       </Tooltip>
     </Box>
@@ -780,8 +780,13 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about CPU request">
-                      <Icon icon="mdi:information-outline" width="16px" height="16px" />
+                    <IconButton aria-label={t('Information about CPU request')}>
+                      <Icon
+                        icon="mdi:information-outline"
+                        width="16px"
+                        height="16px"
+                        aria-hidden="true"
+                      />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -818,8 +823,13 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about CPU limit">
-                      <Icon icon="mdi:information-outline" width="16px" height="16px" />
+                    <IconButton aria-label={t('Information about CPU limit')}>
+                      <Icon
+                        icon="mdi:information-outline"
+                        width="16px"
+                        height="16px"
+                        aria-hidden="true"
+                      />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -855,8 +865,13 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about memory request">
-                      <Icon icon="mdi:information-outline" width="16px" height="16px" />
+                    <IconButton aria-label={t('Information about memory request')}>
+                      <Icon
+                        icon="mdi:information-outline"
+                        width="16px"
+                        height="16px"
+                        aria-hidden="true"
+                      />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -893,8 +908,13 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about memory limit">
-                      <Icon icon="mdi:information-outline" width="16px" height="16px" />
+                    <IconButton aria-label={t('Information about memory limit')}>
+                      <Icon
+                        icon="mdi:information-outline"
+                        width="16px"
+                        height="16px"
+                        aria-hidden="true"
+                      />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -1093,8 +1113,13 @@ export default function ConfigureContainer({
                       )}
                       arrow
                     >
-                      <IconButton aria-label="Information about target CPU utilization">
-                        <Icon icon="mdi:information-outline" width="16px" height="16px" />
+                      <IconButton aria-label={t('Information about target CPU utilization')}>
+                        <Icon
+                          icon="mdi:information-outline"
+                          width="16px"
+                          height="16px"
+                          aria-hidden="true"
+                        />
                       </IconButton>
                     </Tooltip>
                   </Box>

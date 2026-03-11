@@ -15,6 +15,10 @@ vi.mock('./useAzureAuth', () => ({
   useAzureAuth: vi.fn(),
 }));
 
+vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
 import { getClusterInfo } from '../utils/azure/az-cli';
 import type { AzureAuthStatus } from './useAzureAuth';
 import { useAzureAuth } from './useAzureAuth';

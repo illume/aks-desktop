@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Box, Button, Typography } from '@mui/material';
 import React, { useEffect, useRef } from 'react';
 import type { GitHubRepo } from '../../../types/github';
@@ -50,6 +51,7 @@ export function WorkloadIdentitySetup({
   identitySetup,
 }: WorkloadIdentitySetupProps) {
   const { status, error, setupWorkloadIdentity } = identitySetup;
+  const { t } = useTranslation();
   const identityName = getIdentityName(namespace);
 
   // Track the last non-error status so StepIcon can show which step failed
@@ -75,15 +77,16 @@ export function WorkloadIdentitySetup({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <Icon icon="mdi:shield-key-outline" width={28} height={28} />
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Configure Workload Identity
+          {t('Configure Workload Identity')}
         </Typography>
       </Box>
 
       {status === 'idle' ? (
         <>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-            The following Azure resources will be created to enable your GitHub Actions pipeline to
-            authenticate with your AKS cluster:
+            {t(
+              'The following Azure resources will be created to enable your GitHub Actions pipeline to authenticate with your AKS cluster:'
+            )}
           </Typography>
 
           <Box sx={{ mb: 3, pl: 1 }}>
@@ -91,10 +94,10 @@ export function WorkloadIdentitySetup({
               <Icon icon="mdi:identifier" width={20} height={20} style={{ marginTop: 2 }} />
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Managed Identity
+                  {t('Managed Identity')}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  <code>{identityName}</code> in resource group <code>{resourceGroup}</code>
+                  <code>{identityName}</code> {t('in resource group')} <code>{resourceGroup}</code>
                 </Typography>
               </Box>
             </Box>
@@ -108,10 +111,10 @@ export function WorkloadIdentitySetup({
               />
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Role Assignment
+                  {t('Role Assignment')}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  &quot;AKS Cluster User Role&quot; scoped to the resource group
+                  {t('"AKS Cluster User Role" scoped to the resource group')}
                 </Typography>
               </Box>
             </Box>
@@ -120,14 +123,14 @@ export function WorkloadIdentitySetup({
               <Icon icon="mdi:handshake-outline" width={20} height={20} style={{ marginTop: 2 }} />
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Federated Credential
+                  {t('Federated Credential')}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  OIDC trust for{' '}
+                  {t('OIDC trust for')}{' '}
                   <code>
                     {repo.owner}/{repo.repo}
                   </code>{' '}
-                  (branch: <code>{repo.defaultBranch}</code>)
+                  ({t('branch')}: <code>{repo.defaultBranch}</code>)
                 </Typography>
               </Box>
             </Box>
@@ -136,10 +139,10 @@ export function WorkloadIdentitySetup({
           <Button
             variant="contained"
             onClick={handleSetup}
-            startIcon={<Icon icon="mdi:shield-check-outline" />}
+            startIcon={<Icon icon="mdi:shield-check-outline" aria-hidden="true" />}
             sx={{ textTransform: 'none' }}
           >
-            Continue
+            {t('Continue')}
           </Button>
         </>
       ) : (
@@ -164,7 +167,7 @@ export function WorkloadIdentitySetup({
                         : 'text.disabled',
                   }}
                 >
-                  {step.label}
+                  {t(step.label)}
                 </Typography>
               </Box>
             ))}
@@ -180,16 +183,16 @@ export function WorkloadIdentitySetup({
             <Button
               variant="outlined"
               onClick={handleSetup}
-              startIcon={<Icon icon="mdi:refresh" />}
+              startIcon={<Icon icon="mdi:refresh" aria-hidden="true" />}
               sx={{ textTransform: 'none' }}
             >
-              Retry
+              {t('Retry')}
             </Button>
           )}
 
           {status === 'done' && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              Workload identity configured successfully.
+              {t('Workload identity configured successfully.')}
             </Alert>
           )}
         </>

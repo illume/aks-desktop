@@ -15,6 +15,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
       },
     },
   },
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 import { useDeployments } from './useDeployments';
