@@ -173,7 +173,7 @@ export function useDeployWizard({
       case WizardStep.DEPLOY:
         return isStepValid(WizardStep.SOURCE) && isStepValid(WizardStep.CONFIGURE);
       default:
-        return true;
+        return false;
     }
   };
 

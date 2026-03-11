@@ -150,6 +150,11 @@ describe('useDeployWizard', () => {
     expect(result.current.deploying).toBe(false);
   });
 
+  it('isStepValid returns false for an unknown step index', () => {
+    const { result } = renderHook(() => useDeployWizard({}));
+    expect(result.current.isStepValid(99 as WizardStep)).toBe(false);
+  });
+
   it('handleStepClick navigates to a previous step', () => {
     const { result } = renderHook(() => useDeployWizard({}));
     act(() => {
