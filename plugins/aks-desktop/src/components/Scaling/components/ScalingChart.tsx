@@ -3,6 +3,7 @@
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, AlertTitle, Box, CircularProgress, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import React from 'react';
 import {
   CartesianGrid,
@@ -21,14 +22,16 @@ const AngledTick = ({
   x,
   y,
   payload,
+  fill,
 }: {
   x: string | number;
   y: string | number;
   payload: { value: string };
+  fill?: string;
 }) => {
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={12} textAnchor="end" fill="#888" fontSize={9} transform="rotate(-35)">
+      <text x={0} y={0} dy={12} textAnchor="end" fill={fill} fontSize={9} transform="rotate(-35)">
         {payload.value}
       </text>
     </g>
@@ -50,6 +53,7 @@ interface ScalingChartProps {
  */
 export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, error }) => {
   const { t } = useTranslation();
+  const theme = useTheme();
 
   if (loading) {
     return (
@@ -103,31 +107,35 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
           bottom: 30,
         }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#e8e8e8" />
+        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
         <XAxis
           dataKey="time"
-          stroke="#888"
+          stroke={theme.palette.text.secondary}
           fontSize={10}
-          tick={AngledTick}
-          tickLine={{ stroke: '#e0e0e0' }}
+          tick={
+            <AngledTick fill={theme.palette.text.secondary} x={0} y={0} payload={{ value: '' }} />
+          }
+          tickLine={{ stroke: theme.palette.divider }}
           interval={0} // Show all ticks (12 labels over 24 hours)
           height={50}
         />
         <YAxis
-          stroke="#888"
+          stroke={theme.palette.text.secondary}
           fontSize={10}
           tick={{ fontSize: 10 }}
-          tickLine={{ stroke: '#e0e0e0' }}
+          tickLine={{ stroke: theme.palette.divider }}
           domain={[0, 'dataMax + 1']}
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: '#fff',
-            border: '1px solid #ddd',
+            backgroundColor: theme.palette.background.paper,
+            border: `1px solid ${theme.palette.divider}`,
             borderRadius: '6px',
             fontSize: '11px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            color: theme.palette.text.primary,
           }}
+          labelStyle={{ color: theme.palette.text.secondary }}
         />
         <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '5px' }} />
         <Line
@@ -137,7 +145,7 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
           stroke="#66BB6A"
           strokeWidth={2}
           dot={{ fill: '#66BB6A', strokeWidth: 0, r: 2 }}
-          activeDot={{ r: 4, stroke: '#66BB6A', strokeWidth: 2, fill: '#fff' }}
+          activeDot={{ r: 4, stroke: '#66BB6A', strokeWidth: 0, fill: '#66BB6A' }}
         />
         <Line
           type="monotone"
@@ -146,7 +154,7 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
           stroke="#42A5F5"
           strokeWidth={2}
           dot={{ fill: '#42A5F5', strokeWidth: 0, r: 2 }}
-          activeDot={{ r: 4, stroke: '#42A5F5', strokeWidth: 2, fill: '#fff' }}
+          activeDot={{ r: 4, stroke: '#42A5F5', strokeWidth: 0, fill: '#42A5F5' }}
         />
       </LineChart>
     </ResponsiveContainer>

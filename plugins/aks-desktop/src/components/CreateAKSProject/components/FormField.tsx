@@ -65,6 +65,15 @@ export const FormField: React.FC<FormFieldProps> = ({
       required={required}
       fullWidth
       inputRef={inputRef}
+      FormHelperTextProps={
+        /* aria-disabled on the helper-text <p> lets axe recognise it as part of a
+           disabled control and correctly skip the colour-contrast check.
+           WCAG 1.4.3 SC explicitly exempts inactive UI components from contrast
+           requirements, but axe cannot infer this from the <input> alone.
+           MDN: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-disabled
+           Deque: https://dequeuniversity.com/rules/axe/4.11/color-contrast */
+        disabled ? { 'aria-disabled': true } : undefined
+      }
       sx={{
         '& .MuiOutlinedInput-root': {
           '& fieldset': {

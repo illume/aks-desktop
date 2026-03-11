@@ -22,9 +22,15 @@ import RegisterAKSClusterPage from './components/AKS/RegisterAKSClusterPage';
 import AzureLoginPage from './components/AzureAuth/AzureLoginPage';
 import AzureProfilePage from './components/AzureAuth/AzureProfilePage';
 import ClusterCapabilityCard from './components/ClusterCapabilityCard/ClusterCapabilityCard';
+import ConfigurePipelineButton from './components/ConfigurePipeline/ConfigurePipelineButton';
 import CreateAKSProject from './components/CreateAKSProject/CreateAKSProject';
+import CreateNamespace from './components/CreateNamespace/CreateNamespace';
 import AKSProjectDeleteButton from './components/DeleteAKSProject/AKSProjectDeleteButton';
 import DeployButton from './components/Deploy/DeployButton';
+import PipelineCard from './components/Deployments/PipelineCard';
+import DeployTab from './components/DeployTab/DeployTab';
+import { GitHubAuthStatusButton } from './components/GitHubPipeline/components/GitHubAuthStatusButton';
+import { GitHubAuthProvider } from './components/GitHubPipeline/GitHubAuthContext';
 import ImportAKSProjects from './components/ImportAKSProjects/ImportAKSProjects';
 import InfoTab from './components/InfoTab/InfoTab';
 import AzureLogo from './components/Logo/Logo';
@@ -225,22 +231,45 @@ if (Headlamp.isRunningAsApp()) {
     useClusterURL: false,
   });
 
-  // register create custom project for AKS.
+  // Override built-in "Use Existing Namespace(s)" with enhanced AKS version
+  // that discovers both managed namespaces (via Azure Resource Graph) and regular namespaces
   registerCustomCreateProject({
-    id: 'aks',
-    name: 'AKS managed project',
-    description: 'Create a new AKS project implemented on AKS managed namespaces',
-    component: () => <Redirect to="/projects/create-aks-project" />,
-    icon: 'logos:microsoft-azure',
-  });
-
-  // register import existing AKS projects
-  registerCustomCreateProject({
-    id: 'aks-import',
-    name: 'Import AKS projects',
-    description: 'Import existing AKS managed namespaces as projects',
+    id: 'use-existing-namespace',
+    name: 'Use Existing Namespace(s)',
+    description: 'Select namespaces to use as a project',
     component: () => <Redirect to="/projects/import-aks-projects" />,
     icon: 'mdi:import',
+  });
+
+  // Override built-in "Create New Namespace" with AKS-aware version
+  registerRoute({
+    path: '/projects/create-namespace',
+    component: CreateNamespace,
+    name: 'Create New Namespace',
+    sidebar: {
+      sidebar: 'HOME',
+      item: 'projects',
+    },
+    exact: true,
+    noAuthRequired: true,
+    useClusterURL: false,
+  });
+
+  registerCustomCreateProject({
+    id: 'create-namespace',
+    name: 'Create New Namespace',
+    description: 'New namespace with resources as a project',
+    component: () => <Redirect to="/projects/create-namespace" />,
+    icon: 'mdi:folder-add',
+  });
+
+  // AKS-specific: Create new managed namespace via Azure
+  registerCustomCreateProject({
+    id: 'create-aks-managed-namespace',
+    name: 'Create New AKS Managed Namespace',
+    description: 'Create new AKS managed namespace and use as a project',
+    component: () => <Redirect to="/projects/create-aks-project" />,
+    icon: 'logos:microsoft-azure',
   });
 
   // Register AKS as a cluster provider in the "Add Cluster" page
@@ -288,13 +317,38 @@ registerProjectOverviewSection({
   component: ({ project }) => <MetricsCard project={project} />,
 });
 
+registerProjectOverviewSection({
+  id: 'pipeline-overview',
+  // @ts-expect-error isEnabled exists at runtime but is missing from ProjectOverviewSection types
+  isEnabled: isAksProject,
+  // GitHubAuthProvider is duplicated across three registrations (here, DeployTab, and
+  // ConfigurePipelineButton) because Headlamp renders each registered component in an
+  // independent React tree — there is no shared ancestor to hoist the provider into.
+  // Token state is shared across instances via localStorage inside useGitHubAuth.
+  component: ({ project }) => (
+    <GitHubAuthProvider>
+      <PipelineCard project={project} />
+    </GitHubAuthProvider>
+  ),
+});
+
 registerProjectDetailsTab({
   id: 'info',
   label: 'Info',
   icon: 'mdi:information',
-  component: ({ project }) => {
-    return <InfoTab project={project} />;
-  },
+  component: ({ project }) => <InfoTab project={project} />,
+});
+
+registerProjectDetailsTab({
+  id: 'deploy',
+  label: 'Deploy',
+  icon: 'mdi:cloud-upload',
+  isEnabled: isAksProject,
+  component: ({ project }) => (
+    <GitHubAuthProvider>
+      <DeployTab project={project} />
+    </GitHubAuthProvider>
+  ),
 });
 
 registerProjectDetailsTab({
@@ -308,22 +362,16 @@ registerProjectDetailsTab({
   id: 'metrics',
   label: 'Metrics',
   icon: 'mdi:chart-line',
-  // @ts-ignore todo: Type 'unknown' is not assignable to type 'boolean'. isAksProject is a promise
   isEnabled: isAksProject,
-  component: ({ project }) => {
-    return <MetricsTab project={project} />;
-  },
+  component: ({ project }) => <MetricsTab project={project} />,
 });
 
 registerProjectDetailsTab({
   id: 'scaling',
   label: 'Scaling',
   icon: 'mdi:chart-timeline-variant',
-  // @ts-ignore todo: Type 'unknown' is not assignable to type 'boolean'. isAksProject is a promise
   isEnabled: isAksProject,
-  component: ({ project }) => {
-    return <ScalingTab project={project} />;
-  },
+  component: ({ project }) => <ScalingTab project={project} />,
 });
 
 // Register Deploy Application button in project header
@@ -332,12 +380,26 @@ registerProjectHeaderAction({
   component: ({ project }) => <DeployButton project={project} />,
 });
 
+registerProjectHeaderAction({
+  id: 'github-auth-status',
+  component: () => (
+    <GitHubAuthProvider>
+      <GitHubAuthStatusButton />
+    </GitHubAuthProvider>
+  ),
+});
+
+registerProjectHeaderAction({
+  id: 'configure-pipeline',
+  component: ({ project }) => (
+    <GitHubAuthProvider>
+      <ConfigurePipelineButton project={project} />
+    </GitHubAuthProvider>
+  ),
+});
+
 // Register custom delete button for AKS projects only
 registerProjectDeleteButton({
-  // @ts-ignore todo: Type 'unknown' is not assignable to type 'boolean'. isAksProject is a promise
   isEnabled: isAksProject,
-  component: ({ project, buttonStyle }) => (
-    //@ts-ignore todo: buttonStyle issue, registerProjectDeleteButton types not like other register funcs
-    <AKSProjectDeleteButton project={project} buttonStyle={buttonStyle} />
-  ),
+  component: ({ project }) => <AKSProjectDeleteButton project={project} />,
 });
