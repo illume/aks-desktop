@@ -47,7 +47,7 @@ export function RepoSelector({ octokit, selectedRepo, onRepoSelect }: RepoSelect
     } finally {
       setLoading(false);
     }
-  }, [octokit]);
+  }, [octokit, t]);
 
   useEffect(() => {
     fetchRepos();
