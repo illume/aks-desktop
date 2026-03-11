@@ -19,7 +19,7 @@
 
 export type ScreenReaderDriver = 'virtual' | 'voiceover' | 'nvda';
 
-const raw = (process.env.SCREEN_READER ?? '').toLowerCase();
+const raw = (process.env.SCREEN_READER ?? '').trim().toLowerCase();
 
 export const activeDriver: ScreenReaderDriver =
   raw === 'nvda' ? 'nvda' : raw === 'voiceover' ? 'voiceover' : 'virtual';
@@ -27,10 +27,11 @@ export const activeDriver: ScreenReaderDriver =
 /**
  * Lazily resolve the screen reader singleton.
  *
- * For `virtual` (default) the import is synchronous because
- * `@guidepup/virtual-screen-reader` is always available in the vitest
- * environment.  For real drivers the heavy native dependency is loaded
- * dynamically so it never fails in jsdom-only CI.
+ * All drivers are loaded via dynamic (async) imports. For the `virtual`
+ * driver (the default), `@guidepup/virtual-screen-reader` is expected to be
+ * always available in the vitest environment. For the real drivers, the
+ * heavy native dependency is only loaded when needed so it never fails in
+ * jsdom-only CI.
  */
 export async function getScreenReader() {
   if (activeDriver === 'virtual') {

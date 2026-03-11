@@ -88,7 +88,7 @@ import { cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { getScreenReader } from '../../../utils/screenReaderAdapter';
+import { getScreenReader } from '../../../utils/test/screenReaderAdapter';
 
 // Resolved once before all tests — defaults to @guidepup/virtual-screen-reader
 // unless SCREEN_READER=voiceover|nvda is set.
