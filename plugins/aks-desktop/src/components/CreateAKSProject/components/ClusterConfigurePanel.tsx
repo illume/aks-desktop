@@ -28,27 +28,25 @@ type AddonKey = 'azure-monitor-metrics' | 'keda' | 'vpa';
 
 interface AddonOption {
   key: AddonKey;
-  label: string;
   capabilityField: keyof ClusterCapabilities;
 }
 
 const ADDON_OPTIONS: AddonOption[] = [
-  {
-    key: 'azure-monitor-metrics',
-    label: 'Azure Monitor Metrics (Managed Prometheus)',
-    capabilityField: 'prometheusEnabled',
-  },
-  {
-    key: 'keda',
-    label: 'KEDA (Event-Driven Autoscaling)',
-    capabilityField: 'kedaEnabled',
-  },
-  {
-    key: 'vpa',
-    label: 'VPA (Vertical Pod Autoscaler)',
-    capabilityField: 'vpaEnabled',
-  },
+  { key: 'azure-monitor-metrics', capabilityField: 'prometheusEnabled' },
+  { key: 'keda', capabilityField: 'kedaEnabled' },
+  { key: 'vpa', capabilityField: 'vpaEnabled' },
 ];
+
+function getAddonLabel(t: (key: string) => string, key: AddonKey): string {
+  switch (key) {
+    case 'azure-monitor-metrics':
+      return t('Azure Monitor Metrics (Managed Prometheus)');
+    case 'keda':
+      return t('KEDA (Event-Driven Autoscaling)');
+    case 'vpa':
+      return t('VPA (Vertical Pod Autoscaler)');
+  }
+}
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 10000;
@@ -290,7 +288,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
                 size="small"
               />
             }
-            label={<Typography variant="body2">{t(addon.label)}</Typography>}
+            label={<Typography variant="body2">{getAddonLabel(t, addon.key)}</Typography>}
           />
         ))}
       </Box>

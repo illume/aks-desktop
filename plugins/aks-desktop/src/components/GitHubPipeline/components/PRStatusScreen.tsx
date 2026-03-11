@@ -113,6 +113,17 @@ function useElapsedTime(startedAt: string | null): string | null {
   return elapsed;
 }
 
+function getPhaseLabel(t: (key: string) => string, phaseId: string): string {
+  switch (phaseId) {
+    case 'setup':
+      return t('Setting up environment');
+    case 'working':
+      return t('Analyzing repo, generating Dockerfile, K8s manifests, and workflow');
+    default:
+      return phaseId;
+  }
+}
+
 function AgentProgressPhases({
   phases,
   agentStartedAt,
@@ -139,7 +150,7 @@ function AgentProgressPhases({
               fontWeight: phase.status === 'active' ? 600 : 400,
             }}
           >
-            {t(phase.label)}
+            {getPhaseLabel(t, phase.id)}
             {phase.id === 'working' && phase.status === 'active' && elapsed && (
               <Typography component="span" variant="body2" sx={{ color: 'text.secondary', ml: 1 }}>
                 ({elapsed})

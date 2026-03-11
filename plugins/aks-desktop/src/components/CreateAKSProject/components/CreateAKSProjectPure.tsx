@@ -246,7 +246,13 @@ export default function CreateAKSProjectPure({
           >
             {/* Breadcrumbs */}
             <Breadcrumb
-              steps={steps.map(step => t(step))}
+              steps={[
+                t('Basics'),
+                t('Networking Policies'),
+                t('Compute Quota'),
+                t('Access'),
+                t('Review'),
+              ]}
               activeStep={activeStep}
               onStepClick={handleStepClick}
             />

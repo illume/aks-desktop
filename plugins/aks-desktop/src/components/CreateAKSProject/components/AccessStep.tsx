@@ -6,10 +6,27 @@ import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { TextField } from '@mui/material';
 import { Box, Button, FormControl, Grid, IconButton, MenuItem, Typography } from '@mui/material';
 import React, { useEffect, useRef } from 'react';
-import type { AccessStepProps, UserAssignment } from '../types';
-import { AVAILABLE_ROLES, ROLE_DESCRIPTIONS } from '../types';
+import type { AccessStepProps, RoleType, UserAssignment } from '../types';
+import { AVAILABLE_ROLES } from '../types';
 import { isValidEmail } from '../validators';
 import { FormField } from './FormField';
+
+function getRoleDescription(t: (key: string) => string, role: RoleType): string {
+  switch (role) {
+    case 'Reader':
+      return t(
+        'Read-only access to most objects in a namespace. Cannot view roles, role bindings, or Secrets.'
+      );
+    case 'Writer':
+      return t(
+        'Read/write access to most objects in a namespace. Cannot view or modify roles or role bindings. Can access Secrets and run Pods as any ServiceAccount in the namespace.'
+      );
+    case 'Admin':
+      return t(
+        'Read/write access to most resources in a namespace. Can create roles and role bindings within the namespace. Cannot write to resource quota or the namespace itself.'
+      );
+  }
+}
 
 /**
  * Access step component for user assignment management
@@ -118,7 +135,7 @@ export const AccessStep: React.FC<AccessStepProps> = ({
                         component="div"
                         sx={{ fontSize: '0.7rem', lineHeight: 1.3, mt: 0.5, whiteSpace: 'normal' }}
                       >
-                        {t(ROLE_DESCRIPTIONS[role])}
+                        {getRoleDescription(t, role)}
                       </Typography>
                     </Box>
                   </MenuItem>

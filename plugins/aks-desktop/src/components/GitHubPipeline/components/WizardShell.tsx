@@ -14,7 +14,9 @@ interface WizardShellProps {
   footerActions?: React.ReactNode;
 }
 
-const STEPS = ['Connect Source', 'Configure', 'Setup PR', 'Agent', 'Complete'] as const;
+function getStepLabels(t: (key: string) => string): string[] {
+  return [t('Connect Source'), t('Configure'), t('Setup PR'), t('Agent'), t('Complete')];
+}
 
 function StepIndicator({
   index,
@@ -27,8 +29,6 @@ function StepIndicator({
   isActive: boolean;
   isCompleted: boolean;
 }) {
-  const { t } = useTranslation();
-
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       <Box
@@ -55,7 +55,7 @@ function StepIndicator({
           color: isActive || isCompleted ? 'text.primary' : 'text.disabled',
         }}
       >
-        {t(label)}
+        {label}
       </Typography>
     </Box>
   );
@@ -93,7 +93,7 @@ export function WizardShell({
 
         {/* Stepper */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2.5 }}>
-          {STEPS.map((label, i) => (
+          {getStepLabels(t).map((label, i) => (
             <React.Fragment key={label}>
               {i > 0 && (
                 <Box

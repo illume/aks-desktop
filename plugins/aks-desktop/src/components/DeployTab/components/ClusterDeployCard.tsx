@@ -35,26 +35,32 @@ import { usePipelineStatus } from '../hooks/usePipelineStatus';
 import { extractContainerConfigFromDeployment } from '../utils/extractContainerConfig';
 import { PipelineDeployDialog } from './PipelineDeployDialog';
 
-function getDeploymentHealth(d: DeploymentStatus): {
+function getDeploymentHealth(
+  t: (key: string) => string,
+  d: DeploymentStatus
+): {
   label: string;
   color: 'success' | 'default' | 'warning';
 } {
   if (d.availableReplicas >= d.replicas && d.replicas > 0)
-    return { label: 'Healthy', color: 'success' };
-  if (d.replicas === 0) return { label: 'Scaled down', color: 'default' };
-  return { label: 'Degraded', color: 'warning' };
+    return { label: t('Healthy'), color: 'success' };
+  if (d.replicas === 0) return { label: t('Scaled down'), color: 'default' };
+  return { label: t('Degraded'), color: 'warning' };
 }
 
-function getProvenanceDisplay(provenance: DeploymentProvenance): {
+function getProvenanceDisplay(
+  t: (key: string) => string,
+  provenance: DeploymentProvenance
+): {
   label: string;
   icon: string;
   color: 'info' | 'secondary' | 'default';
 } | null {
   switch (provenance) {
     case 'pipeline':
-      return { label: 'Pipeline', icon: 'mdi:rocket-launch', color: 'info' };
+      return { label: t('Pipeline'), icon: 'mdi:rocket-launch', color: 'info' };
     case 'manual':
-      return { label: 'Manual', icon: 'mdi:cloud-upload', color: 'secondary' };
+      return { label: t('Manual'), icon: 'mdi:cloud-upload', color: 'secondary' };
     case 'unknown':
       return null;
     default: {
@@ -187,8 +193,8 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                 </TableHead>
                 <TableBody>
                   {deployments.map(d => {
-                    const health = getDeploymentHealth(d);
-                    const provDisplay = getProvenanceDisplay(d.provenance);
+                    const health = getDeploymentHealth(t, d);
+                    const provDisplay = getProvenanceDisplay(t, d.provenance);
                     return (
                       <TableRow key={d.name}>
                         <TableCell>{d.name}</TableCell>
@@ -196,7 +202,7 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                           {provDisplay ? (
                             <Chip
                               icon={<Icon icon={provDisplay.icon} />}
-                              label={t(provDisplay.label)}
+                              label={provDisplay.label}
                               size="small"
                               color={provDisplay.color}
                             />
@@ -211,7 +217,7 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                           {d.readyReplicas}/{d.replicas}
                         </TableCell>
                         <TableCell align="center">
-                          <Chip label={t(health.label)} size="small" color={health.color} />
+                          <Chip label={health.label} size="small" color={health.color} />
                         </TableCell>
                         <TableCell align="right">
                           {d.provenance === 'manual' && (

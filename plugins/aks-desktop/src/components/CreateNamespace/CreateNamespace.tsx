@@ -407,7 +407,7 @@ function CreateNamespaceContent() {
           >
             {/* Breadcrumbs */}
             <Breadcrumb
-              steps={STEPS.map(step => t(step))}
+              steps={[t('Basics'), t('Review')]}
               activeStep={activeStep}
               onStepClick={step => setActiveStep(step)}
             />
