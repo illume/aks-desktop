@@ -128,10 +128,11 @@ describe('ScalingEditDialog guidepup screen reader', () => {
   });
 
   /**
-   * Tests that the saving state progress indicator is properly announced
-   * so screen reader users know the dialog is processing.
+   * Tests that the Save button still has an accessible name in saving state
+   * (via visually hidden text), so screen reader users can identify the button.
+   * The CircularProgress is aria-hidden since the button text provides meaning.
    */
-  test('announces saving state with progress bar label', async () => {
+  test('announces Save button accessible name in saving state', async () => {
     render(
       <ScalingEditDialog
         open
@@ -147,6 +148,6 @@ describe('ScalingEditDialog guidepup screen reader', () => {
     await virtual.start({ container: document.body });
     const phrases = await collectPhrases();
 
-    expect(phrases.some(p => p.includes('Saving'))).toBe(true);
+    expect(phrases.some(p => p.includes('Save'))).toBe(true);
   });
 });

@@ -143,10 +143,10 @@ export const ScalingEditDialog: React.FC<ScalingEditDialogProps> = ({
         >
           {saving ? (
             <>
-              {/* A11y: CircularProgress renders role="progressbar"; an accessible name
-                  is required so screen readers announce the saving state.
-                  MUI Progress accessibility: https://mui.com/material-ui/react-progress/#accessibility */}
-              <CircularProgress size={20} aria-label={t('Saving')} />
+              {/* A11y: Decorative — the button's visually-hidden "Save" text below
+                  provides the accessible name; the spinner is just visual feedback.
+                  MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
+              <CircularProgress size={20} aria-hidden="true" />
               {/* A11y: Visually hidden text ensures the button always has discernible text
                   even when the visible label is replaced by a spinner (WCAG 4.1.2).
                   MUI button-name: https://dequeuniversity.com/rules/axe/4.11/button-name */}

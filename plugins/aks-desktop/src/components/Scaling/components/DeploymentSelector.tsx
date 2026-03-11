@@ -43,7 +43,10 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
       >
         {loading ? (
           <MenuItem disabled>
-            <CircularProgress size={16} style={{ marginRight: 8 }} />
+            {/* A11y: Decorative — the "Loading deployments..." text in the same
+                MenuItem describes the state; the spinner is just visual feedback.
+                MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
+            <CircularProgress size={16} style={{ marginRight: 8 }} aria-hidden="true" />
             {t('Loading deployments')}...
           </MenuItem>
         ) : deployments.length === 0 ? (

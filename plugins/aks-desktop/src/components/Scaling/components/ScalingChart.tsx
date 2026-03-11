@@ -64,10 +64,10 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
         justifyContent="center"
         height="100%"
       >
-        {/* A11y: CircularProgress renders role="progressbar"; an accessible name is required
-            so that screen readers announce what is loading.
-            MUI Progress accessibility: https://mui.com/material-ui/react-progress/#accessibility */}
-        <CircularProgress size={32} sx={{ mb: 1 }} aria-label={t('Loading scaling metrics')} />
+        {/* A11y: Decorative — the Typography below already describes the loading state
+            for screen readers, so the spinner itself is hidden from the accessibility tree.
+            MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
+        <CircularProgress size={32} sx={{ mb: 1 }} aria-hidden="true" />
         <Typography variant="body2" color="text.secondary">
           {t('Loading scaling metrics from Prometheus')}...
         </Typography>

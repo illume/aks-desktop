@@ -157,10 +157,10 @@ describe('ScalingTabPure guidepup screen reader', () => {
   });
 
   /**
-   * Tests that the "Loading deployments" progress bar is announced during the
+   * Tests that the "Loading deployments" text is announced during the
    * initial load state, so screen reader users know data is being fetched.
    */
-  test('announces loading state with accessible progress bar label', async () => {
+  test('announces loading state with loading text', async () => {
     const { container } = render(
       <ScalingTabPure
         deployments={[]}
@@ -184,12 +184,10 @@ describe('ScalingTabPure guidepup screen reader', () => {
     );
 
     await virtual.start({ container });
-    // Use collectPhrases with a bounded limit — the progressbar role may cause
-    // the virtual screen reader to walk sub-nodes indefinitely
     const phrases = await collectPhrases(20);
 
-    // The CircularProgress has aria-label="Loading deployments"; the virtual screen reader
-    // should announce it as a progressbar with that label.
+    // The visible "Loading deployments..." text should be announced;
+    // CircularProgress is aria-hidden since the text already describes the state.
     expect(phrases.some(p => p.includes('Loading deployments'))).toBe(true);
   });
 

@@ -87,11 +87,20 @@ export const ScalingTabPure: React.FC<ScalingTabPureProps> = ({
 
   if (loading && deployments.length === 0) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        {/* A11y: CircularProgress renders role="progressbar"; aria-label provides the
-            accessible name so screen readers announce what is loading.
-            MUI Progress accessibility: https://mui.com/material-ui/react-progress/#accessibility */}
-        <CircularProgress aria-label={t('Loading deployments')} />
+      <Box
+        display="flex"
+        flexDirection="column"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        {/* A11y: Decorative — the Typography below already describes the loading state
+            for screen readers, so the spinner itself is hidden from the accessibility tree.
+            MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
+        <CircularProgress aria-hidden="true" />
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {t('Loading deployments')}...
+        </Typography>
       </Box>
     );
   }

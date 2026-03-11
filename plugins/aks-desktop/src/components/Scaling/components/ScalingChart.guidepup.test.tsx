@@ -32,10 +32,11 @@ afterEach(async () => {
 
 describe('ScalingChart guidepup screen reader', () => {
   /**
-   * Tests that the loading spinner is announced with its accessible label,
-   * so screen reader users know chart data is being fetched.
+   * Tests that the loading text is announced so screen reader users know
+   * chart data is being fetched. The CircularProgress is aria-hidden since the
+   * visible Typography text already describes the state.
    */
-  test('announces loading state with progress bar label', async () => {
+  test('announces loading state with loading text', async () => {
     const { container } = render(
       <div style={{ height: 400 }}>
         <ScalingChart chartData={[]} loading error={null} />

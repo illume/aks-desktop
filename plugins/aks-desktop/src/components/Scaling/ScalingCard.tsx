@@ -3,8 +3,8 @@
 
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import React from 'react';
-import { ScalingCardPure } from './components/ScalingCardPure';
 import { RESOURCE_GROUP_LABEL, SUBSCRIPTION_LABEL } from '../../utils/constants/projectLabels';
+import { ScalingCardPure } from './components/ScalingCardPure';
 import { useChartData } from './hooks/useChartData';
 import { useDeployments } from './hooks/useDeployments';
 import { useHPAInfo } from './hooks/useHPAInfo';
