@@ -22,15 +22,23 @@ interface WorkloadIdentitySetupProps {
   identitySetup: UseWorkloadIdentitySetupReturn;
 }
 
-const STATUS_STEPS = [
-  { key: 'checking', label: 'Checking for existing identity...' },
-  { key: 'creating-identity', label: 'Creating managed identity...' },
-  { key: 'assigning-role', label: 'Assigning AKS Cluster User Role...' },
-  { key: 'creating-credential', label: 'Configuring federated credential...' },
-  { key: 'done', label: 'Workload identity configured' },
+const STATUS_ORDER = [
+  'checking',
+  'creating-identity',
+  'assigning-role',
+  'creating-credential',
+  'done',
 ] as const;
 
-const STATUS_ORDER = STATUS_STEPS.map(s => s.key);
+function getStatusSteps(t: (key: string) => string) {
+  return [
+    { key: 'checking', label: t('Checking for existing identity...') },
+    { key: 'creating-identity', label: t('Creating managed identity...') },
+    { key: 'assigning-role', label: t('Assigning AKS Cluster User Role...') },
+    { key: 'creating-credential', label: t('Configuring federated credential...') },
+    { key: 'done', label: t('Workload identity configured') },
+  ] as const;
+}
 
 function getStepStatus(step: string, currentStatus: string, lastActiveStatus: string): StepStatus {
   const effectiveStatus = currentStatus === 'error' ? lastActiveStatus : currentStatus;
@@ -53,6 +61,7 @@ export function WorkloadIdentitySetup({
   const { status, error, setupWorkloadIdentity } = identitySetup;
   const { t } = useTranslation();
   const identityName = getIdentityName(namespace);
+  const statusSteps = getStatusSteps(t);
 
   // Track the last non-error status so StepIcon can show which step failed
   const lastActiveStatusRef = useRef(status);
@@ -148,7 +157,7 @@ export function WorkloadIdentitySetup({
       ) : (
         <>
           <Box sx={{ mb: 3 }}>
-            {STATUS_STEPS.map(step => (
+            {statusSteps.map(step => (
               <Box key={step.key} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                 <StepStatusIcon
                   status={getStepStatus(step.key, status, lastActiveStatusRef.current)}
@@ -167,7 +176,7 @@ export function WorkloadIdentitySetup({
                         : 'text.disabled',
                   }}
                 >
-                  {t(step.label)}
+                  {step.label}
                 </Typography>
               </Box>
             ))}

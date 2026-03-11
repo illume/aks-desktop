@@ -53,7 +53,7 @@ const LoadingSpinner: React.FC<{ message: string }> = ({ message }) => (
   </Box>
 );
 
-function getRecoveryHint(error: string): string {
+function getRecoveryHint(t: (key: string) => string, error: string): string {
   const lower = error.toLowerCase();
   if (
     lower.includes('permission') ||
@@ -61,12 +61,14 @@ function getRecoveryHint(error: string): string {
     lower.includes('401') ||
     lower.includes('403')
   ) {
-    return 'This may be a permissions issue. Check your GitHub App permissions and try again.';
+    return t('This may be a permissions issue. Check your GitHub App permissions and try again.');
   }
   if (lower.includes('timeout') || lower.includes('timed out')) {
-    return 'The operation may still be running on GitHub. Check the link above for the latest status.';
+    return t(
+      'The operation may still be running on GitHub. Check the link above for the latest status.'
+    );
   }
-  return 'Try again, or check GitHub for details.';
+  return t('Try again, or check GitHub for details.');
 }
 
 /**
@@ -343,7 +345,7 @@ export function GitHubPipelineWizard({
               {pipeline.state.error ?? t('Unknown error')}
             </Alert>
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-              {t(getRecoveryHint(pipeline.state.error ?? ''))}
+              {getRecoveryHint(t, pipeline.state.error ?? '')}
             </Typography>
             {(pipeline.state.setupPr.url ||
               pipeline.state.triggerIssue.url ||

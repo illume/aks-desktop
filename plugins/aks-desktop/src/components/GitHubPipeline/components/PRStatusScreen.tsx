@@ -39,30 +39,36 @@ const getHeaderColor = (phase: PRPhase, merged: boolean): string => {
   return 'primary.main';
 };
 
-const getTitle = (phase: PRPhase, merged: boolean): string => {
+const getTitle = (t: (key: string) => string, phase: PRPhase, merged: boolean): string => {
   if (phase === 'setup') {
-    return merged ? 'Setup PR Merged' : 'Setup PR Created';
+    return merged ? t('Setup PR Merged') : t('Setup PR Created');
   }
   if (phase === 'agent-pending') {
-    return 'Agent is Working';
+    return t('Agent is Working');
   }
-  return merged ? 'Deployment PR Merged' : 'Deployment PR Ready';
+  return merged ? t('Deployment PR Merged') : t('Deployment PR Ready');
 };
 
-const getDescription = (phase: PRPhase, merged: boolean): string => {
+const getDescription = (t: (key: string) => string, phase: PRPhase, merged: boolean): string => {
   if (phase === 'setup' && !merged) {
-    return 'Review and merge the setup PR to enable the Copilot agent. After merging, the agent will analyze your repo and create a deployment PR.';
+    return t(
+      'Review and merge the setup PR to enable the Copilot agent. After merging, the agent will analyze your repo and create a deployment PR.'
+    );
   }
   if (phase === 'setup' && merged) {
-    return 'The setup PR has been merged. The Copilot agent is now being triggered...';
+    return t('The setup PR has been merged. The Copilot agent is now being triggered...');
   }
   if (phase === 'agent-pending') {
-    return 'The Copilot Coding Agent is analyzing your repository and generating a deployment PR with Dockerfile, Kubernetes manifests, and a GitHub Actions workflow.';
+    return t(
+      'The Copilot Coding Agent is analyzing your repository and generating a deployment PR with Dockerfile, Kubernetes manifests, and a GitHub Actions workflow.'
+    );
   }
   if (phase === 'agent-created' && !merged) {
-    return 'The agent has created a deployment PR. Review the generated files and merge to start the deployment pipeline.';
+    return t(
+      'The agent has created a deployment PR. Review the generated files and merge to start the deployment pipeline.'
+    );
   }
-  return 'The deployment PR has been merged. The deployment pipeline is starting...';
+  return t('The deployment PR has been merged. The deployment pipeline is starting...');
 };
 
 const getTracking = (
@@ -163,8 +169,8 @@ export function PRStatusScreen({
   const merged = prStatus?.merged ?? false;
   const isClosed = prStatus?.state === 'closed' && !merged;
   const { t } = useTranslation();
-  const title = getTitle(prPhase, merged);
-  const description = getDescription(prPhase, merged);
+  const title = getTitle(t, prPhase, merged);
+  const description = getDescription(t, prPhase, merged);
   const { url: prUrl, number: prNumber } = getTracking(pipelineState, prPhase);
   const isWaiting = prPhase === 'agent-pending';
 
@@ -187,12 +193,12 @@ export function PRStatusScreen({
           sx={{ fontSize: 28, color: getHeaderColor(prPhase, merged) }}
         />
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          {t(title)}
+          {title}
         </Typography>
       </Box>
 
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-        {t(description)}
+        {description}
       </Typography>
 
       {prNumber !== null && (
@@ -205,10 +211,13 @@ export function PRStatusScreen({
 
       {isTimedOut && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {t(
-            'This is taking longer than expected. The operation may still be in progress — check the {{target}} for the latest status.',
-            { target: prPhase === 'agent-pending' ? t('GitHub issue') : t('PR on GitHub') }
-          )}
+          {prPhase === 'agent-pending'
+            ? t(
+                'This is taking longer than expected. The operation may still be in progress — check the GitHub issue for the latest status.'
+              )
+            : t(
+                'This is taking longer than expected. The operation may still be in progress — check the PR on GitHub for the latest status.'
+              )}
         </Alert>
       )}
 

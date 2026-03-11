@@ -178,7 +178,7 @@ function PipelineCard({ project }: PipelineCardProps) {
                       component={Icon}
                       icon="mdi:open-in-new"
                       sx={{ fontSize: 16 }}
-                      aria-hidden={true}
+                      aria-hidden
                     />
                   </IconButton>
                 </Tooltip>

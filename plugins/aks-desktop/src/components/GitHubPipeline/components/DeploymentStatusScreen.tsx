@@ -236,9 +236,7 @@ export function DeploymentStatusScreen({
               />
               {pod.restarts > 0 && (
                 <Typography variant="caption" sx={{ color: 'warning.main' }}>
-                  {t(pod.restarts === 1 ? '{{count}} restart' : '{{count}} restarts', {
-                    count: pod.restarts,
-                  })}
+                  {t('{{count}} restart', { count: pod.restarts })}
                 </Typography>
               )}
             </Box>

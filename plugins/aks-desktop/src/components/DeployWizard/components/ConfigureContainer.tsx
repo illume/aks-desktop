@@ -40,7 +40,7 @@ function LabelWithInfo({ label, infoText }: { label: string; infoText: string })
       <span>{t(label)}</span>
       <Tooltip title={t(infoText)} arrow>
         <IconButton aria-label={t('Information about {{label}}', { label: t(label) })}>
-          <Icon icon="mdi:information-outline" width="16px" height="16px" aria-hidden={true} />
+          <Icon icon="mdi:information-outline" width="16px" height="16px" aria-hidden />
         </IconButton>
       </Tooltip>
     </Box>

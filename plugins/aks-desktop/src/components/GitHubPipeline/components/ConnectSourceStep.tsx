@@ -11,13 +11,15 @@ import { openExternalUrl } from '../../../utils/shared/openExternalUrl';
 import type { GitHubAuthState } from '../types';
 import { RepoSelector } from './RepoSelector';
 
-const PERMISSIONS = [
-  { name: 'Contents', purpose: 'Push agent config files' },
-  { name: 'Workflows', purpose: 'Create setup workflow in .github/workflows/' },
-  { name: 'Pull requests', purpose: 'Create deployment PRs' },
-  { name: 'Issues', purpose: 'Track agent progress' },
-  { name: 'Actions', purpose: 'Run deployment workflows' },
-];
+function getPermissions(t: (key: string) => string) {
+  return [
+    { id: 'contents', name: t('Contents'), purpose: t('Push agent config files') },
+    { id: 'workflows', name: t('Workflows'), purpose: t('Create setup workflow in .github/workflows/') },
+    { id: 'pull-requests', name: t('Pull requests'), purpose: t('Create deployment PRs') },
+    { id: 'issues', name: t('Issues'), purpose: t('Track agent progress') },
+    { id: 'actions', name: t('Actions'), purpose: t('Run deployment workflows') },
+  ];
+}
 
 interface ConnectSourceStepProps {
   authState: GitHubAuthState;
@@ -44,6 +46,7 @@ export function ConnectSourceStep({
   const { t } = useTranslation();
   const { isAuthorizingBrowser, username, error } = authState;
   const isAuthenticated = authCompleted || authState.isAuthenticated;
+  const permissions = getPermissions(t);
 
   return (
     <Box sx={{ maxWidth: 600 }}>
@@ -76,16 +79,16 @@ export function ConnectSourceStep({
             {t('Required Permissions')}
           </Typography>
           <Box sx={{ mb: 2 }}>
-            {PERMISSIONS.map(perm => (
-              <Box key={perm.name} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            {permissions.map(perm => (
+              <Box key={perm.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <Box
                   component={Icon}
                   icon="mdi:check-circle-outline"
                   sx={{ fontSize: 16, color: 'text.secondary' }}
                 />
                 <Typography variant="body2">
-                  <strong>{t(perm.name)}</strong>
-                  {perm.purpose && ` - ${t(perm.purpose)}`}
+                  <strong>{perm.name}</strong>
+                  {perm.purpose && ` - ${perm.purpose}`}
                 </Typography>
               </Box>
             ))}
