@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Box, Button, IconButton, Typography } from '@mui/material';
 import React, { useState } from 'react';
 
@@ -26,6 +27,8 @@ function StepIndicator({
   isActive: boolean;
   isCompleted: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       <Box
@@ -52,7 +55,7 @@ function StepIndicator({
           color: isActive || isCompleted ? 'text.primary' : 'text.disabled',
         }}
       >
-        {label}
+        {t(label)}
       </Typography>
     </Box>
   );
@@ -65,6 +68,7 @@ export function WizardShell({
   children,
   footerActions,
 }: WizardShellProps) {
+  const { t } = useTranslation();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   return (
@@ -74,13 +78,13 @@ export function WizardShell({
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Configure Pipeline
+              {t('Configure Pipeline')}
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              Set up a CI/CD pipeline to automate your deployments and streamline your workflow
+              {t('Set up a CI/CD pipeline to automate your deployments and streamline your workflow')}
             </Typography>
           </Box>
-          <IconButton onClick={onClose} size="small" aria-label="Close">
+          <IconButton onClick={onClose} size="small" aria-label={t('Close')}>
             <Icon icon="mdi:close" />
           </IconButton>
         </Box>
@@ -120,7 +124,7 @@ export function WizardShell({
                   onClick={() => setShowCancelConfirm(false)}
                   sx={{ textTransform: 'none' }}
                 >
-                  Keep Going
+                  {t('Keep Going')}
                 </Button>
                 <Button
                   size="small"
@@ -129,12 +133,12 @@ export function WizardShell({
                   onClick={() => onCancel?.()}
                   sx={{ textTransform: 'none' }}
                 >
-                  Discard
+                  {t('Discard')}
                 </Button>
               </Box>
             }
           >
-            Canceling will discard your pipeline progress. Are you sure?
+            {t('Canceling will discard your pipeline progress. Are you sure?')}
           </Alert>
         ) : (
           children
@@ -162,7 +166,7 @@ export function WizardShell({
               onClick={() => setShowCancelConfirm(true)}
               sx={{ textTransform: 'none', color: 'text.secondary', fontSize: '0.8rem' }}
             >
-              Start over
+              {t('Start over')}
             </Button>
           ) : (
             <Box />
