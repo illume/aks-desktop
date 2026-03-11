@@ -82,7 +82,10 @@ export function PipelineDeployDialog({
       <DialogContent>
         <Box sx={{ py: 1 }}>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            {t('Trigger deploy-to-aks.yml workflow on {{owner}}/{{repo}} with the following parameters:', { owner: repo.owner, repo: repo.repo })}
+            {t(
+              'Trigger deploy-to-aks.yml workflow on {{owner}}/{{repo}} with the following parameters:',
+              { owner: repo.owner, repo: repo.repo }
+            )}
           </Typography>
           <Box sx={{ pl: 2, mb: 2 }}>
             <Typography variant="body2">

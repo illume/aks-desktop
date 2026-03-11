@@ -81,7 +81,9 @@ export function WizardShell({
               {t('Configure Pipeline')}
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              {t('Set up a CI/CD pipeline to automate your deployments and streamline your workflow')}
+              {t(
+                'Set up a CI/CD pipeline to automate your deployments and streamline your workflow'
+              )}
             </Typography>
           </Box>
           <IconButton onClick={onClose} size="small" aria-label={t('Close')}>

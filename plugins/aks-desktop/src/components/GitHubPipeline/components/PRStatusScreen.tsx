@@ -197,19 +197,26 @@ export function PRStatusScreen({
 
       {prNumber !== null && (
         <Typography variant="body2" sx={{ mb: 2, fontFamily: 'monospace' }}>
-          {prPhase === 'agent-pending' ? t('Issue #{{number}}', { number: prNumber }) : t('PR #{{number}}', { number: prNumber })}
+          {prPhase === 'agent-pending'
+            ? t('Issue #{{number}}', { number: prNumber })
+            : t('PR #{{number}}', { number: prNumber })}
         </Typography>
       )}
 
       {isTimedOut && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('This is taking longer than expected. The operation may still be in progress — check the {{target}} for the latest status.', { target: prPhase === 'agent-pending' ? t('GitHub issue') : t('PR on GitHub') })}
+          {t(
+            'This is taking longer than expected. The operation may still be in progress — check the {{target}} for the latest status.',
+            { target: prPhase === 'agent-pending' ? t('GitHub issue') : t('PR on GitHub') }
+          )}
         </Alert>
       )}
 
       {isClosed && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {prPhase === 'agent-pending' ? t('This issue was closed. You may need to restart the process.') : t('This PR was closed without merging. You may need to restart the process.')}
+          {prPhase === 'agent-pending'
+            ? t('This issue was closed. You may need to restart the process.')
+            : t('This PR was closed without merging. You may need to restart the process.')}
         </Alert>
       )}
 

@@ -84,7 +84,9 @@ export function WorkloadIdentitySetup({
       {status === 'idle' ? (
         <>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-            {t('The following Azure resources will be created to enable your GitHub Actions pipeline to authenticate with your AKS cluster:')}
+            {t(
+              'The following Azure resources will be created to enable your GitHub Actions pipeline to authenticate with your AKS cluster:'
+            )}
           </Typography>
 
           <Box sx={{ mb: 3, pl: 1 }}>
@@ -124,7 +126,10 @@ export function WorkloadIdentitySetup({
                   {t('Federated Credential')}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {t('OIDC trust for {{ownerRepo}} (branch: {{branch}})', { ownerRepo: `${repo.owner}/${repo.repo}`, branch: repo.defaultBranch })}
+                  {t('OIDC trust for {{ownerRepo}} (branch: {{branch}})', {
+                    ownerRepo: `${repo.owner}/${repo.repo}`,
+                    branch: repo.defaultBranch,
+                  })}
                 </Typography>
               </Box>
             </Box>

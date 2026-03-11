@@ -192,9 +192,7 @@ export function DeploymentStatusScreen({
                 'The deployment pipeline failed ({{conclusion}}). Check the GitHub Actions logs for details.',
                 { conclusion: workflowStatus.conclusion }
               )
-            : t(
-                'The deployment pipeline failed. Check the GitHub Actions logs for details.'
-              )}
+            : t('The deployment pipeline failed. Check the GitHub Actions logs for details.')}
         </Alert>
       )}
 

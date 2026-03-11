@@ -236,7 +236,8 @@ export function GitHubPipelineWizard({
       }
 
       case 'ReadyForSetup': {
-        if (!pipeline.state.config) return <LoadingSpinner message={t('Loading configuration...')} />;
+        if (!pipeline.state.config)
+          return <LoadingSpinner message={t('Loading configuration...')} />;
 
         const readiness = pipeline.state.repoReadiness;
         const filesAlreadyExist = !!(readiness?.hasSetupWorkflow && readiness?.hasAgentConfig);
