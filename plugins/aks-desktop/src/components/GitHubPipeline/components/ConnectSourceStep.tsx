@@ -106,7 +106,7 @@ export function ConnectSourceStep({
             <Button
               variant="outlined"
               size="small"
-              startIcon={<Icon icon="mdi:open-in-new" />}
+              startIcon={<Icon icon="mdi:open-in-new" aria-hidden="true" />}
               onClick={onStartOAuth}
               sx={{ textTransform: 'none', mb: 2 }}
             >

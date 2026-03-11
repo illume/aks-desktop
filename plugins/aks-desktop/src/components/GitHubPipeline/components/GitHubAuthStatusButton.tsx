@@ -45,7 +45,7 @@ export function GitHubAuthStatusButton() {
       <Tooltip title={`GitHub: ${authState.username}`}>
         <Button
           variant="outlined"
-          startIcon={<Icon icon="mdi:github" />}
+          startIcon={<Icon icon="mdi:github" aria-hidden="true" />}
           sx={{ textTransform: 'none', fontWeight: 'bold' }}
         >
           {authState.username ?? t('Connected')}
@@ -58,7 +58,7 @@ export function GitHubAuthStatusButton() {
     <Tooltip title={t('Sign in to GitHub')}>
       <Button
         variant="outlined"
-        startIcon={<Icon icon="mdi:github" />}
+        startIcon={<Icon icon="mdi:github" aria-hidden="true" />}
         onClick={startOAuth}
         sx={{ textTransform: 'none', fontWeight: 'bold' }}
       >

@@ -396,7 +396,12 @@ export function GitHubPipelineWizard({
             variant="contained"
             disabled={needsApp}
             onClick={handleCreateSetupPR}
-            startIcon={<Icon icon={filesExist ? 'mdi:robot-outline' : 'mdi:source-pull'} />}
+            startIcon={
+              <Icon
+                icon={filesExist ? 'mdi:robot-outline' : 'mdi:source-pull'}
+                aria-hidden="true"
+              />
+            }
             sx={{ textTransform: 'none' }}
           >
             {filesExist ? t('Trigger Copilot Agent') : t('Create Setup PR')}

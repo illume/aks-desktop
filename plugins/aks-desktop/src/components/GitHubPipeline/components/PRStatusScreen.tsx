@@ -276,7 +276,7 @@ export function PRStatusScreen({
         <Button
           variant="outlined"
           onClick={onReviewInGitHub}
-          startIcon={<Icon icon="mdi:open-in-new" />}
+          startIcon={<Icon icon="mdi:open-in-new" aria-hidden="true" />}
           sx={{ textTransform: 'none' }}
         >
           {prPhase === 'agent-pending'

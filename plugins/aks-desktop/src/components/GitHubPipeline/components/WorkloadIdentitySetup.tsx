@@ -139,7 +139,7 @@ export function WorkloadIdentitySetup({
           <Button
             variant="contained"
             onClick={handleSetup}
-            startIcon={<Icon icon="mdi:shield-check-outline" />}
+            startIcon={<Icon icon="mdi:shield-check-outline" aria-hidden="true" />}
             sx={{ textTransform: 'none' }}
           >
             {t('Continue')}
@@ -183,7 +183,7 @@ export function WorkloadIdentitySetup({
             <Button
               variant="outlined"
               onClick={handleSetup}
-              startIcon={<Icon icon="mdi:refresh" />}
+              startIcon={<Icon icon="mdi:refresh" aria-hidden="true" />}
               sx={{ textTransform: 'none' }}
             >
               {t('Retry')}

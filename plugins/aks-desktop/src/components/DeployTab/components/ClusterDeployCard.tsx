@@ -217,7 +217,7 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                           {d.provenance === 'manual' && (
                             <Tooltip title={t('Edit deployment')}>
                               <IconButton size="small" onClick={() => handleEditManual(d)}>
-                                <Icon icon="mdi:pencil" />
+                                <Icon icon="mdi:pencil" aria-hidden="true" />
                               </IconButton>
                             </Tooltip>
                           )}
@@ -227,14 +227,14 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                                 size="small"
                                 onClick={() => openExternalUrl(d.pipelineRunUrl ?? '')}
                               >
-                                <Icon icon="mdi:open-in-new" />
+                                <Icon icon="mdi:open-in-new" aria-hidden="true" />
                               </IconButton>
                             </Tooltip>
                           )}
                           {d.provenance === 'pipeline' && (
                             <Tooltip title={t('Re-deploy via pipeline')}>
                               <IconButton size="small" onClick={() => handleRedeployPipeline(d)}>
-                                <Icon icon="mdi:replay" />
+                                <Icon icon="mdi:replay" aria-hidden="true" />
                               </IconButton>
                             </Tooltip>
                           )}

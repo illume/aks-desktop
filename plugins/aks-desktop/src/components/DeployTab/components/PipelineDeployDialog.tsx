@@ -142,7 +142,11 @@ export function PipelineDeployDialog({
             onClick={handleDeploy}
             disabled={dispatching || !gitHubAuth.authState.isAuthenticated}
             startIcon={
-              dispatching ? <CircularProgress size={16} /> : <Icon icon="mdi:rocket-launch" />
+              dispatching ? (
+                <CircularProgress size={16} />
+              ) : (
+                <Icon icon="mdi:rocket-launch" aria-hidden="true" />
+              )
             }
           >
             {dispatching ? t('Triggering...') : t('Deploy')}

@@ -179,7 +179,7 @@ export function DeploymentStatusScreen({
               sx={{ ml: 0.5 }}
               aria-label={t('View workflow run on GitHub')}
             >
-              <Icon icon="mdi:open-in-new" width={16} />
+              <Icon icon="mdi:open-in-new" width={16} aria-hidden="true" />
             </IconButton>
           </Tooltip>
         )}
@@ -289,7 +289,7 @@ export function DeploymentStatusScreen({
             variant="contained"
             color="primary"
             onClick={onOpenGitHubRun}
-            startIcon={<Icon icon="mdi:open-in-new" />}
+            startIcon={<Icon icon="mdi:open-in-new" aria-hidden="true" />}
             sx={{ textTransform: 'none', fontSize: 14 }}
           >
             {t('View on GitHub')}
@@ -298,7 +298,7 @@ export function DeploymentStatusScreen({
         <Button
           variant="outlined"
           onClick={onRedeploy}
-          startIcon={<Icon icon="mdi:refresh" />}
+          startIcon={<Icon icon="mdi:refresh" aria-hidden="true" />}
           sx={{ textTransform: 'none', fontSize: 14 }}
         >
           {t('Redeploy')}

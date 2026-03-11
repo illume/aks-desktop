@@ -151,7 +151,7 @@ export const useClusterDeployStatus = (
       isCancelled = true;
       cancelFns.forEach(fn => fn());
     };
-  }, [cluster, namespace, enabled]);
+  }, [cluster, namespace, enabled, t]);
 
   return { deployments, services, loading, error };
 };
