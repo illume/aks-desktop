@@ -15,7 +15,6 @@
     "test": "headlamp-plugin test",
     "test:nvda": "cross-env SCREEN_READER=nvda vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
     "test:voiceover": "cross-env SCREEN_READER=voiceover vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
-    "test:narrator": "cross-env SCREEN_READER=narrator vitest run -c node_modules/@kinvolk/headlamp-plugin/config/vite.config.mjs guidepup",
     "prettier": "prettier --write .",
     "i18n": "headlamp-plugin i18n"
   },

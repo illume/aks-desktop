@@ -8,7 +8,6 @@
  *   SCREEN_READER unset / empty → @guidepup/virtual-screen-reader  (default)
  *   SCREEN_READER=voiceover     → VoiceOver via @guidepup/guidepup  (macOS)
  *   SCREEN_READER=nvda          → NVDA via @guidepup/guidepup       (Windows)
- *   SCREEN_READER=narrator      → Windows Narrator (not yet supported)
  *
  * All drivers expose the same core API surface used by the tests:
  *   start / stop / next / lastSpokenPhrase / spokenPhraseLog
@@ -18,18 +17,12 @@
  * module returns the correct singleton for the environment.
  */
 
-export type ScreenReaderDriver = 'virtual' | 'voiceover' | 'nvda' | 'narrator';
+export type ScreenReaderDriver = 'virtual' | 'voiceover' | 'nvda';
 
 const raw = (process.env.SCREEN_READER ?? '').trim().toLowerCase();
 
 export const activeDriver: ScreenReaderDriver =
-  raw === 'nvda'
-    ? 'nvda'
-    : raw === 'voiceover'
-    ? 'voiceover'
-    : raw === 'narrator'
-    ? 'narrator'
-    : 'virtual';
+  raw === 'nvda' ? 'nvda' : raw === 'voiceover' ? 'voiceover' : 'virtual';
 
 /**
  * Lazily resolve the screen reader singleton.
@@ -44,12 +37,6 @@ export async function getScreenReader() {
   if (activeDriver === 'virtual') {
     const { virtual } = await import('@guidepup/virtual-screen-reader');
     return virtual;
-  }
-  if (activeDriver === 'narrator') {
-    throw new Error(
-      'Windows Narrator is not yet supported by @guidepup/guidepup. ' +
-        'Use SCREEN_READER=nvda for Windows screen reader testing.'
-    );
   }
   const guidepup = await import('@guidepup/guidepup');
   return activeDriver === 'nvda' ? guidepup.nvda : guidepup.voiceOver;
