@@ -39,7 +39,7 @@ function LabelWithInfo({ label, infoText }: { label: string; infoText: string })
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       <span>{t(label)}</span>
       <Tooltip title={t(infoText)} arrow>
-        <IconButton aria-label={`Information about ${label}`}>
+        <IconButton aria-label={t('Information about {{label}}', { label })}>
           <Icon icon="mdi:information-outline" width="16px" height="16px" />
         </IconButton>
       </Tooltip>
@@ -71,7 +71,7 @@ export default function ConfigureContainer({
               />
               <TextField
                 label={t('Container image')}
-                placeholder="registry/image:tag"
+                placeholder={t('registry/image:tag')}
                 value={containerConfig.config.containerImage}
                 onChange={e =>
                   containerConfig.setConfig(c => ({ ...c, containerImage: e.target.value }))
@@ -350,7 +350,7 @@ export default function ConfigureContainer({
                           onChange={e =>
                             containerConfig.setConfig(c => ({ ...c, livenessPath: e.target.value }))
                           }
-                          placeholder="/healthz"
+                          placeholder={t('/healthz')}
                         />
                       </Box>
                       <Box sx={{ ml: 5, mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -490,7 +490,7 @@ export default function ConfigureContainer({
                               readinessPath: e.target.value,
                             }))
                           }
-                          placeholder="/ready"
+                          placeholder={t('/ready')}
                         />
                       </Box>
                       <Box sx={{ ml: 5, mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -627,7 +627,7 @@ export default function ConfigureContainer({
                           onChange={e =>
                             containerConfig.setConfig(c => ({ ...c, startupPath: e.target.value }))
                           }
-                          placeholder="/startup"
+                          placeholder={t('/startup')}
                         />
                       </Box>
                       <Box sx={{ ml: 5, mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -780,7 +780,7 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about CPU request">
+                    <IconButton aria-label={t('Information about CPU request')}>
                       <Icon icon="mdi:information-outline" width="16px" height="16px" />
                     </IconButton>
                   </Tooltip>
@@ -818,7 +818,7 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about CPU limit">
+                    <IconButton aria-label={t('Information about CPU limit')}>
                       <Icon icon="mdi:information-outline" width="16px" height="16px" />
                     </IconButton>
                   </Tooltip>
@@ -855,7 +855,7 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about memory request">
+                    <IconButton aria-label={t('Information about memory request')}>
                       <Icon icon="mdi:information-outline" width="16px" height="16px" />
                     </IconButton>
                   </Tooltip>
@@ -893,7 +893,7 @@ export default function ConfigureContainer({
                     )}
                     arrow
                   >
-                    <IconButton aria-label="Information about memory limit">
+                    <IconButton aria-label={t('Information about memory limit')}>
                       <Icon icon="mdi:information-outline" width="16px" height="16px" />
                     </IconButton>
                   </Tooltip>
@@ -1093,7 +1093,7 @@ export default function ConfigureContainer({
                       )}
                       arrow
                     >
-                      <IconButton aria-label="Information about target CPU utilization">
+                      <IconButton aria-label={t('Information about target CPU utilization')}>
                         <Icon icon="mdi:information-outline" width="16px" height="16px" />
                       </IconButton>
                     </Tooltip>
