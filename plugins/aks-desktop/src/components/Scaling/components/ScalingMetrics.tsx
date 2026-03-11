@@ -67,8 +67,11 @@ export const ScalingMetrics: React.FC<ScalingMetricsProps> = ({
             {t('Scaling Mode')}
           </Typography>
           <Box display="flex" alignItems="center" gap={0.5}>
+            {/* A11y: Icon is purely decorative — aria-hidden hides it from the accessibility tree.
+                MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
             <Icon
               icon={hpaInfo ? 'mdi:autorenew' : 'mdi:account'}
+              aria-hidden="true"
               style={{ fontSize: 18, color: hpaInfo ? '#66BB6A' : '#42A5F5' }}
             />
             <Typography variant="body1" fontWeight="bold">

@@ -64,7 +64,10 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
         justifyContent="center"
         height="100%"
       >
-        <CircularProgress size={32} sx={{ mb: 1 }} />
+        {/* A11y: Decorative — the Typography below already describes the loading state
+            for screen readers, so the spinner itself is hidden from the accessibility tree.
+            MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
+        <CircularProgress size={32} sx={{ mb: 1 }} aria-hidden="true" />
         <Typography variant="body2" color="text.secondary">
           {t('Loading scaling metrics from Prometheus')}...
         </Typography>

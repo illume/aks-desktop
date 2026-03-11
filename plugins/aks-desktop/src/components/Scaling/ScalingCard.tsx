@@ -1,14 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { Icon } from '@iconify/react';
-import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { Alert, Box, Typography } from '@mui/material';
+import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import React from 'react';
 import { RESOURCE_GROUP_LABEL, SUBSCRIPTION_LABEL } from '../../utils/constants/projectLabels';
-import { DeploymentSelector } from './components/DeploymentSelector';
-import { ScalingChart } from './components/ScalingChart';
-import { ScalingMetrics } from './components/ScalingMetrics';
+import { ScalingCardPure } from './components/ScalingCardPure';
 import { useChartData } from './hooks/useChartData';
 import { useDeployments } from './hooks/useDeployments';
 import { useHPAInfo } from './hooks/useHPAInfo';
@@ -43,10 +39,12 @@ interface ScalingCardProps {
 /**
  * Displays scaling metrics and charts for a selected Kubernetes deployment.
  *
+ * This connected component fetches live data via K8s hooks and delegates all
+ * rendering to {@link ScalingCardPure}.
+ *
  * @param props.project - The project whose first cluster and namespace are used to fetch deployments.
  */
 function ScalingCard({ project }: ScalingCardProps) {
-  const { t } = useTranslation();
   const namespace = project.namespaces?.[0];
   const cluster = project.clusters?.[0];
 
@@ -80,63 +78,17 @@ function ScalingCard({ project }: ScalingCardProps) {
   );
 
   return (
-    <Box
-      sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0, '&:last-child': { pb: 0 } }}
-    >
-      {/* Header with title and deployment selector */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          mb: 2,
-        }}
-      >
-        <Typography variant="h6">{t('Scaling')}</Typography>
-        <DeploymentSelector
-          selectedDeployment={selectedDeployment}
-          deployments={deployments}
-          loading={loading}
-          onDeploymentChange={setSelectedDeployment}
-        />
-      </Box>
-
-      {error && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      {selectedDeployment && (
-        <>
-          {/* Metrics Overview */}
-          <ScalingMetrics
-            hpaInfo={hpaInfo}
-            selectedDeployment={selectedDeployment}
-            deployments={deployments}
-          />
-          {/* Chart */}
-          <Box sx={{ height: 400, width: '100%' }}>
-            <ScalingChart chartData={chartData} loading={chartLoading} error={chartError} />
-          </Box>
-        </>
-      )}
-
-      {!selectedDeployment && (
-        <Box
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          justifyContent="center"
-          flex={1}
-        >
-          <Icon icon="mdi:chart-line" style={{ marginBottom: 16, color: '#ccc', fontSize: 48 }} />
-          <Typography color="textSecondary" variant="body1">
-            {t('Select a deployment to view scaling metrics')}
-          </Typography>
-        </Box>
-      )}
-    </Box>
+    <ScalingCardPure
+      deployments={deployments}
+      selectedDeployment={selectedDeployment}
+      loading={loading}
+      error={error}
+      hpaInfo={hpaInfo}
+      chartData={chartData}
+      chartLoading={chartLoading}
+      chartError={chartError}
+      onDeploymentChange={setSelectedDeployment}
+    />
   );
 }
 

@@ -4,6 +4,7 @@
 import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import {
+  Box,
   Button,
   CircularProgress,
   Dialog,
@@ -12,6 +13,7 @@ import {
   DialogTitle,
   TextField,
 } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import React from 'react';
 import type { EditValues } from '../hooks/useEditDialog';
 import type { HPAInfo } from '../hooks/useHPAInfo';
@@ -130,9 +132,31 @@ export const ScalingEditDialog: React.FC<ScalingEditDialogProps> = ({
           onClick={onSave}
           variant="contained"
           disabled={saving}
-          startIcon={saving ? undefined : <Icon icon="mdi:content-save" />}
+          startIcon={
+            saving ? undefined : (
+              // A11y: Icon is purely decorative (the button text "Save" provides meaning) —
+              // aria-hidden hides it from the accessibility tree.
+              // MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden
+              <Icon icon="mdi:content-save" aria-hidden="true" />
+            )
+          }
         >
-          {saving ? <CircularProgress size={20} /> : t('Save')}
+          {saving ? (
+            <>
+              {/* A11y: Decorative — the button's visually-hidden "Save" text below
+                  provides the accessible name; the spinner is just visual feedback.
+                  MDN aria-hidden: https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-hidden */}
+              <CircularProgress size={20} aria-hidden="true" />
+              {/* A11y: Visually hidden text ensures the button always has discernible text
+                  even when the visible label is replaced by a spinner (WCAG 4.1.2).
+                  MUI button-name: https://dequeuniversity.com/rules/axe/4.11/button-name */}
+              <Box component="span" sx={visuallyHidden}>
+                {t('Save')}
+              </Box>
+            </>
+          ) : (
+            t('Save')
+          )}
         </Button>
       </DialogActions>
     </Dialog>
