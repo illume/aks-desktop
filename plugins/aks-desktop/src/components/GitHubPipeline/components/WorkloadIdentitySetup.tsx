@@ -32,11 +32,11 @@ const STATUS_ORDER = [
 
 function getStatusSteps(t: (key: string) => string) {
   return [
-    { key: 'checking', label: t('Checking for existing identity...') },
-    { key: 'creating-identity', label: t('Creating managed identity...') },
-    { key: 'assigning-role', label: t('Assigning AKS Cluster User Role...') },
-    { key: 'creating-credential', label: t('Configuring federated credential...') },
-    { key: 'done', label: t('Workload identity configured') },
+    { key: STATUS_ORDER[0], label: t('Checking for existing identity...') },
+    { key: STATUS_ORDER[1], label: t('Creating managed identity...') },
+    { key: STATUS_ORDER[2], label: t('Assigning AKS Cluster User Role...') },
+    { key: STATUS_ORDER[3], label: t('Configuring federated credential...') },
+    { key: STATUS_ORDER[4], label: t('Workload identity configured') },
   ] as const;
 }
 
