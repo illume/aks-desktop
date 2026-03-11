@@ -39,7 +39,7 @@ function LabelWithInfo({ label, infoText }: { label: string; infoText: string })
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       <span>{t(label)}</span>
       <Tooltip title={t(infoText)} arrow>
-        <IconButton aria-label={t('Information about {{label}}', { label })}>
+        <IconButton aria-label={t('Information about {{label}}', { label: t(label) })}>
           <Icon icon="mdi:information-outline" width="16px" height="16px" />
         </IconButton>
       </Tooltip>

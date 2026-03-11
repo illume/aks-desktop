@@ -53,8 +53,12 @@ const ADDON_OPTIONS: AddonOption[] = [
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL_MS = 10000;
 
-const NETWORK_POLICY_INFO =
-  'Network policy engine cannot be changed after cluster creation. Create a new cluster with --network-policy cilium for full network policy support.';
+const NETWORK_POLICY_INFO = (
+  <>
+    Network policy engine cannot be changed after cluster creation. Create a new cluster with{' '}
+    <code>--network-policy cilium</code> for full network policy support.
+  </>
+);
 
 /**
  * Panel for enabling missing addons on a Standard AKS cluster.
@@ -245,7 +249,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
           {t('Cluster Configuration')}
         </Typography>
         <Alert severity="info" sx={{ mt: 1 }}>
-          {t(NETWORK_POLICY_INFO)}
+          {NETWORK_POLICY_INFO}
         </Alert>
       </Box>
     );
@@ -288,7 +292,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
       {/* Network policy info (non-actionable) */}
       {hasNetworkPolicyWarning && (
         <Alert severity="info" sx={{ mt: 1 }}>
-          {t(NETWORK_POLICY_INFO)}
+          {NETWORK_POLICY_INFO}
         </Alert>
       )}
 

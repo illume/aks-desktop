@@ -87,7 +87,7 @@ export function WizardShell({
             </Typography>
           </Box>
           <IconButton onClick={onClose} size="small" aria-label={t('Close')}>
-            <Icon icon="mdi:close" />
+            <Icon icon="mdi:close" aria-hidden="true" />
           </IconButton>
         </Box>
 

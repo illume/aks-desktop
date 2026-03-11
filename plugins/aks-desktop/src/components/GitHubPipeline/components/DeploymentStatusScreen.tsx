@@ -236,7 +236,9 @@ export function DeploymentStatusScreen({
               />
               {pod.restarts > 0 && (
                 <Typography variant="caption" sx={{ color: 'warning.main' }}>
-                  {t('{{count}} restart', { count: pod.restarts })}
+                  {t(pod.restarts === 1 ? '{{count}} restart' : '{{count}} restarts', {
+                    count: pod.restarts,
+                  })}
                 </Typography>
               )}
             </Box>
@@ -269,7 +271,9 @@ export function DeploymentStatusScreen({
       >
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {totalPods > 0
-            ? t('{{ready}}/{{total}} pod(s) ready', { ready: readyPods, total: totalPods })
+            ? totalPods === 1
+              ? t('{{ready}}/{{total}} pod ready', { ready: readyPods, total: totalPods })
+              : t('{{ready}}/{{total}} pods ready', { ready: readyPods, total: totalPods })
             : t('No pods found')}
         </Typography>
         {lastUpdated && (
