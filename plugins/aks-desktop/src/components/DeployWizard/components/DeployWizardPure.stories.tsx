@@ -4,6 +4,7 @@
 import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import { WizardStep } from '../hooks/useDeployWizard';
 import DeployWizardPure, { DeployWizardPureProps } from './DeployWizardPure';
 
 const noOp = () => {};
@@ -62,7 +63,7 @@ const containerConfigStub = {
 };
 
 const baseArgs: DeployWizardPureProps = {
-  activeStep: 0,
+  activeStep: WizardStep.SOURCE,
   sourceType: null,
   setSourceType: noOp as any,
   yamlEditorValue: '',
@@ -101,7 +102,7 @@ const Template: StoryFn<DeployWizardPureProps> = args => <DeployWizardPure {...a
 export const SourceStep = Template.bind({});
 SourceStep.args = {
   ...baseArgs,
-  activeStep: 0,
+  activeStep: WizardStep.SOURCE,
   sourceType: null,
   stepContent: <div>Source step content</div>,
 };
@@ -109,7 +110,7 @@ SourceStep.args = {
 export const SourceStepYamlSelected = Template.bind({});
 SourceStepYamlSelected.args = {
   ...baseArgs,
-  activeStep: 0,
+  activeStep: WizardStep.SOURCE,
   sourceType: 'yaml',
   stepContent: <div>Source step — YAML selected</div>,
 };
@@ -117,7 +118,7 @@ SourceStepYamlSelected.args = {
 export const DeployStepSuccess = Template.bind({});
 DeployStepSuccess.args = {
   ...baseArgs,
-  activeStep: 2,
+  activeStep: WizardStep.DEPLOY,
   sourceType: 'yaml',
   deployResult: 'success',
   deployMessage: 'Applied 1 resource successfully.',
@@ -128,7 +129,7 @@ DeployStepSuccess.args = {
 export const DeployStepError = Template.bind({});
 DeployStepError.args = {
   ...baseArgs,
-  activeStep: 2,
+  activeStep: WizardStep.DEPLOY,
   sourceType: 'yaml',
   deployResult: 'error',
   deployMessage:
@@ -141,7 +142,7 @@ DeployStepError.args = {
 export const DeployStepDeploying = Template.bind({});
 DeployStepDeploying.args = {
   ...baseArgs,
-  activeStep: 2,
+  activeStep: WizardStep.DEPLOY,
   sourceType: 'yaml',
   deploying: true,
   deployResult: null,
@@ -154,7 +155,7 @@ DeployStepDeploying.args = {
 export const ContainerSourceSelected = Template.bind({});
 ContainerSourceSelected.args = {
   ...baseArgs,
-  activeStep: 0,
+  activeStep: WizardStep.SOURCE,
   sourceType: 'container',
   stepContent: <div>Source step — Container selected</div>,
 };
@@ -163,7 +164,7 @@ ContainerSourceSelected.args = {
 export const NextButtonDisabled = Template.bind({});
 NextButtonDisabled.args = {
   ...baseArgs,
-  activeStep: 0,
+  activeStep: WizardStep.SOURCE,
   isStepValid: () => false,
   stepContent: <div>Source step — no source selected</div>,
 };

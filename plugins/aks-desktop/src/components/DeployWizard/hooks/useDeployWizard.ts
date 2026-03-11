@@ -155,7 +155,7 @@ export function useDeployWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStep, sourceType, namespace, yamlEditorValue, containerConfig.config]);
 
-  const isStepValid = (step: number): boolean => {
+  const isStepValid = (step: WizardStep): boolean => {
     switch (step) {
       case WizardStep.SOURCE:
         return sourceType !== null;
@@ -177,9 +177,9 @@ export function useDeployWizard({
     }
   };
 
-  const handleNext = () => setActiveStep(s => Math.min(s + 1, WizardStep.DEPLOY));
-  const handleBack = () => setActiveStep(s => Math.max(s - 1, WizardStep.SOURCE));
-  const handleStepClick = (step: number) => {
+  const handleNext = () => setActiveStep(s => (Math.min(s + 1, WizardStep.DEPLOY) as WizardStep));
+  const handleBack = () => setActiveStep(s => (Math.max(s - 1, WizardStep.SOURCE) as WizardStep));
+  const handleStepClick = (step: WizardStep) => {
     // Block breadcrumb navigation while a deploy is in-flight to prevent stale
     // success/error state from being applied to a different YAML/config.
     if (deploying) return;

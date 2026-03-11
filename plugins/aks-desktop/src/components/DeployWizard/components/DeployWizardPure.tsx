@@ -23,7 +23,7 @@ import { WizardStep } from '../hooks/useDeployWizard';
  */
 export interface DeployWizardPureProps {
   /** Index of the currently active step (see {@link WizardStep}). */
-  activeStep: number;
+  activeStep: WizardStep;
   /** Selected deploy source, or `null` while the user has not yet chosen. */
   sourceType: 'yaml' | 'container' | null;
   /** Setter for {@link sourceType}. */
@@ -53,11 +53,11 @@ export interface DeployWizardPureProps {
   /** Decrements {@link activeStep} by one. */
   handleBack: () => void;
   /** Jumps to a specific step if allowed by {@link isStepValid}. */
-  handleStepClick: (step: number) => void;
+  handleStepClick: (step: WizardStep) => void;
   /** Validates and applies all Kubernetes resources from the current source. */
   handleDeploy: () => Promise<void>;
   /** Returns `true` when the given step has enough data to proceed. */
-  isStepValid: (step: number) => boolean;
+  isStepValid: (step: WizardStep) => boolean;
   /** Called when the user clicks "Close" after a deploy result. */
   onClose?: () => void;
   /** Step-specific content rendered inside the scrollable area (composed by the connector). */
@@ -106,7 +106,7 @@ export default function DeployWizardPure({
             <Breadcrumb
               steps={[t('Source'), t('Configure'), t('Deploy')]}
               activeStep={activeStep}
-              onStepClick={handleStepClick}
+              onStepClick={(step) => handleStepClick(step as WizardStep)}
             />
           </Box>
           <Box

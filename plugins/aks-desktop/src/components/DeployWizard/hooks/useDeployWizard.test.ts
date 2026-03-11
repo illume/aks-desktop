@@ -33,14 +33,14 @@ vi.mock('../utils/yamlGenerator', () => ({
 }));
 
 import { apply } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
-import { useDeployWizard } from './useDeployWizard';
+import { useDeployWizard, WizardStep } from './useDeployWizard';
 
 const mockApply = vi.mocked(apply);
 
 describe('useDeployWizard', () => {
   it('has correct initial state', () => {
     const { result } = renderHook(() => useDeployWizard({}));
-    expect(result.current.activeStep).toBe(0);
+    expect(result.current.activeStep).toBe(WizardStep.SOURCE);
     expect(result.current.sourceType).toBeNull();
     expect(result.current.deploying).toBe(false);
   });
@@ -50,7 +50,7 @@ describe('useDeployWizard', () => {
     act(() => {
       result.current.handleNext();
     });
-    expect(result.current.activeStep).toBe(1);
+    expect(result.current.activeStep).toBe(WizardStep.CONFIGURE);
   });
 
   it('handleBack decrements activeStep', () => {
@@ -61,7 +61,7 @@ describe('useDeployWizard', () => {
     act(() => {
       result.current.handleBack();
     });
-    expect(result.current.activeStep).toBe(0);
+    expect(result.current.activeStep).toBe(WizardStep.SOURCE);
   });
 
   it('handleBack does not go below 0', () => {
@@ -69,12 +69,12 @@ describe('useDeployWizard', () => {
     act(() => {
       result.current.handleBack();
     });
-    expect(result.current.activeStep).toBe(0);
+    expect(result.current.activeStep).toBe(WizardStep.SOURCE);
   });
 
   it('isStepValid(0) returns false when sourceType is null', () => {
     const { result } = renderHook(() => useDeployWizard({}));
-    expect(result.current.isStepValid(0)).toBe(false);
+    expect(result.current.isStepValid(WizardStep.SOURCE)).toBe(false);
   });
 
   it('isStepValid(0) returns true when sourceType is set', () => {
@@ -82,7 +82,7 @@ describe('useDeployWizard', () => {
     act(() => {
       result.current.setSourceType('yaml');
     });
-    expect(result.current.isStepValid(0)).toBe(true);
+    expect(result.current.isStepValid(WizardStep.SOURCE)).toBe(true);
   });
 
   it('isStepValid(1) returns false when yamlEditorValue is empty with sourceType=yaml', () => {
@@ -90,7 +90,7 @@ describe('useDeployWizard', () => {
     act(() => {
       result.current.setSourceType('yaml');
     });
-    expect(result.current.isStepValid(1)).toBe(false);
+    expect(result.current.isStepValid(WizardStep.CONFIGURE)).toBe(false);
   });
 
   it('isStepValid(1) returns true when yamlEditorValue is non-empty with sourceType=yaml', () => {
@@ -99,7 +99,7 @@ describe('useDeployWizard', () => {
       result.current.setSourceType('yaml');
       result.current.setYamlEditorValue('apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: cm');
     });
-    expect(result.current.isStepValid(1)).toBe(true);
+    expect(result.current.isStepValid(WizardStep.CONFIGURE)).toBe(true);
   });
 
   it('handleDeploy success path sets deployResult to success', async () => {
@@ -155,11 +155,11 @@ describe('useDeployWizard', () => {
     act(() => {
       result.current.handleNext();
     });
-    expect(result.current.activeStep).toBe(1);
+    expect(result.current.activeStep).toBe(WizardStep.CONFIGURE);
     act(() => {
-      result.current.handleStepClick(0);
+      result.current.handleStepClick(WizardStep.SOURCE);
     });
-    expect(result.current.activeStep).toBe(0);
+    expect(result.current.activeStep).toBe(WizardStep.SOURCE);
   });
 
   it('handleStepClick does not navigate while deploying is true', async () => {
@@ -182,8 +182,8 @@ describe('useDeployWizard', () => {
     expect(result.current.deploying).toBe(true);
     // Attempting to navigate back to step 0 must be a no-op.
     act(() => {
-      result.current.handleStepClick(0);
+      result.current.handleStepClick(WizardStep.SOURCE);
     });
-    expect(result.current.activeStep).toBe(2);
+    expect(result.current.activeStep).toBe(WizardStep.DEPLOY);
   });
 });
