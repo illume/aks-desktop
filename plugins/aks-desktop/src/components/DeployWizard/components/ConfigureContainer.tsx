@@ -71,7 +71,7 @@ export default function ConfigureContainer({
               />
               <TextField
                 label={t('Container image')}
-                placeholder={t('registry/image:tag')}
+                placeholder="registry/image:tag"
                 value={containerConfig.config.containerImage}
                 onChange={e =>
                   containerConfig.setConfig(c => ({ ...c, containerImage: e.target.value }))
@@ -350,7 +350,7 @@ export default function ConfigureContainer({
                           onChange={e =>
                             containerConfig.setConfig(c => ({ ...c, livenessPath: e.target.value }))
                           }
-                          placeholder={t('/healthz')}
+                          placeholder="/healthz"
                         />
                       </Box>
                       <Box sx={{ ml: 5, mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -490,7 +490,7 @@ export default function ConfigureContainer({
                               readinessPath: e.target.value,
                             }))
                           }
-                          placeholder={t('/ready')}
+                          placeholder="/ready"
                         />
                       </Box>
                       <Box sx={{ ml: 5, mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -627,7 +627,7 @@ export default function ConfigureContainer({
                           onChange={e =>
                             containerConfig.setConfig(c => ({ ...c, startupPath: e.target.value }))
                           }
-                          placeholder={t('/startup')}
+                          placeholder="/startup"
                         />
                       </Box>
                       <Box sx={{ ml: 5, mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>

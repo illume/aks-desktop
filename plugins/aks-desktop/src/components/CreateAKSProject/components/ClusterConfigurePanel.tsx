@@ -216,7 +216,10 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
           })
         );
       } else if (!settled.value.result.success) {
-        errors.push(settled.value.result.error || `Failed to enable ${settled.value.addonKey}`);
+        errors.push(
+          settled.value.result.error ||
+            t('Failed to enable {{addonKey}}', { addonKey: settled.value.addonKey })
+        );
       }
     }
 

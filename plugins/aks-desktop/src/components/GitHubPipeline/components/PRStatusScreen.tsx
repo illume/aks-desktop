@@ -96,7 +96,7 @@ function useElapsedTime(startedAt: string | null): string | null {
         setElapsed(t('less than a minute'));
       } else {
         const minutes = Math.floor(seconds / 60);
-        setElapsed(`${minutes} min`);
+        setElapsed(t('{{minutes}} min', { minutes }));
       }
     };
     update();
