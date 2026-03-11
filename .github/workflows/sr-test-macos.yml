@@ -1,0 +1,62 @@
+name: Screen Reader Tests (macOS / VoiceOver)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  SCREEN_READER: voiceover
+
+jobs:
+  sr-test-voiceover:
+    name: VoiceOver Screen Reader Tests
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: plugins/aks-desktop
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: plugins/aks-desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup VoiceOver screen reader
+        uses: guidepup/setup-action@v1
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Build Storybook
+        run: npm run storybook-build
+
+      - name: Run screen reader tests
+        run: npx playwright test --config playwright.config.ts
+        env:
+          SCREEN_READER: voiceover
+          CI: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sr-test-results-voiceover
+          path: |
+            plugins/aks-desktop/test-results/
+            plugins/aks-desktop/playwright-report/
+          retention-days: 30

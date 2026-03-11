@@ -427,3 +427,11 @@ FodyWeavers.xsd
 *.msp
 
 .eslintcache
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# Storybook
+storybook-static/
