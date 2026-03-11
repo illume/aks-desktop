@@ -14,7 +14,11 @@ import { RepoSelector } from './RepoSelector';
 function getPermissions(t: (key: string) => string) {
   return [
     { id: 'contents', name: t('Contents'), purpose: t('Push agent config files') },
-    { id: 'workflows', name: t('Workflows'), purpose: t('Create setup workflow in .github/workflows/') },
+    {
+      id: 'workflows',
+      name: t('Workflows'),
+      purpose: t('Create setup workflow in .github/workflows/'),
+    },
     { id: 'pull-requests', name: t('Pull requests'), purpose: t('Create deployment PRs') },
     { id: 'issues', name: t('Issues'), purpose: t('Track agent progress') },
     { id: 'actions', name: t('Actions'), purpose: t('Run deployment workflows') },
