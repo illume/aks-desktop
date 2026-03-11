@@ -54,7 +54,7 @@ function ConfigurePipelineButton({ project }: ConfigurePipelineButtonProps) {
       <Button
         variant="contained"
         color="primary"
-        startIcon={<Icon icon="mdi:pipe" />}
+        startIcon={<Icon icon="mdi:pipe" aria-hidden="true" />}
         onClick={() => setOpen(true)}
         sx={{ textTransform: 'none', fontWeight: 'bold' }}
       >

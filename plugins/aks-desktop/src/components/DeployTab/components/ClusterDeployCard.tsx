@@ -143,7 +143,7 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                   key={`${repo.owner}/${repo.repo}`}
                   variant="contained"
                   size="small"
-                  startIcon={<Icon icon="mdi:rocket-launch" />}
+                  startIcon={<Icon icon="mdi:rocket-launch" aria-hidden="true" />}
                   onClick={() => setPipelineDeployRepo(repo)}
                   sx={{ textTransform: 'none' }}
                 >

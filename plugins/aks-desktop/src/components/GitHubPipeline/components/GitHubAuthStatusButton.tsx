@@ -42,7 +42,7 @@ export function GitHubAuthStatusButton() {
 
   if (authState.isAuthenticated) {
     return (
-      <Tooltip title={`GitHub: ${authState.username}`}>
+      <Tooltip title={t('GitHub: {{username}}', { username: authState.username })}>
         <Button
           variant="outlined"
           startIcon={<Icon icon="mdi:github" aria-hidden="true" />}
