@@ -42,18 +42,22 @@ interface StageInfo {
 }
 
 function getPipelineStageInfo(
+  t: (key: string) => string,
   succeeded: boolean,
   failed: boolean,
   running: boolean
 ): { label: string; icon: string; color: string } {
-  if (failed) return { label: 'Pipeline Failed', icon: 'mdi:close-circle', color: 'error.main' };
+  if (failed)
+    return { label: t('Pipeline Failed'), icon: 'mdi:close-circle', color: 'error.main' };
   if (succeeded)
-    return { label: 'Pipeline Succeeded', icon: 'mdi:check-circle', color: 'success.main' };
-  if (running) return { label: 'Pipeline Running', icon: 'mdi:progress-clock', color: 'info.main' };
-  return { label: 'Pipeline Running', icon: 'mdi:progress-clock', color: 'text.disabled' };
+    return { label: t('Pipeline Succeeded'), icon: 'mdi:check-circle', color: 'success.main' };
+  if (running)
+    return { label: t('Pipeline Running'), icon: 'mdi:progress-clock', color: 'info.main' };
+  return { label: t('Pipeline Running'), icon: 'mdi:progress-clock', color: 'text.disabled' };
 }
 
 const getStages = (
+  t: (key: string) => string,
   workflowStatus: DeploymentStatusScreenProps['workflowStatus'],
   deploymentReady: boolean
 ): StageInfo[] => {
@@ -63,18 +67,18 @@ const getStages = (
   const pipelineRunning =
     workflowStatus.status === 'in_progress' || workflowStatus.status === 'queued';
 
-  const pipelineStage = getPipelineStageInfo(pipelineSucceeded, pipelineFailed, pipelineRunning);
+  const pipelineStage = getPipelineStageInfo(t, pipelineSucceeded, pipelineFailed, pipelineRunning);
 
   return [
     {
-      label: 'PR Created',
+      label: t('PR Created'),
       icon: 'mdi:check-circle',
       color: 'success.main',
       completed: true,
       active: false,
     },
     {
-      label: 'PR Merged',
+      label: t('PR Merged'),
       icon: 'mdi:check-circle',
       color: 'success.main',
       completed: true,
@@ -88,7 +92,7 @@ const getStages = (
       active: pipelineRunning,
     },
     {
-      label: deploymentReady ? 'Deployment Ready' : 'Deployment Pending',
+      label: deploymentReady ? t('Deployment Ready') : t('Deployment Pending'),
       icon: deploymentReady ? 'mdi:check-circle' : 'mdi:timer-sand',
       color: deploymentReady ? 'success.main' : pipelineSucceeded ? 'info.main' : 'text.disabled',
       completed: deploymentReady,
@@ -106,7 +110,7 @@ export function DeploymentStatusScreen({
   onOpenGitHubRun,
 }: DeploymentStatusScreenProps) {
   const { t } = useTranslation();
-  const stages = getStages(workflowStatus, deploymentHealth.ready);
+  const stages = getStages(t, workflowStatus, deploymentHealth.ready);
   const namespace = pipelineState.config?.namespace ?? '';
   const pipelineFailed =
     workflowStatus.status === 'completed' && workflowStatus.conclusion !== 'success';
@@ -132,7 +136,7 @@ export function DeploymentStatusScreen({
                   maxWidth: 80,
                 }}
               >
-                {t(stage.label)}
+                {stage.label}
               </Typography>
             </Box>
             {index < stages.length - 1 && (
