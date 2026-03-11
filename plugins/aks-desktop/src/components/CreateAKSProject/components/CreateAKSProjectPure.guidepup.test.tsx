@@ -84,7 +84,7 @@
  */
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -174,6 +174,10 @@ beforeAll(async () => {
  * Mount CreateAKSProjectPure and start the SR on document.body.
  * We use document.body (not the render container) because MUI Dialogs render
  * into a portal at document.body and would be invisible otherwise.
+ *
+ * The extra `act()` flush after render lets MUI Dialog's Fade/Transition
+ * finish their asynchronous state updates, preventing React "not wrapped in
+ * act(...)" warnings on macOS CI.
  */
 async function mountWizard(overrides: Partial<CreateAKSProjectPureProps> = {}) {
   render(
@@ -181,6 +185,8 @@ async function mountWizard(overrides: Partial<CreateAKSProjectPureProps> = {}) {
       <CreateAKSProjectPure {...BASE_PROPS} {...overrides} />
     </MemoryRouter>
   );
+  // Flush pending MUI Dialog transition state updates
+  await act(async () => {});
   await sr.start({ container: document.body });
 }
 
