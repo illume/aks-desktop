@@ -549,5 +549,21 @@
   "{{minutes}} min ago": "{{minutes}} min ago",
   "{{hours}}h ago": "{{hours}}h ago",
   "{{days}}d ago": "{{days}}d ago",
-  "{{weeks}}w ago": "{{weeks}}w ago"
+  "{{weeks}}w ago": "{{weeks}}w ago",
+  "Connect Source": "Connect Source",
+  "Setup PR": "Setup PR",
+  "Agent": "Agent",
+  "Complete": "Complete",
+  "Setting up environment": "Setting up environment",
+  "Analyzing repo, generating Dockerfile, K8s manifests, and workflow": "Analyzing repo, generating Dockerfile, K8s manifests, and workflow",
+  "PR Created": "PR Created",
+  "PR Merged": "PR Merged",
+  "Pipeline Failed": "Pipeline Failed",
+  "Pipeline Succeeded": "Pipeline Succeeded",
+  "Pipeline Running": "Pipeline Running",
+  "Deployment Ready": "Deployment Ready",
+  "Deployment Pending": "Deployment Pending",
+  "Healthy": "Healthy",
+  "Scaled down": "Scaled down",
+  "Degraded": "Degraded"
 }

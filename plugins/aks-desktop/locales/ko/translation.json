@@ -539,5 +539,21 @@
   "{{hours}}h ago": "",
   "{{days}}d ago": "",
   "{{weeks}}w ago": "",
-  "{{count}} restart_one": ""
+  "{{count}} restart_one": "",
+  "Connect Source": "",
+  "Setup PR": "",
+  "Agent": "",
+  "Complete": "",
+  "Setting up environment": "",
+  "Analyzing repo, generating Dockerfile, K8s manifests, and workflow": "",
+  "PR Created": "",
+  "PR Merged": "",
+  "Pipeline Failed": "",
+  "Pipeline Succeeded": "",
+  "Pipeline Running": "",
+  "Deployment Ready": "",
+  "Deployment Pending": "",
+  "Healthy": "",
+  "Scaled down": "",
+  "Degraded": ""
 }
