@@ -73,6 +73,12 @@
     ],
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
       "node .husky/format-plugin.js"
+    ],
+    "plugins/ai-assistant/**/*.{js,jsx,ts,tsx}": [
+      "node .husky/lint-ai-assistant.js"
+    ],
+    "plugins/ai-assistant/**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
+      "node .husky/format-ai-assistant.js"
     ]
   },
   "repository": {

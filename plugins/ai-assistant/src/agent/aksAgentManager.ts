@@ -10,7 +10,7 @@ declare const pluginRunCommand: typeof runCommand;
  * itself, which is handled by ending the string, adding an escaped
  * single quote, and starting a new single-quoted string.
  */
-function shellEscapeSingleQuote(s: string): string {
+export function shellEscapeSingleQuote(s: string): string {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
@@ -155,7 +155,28 @@ export async function getClustersFromHeadlampConfig(): Promise<
     // clusters is an array: [{ name, server, ... }, ...]
     if (Array.isArray(data.clusters)) {
       return data.clusters
-        .filter((c: any) => c.server && c.server.includes('.azmk8s.io'))
+        .filter((c: any) => {
+          if (!c.server || typeof c.server !== 'string') {
+            return false;
+          }
+          let urlString = c.server as string;
+          try {
+            // Ensure we have a scheme so that URL parsing works even if server is just a host.
+            const hasScheme = /^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//.test(urlString);
+            if (!hasScheme) {
+              urlString = 'https://' + urlString;
+            }
+            const parsed = new URL(urlString);
+            const hostname = parsed.hostname.toLowerCase();
+            return (
+              hostname === 'azmk8s.io' ||
+              hostname.endsWith('.azmk8s.io')
+            );
+          } catch {
+            // If the URL cannot be parsed, treat it as not an AKS cluster.
+            return false;
+          }
+        })
         .map((c: any) => ({ name: c.name as string, server: c.server as string }))
         .filter(c => c.name);
     }
