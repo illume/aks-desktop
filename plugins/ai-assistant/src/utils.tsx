@@ -138,6 +138,8 @@ interface PluginConfig extends SavedConfigurations {
   testMode?: boolean;
   /** Latest Headlamp event payload */
   event?: HeadlampEventPayload | null; //@todo: should this be HeadlampEventPayload?
+  /** Is the AI Assistant preview enabled? Disabled by default. */
+  previewEnabled?: boolean;
 }
 
 export const pluginStore = new ConfigStore<PluginConfig>(PLUGIN_NAME);
@@ -153,7 +155,9 @@ function usePluginSettings() {
   const [aksAgentClusters, setAksAgentClusters] = React.useState<string[]>([]);
   const [aksClusterServerMap, setAksClusterServerMap] = React.useState<Record<string, string>>({});
   // Map of cluster name -> pod info (namespace, podName, containerName) for the AKS agent
-  const [aksAgentPodInfoMap, setAksAgentPodInfoMap] = React.useState<Record<string, AksAgentPodInfo>>({});
+  const [aksAgentPodInfoMap, setAksAgentPodInfoMap] = React.useState<
+    Record<string, AksAgentPodInfo>
+  >({});
   const [hasCheckedForAgents, setHasCheckedForAgents] = React.useState(false);
 
   // Get the current configuration

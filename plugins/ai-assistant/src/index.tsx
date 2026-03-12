@@ -23,7 +23,11 @@ import {
 } from '@mui/material';
 import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { type AksAgentPodInfo, checkAksAgentInstalled, getClustersFromHeadlampConfig } from './agent/aksAgentManager';
+import {
+  type AksAgentPodInfo,
+  checkAksAgentInstalled,
+  getClustersFromHeadlampConfig,
+} from './agent/aksAgentManager';
 import { ModelSelector } from './components';
 import { getDefaultConfig } from './config/modelConfig';
 import { isTestModeCheck } from './helper';
@@ -74,8 +78,8 @@ const AIPanelComponent = React.memo(() => {
     };
   }, [isResizing]);
 
-  // Don't render anything if panel is closed
-  if (!pluginState.isUIPanelOpen) {
+  // Don't render anything if preview is disabled or panel is closed
+  if (!conf?.previewEnabled || !pluginState.isUIPanelOpen) {
     return null;
   }
   return (
@@ -136,6 +140,7 @@ function HeadlampAIPrompt() {
   const [showPopover, setShowPopover] = React.useState(false);
   const theme = useTheme();
 
+  const previewEnabled = savedConfigs?.previewEnabled ?? false;
   const hasShownPopover = savedConfigs?.configPopoverShown || false;
 
   const savedConfigData = React.useMemo(() => {
@@ -148,9 +153,7 @@ function HeadlampAIPrompt() {
   React.useEffect(() => {
     if (pluginState.hasCheckedForAgents) return;
     getClustersFromHeadlampConfig().then(async clusters => {
-      pluginState.setAksClusterServerMap(
-        Object.fromEntries(clusters.map(c => [c.name, c.server]))
-      );
+      pluginState.setAksClusterServerMap(Object.fromEntries(clusters.map(c => [c.name, c.server])));
 
       // For each AKS cluster, check if the agent is installed and record its pod info
       const podInfoMap: Record<string, AksAgentPodInfo> = {};
@@ -166,7 +169,9 @@ function HeadlampAIPrompt() {
         })
       );
 
-      pluginState.setAksAgentClusters(clustersWithAgent.length > 0 ? clustersWithAgent : clusters.map(c => c.name));
+      pluginState.setAksAgentClusters(
+        clustersWithAgent.length > 0 ? clustersWithAgent : clusters.map(c => c.name)
+      );
       pluginState.setAksAgentPodInfoMap(podInfoMap);
       pluginState.setHasCheckedForAgents(true);
     });
@@ -219,6 +224,11 @@ function HeadlampAIPrompt() {
     history.push(getSettingsURL());
   };
 
+  // Don't render the app bar button if preview is not enabled
+  if (!previewEnabled) {
+    return null;
+  }
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
       <Tooltip title="AI Assistant">
@@ -235,7 +245,7 @@ function HeadlampAIPrompt() {
           size="small"
           value="ai-assistant"
         >
-          <Icon icon="ai-assistant:logo" width="24px" color='white'/>
+          <Icon icon="ai-assistant:logo" width="24px" color="white" />
         </ToggleButton>
       </Tooltip>
 
@@ -296,6 +306,12 @@ registerAppBarAction(HeadlampAIPrompt);
 
 registerAppBarAction(() => {
   const _pluginState = useGlobalState();
+  const _conf = usePluginConfig();
+
+  // Only register event callbacks when the preview is enabled
+  if (!_conf?.previewEnabled) {
+    return null;
+  }
 
   // @todo: these "any" casts are all suspicious and also bugs (at least in the types maybe more).
   // @todo: the data being used is not in the event type definitions. Check the definitions and this code.
@@ -412,6 +428,7 @@ function Settings() {
 
   const isTestMode = isTestModeCheck();
   const hasShownConfigPopover = savedConfigs?.configPopoverShown || false;
+  const previewEnabled = savedConfigs?.previewEnabled ?? false;
 
   const toolsList = getAllAvailableTools();
   const pluginSettings = savedConfigs;
@@ -421,96 +438,133 @@ function Settings() {
     pluginStore.update(updatedSettings);
   };
 
+  const handlePreviewToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const currentConf = pluginStore.get() || {};
+    pluginStore.update({
+      ...currentConf,
+      previewEnabled: event.target.checked,
+    });
+  };
+
   return (
     <Box width={'80%'}>
-      <Typography variant="body1" sx={{ mb: 3 }}>
-        This plugin is in early development and is not yet ready for production use. Using it may
-        incur in costs from the AI provider! Use at your own risk.
-      </Typography>
-
-      <Divider sx={{ my: 3 }} />
-      {isTestMode && (
-        <>
-          <Box sx={{ mb: 3, ml: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch checked={isTestMode} onChange={handleTestModeChange} color="primary" />
-              }
-              label={
-                <Box>
-                  <Typography variant="body1">Test Mode</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Enable test mode to manually input AI responses and see how they render in the
-                    chat window
-                  </Typography>
-                </Box>
-              }
-            />
-          </Box>
-
-          <Box sx={{ mb: 3, ml: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box>
-                <Typography variant="body1">Configuration Popover</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {hasShownConfigPopover
-                    ? 'The configuration popover has been shown and dismissed'
-                    : 'The configuration popover will show when no AI providers are configured'}
-                </Typography>
-              </Box>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleResetPopover}
-                disabled={!hasShownConfigPopover}
-              >
-                Reset
-              </Button>
+      <Box sx={{ mb: 3, ml: 2 }}>
+        <FormControlLabel
+          control={
+            <Switch checked={previewEnabled} onChange={handlePreviewToggle} color="primary" />
+          }
+          label={
+            <Box>
+              <Typography variant="body1">Enable AI Assistant (Preview)</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Enable the AI Assistant preview feature. This is experimental and may incur costs
+                from the AI provider.
+              </Typography>
             </Box>
-          </Box>
+          }
+        />
+      </Box>
+
+      {!previewEnabled && (
+        <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+          Enable the preview above to configure the AI Assistant.
+        </Typography>
+      )}
+
+      {previewEnabled && (
+        <>
+          <Typography variant="body1" sx={{ mb: 3 }}>
+            This plugin is in early development and is not yet ready for production use. Using it
+            may incur in costs from the AI provider! Use at your own risk.
+          </Typography>
 
           <Divider sx={{ my: 3 }} />
+          {isTestMode && (
+            <>
+              <Box sx={{ mb: 3, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch checked={isTestMode} onChange={handleTestModeChange} color="primary" />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1">Test Mode</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Enable test mode to manually input AI responses and see how they render in
+                        the chat window
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 3, ml: 2 }}>
+                <Box
+                  sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <Box>
+                    <Typography variant="body1">Configuration Popover</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {hasShownConfigPopover
+                        ? 'The configuration popover has been shown and dismissed'
+                        : 'The configuration popover will show when no AI providers are configured'}
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleResetPopover}
+                    disabled={!hasShownConfigPopover}
+                  >
+                    Reset
+                  </Button>
+                </Box>
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+            </>
+          )}
+          <ModelSelector
+            selectedProvider={activeConfiguration.providerId}
+            config={activeConfiguration.config}
+            savedConfigs={savedConfigs}
+            configName={activeConfiguration.displayName}
+            isConfigView
+            onChange={handleModelSelectorChange}
+            onTermsAccept={updatedConfigs => {
+              pluginStore.update(updatedConfigs);
+            }}
+          />
+          {/* AI Tools Section */}
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            AI Tools
+          </Typography>
+          <Box>
+            {toolsList.map(tool => (
+              <Box key={tool.id} sx={{ display: 'flex', alignItems: 'center', mb: 2, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={isToolEnabled(pluginSettings, tool.id)}
+                      onChange={() => handleToolToggle(tool.id)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1">{tool.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {tool.description}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+            ))}
+          </Box>
         </>
       )}
-      <ModelSelector
-        selectedProvider={activeConfiguration.providerId}
-        config={activeConfiguration.config}
-        savedConfigs={savedConfigs}
-        configName={activeConfiguration.displayName}
-        isConfigView
-        onChange={handleModelSelectorChange}
-        onTermsAccept={updatedConfigs => {
-          pluginStore.update(updatedConfigs);
-        }}
-      />
-      {/* AI Tools Section */}
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        AI Tools
-      </Typography>
-      <Box>
-        {toolsList.map(tool => (
-          <Box key={tool.id} sx={{ display: 'flex', alignItems: 'center', mb: 2, ml: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isToolEnabled(pluginSettings, tool.id)}
-                  onChange={() => handleToolToggle(tool.id)}
-                  color="primary"
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body1">{tool.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {tool.description}
-                  </Typography>
-                </Box>
-              }
-            />
-          </Box>
-        ))}
-      </Box>
     </Box>
   );
 }

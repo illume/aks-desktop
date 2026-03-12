@@ -146,8 +146,12 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
         <Typography
           variant="caption"
           sx={{
-            color: step.status === 'running' ? 'text.primary'
-              : step.status === 'completed' ? 'text.secondary' : 'text.disabled',
+            color:
+              step.status === 'running'
+                ? 'text.primary'
+                : step.status === 'completed'
+                ? 'text.secondary'
+                : 'text.disabled',
             fontWeight: step.status === 'running' ? 500 : 400,
             lineHeight: 1.4,
             ...(step.status === 'running' && {
@@ -190,9 +194,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
                 icon={meta.icon}
                 width={15}
                 style={
-                  !done
-                    ? ({ animation: `${pulse} 2s ease-in-out infinite` } as any)
-                    : undefined
+                  !done ? ({ animation: `${pulse} 2s ease-in-out infinite` } as any) : undefined
                 }
               />
             )}
@@ -222,9 +224,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
 
           {/* Phase items */}
           <Collapse in={!collapsed} timeout={200}>
-            <Box sx={{ pl: 1.5 }}>
-              {items.map(renderStep)}
-            </Box>
+            <Box sx={{ pl: 1.5 }}>{items.map(renderStep)}</Box>
           </Collapse>
         </Box>
       );
@@ -238,7 +238,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
             mx: 0,
             p: 1.5,
             borderRadius: 1,
-            bgcolor: (theme) => alpha(theme.palette.action.hover, 0.04),
+            bgcolor: theme => alpha(theme.palette.action.hover, 0.04),
             border: '1px solid',
             borderColor: 'divider',
           }}

@@ -343,16 +343,15 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
 
         {history.map((prompt, index) => renderMessage(prompt, index))}
 
-        {isLoading && (
-          agentThinkingSteps && agentThinkingSteps.length > 0 ? (
+        {isLoading &&
+          (agentThinkingSteps && agentThinkingSteps.length > 0 ? (
             <AgentThinkingSteps steps={agentThinkingSteps} isRunning={isLoading} />
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
               <CircularProgress size={24} sx={{ mr: 1 }} />
               <Typography>Processing your request...</Typography>
             </Box>
-          )
-        )}
+          ))}
 
         {/* This is an invisible element that we'll scroll to */}
         <div ref={messagesEndRef} />

@@ -5,7 +5,12 @@ import { Box, Button, CircularProgress, Grid, Typography } from '@mui/material';
 import { isEqual } from 'lodash';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { type AgentThinkingStep, type ConversationEntry, destroyAgentSession, runAksAgent } from './agent/aksAgentManager';
+import {
+  type AgentThinkingStep,
+  type ConversationEntry,
+  destroyAgentSession,
+  runAksAgent,
+} from './agent/aksAgentManager';
 import AIManager, { Prompt } from './ai/manager';
 import {
   AIAssistantHeader,
@@ -529,14 +534,11 @@ export default function AIPrompt(props: {
         prompt,
         agentPodInfo,
         selectedAgentCluster,
-        (steps) => setAgentThinkingSteps(steps),
+        steps => setAgentThinkingSteps(steps),
         conversationHistory
       );
 
-      setPromptHistory(prev => [
-        ...prev,
-        { role: 'assistant', content: response },
-      ]);
+      setPromptHistory(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (error) {
       setPromptHistory(prev => [
         ...prev,
@@ -978,7 +980,7 @@ export default function AIPrompt(props: {
               }}
               aksAgentClusters={_pluginSetting.aksAgentClusters}
               selectedAgentCluster={selectedAgentCluster}
-              onAgentClusterChange={(cluster) => {
+              onAgentClusterChange={cluster => {
                 if (cluster !== selectedAgentCluster) {
                   destroyAgentSession();
                   setPromptHistory([]);
