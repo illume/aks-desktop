@@ -18,7 +18,7 @@ let _enabled: boolean | null = null;
 function isEnabled(): boolean {
   if (_enabled !== null) return _enabled;
   try {
-    // @ts-ignore – import.meta.env is injected by Vite
+    // Silent during vitest — import.meta.env.MODE is set by Vite
     if (import.meta.env.MODE === 'test') {
       _enabled = false;
       return false;
