@@ -325,7 +325,7 @@ function normalizeBullets(text: string): string {
  */
 function looksLikeYaml(trimmed: string): boolean {
   if (trimmed === '' || trimmed.startsWith('#')) return true;
-  // YAML document separator (---) and document end marker (...)
+  // YAML document separator (exactly ---) and document end marker (exactly ...)
   if (trimmed === '---' || trimmed === '...') return true;
   // key: or key:  (with optional value)
   if (/^[\w][\w.\/-]*:\s?/.test(trimmed)) return true;
@@ -495,6 +495,7 @@ const AGENT_NOISE_PATTERNS: RegExp[] = [
   // The python command we exec'd into the pod
   /^python\s+\/app\/aks-agent\.py/,
   // Task-list table decorations (borders, header, data rows, section header)
+  // Matches +---+, +====+, and mixed variants like +-=+-+
   /^Task List:\s*$/,
   /^\+[-+=]+\+$/,
   /^\|\s*ID\s*\|/,
