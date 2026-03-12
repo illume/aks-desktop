@@ -29,13 +29,15 @@ vi.mock('../utils/namespaceOverride', () => ({
 }));
 
 vi.mock('../utils/yamlGenerator', () => ({
-  generateYamlForContainer: () => 'generated-yaml',
+  generateYamlForContainer: vi.fn(() => 'generated-yaml'),
 }));
 
 import { apply } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { generateYamlForContainer } from '../utils/yamlGenerator';
 import { useDeployWizard, WizardStep } from './useDeployWizard';
 
 const mockApply = vi.mocked(apply);
+const mockGenerateYaml = vi.mocked(generateYamlForContainer);
 
 describe('useDeployWizard', () => {
   it('has correct initial state', () => {
@@ -190,5 +192,38 @@ describe('useDeployWizard', () => {
       result.current.handleStepClick(WizardStep.SOURCE);
     });
     expect(result.current.activeStep).toBe(WizardStep.DEPLOY);
+  });
+
+  it('handleDeploy generates YAML synchronously for container source (no race)', async () => {
+    const validYaml = 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-app';
+    mockGenerateYaml.mockReturnValue(validYaml);
+    mockApply.mockResolvedValueOnce(undefined as any);
+
+    const { result } = renderHook(() => useDeployWizard({}));
+    act(() => {
+      result.current.setSourceType('container');
+      result.current.containerConfig.setConfig(prev => ({
+        ...prev,
+        appName: 'my-app',
+        containerImage: 'nginx:latest',
+      }));
+      result.current.handleNext();
+      result.current.handleNext();
+    });
+
+    // Clear call count accumulated by the preview-generation useEffect so we
+    // can verify handleDeploy calls generateYamlForContainer directly.
+    mockGenerateYaml.mockClear();
+    mockGenerateYaml.mockReturnValue(validYaml);
+
+    await act(async () => {
+      await result.current.handleDeploy();
+    });
+
+    // handleDeploy called generateYamlForContainer synchronously rather than
+    // reading the async containerPreviewYaml value.
+    expect(mockGenerateYaml).toHaveBeenCalled();
+    expect(result.current.deployResult).toBe('success');
+    expect(mockApply).toHaveBeenCalled();
   });
 });

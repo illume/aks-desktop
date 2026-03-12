@@ -6,7 +6,10 @@ import { apply } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 import React, { useEffect, useState } from 'react';
 import YAML from 'yaml';
 import { applyNamespaceOverride } from '../utils/namespaceOverride';
-import { generateYamlForContainer } from '../utils/yamlGenerator';
+import {
+  type ContainerConfigForYaml,
+  generateYamlForContainer,
+} from '../utils/yamlGenerator';
 import type { ContainerConfig } from './useContainerConfiguration';
 import { useContainerConfiguration } from './useContainerConfiguration';
 
@@ -20,6 +23,16 @@ function parseAndOverride(yaml: string, namespace?: string) {
     .map(d => d.toJSON())
     .filter(Boolean)
     .map(obj => applyNamespaceOverride(obj, namespace));
+}
+
+/** Strips UI-only fields from a full ContainerConfig, returning only YAML-generation fields. */
+function toYamlConfig(config: ContainerConfig, namespace?: string): ContainerConfigForYaml {
+  // Destructure to exclude UI-only fields that generateYamlForContainer does not accept.
+  /* eslint-disable no-unused-vars */
+  const { containerStep, showProbeConfigs, containerPreviewYaml, useCustomServicePort, ...rest } =
+    config;
+  /* eslint-enable no-unused-vars */
+  return { ...rest, namespace };
 }
 
 /**
@@ -134,7 +147,7 @@ export function useDeployWizard({
   useEffect(() => {
     // Generate YAML preview for the review step
     if (activeStep === WizardStep.DEPLOY && sourceType === 'container') {
-      const newYaml = generateYamlForContainer({ ...containerConfig.config, namespace });
+      const newYaml = generateYamlForContainer(toYamlConfig(containerConfig.config, namespace));
       if (newYaml !== containerConfig.config.containerPreviewYaml) {
         containerConfig.setConfig(prev => ({
           ...prev,
@@ -203,8 +216,12 @@ export function useDeployWizard({
       setDeployMessage('');
       setDeploying(true);
 
+      // Generate container YAML synchronously to avoid a race where
+      // containerPreviewYaml may still be empty on the first render of the Deploy step.
       const text =
-        sourceType === 'container' ? containerConfig.config.containerPreviewYaml : yamlEditorValue;
+        sourceType === 'container'
+          ? generateYamlForContainer(toYamlConfig(containerConfig.config, namespace))
+          : yamlEditorValue;
 
       let docs;
       try {
