@@ -80,83 +80,38 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   }, []);
 
   const scrollToShowNewMessage = useCallback(() => {
-    if (containerRef.current && history.length > 0) {
-      const container = containerRef.current;
+    if (!containerRef.current || history.length === 0) return;
 
-      // Find the most recent user message
-      let lastUserMessageIndex = -1;
-      for (let i = history.length - 1; i >= 0; i--) {
-        if (history[i].role === 'user') {
-          lastUserMessageIndex = i;
-          break;
-        }
-      }
+    const container = containerRef.current;
 
-      if (lastUserMessageIndex >= 0) {
-        // Count non-user messages after the last user message
-        const nonUserMessagesAfterUser = history.length - 1 - lastUserMessageIndex;
-
-        if (nonUserMessagesAfterUser === 1) {
-          // Only one non-user message after user - show the user message
-          const messageElements = container.querySelectorAll('[data-message-index]');
-          const userMessageElement = Array.from(messageElements).find(
-            el => el.getAttribute('data-message-index') === lastUserMessageIndex.toString()
-          ) as HTMLElement;
-
-          if (userMessageElement) {
-            // Get the position of the user message relative to the container
-            const messageRect = userMessageElement.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const messageTop = messageRect.top - containerRect.top + container.scrollTop;
-
-            // Check if the user message is larger than the viewport
-            const containerHeight = containerRect.height;
-            const messageHeight = messageRect.height;
-
-            if (messageHeight > containerHeight) {
-              // If user message is larger than viewport, show the bottom of it
-              const targetScrollPosition = messageTop + messageHeight - containerHeight;
-              container.scrollTo({
-                top: Math.max(0, targetScrollPosition),
-                behavior: 'smooth',
-              });
-            } else {
-              // Show the user message at the top of the viewport
-              container.scrollTo({
-                top: Math.max(0, messageTop),
-                behavior: 'smooth',
-              });
-            }
-          }
-        } else {
-          // Multiple non-user messages after user - show half of the last message
-          if (lastMessageRef.current) {
-            const lastMessageElement = lastMessageRef.current;
-            const messageRect = lastMessageElement.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const messageTop = messageRect.top - containerRect.top + container.scrollTop;
-
-            // Scroll to show half of the last message
-            container.scrollTo({
-              top: messageTop,
-              behavior: 'smooth',
-            });
-          }
-        }
-      } else {
-        // Fallback: scroll to bottom if no user message found
-        container.scrollTop = container.scrollHeight;
+    // Find the latest non-user, non-system message (the newest agent response)
+    let lastResponseIndex = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role !== 'user' && history[i].role !== 'system') {
+        lastResponseIndex = i;
+        break;
       }
     }
+
+    if (lastResponseIndex < 0) return;
+
+    const messageElements = container.querySelectorAll('[data-message-index]');
+    const targetElement = Array.from(messageElements).find(
+      el => el.getAttribute('data-message-index') === lastResponseIndex.toString()
+    ) as HTMLElement;
+
+    if (targetElement) {
+      const messageRect = targetElement.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const messageTop = messageRect.top - containerRect.top + container.scrollTop;
+
+      // Scroll so the top of the new response is at the top of the viewport
+      container.scrollTo({
+        top: Math.max(0, messageTop),
+        behavior: 'smooth',
+      });
+    }
   }, [history]);
-
-  // const scrollToLastMessage = useCallback(() => {
-  //   if (!lastMessageRef.current) {
-  //     return;
-  //   }
-
-  //   lastMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  // }, []);
 
   // Handle container scroll event
   const handleScroll = useCallback(() => {
@@ -182,14 +137,13 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
       // Update the ref with current count
       lastUserMessageCountRef.current = currentUserMessageCount;
     } else if (isNearBottom()) {
-      // For non-user messages when near bottom, scroll to show at least 60% of new message
+      // For non-user messages when near bottom, scroll to show the top of the new response
       setTimeout(() => {
         scrollToShowNewMessage();
       }, 100);
     } else if (history.length > 0) {
-      // If not at bottom, show the scroll button
+      // If not at bottom, just show the scroll button — don't force scroll
       setShowScrollButton(true);
-      scrollToShowNewMessage();
     }
   }, [history, isNearBottom, scrollToBottom, scrollToShowNewMessage]);
 
