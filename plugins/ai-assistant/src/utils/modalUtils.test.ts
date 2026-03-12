@@ -197,5 +197,6 @@ describe('parseSuggestionsFromResponse', () => {
     const content = 'SUGGESTIONS: A | B\nSUGGESTIONS: C | D';
     const result = parseSuggestionsFromResponse(content);
     expect(result.suggestions).toEqual(['A', 'B']);
+    expect(result.cleanContent).not.toContain('SUGGESTIONS:');
   });
 });

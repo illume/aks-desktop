@@ -67,8 +67,9 @@ export function parseSuggestionsFromResponse(content: string | any): {
       .filter(s => s.length > 0)
       .slice(0, 3); // Ensure max 3 suggestions
 
-    // Remove the suggestions line from the content
-    const cleanContent = processedContent.replace(suggestionPattern, '').trim();
+    // Remove all SUGGESTIONS: lines from the content (global replace)
+    const globalPattern = /SUGGESTIONS:\s*(.+?)(?:\n|$)/gi;
+    const cleanContent = processedContent.replace(globalPattern, '').trim();
 
     return { cleanContent, suggestions };
   }
