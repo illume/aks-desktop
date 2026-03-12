@@ -3,7 +3,7 @@
 
 import { Box, Button, createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import { Meta, StoryFn } from '@storybook/react';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { Prompt } from './ai/manager';
 import TextStreamContainer from './textstream';
@@ -128,11 +128,14 @@ Both options integrate with Grafana for dashboards.`,
 export const ScrollToTopOfResponse: StoryFn = () => {
   const [history, setHistory] = useState<Prompt[]>(previousConversation);
   const [isLoading, setIsLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const addResponse = () => {
     setIsLoading(true);
     // Short delay to simulate loading
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setHistory(prev => [...prev, { role: 'assistant', content: longAssistantResponse }]);
       setIsLoading(false);
     }, 500);
@@ -162,10 +165,13 @@ export const ScrollToTopOfResponse: StoryFn = () => {
 export const ScrollToTopOfResponseDark: StoryFn = () => {
   const [history, setHistory] = useState<Prompt[]>(previousConversation);
   const [isLoading, setIsLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const addResponse = () => {
     setIsLoading(true);
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setHistory(prev => [...prev, { role: 'assistant', content: longAssistantResponse }]);
       setIsLoading(false);
     }, 500);
@@ -278,6 +284,9 @@ az aks nodepool update \\
   ]);
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const addNextExchange = () => {
     if (step >= exchanges.length) return;
@@ -288,7 +297,7 @@ az aks nodepool update \\
 
     // Add assistant response after a short delay
     setIsLoading(true);
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setHistory(prev => [...prev, { role: 'assistant', content: exchange.assistant }]);
       setIsLoading(false);
       setStep(s => s + 1);
