@@ -29,8 +29,13 @@ function parseAndOverride(yaml: string, namespace?: string) {
 function toYamlConfig(config: ContainerConfig, namespace?: string): ContainerConfigForYaml {
   // Destructure to exclude UI-only fields that generateYamlForContainer does not accept.
   /* eslint-disable no-unused-vars */
-  const { containerStep, showProbeConfigs, containerPreviewYaml, useCustomServicePort, ...rest } =
-    config;
+  const {
+    containerStep,
+    showProbeConfigs,
+    containerPreviewYaml,
+    useCustomServicePort,
+    ...rest
+  } = config;
   /* eslint-enable no-unused-vars */
   return { ...rest, namespace };
 }
