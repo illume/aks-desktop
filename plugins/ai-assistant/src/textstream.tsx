@@ -112,10 +112,9 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
 
     if (lastResponseIndex < 0) return;
 
-    const messageElements = container.querySelectorAll('[data-message-index]');
-    const targetElement = Array.from(messageElements).find(
-      el => el.getAttribute('data-message-index') === lastResponseIndex.toString()
-    ) as HTMLElement;
+    const targetElement = container.querySelector(
+      `[data-message-index="${lastResponseIndex}"]`
+    ) as HTMLElement | null;
 
     if (targetElement) {
       const messageRect = targetElement.getBoundingClientRect();
@@ -148,6 +147,12 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
 
     // Check if there's a new user message
     const hasNewUserMessage = currentUserMessageCount > lastUserMessageCountRef.current;
+
+    // Reset tracking ref when history is cleared or user messages decrease
+    // (e.g. setPromptHistory([]) in modal.tsx) so future messages are detected correctly.
+    if (currentUserMessageCount < lastUserMessageCountRef.current) {
+      lastUserMessageCountRef.current = currentUserMessageCount;
+    }
 
     if (hasNewUserMessage) {
       // Always scroll to bottom when there's a new user message
