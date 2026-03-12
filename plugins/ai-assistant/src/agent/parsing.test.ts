@@ -1826,13 +1826,7 @@ describe('parser edge cases', () => {
     });
 
     it('handles YAML where apiVersion value is on the next line', () => {
-      const input = [
-        'apiVersion:',
-        '  v1',
-        'kind: Pod',
-        'metadata:',
-        '  name: test',
-      ].join('\n');
+      const input = ['apiVersion:', '  v1', 'kind: Pod', 'metadata:', '  name: test'].join('\n');
       const result = wrapBareYamlBlocks(input);
       expect(result).toContain('```yaml');
       expect(result).toContain('apiVersion:');
@@ -1856,13 +1850,7 @@ describe('parser edge cases', () => {
     });
 
     it('handles YAML with single blank line (does not split)', () => {
-      const input = [
-        'apiVersion: v1',
-        'kind: Pod',
-        '',
-        'metadata:',
-        '  name: test',
-      ].join('\n');
+      const input = ['apiVersion: v1', 'kind: Pod', '', 'metadata:', '  name: test'].join('\n');
       const result = wrapBareYamlBlocks(input);
       // Single blank line should be included in the same block
       const yamlFences = (result.match(/```yaml/g) || []).length;
@@ -2255,9 +2243,7 @@ describe('parser edge cases', () => {
 
   describe('isAgentNoiseLine edge cases', () => {
     it('detects noise with long paths', () => {
-      expect(
-        isAgentNoiseLine('root@long-hostname-12345:/very/deep/path/to/workspace#')
-      ).toBe(true);
+      expect(isAgentNoiseLine('root@long-hostname-12345:/very/deep/path/to/workspace#')).toBe(true);
     });
 
     it('does not flag K8s resource lines as noise', () => {
@@ -2270,9 +2256,7 @@ describe('parser edge cases', () => {
 
     it('does not flag prose that discusses K8s concepts as noise', () => {
       expect(isAgentNoiseLine('The pod is in CrashLoopBackOff state.')).toBe(false);
-      expect(isAgentNoiseLine('You need to create a Service of type LoadBalancer.')).toBe(
-        false
-      );
+      expect(isAgentNoiseLine('You need to create a Service of type LoadBalancer.')).toBe(false);
     });
 
     it('detects table border variations', () => {

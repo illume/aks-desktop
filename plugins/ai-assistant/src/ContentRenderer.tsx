@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { Link as RouterLink, useHistory } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import YAML from 'yaml';
+import { debugLog } from './agent/debugLog';
 import { LogsButton, YamlDisplay } from './components';
 import { getHeadlampLink } from './utils/promptLinkHelper';
 import { parseKubernetesYAML } from './utils/SampleYamlLibrary';
@@ -22,7 +23,7 @@ const parseJsonContent = (content: string): ParseResult<any> => {
     const parsed = JSON.parse(content);
     return { success: true, data: parsed };
   } catch (error) {
-    console.debug(
+    debugLog(
       'Content is not valid JSON:',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -180,7 +181,7 @@ const convertJsonToYaml = (content: string): string => {
       });
     }
   } catch (error) {
-    console.debug(
+    debugLog(
       'Content is not valid JSON, cannot convert to YAML:',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -199,7 +200,7 @@ const isJsonKubernetesResource = (content: string): boolean => {
     const parsed = JSON.parse(trimmed);
     return !!(parsed && typeof parsed === 'object' && parsed.apiVersion && parsed.kind);
   } catch (error) {
-    console.debug(
+    debugLog(
       'Content is not valid JSON when checking for Kubernetes resource:',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -554,6 +555,13 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
     const processedContent = useMemo(() => {
       if (!content) return null;
 
+      debugLog(
+        '[ContentRenderer] Processing content, length:',
+        content.length,
+        'first 200 chars:',
+        content.slice(0, 200)
+      );
+
       // First, check if content is a JSON response with error or success keys
       const jsonParseResult = parseJsonContent(content.trim());
       if (jsonParseResult.success) {
@@ -561,6 +569,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
 
         // Check if it's an error response
         if (parsedContent.error === true && parsedContent.content) {
+          debugLog('[ContentRenderer] Detected JSON error response');
           return (
             <Alert severity="error" sx={{ mb: 1, overflowWrap: 'anywhere' }}>
               <Typography variant="body2">{parsedContent.content}</Typography>
@@ -570,6 +579,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
 
         // Check if it's a success response
         if (parsedContent.success === true && parsedContent.content) {
+          debugLog('[ContentRenderer] Detected JSON success response');
           return (
             <Alert severity="success" sx={{ mb: 1, overflowWrap: 'anywhere' }}>
               <Typography variant="body2">{parsedContent.content}</Typography>
@@ -580,6 +590,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
         // If it's a JSON response but not error/success, continue with normal processing
         // unless it's a Kubernetes resource, then fall through to regular content processing
         if (!isJsonKubernetesResource(content)) {
+          debugLog('[ContentRenderer] Detected non-K8s JSON response, rendering as formatted JSON');
           // For other JSON responses that aren't Kubernetes resources,
           // render as formatted JSON
           return (
@@ -603,6 +614,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
 
       // Check if the entire content is a JSON Kubernetes resource
       if (isJsonKubernetesResource(content)) {
+        debugLog('[ContentRenderer] Detected JSON Kubernetes resource');
         const yamlContent = convertJsonToYaml(content);
         const parsed = parseKubernetesYAML(yamlContent);
         if (parsed.isValid) {
@@ -618,6 +630,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
 
       // Check for logs button format
       if (content.includes('LOGS_BUTTON:')) {
+        debugLog('[ContentRenderer] Detected LOGS_BUTTON marker');
         const logsButtonIndex = content.indexOf('LOGS_BUTTON:');
         if (logsButtonIndex !== -1) {
           const logsResult = parseLogsButtonData(content, logsButtonIndex);
@@ -653,11 +666,16 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
         content.includes('"metadata":');
 
       if (hasUnformattedYaml || hasJsonKubernetesResource) {
+        debugLog(
+          '[ContentRenderer] Detected unformatted YAML/JSON K8s resource, processing separately',
+          { hasUnformattedYaml, hasJsonKubernetesResource }
+        );
         // Handle content with unformatted YAML or JSON resources
         return processUnformattedYaml(content);
       }
 
       // For regular markdown content, use ReactMarkdown
+      debugLog('[ContentRenderer] Rendering as regular markdown');
       return (
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={allMarkdownComponents}>
           {content}

@@ -1,5 +1,6 @@
 import { runCommand } from '@kinvolk/headlamp-plugin/lib';
 import { clusterRequest, stream } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { debugLog, dumpForTestCase, warnLog } from './debugLog';
 
 declare const pluginRunCommand: typeof runCommand;
 
@@ -354,6 +355,7 @@ function wrapBareYamlBlocks(text: string): string {
   const result: string[] = [];
   let i = 0;
   let inCodeFence = false;
+  let wrappedBlockCount = 0;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -417,6 +419,7 @@ function wrapBareYamlBlocks(text: string): string {
         result.push('```yaml');
         result.push(...dedented);
         result.push('```');
+        wrappedBlockCount++;
         i = j;
       } else {
         result.push(line);
@@ -426,6 +429,14 @@ function wrapBareYamlBlocks(text: string): string {
       result.push(line);
       i++;
     }
+  }
+
+  if (wrappedBlockCount > 0) {
+    debugLog(
+      '[AKS Agent Parse] wrapBareYamlBlocks: wrapped',
+      wrappedBlockCount,
+      'bare YAML blocks'
+    );
   }
 
   return result.join('\n');
@@ -443,6 +454,8 @@ function cleanTerminalFormatting(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];
   let inCodeFence = false;
+  let droppedBorders = 0;
+  let unwrappedPanels = 0;
 
   for (const line of lines) {
     const rTrimmed = line.trimEnd(); // trailing 80-char padding removed
@@ -461,10 +474,16 @@ function cleanTerminalFormatting(text: string): string {
     const stripped = rTrimmed.trimStart(); // leading indentation removed (for box detection only)
 
     // Drop Rich panel border lines — may be indented: ┏━━━━┓ and ┗━━━━┛
-    if (/^[┏┗][━\s]*[┓┛]$/.test(stripped)) continue;
+    if (/^[┏┗][━\s]*[┓┛]$/.test(stripped)) {
+      droppedBorders++;
+      continue;
+    }
 
     // Drop Rich horizontal rule lines — only pure box-drawing chars, at least 4 wide
-    if (/^[─━═]{4,}$/.test(stripped)) continue;
+    if (/^[─━═]{4,}$/.test(stripped)) {
+      droppedBorders++;
+      continue;
+    }
 
     // Unwrap Rich panel content lines — preserve internal indentation
     // ┃   text   ┃  →  text  (trimming only the outer box characters + 1 space padding)
@@ -473,12 +492,23 @@ function cleanTerminalFormatting(text: string): string {
         .replace(/^┃\s?/, '') // remove leading ┃ and at most one space
         .replace(/\s?┃$/, ''); // remove trailing ┃ and at most one space
       if (inner) {
+        unwrappedPanels++;
         result.push(inner);
       }
       continue;
     }
 
     result.push(rTrimmed);
+  }
+
+  if (droppedBorders > 0 || unwrappedPanels > 0) {
+    debugLog(
+      '[AKS Agent Parse] cleanTerminalFormatting: dropped',
+      droppedBorders,
+      'border lines, unwrapped',
+      unwrappedPanels,
+      'panel lines'
+    );
   }
 
   return result.join('\n');
@@ -522,6 +552,7 @@ function stripAgentNoise(lines: string[]): string[] {
   const cleaned: string[] = [];
   let prevBlank = false;
   let inCodeFence = false;
+  let droppedCount = 0;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -539,7 +570,11 @@ function stripAgentNoise(lines: string[]): string[] {
     }
 
     // Drop noise lines
-    if (isAgentNoiseLine(trimmed)) continue;
+    if (isAgentNoiseLine(trimmed)) {
+      droppedCount++;
+      debugLog('[AKS Agent Parse] stripAgentNoise: dropping noise line:', trimmed.slice(0, 120));
+      continue;
+    }
 
     // Collapse multiple blank lines
     if (trimmed === '') {
@@ -552,6 +587,10 @@ function stripAgentNoise(lines: string[]): string[] {
     cleaned.push(line);
   }
 
+  if (droppedCount > 0) {
+    debugLog('[AKS Agent Parse] stripAgentNoise: dropped', droppedCount, 'noise lines total');
+  }
+
   return cleaned;
 }
 
@@ -562,6 +601,8 @@ function stripAgentNoise(lines: string[]): string[] {
  * Converts Unicode bullets to markdown syntax.
  */
 function extractAIAnswer(rawOutput: string): string {
+  debugLog('[AKS Agent Parse] extractAIAnswer: raw input length:', rawOutput.length);
+
   // Split the raw output into terminal line chunks (each chunk = one terminal line)
   // and reassemble with proper \n separators, trimming 80-char padding as we go.
   const normalised = rawOutput
@@ -570,9 +611,11 @@ function extractAIAnswer(rawOutput: string): string {
     .join('\n');
 
   const lines = normalised.split('\n');
+  debugLog('[AKS Agent Parse] extractAIAnswer: normalised line count:', lines.length);
 
   // Locate the "AI:" line — it may be alone or have content after the colon
   const aiLineIdx = lines.findIndex(l => /^AI:\s*$/.test(l.trim()) || /^AI:\s+\S/.test(l));
+  debugLog('[AKS Agent Parse] extractAIAnswer: AI: line index:', aiLineIdx);
 
   let contentLines: string[];
 
@@ -582,17 +625,32 @@ function extractAIAnswer(rawOutput: string): string {
     if (/^AI:\s*$/.test(aiLine.trim())) {
       // "AI:" alone on its own line — content starts on the next line
       contentLines = lines.slice(aiLineIdx + 1);
+      debugLog(
+        '[AKS Agent Parse] extractAIAnswer: AI: on own line, content lines:',
+        contentLines.length
+      );
     } else {
       // "AI: content…" on the same line — strip the prefix and keep the rest
       contentLines = [aiLine.replace(/^AI:\s+/, ''), ...lines.slice(aiLineIdx + 1)];
+      debugLog(
+        '[AKS Agent Parse] extractAIAnswer: AI: with inline content, content lines:',
+        contentLines.length
+      );
     }
   } else {
     // Fallback: use all lines (will be cleaned below)
     contentLines = [...lines];
+    warnLog('[AKS Agent Parse] extractAIAnswer: no AI: line found — using all lines as fallback');
   }
 
   // Strip agent infrastructure noise from content lines
+  const beforeNoiseStrip = contentLines.length;
   contentLines = stripAgentNoise(contentLines);
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: stripAgentNoise removed',
+    beforeNoiseStrip - contentLines.length,
+    'lines'
+  );
 
   // Drop trailing blank lines and bash-prompt line(s).
   while (contentLines.length > 0) {
@@ -609,8 +667,32 @@ function extractAIAnswer(rawOutput: string): string {
     contentLines.shift();
   }
 
-  const result = contentLines.join('\n').trim();
-  return wrapBareYamlBlocks(normalizeBullets(cleanTerminalFormatting(result)));
+  const joined = contentLines.join('\n').trim();
+  debugLog('[AKS Agent Parse] extractAIAnswer: after trim, content length:', joined.length);
+
+  const afterTerminal = cleanTerminalFormatting(joined);
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: after cleanTerminalFormatting, length:',
+    afterTerminal.length
+  );
+
+  const afterBullets = normalizeBullets(afterTerminal);
+  const result = wrapBareYamlBlocks(afterBullets);
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: final result length:',
+    result.length,
+    'first 200 chars:',
+    result.slice(0, 200)
+  );
+
+  if (!result) {
+    warnLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
+  }
+
+  // Dump raw→parsed as JSON strings for easy copy-paste into test cases
+  dumpForTestCase('extractAIAnswer', rawOutput, result);
+
+  return result;
 }
 
 // ─── Real-time thinking-step parser ──────────────────────────────────────────
@@ -686,6 +768,7 @@ class ThinkingStepTracker {
     if (this.partialTaskRow) {
       // Blank line, table border, table header, or new task row → abandon partial, fall through
       if (!trimmed || /^\+[-+=]+\+$/.test(trimmed) || /^\|\s*(ID|t\d+)\s*\|/.test(trimmed)) {
+        debugLog('[AKS Agent Parse] ThinkingStepTracker: abandoning partial task row');
         this.partialTaskRow = '';
         // Fall through to normal processing below
       } else {
@@ -693,6 +776,11 @@ class ThinkingStepTracker {
         const joined = (this.partialTaskRow + ' ' + trimmed).replace(/\s+/g, ' ').trim();
         const taskRow = extractTaskRow(joined);
         if (taskRow) {
+          debugLog(
+            '[AKS Agent Parse] ThinkingStepTracker: completed wrapped task row:',
+            taskRow.content,
+            taskRow.status
+          );
           this.partialTaskRow = '';
           return this.applyTaskRow(taskRow);
         }
@@ -711,6 +799,7 @@ class ThinkingStepTracker {
     const modelMatch = trimmed.match(/^Loaded models:\s*\[(.+)\]/);
     if (modelMatch) {
       const models = modelMatch[1].replace(/'/g, '').trim();
+      debugLog('[AKS Agent Parse] ThinkingStepTracker: model loaded:', models);
       this.steps.push({
         id: this.nextId++,
         label: `Model: ${models}`,
@@ -750,10 +839,12 @@ class ThinkingStepTracker {
     // ── Planning phase: task-list rows ──
     const taskRow = extractTaskRow(trimmed);
     if (taskRow) {
+      debugLog('[AKS Agent Parse] ThinkingStepTracker: task row:', taskRow.content, taskRow.status);
       return this.applyTaskRow(taskRow);
     }
     // Start buffering if this looks like a partial (wrapped) task row
     if (/^\|\s*t\d+\s*\|/.test(trimmed)) {
+      debugLog('[AKS Agent Parse] ThinkingStepTracker: buffering partial task row');
       this.partialTaskRow = trimmed;
       return false;
     }
@@ -762,6 +853,10 @@ class ThinkingStepTracker {
     const runMatch = trimmed.match(/^Running tool\s+#(\d+)\s+/);
     if (runMatch) {
       const toolNum = parseInt(runMatch[1], 10);
+      debugLog(
+        '[AKS Agent Parse] ThinkingStepTracker: running tool #' + toolNum + ':',
+        trimmed.slice(0, 100)
+      );
       // Skip TodoWrite and kubectl tools — they're tracked via the task table
       if (/TodoWrite/i.test(trimmed) || /call_kubectl/i.test(trimmed)) {
         // Still record the tool number so we can mark it finished without noise
@@ -877,6 +972,12 @@ export async function runAksAgent(
   const result = await session.ask(enrichedPrompt, onProgress);
 
   if (result && result.trim().length > 0) {
+    debugLog(
+      '[AKS Agent Parse] runAksAgent: raw result length:',
+      result.length,
+      'first 300 chars:',
+      result.slice(0, 300)
+    );
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
@@ -1088,16 +1189,26 @@ class AgentSession {
       const bytes = new Uint8Array(data);
       const channel = bytes[0];
       const text = new TextDecoder().decode(bytes.slice(1));
+      debugLog(
+        '[AKS Agent Data] handleData: ArrayBuffer channel:',
+        channel,
+        'text length:',
+        text.length,
+        'text:',
+        text.slice(0, 200)
+      );
 
       this.handleChannel(channel, text);
     } else {
       // Plain string data (base64 protocol)
+      debugLog('[AKS Agent Data] handleData: string data length:', data.length);
       console.log('[AKS Agent] string data from exec:', data);
       this.output += data;
     }
   }
 
   private handleChannel(channel: number, text: string): void {
+    debugLog('[AKS Agent Data] handleChannel:', channel, 'text length:', text.length);
     if (channel === 1) {
       this.handleStdout(text);
     } else if (channel === 2) {
@@ -1124,7 +1235,14 @@ class AgentSession {
     if (this.questionResolved || !this.pendingResolve) return;
 
     this.resetIdleTimer();
-    console.log('[AKS Agent] stdout chunk from exec:', text);
+    debugLog(
+      '[AKS Agent Data] handleStdout: chunk length:',
+      text.length,
+      'accumulated output length:',
+      this.output.length,
+      'chunk:',
+      text.slice(0, 300)
+    );
 
     // Ensure each terminal line chunk is newline-terminated.
     this.output += text.endsWith('\n') ? text : text + '\n';
@@ -1137,6 +1255,10 @@ class AgentSession {
         if (this.tracker.processLine(cl)) anyChanged = true;
       }
       if (anyChanged) {
+        debugLog(
+          '[AKS Agent Data] handleStdout: thinking steps updated, count:',
+          this.tracker.steps.length
+        );
         this.onProgress([...this.tracker.steps]);
       }
     }
@@ -1150,6 +1272,7 @@ class AgentSession {
       /root@[^:]+:[^#]*#\s*$/.test(plainText.trim())
     ) {
       console.log('[AKS Agent] Bash prompt detected after AI answer — question complete.');
+      debugLog('[AKS Agent Data] handleStdout: total output length:', this.output.length);
       this.resolveCurrentQuestion(this.output);
     }
   }
