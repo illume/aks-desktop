@@ -10,7 +10,7 @@ declare const pluginRunCommand: typeof runCommand;
  * itself, which is handled by ending the string, adding an escaped
  * single quote, and starting a new single-quoted string.
  */
-function shellEscapeSingleQuote(s: string): string {
+export function shellEscapeSingleQuote(s: string): string {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
