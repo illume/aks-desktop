@@ -200,3 +200,177 @@ describe('parseSuggestionsFromResponse', () => {
     expect(result.cleanContent).not.toContain('SUGGESTIONS:');
   });
 });
+
+describe('malformed AI output handling', () => {
+  describe('markdownToPlainText with malformed markdown', () => {
+    it('handles unclosed bold markers', () => {
+      const result = markdownToPlainText('**unclosed bold');
+      expect(result).toContain('unclosed bold');
+    });
+
+    it('handles unclosed italic markers', () => {
+      const result = markdownToPlainText('*unclosed italic');
+      expect(result).toContain('unclosed italic');
+    });
+
+    it('handles unclosed inline code', () => {
+      const result = markdownToPlainText('use `kubectl get');
+      expect(result).toContain('kubectl get');
+    });
+
+    it('handles unclosed link syntax', () => {
+      const result = markdownToPlainText('[click here](http://');
+      expect(result).toContain('click here');
+    });
+
+    it('handles link with no URL (keeps partial syntax)', () => {
+      const result = markdownToPlainText('[text]()');
+      expect(result).toContain('text');
+    });
+
+    it('handles nested unclosed markers', () => {
+      const result = markdownToPlainText('**bold *italic');
+      expect(result).toContain('bold');
+      expect(result).toContain('italic');
+    });
+
+    it('handles markdown table-like content', () => {
+      const result = markdownToPlainText('| col1 | col2 |\n|---|---|\n| a | b |');
+      expect(result).toContain('col1');
+      expect(result).toContain('col2');
+    });
+
+    it('handles triple backtick code block markers inline', () => {
+      const result = markdownToPlainText('use ```kubectl get pods```');
+      expect(result).toContain('kubectl get pods');
+    });
+
+    it('handles excessive heading levels', () => {
+      const result = markdownToPlainText('####### Not a heading');
+      expect(result).toContain('Not a heading');
+    });
+
+    it('handles heading with no text', () => {
+      const result = markdownToPlainText('## ');
+      expect(result.trim()).toBe('');
+    });
+
+    it('handles multiple horizontal rules', () => {
+      const result = markdownToPlainText('---\ntext\n---\nmore\n---');
+      expect(result).toContain('text');
+      expect(result).toContain('more');
+    });
+
+    it('handles image syntax', () => {
+      const result = markdownToPlainText('![alt text](image.png)');
+      expect(result).toContain('alt text');
+    });
+
+    it('handles strikethrough with no closing', () => {
+      const result = markdownToPlainText('~~deleted text');
+      expect(result).toContain('deleted text');
+    });
+
+    it('handles mixed unclosed formatting', () => {
+      const result = markdownToPlainText('**bold *italic `code ~~strike');
+      expect(result).toContain('bold');
+      expect(result).toContain('italic');
+      expect(result).toContain('code');
+    });
+  });
+
+  describe('parseSuggestionsFromResponse with malformed output', () => {
+    it('handles SUGGESTIONS with no pipe separators', () => {
+      const result = parseSuggestionsFromResponse('SUGGESTIONS: just one suggestion');
+      expect(result.suggestions).toEqual(['just one suggestion']);
+    });
+
+    it('handles SUGGESTIONS with only pipes', () => {
+      const result = parseSuggestionsFromResponse('SUGGESTIONS: | | |');
+      expect(result.suggestions).toEqual([]);
+    });
+
+    it('handles SUGGESTIONS with very long suggestion text', () => {
+      const longSuggestion = 'A'.repeat(500);
+      const result = parseSuggestionsFromResponse(`SUGGESTIONS: ${longSuggestion} | Short`);
+      expect(result.suggestions).toHaveLength(2);
+      expect(result.suggestions[0].length).toBe(500);
+    });
+
+    it('handles SUGGESTIONS with special characters', () => {
+      const result = parseSuggestionsFromResponse(
+        'SUGGESTIONS: kubectl get pods --namespace=kube-system | az aks show --name="cluster"'
+      );
+      expect(result.suggestions).toHaveLength(2);
+    });
+
+    it('handles SUGGESTIONS with unicode characters', () => {
+      const result = parseSuggestionsFromResponse('SUGGESTIONS: 查看日志 | ポッド確認');
+      expect(result.suggestions).toHaveLength(2);
+    });
+
+    it('handles SUGGESTIONS embedded in markdown', () => {
+      const content = '## Results\n\n**Info**: data\n\nSUGGESTIONS: A | B\n\n### Footer';
+      const result = parseSuggestionsFromResponse(content);
+      expect(result.suggestions).toEqual(['A', 'B']);
+      expect(result.cleanContent).toContain('## Results');
+      expect(result.cleanContent).toContain('### Footer');
+      expect(result.cleanContent).not.toContain('SUGGESTIONS');
+    });
+
+    it('handles content that contains SUGGESTIONS as a word in prose', () => {
+      const content = 'The SUGGESTIONS: feature allows users to pick from options.';
+      const result = parseSuggestionsFromResponse(content);
+      expect(result.suggestions.length).toBeGreaterThan(0);
+    });
+
+    it('handles SUGGESTIONS with markdown in values', () => {
+      const content = 'SUGGESTIONS: **Check** `pods` | _List_ services | ~~Delete~~ ns';
+      const result = parseSuggestionsFromResponse(content);
+      expect(result.suggestions).toEqual(['Check pods', 'List services', 'Delete ns']);
+    });
+
+    it('handles SUGGESTIONS at end of content with no newline', () => {
+      const content = 'Here is the answer.\nSUGGESTIONS: A | B | C';
+      const result = parseSuggestionsFromResponse(content);
+      expect(result.suggestions).toEqual(['A', 'B', 'C']);
+      expect(result.cleanContent).toBe('Here is the answer.');
+    });
+
+    it('handles array with no text items', () => {
+      const content = [
+        { type: 'image', url: 'http://example.com/img.png' },
+        { type: 'audio', url: 'http://example.com/audio.mp3' },
+      ];
+      const result = parseSuggestionsFromResponse(content);
+      expect(result.suggestions).toEqual([]);
+      expect(result.cleanContent).toBe('');
+    });
+
+    it('handles array with empty text items', () => {
+      const content = [
+        { type: 'text', text: '' },
+        { type: 'text', text: '' },
+      ];
+      const result = parseSuggestionsFromResponse(content);
+      expect(result.suggestions).toEqual([]);
+    });
+
+    it('handles object with empty text property (falls through to String())', () => {
+      const result = parseSuggestionsFromResponse({ text: '' });
+      expect(result.suggestions).toEqual([]);
+      expect(result.cleanContent).toBe('[object Object]');
+    });
+
+    it('handles boolean content', () => {
+      const result = parseSuggestionsFromResponse(true);
+      expect(result.suggestions).toEqual([]);
+      expect(result.cleanContent).toBe('true');
+    });
+
+    it('handles object with no text property', () => {
+      const result = parseSuggestionsFromResponse({ other: 'value' });
+      expect(result.suggestions).toEqual([]);
+    });
+  });
+});

@@ -213,3 +213,202 @@ describe('convertJsonToYaml', () => {
     expect(convertJsonToYaml(json)).toBe(json);
   });
 });
+
+describe('malformed AI output handling', () => {
+  describe('parseLogsButtonData with malformed JSON', () => {
+    it('handles truncated JSON (missing closing brace)', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":"test"';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(false);
+    });
+
+    it('handles JSON with trailing comma', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":"test",}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(false);
+    });
+
+    it('handles JSON with single quotes instead of double quotes', () => {
+      const content = "LOGS_BUTTON:{'data':{'logs':'test'}}";
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(false);
+    });
+
+    it('handles empty JSON object', () => {
+      const content = 'LOGS_BUTTON:{}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('missing required fields');
+    });
+
+    it('fails on JSON with literal unescaped newlines in strings', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":"line1\nline2"}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(false);
+    });
+
+    it('handles LOGS_BUTTON with no colon', () => {
+      const content = 'LOGS_BUTTON {"data":{"logs":"test"}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(true);
+    });
+
+    it('handles deeply nested JSON', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":"test","meta":{"a":{"b":{"c":{"d":"deep"}}}}}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(true);
+      expect(result.data.data.meta.a.b.c.d).toBe('deep');
+    });
+
+    it('handles JSON with unicode characters', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":"Error: 日本語テスト"}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(true);
+      expect(result.data.data.logs).toContain('日本語');
+    });
+
+    it('handles JSON with very long log content', () => {
+      const longLogs = 'x'.repeat(50000);
+      const content = `LOGS_BUTTON:{"data":{"logs":"${longLogs}"}}`;
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(true);
+      expect(result.data.data.logs.length).toBe(50000);
+    });
+
+    it('handles JSON where data.logs is a number', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":123}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(true);
+    });
+
+    it('handles JSON where data.logs is null', () => {
+      const content = 'LOGS_BUTTON:{"data":{"logs":null}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('missing required fields');
+    });
+
+    it('handles multiple LOGS_BUTTON markers', () => {
+      const content =
+        'LOGS_BUTTON:{"data":{"logs":"first"}} and LOGS_BUTTON:{"data":{"logs":"second"}}';
+      const result = parseLogsButtonData(content, 0);
+      expect(result.success).toBe(true);
+      expect(result.data.data.logs).toBe('first');
+    });
+  });
+
+  describe('parseJsonContent with malformed JSON', () => {
+    it('fails on truncated JSON object', () => {
+      const result = parseJsonContent('{"key": "val');
+      expect(result.success).toBe(false);
+    });
+
+    it('fails on JSON with trailing comma', () => {
+      const result = parseJsonContent('{"key": "value",}');
+      expect(result.success).toBe(false);
+    });
+
+    it('fails on JSON with single quotes', () => {
+      const result = parseJsonContent("{'key': 'value'}");
+      expect(result.success).toBe(false);
+    });
+
+    it('fails on JSON with unquoted keys', () => {
+      const result = parseJsonContent('{key: "value"}');
+      expect(result.success).toBe(false);
+    });
+
+    it('fails on JavaScript object notation', () => {
+      const result = parseJsonContent('{ key: value, count: 42 }');
+      expect(result.success).toBe(false);
+    });
+
+    it('parses JSON with extra whitespace', () => {
+      const result = parseJsonContent('  {  "key"  :  "value"  }  ');
+      expect(result.success).toBe(true);
+      expect(result.data.key).toBe('value');
+    });
+
+    it('fails on concatenated JSON objects', () => {
+      const result = parseJsonContent('{"a":1}{"b":2}');
+      expect(result.success).toBe(false);
+    });
+
+    it('parses JSON with unicode escape sequences', () => {
+      const result = parseJsonContent('{"name": "\\u0048ello"}');
+      expect(result.success).toBe(true);
+      expect(result.data.name).toBe('Hello');
+    });
+
+    it('fails on XML-like content', () => {
+      const result = parseJsonContent('<apiVersion>v1</apiVersion>');
+      expect(result.success).toBe(false);
+    });
+
+    it('fails on YAML content', () => {
+      const result = parseJsonContent('apiVersion: v1\nkind: Pod');
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('isJsonKubernetesResource with edge cases', () => {
+    it('rejects JSON with apiVersion but empty kind', () => {
+      expect(isJsonKubernetesResource('{"apiVersion":"v1","kind":""}')).toBe(false);
+    });
+
+    it('rejects JSON where apiVersion is a number', () => {
+      expect(isJsonKubernetesResource('{"apiVersion":1,"kind":"Pod"}')).toBe(true);
+    });
+
+    it('rejects deeply nested K8s-like JSON', () => {
+      const json = '{"wrapper":{"apiVersion":"v1","kind":"Pod"}}';
+      expect(isJsonKubernetesResource(json)).toBe(false);
+    });
+
+    it('rejects JSON with null apiVersion', () => {
+      expect(isJsonKubernetesResource('{"apiVersion":null,"kind":"Pod"}')).toBe(false);
+    });
+
+    it('handles JSON with extra fields alongside K8s fields', () => {
+      const json = JSON.stringify({
+        apiVersion: 'v1',
+        kind: 'Service',
+        metadata: { name: 'svc' },
+        spec: { ports: [{ port: 80 }] },
+        extra: 'data',
+      });
+      expect(isJsonKubernetesResource(json)).toBe(true);
+    });
+  });
+
+  describe('convertJsonToYaml with edge cases', () => {
+    it('returns original for truncated JSON', () => {
+      const input = '{"apiVersion": "v1", "kind": "Po';
+      expect(convertJsonToYaml(input)).toBe(input);
+    });
+
+    it('returns original for JSON with only apiVersion', () => {
+      const json = '{"apiVersion": "v1"}';
+      expect(convertJsonToYaml(json)).toBe(json);
+    });
+
+    it('converts JSON with nested arrays', () => {
+      const json = JSON.stringify({
+        apiVersion: 'v1',
+        kind: 'Pod',
+        spec: { containers: [{ name: 'nginx', ports: [{ containerPort: 80 }] }] },
+      });
+      const result = convertJsonToYaml(json);
+      expect(result).toContain('apiVersion: v1');
+      expect(result).toContain('containerPort: 80');
+    });
+
+    it('returns original for null JSON string', () => {
+      expect(convertJsonToYaml('null')).toBe('null');
+    });
+
+    it('returns original for boolean JSON string', () => {
+      expect(convertJsonToYaml('true')).toBe('true');
+    });
+  });
+});
