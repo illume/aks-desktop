@@ -1,5 +1,5 @@
 import { Link } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
-import { Alert, Box, Button, Link as MuiLink, Typography } from '@mui/material';
+import { Alert, Box, Button, Link as MuiLink, Typography, useTheme } from '@mui/material';
 import React, { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Link as RouterLink, useHistory } from 'react-router-dom';
@@ -278,6 +278,13 @@ markdownComponents.blockquote.displayName = 'MarkdownBlockquote';
 const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
   ({ content, onYamlDetected }) => {
     const history = useHistory();
+    const theme = useTheme();
+    const isDark = theme.palette.mode === 'dark';
+
+    // Theme-aware code block colors
+    const codeBlockBg = isDark ? theme.palette.grey[900] : theme.palette.grey[100];
+    const codeBlockColor = isDark ? theme.palette.grey[100] : theme.palette.grey[900];
+
     // Create code component that has access to onYamlDetected
     const CodeComponent = React.useMemo(() => {
       const component = React.memo(({ className, children, ...props }: any) => {
@@ -335,8 +342,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           <Box
             component="pre"
             sx={{
-              backgroundColor: theme => theme.palette.grey[100],
-              color: theme => theme.palette.grey[900],
+              backgroundColor: codeBlockBg,
+              color: codeBlockColor,
               padding: 2,
               borderRadius: 1,
               overflowX: 'auto',
@@ -354,8 +361,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           <Box
             component="code"
             sx={{
-              backgroundColor: theme => theme.palette.grey[100],
-              color: theme => theme.palette.grey[900],
+              backgroundColor: codeBlockBg,
+              color: codeBlockColor,
               padding: '0.1em 0.3em',
               borderRadius: '0.3em',
               fontSize: '85%',
@@ -370,7 +377,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
       });
       component.displayName = 'MarkdownCode';
       return component;
-    }, [onYamlDetected]);
+    }, [onYamlDetected, codeBlockBg, codeBlockColor]);
 
     // Create link component that has access to history
     const LinkComponent = React.useMemo(() => {
@@ -478,8 +485,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
                   component="pre"
                   key={`code-${index}-${sectionIndex++}`}
                   sx={{
-                    backgroundColor: theme => theme.palette.grey[100],
-                    color: theme => theme.palette.grey[900],
+                    backgroundColor: codeBlockBg,
+                    color: codeBlockColor,
                     padding: 2,
                     borderRadius: 1,
                     overflowX: 'auto',
@@ -556,8 +563,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
             <Box
               component="pre"
               sx={{
-                backgroundColor: theme => theme.palette.grey[100],
-                color: theme => theme.palette.grey[900],
+                backgroundColor: codeBlockBg,
+                color: codeBlockColor,
                 padding: 2,
                 borderRadius: 1,
                 overflowX: 'auto',
@@ -633,7 +640,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           {content}
         </ReactMarkdown>
       );
-    }, [content, onYamlDetected, processUnformattedYaml]);
+    }, [content, onYamlDetected, processUnformattedYaml, codeBlockBg, codeBlockColor]);
 
     return (
       <Box sx={{ width: '100%', overflowWrap: 'break-word', wordWrap: 'break-word' }}>

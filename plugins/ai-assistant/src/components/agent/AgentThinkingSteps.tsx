@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react';
-import { Box, Collapse, keyframes, Typography } from '@mui/material';
+import { Box, Collapse, keyframes, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentThinkingStep } from '../../agent/aksAgentManager';
@@ -58,6 +58,8 @@ interface AgentThinkingStepsProps {
 
 const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
   ({ steps, isRunning = true }) => {
+    const theme = useTheme();
+    const successColor = theme.palette.success.main;
     const [collapsedPhases, setCollapsedPhases] = useState<Set<Phase>>(new Set());
     const prevPhaseCountRef = useRef<Record<Phase, number>>({ init: 0, planning: 0, executing: 0 });
 
@@ -134,7 +136,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
           <Icon
             icon="mdi:check-circle-outline"
             width={13}
-            style={{ color: '#4caf50', marginTop: 2, flexShrink: 0 }}
+            style={{ color: successColor, marginTop: 2, flexShrink: 0 }}
           />
         ) : (
           <Icon
@@ -188,7 +190,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
             onClick={() => togglePhase(phase)}
           >
             {done ? (
-              <Icon icon="mdi:check-circle" width={15} style={{ color: '#4caf50' }} />
+              <Icon icon="mdi:check-circle" width={15} style={{ color: successColor }} />
             ) : (
               <Icon
                 icon={meta.icon}
@@ -259,7 +261,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
                 style={{ animation: `${pulse} 2s ease-in-out infinite` } as any}
               />
             ) : (
-              <Icon icon="mdi:check-all" width={16} style={{ color: '#4caf50' }} />
+              <Icon icon="mdi:check-all" width={16} style={{ color: successColor }} />
             )}
             <Typography
               variant="caption"
