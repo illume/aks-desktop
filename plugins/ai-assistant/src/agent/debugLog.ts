@@ -4,7 +4,8 @@
  * - Silent during tests (`import.meta.env.MODE === 'test'`) so test output
  *   stays clean.
  * - `debugLog(tag, ...args)` — emits a `console.debug` line when enabled.
- * - `warnLog(tag, ...args)` — emits a `console.warn` line when enabled.
+ * - `warnLog(tag, ...args)` — emits a `console.warn` line when enabled
+ *   (same gating as `debugLog`).
  * - `dumpForTestCase(tag, raw, parsed)` — logs both values as JSON strings
  *   so you can copy-paste them straight into a new test case.
  *
@@ -40,13 +41,13 @@ function isEnabled(): boolean {
   return enabled;
 }
 
-/** Emit a console.debug line.  Requires `localStorage.AKS_DEBUG = '1'`. */
+/** Emit a console.debug line.  Silent during tests and in production unless `localStorage.AKS_DEBUG = '1'`. */
 export function debugLog(tag: string, ...args: unknown[]): void {
   if (!isEnabled()) return;
   console.debug(tag, ...args);
 }
 
-/** Emit a console.warn line.  Requires `localStorage.AKS_DEBUG = '1'`. */
+/** Emit a console.warn line.  Silent during tests and in production unless `localStorage.AKS_DEBUG = '1'`. */
 export function warnLog(tag: string, ...args: unknown[]): void {
   if (!isEnabled()) return;
   console.warn(tag, ...args);
