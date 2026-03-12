@@ -168,10 +168,7 @@ export async function getClustersFromHeadlampConfig(): Promise<
             }
             const parsed = new URL(urlString);
             const hostname = parsed.hostname.toLowerCase();
-            return (
-              hostname === 'azmk8s.io' ||
-              hostname.endsWith('.azmk8s.io')
-            );
+            return hostname === 'azmk8s.io' || hostname.endsWith('.azmk8s.io');
           } catch {
             // If the URL cannot be parsed, treat it as not an AKS cluster.
             return false;
@@ -351,9 +348,6 @@ function looksLikeYaml(trimmed: string): boolean {
  * is clearly not YAML.
  */
 function wrapBareYamlBlocks(text: string): string {
-  // If code fences with yaml already exist, skip early for perf
-  if (/```ya?ml/i.test(text)) return text;
-
   const lines = text.split('\n');
   const result: string[] = [];
   let i = 0;
@@ -376,8 +370,8 @@ function wrapBareYamlBlocks(text: string): string {
       continue;
     }
 
-    // Detect start of a bare YAML block: apiVersion: <value>
-    if (/^\s*apiVersion:\s*\S/.test(line)) {
+    // Detect start of a bare YAML block: apiVersion: (with optional value)
+    if (/^\s*apiVersion:\s*/.test(line)) {
       const yamlLines: string[] = [];
       let j = i;
       let consecutiveBlanks = 0;
@@ -1305,3 +1299,19 @@ class AgentSession {
     this.clearWallTimer();
   }
 }
+
+// Exported for testing — these are internal parsing helpers that
+// need thorough test coverage for correctness.
+export const _testing = {
+  stripAnsi,
+  normalizeBullets,
+  looksLikeYaml,
+  wrapBareYamlBlocks,
+  cleanTerminalFormatting,
+  stripAgentNoise,
+  isAgentNoiseLine,
+  extractAIAnswer,
+  ThinkingStepTracker,
+  extractTaskRow,
+  friendlyToolLabel,
+};
