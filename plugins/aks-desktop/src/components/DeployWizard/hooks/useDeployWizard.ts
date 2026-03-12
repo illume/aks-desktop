@@ -208,6 +208,7 @@ export function useDeployWizard({
 
       let docs;
       try {
+        // Container YAML already has namespace set by generateYamlForContainer.
         docs =
           sourceType === 'yaml'
             ? parseAndOverride(text, namespace)
