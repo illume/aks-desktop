@@ -55,7 +55,7 @@ const pluginName = packageJson.name;
 console.log(`Building plugin: ${pluginName}`);
 
 // Build the aks-plugin
-execSync('npm install && npm run build', { stdio: 'inherit' });
+execSync('npm ci && npm run build', { stdio: 'inherit' });
 
 console.log(`Copying built files for plugin: ${pluginName}`);
 const targetDir = path.join(ROOT_DIR, 'headlamp', '.plugins', pluginName);
