@@ -101,3 +101,82 @@ export const CompletedDark: StoryFn<typeof AgentThinkingSteps> = () => {
     </ThemeProvider>
   );
 };
+
+// ── Edge cases ───────────────────────────────────────────────────────────────
+
+/** Single step in running state - minimal case. */
+export const SingleStep: StoryFn<typeof AgentThinkingSteps> = () => (
+  <AgentThinkingSteps
+    steps={[
+      { id: 1, label: 'Connecting to cluster', status: 'running', phase: 'init', timestamp: now },
+    ]}
+    isRunning
+  />
+);
+
+/** Many steps - 15+ tasks across all phases. */
+export const ManySteps: StoryFn<typeof AgentThinkingSteps> = () => {
+  const steps: AgentThinkingStep[] = [
+    { id: 1, label: 'Connecting to cluster', status: 'completed', phase: 'init', timestamp: now },
+    { id: 2, label: 'Loading context', status: 'completed', phase: 'init', timestamp: now },
+    { id: 3, label: 'Authenticating with Azure AD', status: 'completed', phase: 'init', timestamp: now },
+    { id: 4, label: 'Check pod status across all namespaces', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 5, label: 'Analyze node resource utilization', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 6, label: 'Review recent Kubernetes events', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 7, label: 'Check PersistentVolumeClaim status', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 8, label: 'Inspect network policies', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 9, label: 'Verify ingress configuration', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 10, label: 'Running kubectl get pods --all-namespaces', status: 'completed', phase: 'executing', timestamp: now },
+    { id: 11, label: 'Running kubectl top nodes', status: 'completed', phase: 'executing', timestamp: now },
+    { id: 12, label: 'Running kubectl get events --sort-by=.lastTimestamp', status: 'completed', phase: 'executing', timestamp: now },
+    { id: 13, label: 'Running kubectl get pvc -A', status: 'completed', phase: 'executing', timestamp: now },
+    { id: 14, label: 'Running kubectl get networkpolicies -A', status: 'running', phase: 'executing', timestamp: now },
+    { id: 15, label: 'Running kubectl get ingress -A', status: 'pending', phase: 'executing', timestamp: now },
+  ];
+  return <AgentThinkingSteps steps={steps} isRunning />;
+};
+
+/** Steps with very long labels - verify text wrapping. */
+export const LongLabels: StoryFn<typeof AgentThinkingSteps> = () => (
+  <AgentThinkingSteps
+    steps={[
+      { id: 1, label: 'Connecting to AKS cluster myaks-production-eastus2-environment-primary in subscription my-azure-subscription-id-12345', status: 'completed', phase: 'init', timestamp: now },
+      { id: 2, label: 'Loading Kubernetes context for cluster myaks-production-eastus2-environment-primary with RBAC enabled and Azure AD integration', status: 'completed', phase: 'init', timestamp: now },
+      { id: 3, label: 'Analyzing pod health for all 47 deployments across 12 namespaces including production, staging, development, monitoring, and system namespaces', status: 'running', phase: 'planning', timestamp: now },
+    ]}
+    isRunning
+  />
+);
+
+/** All steps pending - early state before any work starts. */
+export const AllPending: StoryFn<typeof AgentThinkingSteps> = () => (
+  <AgentThinkingSteps
+    steps={[
+      { id: 1, label: 'Connecting to cluster', status: 'pending', phase: 'init', timestamp: now },
+      { id: 2, label: 'Loading context', status: 'pending', phase: 'init', timestamp: now },
+    ]}
+    isRunning
+  />
+);
+
+/** Many steps in dark theme - verify all status icons contrast. */
+export const ManyStepsDark: StoryFn<typeof AgentThinkingSteps> = () => {
+  const steps: AgentThinkingStep[] = [
+    { id: 1, label: 'Connecting to cluster', status: 'completed', phase: 'init', timestamp: now },
+    { id: 2, label: 'Loading context', status: 'completed', phase: 'init', timestamp: now },
+    { id: 3, label: 'Authenticating with Azure AD', status: 'completed', phase: 'init', timestamp: now },
+    { id: 4, label: 'Check pod status', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 5, label: 'Analyze node resources', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 6, label: 'Review events', status: 'completed', phase: 'planning', timestamp: now },
+    { id: 7, label: 'Running kubectl get pods', status: 'completed', phase: 'executing', timestamp: now },
+    { id: 8, label: 'Running kubectl top nodes', status: 'completed', phase: 'executing', timestamp: now },
+    { id: 9, label: 'Running kubectl get events', status: 'running', phase: 'executing', timestamp: now },
+    { id: 10, label: 'Running kubectl get pvc -A', status: 'pending', phase: 'executing', timestamp: now },
+  ];
+  return (
+    <ThemeProvider theme={darkTheme}>
+      <CssBaseline />
+      <AgentThinkingSteps steps={steps} isRunning />
+    </ThemeProvider>
+  );
+};

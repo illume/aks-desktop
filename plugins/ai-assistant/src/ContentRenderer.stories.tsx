@@ -5,7 +5,7 @@ import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import ContentRenderer from '../ContentRenderer';
+import ContentRenderer from './ContentRenderer';
 
 const darkTheme = createTheme({
   palette: {
@@ -217,5 +217,209 @@ export const AlertsDark: StoryFn<typeof ContentRenderer> = () => (
       <br />
       <ContentRenderer content={JSON.stringify({ success: true, content: 'Successfully scaled deployment.' })} />
     </div>
+  </ThemeProvider>
+);
+
+// ── Edge cases ───────────────────────────────────────────────────────────────
+
+/** Empty string content - should not crash. */
+export const EmptyContent: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer content="" />
+);
+
+/** Plain text with no markdown formatting. */
+export const PlainText: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer content="This is just plain text with no formatting at all. No bold, no code, no links." />
+);
+
+/** Content with only inline code - many backtick segments. */
+export const InlineCodeOnly: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content="Run `kubectl get pods`, then `kubectl describe pod my-pod`, check `kubectl logs my-pod -f`, and use `kubectl exec -it my-pod -- /bin/bash` to debug."
+  />
+);
+
+/** Inline code in dark theme - verify inline backtick contrast. */
+export const InlineCodeOnlyDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      content="Run `kubectl get pods`, then `kubectl describe pod my-pod`, check `kubectl logs my-pod -f`, and use `kubectl exec -it my-pod -- /bin/bash` to debug."
+    />
+  </ThemeProvider>
+);
+
+/** YAML code block (Kubernetes resource). */
+export const YamlCodeBlock: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`Here's a sample deployment:
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+\`\`\``}
+  />
+);
+
+/** YAML code block in dark theme. */
+export const YamlCodeBlockDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      content={`Here's a sample deployment:
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+\`\`\``}
+    />
+  </ThemeProvider>
+);
+
+/** Deeply nested markdown - headings, lists, bold, inline code together. */
+export const DeeplyNestedContent: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`# Level 1
+
+## Level 2
+
+### Level 3
+
+- Item with **bold** and \`inline code\`
+  - Nested item with [a link](https://example.com)
+    - Deeply nested with \`more code\`
+
+1. First **ordered** item
+2. Second item with \`kubectl get ns\`
+3. Third item
+
+> A blockquote with **bold text** and \`code\` inside.
+>
+> > Nested blockquote for emphasis.`}
+  />
+);
+
+/** Very long unbroken strings and URLs. */
+export const LongUnbrokenStrings: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`The error log contains the following message:
+
+\`\`\`
+E0312 21:02:19.886Z controller/manager.go:123 ReconciliationError: unable to reconcile resource aksmanagedcluster/myverylongclustername-in-eastus2-production-environment with the expected state, timeout exceeded after 300 seconds of continuous polling
+\`\`\`
+
+Check https://learn.microsoft.com/en-us/azure/aks/troubleshooting-common-issues-with-very-long-urls-that-might-break-layouts for more details.`}
+  />
+);
+
+/** Multiple sequential code blocks of different languages. */
+export const MultipleCodeBlocks: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`First, check with bash:
+
+\`\`\`bash
+kubectl get pods -n production
+\`\`\`
+
+Then look at the JSON output:
+
+\`\`\`json
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "api-server-7d8f9",
+    "namespace": "production"
+  },
+  "status": {
+    "phase": "Running"
+  }
+}
+\`\`\`
+
+And the YAML manifest:
+
+\`\`\`yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+\`\`\``}
+  />
+);
+
+/** Multiple code blocks in dark theme. */
+export const MultipleCodeBlocksDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      content={`Check with bash:
+
+\`\`\`bash
+kubectl get pods -n production
+\`\`\`
+
+JSON output:
+
+\`\`\`json
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "status": { "phase": "Running" }
+}
+\`\`\`
+
+YAML manifest:
+
+\`\`\`yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-server
+\`\`\``}
+    />
   </ThemeProvider>
 );
