@@ -104,8 +104,6 @@ export default function DeployPure({
           </Typography>
           <Box
             sx={{
-              flex: 1,
-              minHeight: 0,
               border: '1px solid',
               borderColor: 'divider',
               borderRadius: 1,
@@ -113,7 +111,7 @@ export default function DeployPure({
             }}
           >
             <MonacoEditor
-              height="100%"
+              height="40vh"
               language="yaml"
               value={containerPreviewYaml}
               onChange={() => {}}

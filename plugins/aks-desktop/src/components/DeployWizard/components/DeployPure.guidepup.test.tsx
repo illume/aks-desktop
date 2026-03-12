@@ -40,6 +40,9 @@ vi.mock('@monaco-editor/react', () => ({
 
 import DeployPure, { DeployPureProps } from './DeployPure';
 import {
+  ContainerDeployError,
+  ContainerDeploySuccess,
+  ContainerPreview,
   DeployError,
   DeploySuccess,
   EmptyResourceList,
@@ -305,5 +308,79 @@ describe('DeployPure — container sourceType (guidepup)', () => {
 
     expect(phrases).not.toContain('Deployment');
     expect(phrases).not.toContain('my-app');
+  });
+});
+
+describe('DeployPure — ContainerPreview story (guidepup)', () => {
+  it('announces the generated manifests subtitle with namespace', async () => {
+    renderStory(ContainerPreview.args!);
+    const phrases = await collect();
+
+    expect(
+      phrases.some(p => p.includes('Generated Kubernetes manifests') && p.includes('test'))
+    ).toBe(true);
+  });
+
+  it('announces the Monaco editor region', async () => {
+    renderStory(ContainerPreview.args!);
+    const phrases = await collect();
+
+    expect(phrases).toContain('region, YAML editor');
+  });
+
+  it('does not announce any status or alert region', async () => {
+    renderStory(ContainerPreview.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.startsWith('status'))).toBe(false);
+    expect(phrases.some(p => p.startsWith('alert'))).toBe(false);
+  });
+});
+
+describe('DeployPure — ContainerDeploySuccess story (guidepup)', () => {
+  it('announces a polite status live region', async () => {
+    renderStory(ContainerDeploySuccess.args!);
+    const phrases = await collect();
+
+    expect(phrases).toContain('status');
+    expect(phrases).toContain('end of status');
+  });
+
+  it('announces the success message', async () => {
+    renderStory(ContainerDeploySuccess.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('Applied 2 resources successfully'))).toBe(true);
+  });
+
+  it('still announces the Monaco editor region', async () => {
+    renderStory(ContainerDeploySuccess.args!);
+    const phrases = await collect();
+
+    expect(phrases).toContain('region, YAML editor');
+  });
+});
+
+describe('DeployPure — ContainerDeployError story (guidepup)', () => {
+  it('announces an assertive alert live region', async () => {
+    renderStory(ContainerDeployError.args!);
+    const phrases = await collect();
+
+    expect(phrases).toContain('alert');
+    expect(phrases).toContain('end of alert');
+  });
+
+  it('announces the error message', async () => {
+    renderStory(ContainerDeployError.args!);
+    const phrases = await collect();
+
+    expect(phrases.some(p => p.includes('ImagePullBackOff'))).toBe(true);
+  });
+
+  it('still announces the Monaco editor region', async () => {
+    renderStory(ContainerDeployError.args!);
+    const phrases = await collect();
+
+    expect(phrases).toContain('region, YAML editor');
   });
 });

@@ -45,6 +45,9 @@ vi.mock('@monaco-editor/react', () => ({
 // ── component + stories ───────────────────────────────────────────────────────
 import DeployPure, { DeployPureProps } from './DeployPure';
 import {
+  ContainerDeployError,
+  ContainerDeploySuccess,
+  ContainerPreview,
   DeployError,
   DeploySuccess,
   EmptyResourceList,
@@ -229,5 +232,60 @@ describe('DeployPure — container sourceType', () => {
     });
     expect(screen.getByText(/generated kubernetes manifests/i)).toBeInTheDocument();
     expect(screen.getByText(/namespace: production/i)).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('DeployPure — ContainerPreview story', () => {
+  it('renders the Monaco editor', () => {
+    renderStory(ContainerPreview.args!);
+    expect(screen.getByTestId('monaco-editor')).toBeInTheDocument();
+  });
+
+  it('shows the generated manifests subtitle with the story namespace', () => {
+    renderStory(ContainerPreview.args!);
+    expect(screen.getByText(/generated kubernetes manifests/i)).toBeInTheDocument();
+    expect(screen.getByText(/namespace: test/i)).toBeInTheDocument();
+  });
+
+  it('does not show resource cards (container path uses editor)', () => {
+    renderStory(ContainerPreview.args!);
+    expect(screen.queryByText(/object\)/i)).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('DeployPure — ContainerDeploySuccess story', () => {
+  it('renders a polite status live region on success', () => {
+    renderStory(ContainerDeploySuccess.args!);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('shows the success message', () => {
+    renderStory(ContainerDeploySuccess.args!);
+    expect(screen.getByText(/applied 2 resources successfully/i)).toBeInTheDocument();
+  });
+
+  it('still renders the Monaco editor', () => {
+    renderStory(ContainerDeploySuccess.args!);
+    expect(screen.getByTestId('monaco-editor')).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('DeployPure — ContainerDeployError story', () => {
+  it('renders an assertive alert live region on error', () => {
+    renderStory(ContainerDeployError.args!);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows the error message', () => {
+    renderStory(ContainerDeployError.args!);
+    expect(screen.getByText(/imagepullbackoff/i)).toBeInTheDocument();
+  });
+
+  it('still renders the Monaco editor', () => {
+    renderStory(ContainerDeployError.args!);
+    expect(screen.getByTestId('monaco-editor')).toBeInTheDocument();
   });
 });

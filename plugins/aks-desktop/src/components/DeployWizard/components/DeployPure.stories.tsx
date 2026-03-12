@@ -86,3 +86,89 @@ ManyResourceTypes.args = {
     { kind: 'ServiceAccount', name: 'web-frontend-sa', namespace: 'production' },
   ],
 };
+
+const sampleContainerYaml = `# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: test
+  annotations:
+    aks-project/deployed-by: manual
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-app
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: test
+spec:
+  type: ClusterIP
+  selector:
+    app: my-app
+  ports:
+    - port: 80
+      targetPort: 80`;
+
+/** Container source — shows the Monaco editor with generated YAML. */
+export const ContainerPreview = Template.bind({});
+ContainerPreview.args = {
+  sourceType: 'container',
+  namespace: 'test',
+  containerPreviewYaml: sampleContainerYaml,
+  deployResult: null,
+  deployMessage: '',
+  yamlObjects: [],
+};
+
+/** Container source — deploy succeeded. */
+export const ContainerDeploySuccess = Template.bind({});
+ContainerDeploySuccess.args = {
+  ...ContainerPreview.args,
+  deployResult: 'success',
+  deployMessage: 'Applied 2 resources successfully.',
+};
+
+/** Container source — deploy failed. */
+export const ContainerDeployError = Template.bind({});
+ContainerDeployError.args = {
+  ...ContainerPreview.args,
+  deployResult: 'error',
+  deployMessage: 'Failed to apply Deployment/my-app in namespace test: ImagePullBackOff',
+};
