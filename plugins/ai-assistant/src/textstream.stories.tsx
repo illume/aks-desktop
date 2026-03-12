@@ -600,7 +600,6 @@ Let me know if you need help with deployments or networking!`,
  * correctly when the response finally arrives.
  */
 export const SlowResponsesWithLoader: StoryFn = () => {
-  const responseTimes = [2000, 4000, 3000, 5000]; // Variable delays in ms
   const exchanges: Array<{ user: string; assistant: string; delayMs: number }> = [
     {
       user: 'How do I check my cluster health?',
@@ -619,12 +618,12 @@ kubectl get pods -n kube-system
 \`\`\`
 
 If any nodes show **NotReady**, check the kubelet logs on that node.`,
-      delayMs: responseTimes[0],
+      delayMs: 2000,
     },
     {
       user: longUserQuestions[0], // Long YAML question
       assistant: longQuestionResponses[0],
-      delayMs: responseTimes[1],
+      delayMs: 4000,
     },
     {
       user: 'What ports does AKS need open?',
@@ -644,12 +643,12 @@ kubectl cluster-info
 # Check if you can reach the API
 curl -k https://<api-server-url>:443/healthz
 \`\`\``,
-      delayMs: responseTimes[2],
+      delayMs: 3000,
     },
     {
       user: longUserQuestions[1], // Long network policy question
       assistant: longQuestionResponses[1],
-      delayMs: responseTimes[3],
+      delayMs: 5000,
     },
   ];
 
@@ -697,7 +696,7 @@ curl -k https://<api-server-url>:443/healthz
             disabled={isLoading || step >= exchanges.length}
           >
             {isLoading
-              ? `Waiting for AI... (~${responseTimes[step] / 1000}s)`
+              ? `Waiting for AI... (~${exchanges[Math.min(step, exchanges.length - 1)].delayMs / 1000}s)`
               : step < exchanges.length
                 ? `Send Question ${step + 1}/${exchanges.length}${step === 1 || step === 3 ? ' (Long YAML)' : ''}`
                 : 'All Questions Answered'}
