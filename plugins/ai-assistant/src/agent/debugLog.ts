@@ -3,22 +3,22 @@
  *
  * - Silent during tests (`import.meta.env.MODE === 'test'`) so test output
  *   stays clean.
- * - `debugLog(tag, ...args)` — emits a `console.debug` line.
- * - `warnLog(tag, ...args)` — emits a `console.warn` line (always, even in tests).
+ * - `debugLog(tag, ...args)` — emits a `console.debug` line when enabled.
+ * - `warnLog(tag, ...args)` — emits a `console.warn` line when enabled.
  * - `dumpForTestCase(tag, raw, parsed)` — logs both values as JSON strings
  *   so you can copy-paste them straight into a new test case.
  *
- * Enable verbose output at runtime by setting `localStorage.AKS_DEBUG = '1'`
- * in the browser console.  When enabled, `debugLog` writes to `console.debug`
- * even if it would otherwise be silent.
+ * Enable verbose output at runtime (in non-test builds) by setting
+ * `localStorage.AKS_DEBUG = '1'` in the browser console.
  */
 
 let _enabled: boolean | null = null;
 
 function isEnabled(): boolean {
   if (_enabled !== null) return _enabled;
+
+  // Silent during vitest — import.meta.env.MODE is set by Vite
   try {
-    // Silent during vitest — import.meta.env.MODE is set by Vite
     if (import.meta.env.MODE === 'test') {
       _enabled = false;
       return false;
@@ -26,21 +26,29 @@ function isEnabled(): boolean {
   } catch {
     /* not in Vite context */
   }
-  _enabled = true;
-  return true;
+
+  // Off by default in production — opt in via localStorage
+  let enabled = false;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      enabled = window.localStorage.getItem('AKS_DEBUG') === '1';
+    }
+  } catch {
+    // localStorage unavailable or throws (e.g. iframe sandbox)
+  }
+  _enabled = enabled;
+  return enabled;
 }
 
-/** Emit a console.debug line.  Silent during tests. */
+/** Emit a console.debug line.  Requires `localStorage.AKS_DEBUG = '1'`. */
 export function debugLog(tag: string, ...args: unknown[]): void {
   if (!isEnabled()) return;
   console.debug(tag, ...args);
 }
 
-/**
- * Emit a console.warn line.  Active even during tests so real
- * problems are never silently swallowed.
- */
+/** Emit a console.warn line.  Requires `localStorage.AKS_DEBUG = '1'`. */
 export function warnLog(tag: string, ...args: unknown[]): void {
+  if (!isEnabled()) return;
   console.warn(tag, ...args);
 }
 

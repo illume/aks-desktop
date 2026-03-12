@@ -1,6 +1,6 @@
 import { runCommand } from '@kinvolk/headlamp-plugin/lib';
 import { clusterRequest, stream } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
-import { debugLog, dumpForTestCase, warnLog } from './debugLog';
+import { debugLog, dumpForTestCase } from './debugLog';
 
 declare const pluginRunCommand: typeof runCommand;
 
@@ -640,7 +640,7 @@ function extractAIAnswer(rawOutput: string): string {
   } else {
     // Fallback: use all lines (will be cleaned below)
     contentLines = [...lines];
-    warnLog('[AKS Agent Parse] extractAIAnswer: no AI: line found — using all lines as fallback');
+    debugLog('[AKS Agent Parse] extractAIAnswer: no AI: line found — using all lines as fallback');
   }
 
   // Strip agent infrastructure noise from content lines
@@ -686,7 +686,7 @@ function extractAIAnswer(rawOutput: string): string {
   );
 
   if (!result) {
-    warnLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
+    debugLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
   }
 
   // Dump raw→parsed as JSON strings for easy copy-paste into test cases
