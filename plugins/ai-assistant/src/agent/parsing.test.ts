@@ -1145,7 +1145,7 @@ describe('malformed AI output handling', () => {
   });
 
   describe('looksLikeYaml with edge cases', () => {
-    it('rejects plain English sentences with colons', () => {
+    it('accepts plain English sentences with colons as YAML-like', () => {
       expect(looksLikeYaml('Note: this is just a sentence')).toBe(true);
     });
 
@@ -1181,7 +1181,7 @@ describe('malformed AI output handling', () => {
       expect(result).toBe('- first\n- second\n- third\n- already normal');
     });
 
-    it('preserves bullets inside code fences', () => {
+    it('converts bullets even inside code fences (no fence awareness)', () => {
       const input = '```\n• not a bullet\n```';
       expect(normalizeBullets(input)).toBe('```\n- not a bullet\n```');
     });
