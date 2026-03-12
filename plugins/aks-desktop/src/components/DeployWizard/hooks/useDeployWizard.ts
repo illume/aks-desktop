@@ -11,6 +11,18 @@ import type { ContainerConfig } from './useContainerConfiguration';
 import { useContainerConfiguration } from './useContainerConfiguration';
 
 /**
+ * Parses a multi-document YAML string, filters empty documents, converts
+ * each to a plain JS object, and optionally overrides the namespace.
+ */
+function parseAndOverride(yaml: string, namespace?: string) {
+  return YAML.parseAllDocuments(yaml)
+    .filter(d => d?.contents)
+    .map(d => d.toJSON())
+    .filter(Boolean)
+    .map(obj => applyNamespaceOverride(obj, namespace));
+}
+
+/**
  * The three ordered steps of the Deploy wizard.
  * Used as numeric indices for `activeStep` comparisons.
  */
@@ -135,13 +147,9 @@ export function useDeployWizard({
   useEffect(() => {
     if (activeStep === WizardStep.DEPLOY && sourceType === 'yaml') {
       try {
-        const text = yamlEditorValue;
-        const docs = YAML.parseAllDocuments(text).filter(d => d && d.contents);
-        const processed = docs
-          .map(d => d.toJSON())
-          .filter(Boolean)
-          .map(obj => applyNamespaceOverride(obj, namespace))
-          .map(obj => YAML.stringify(obj).trim());
+        const processed = parseAndOverride(yamlEditorValue, namespace).map(obj =>
+          YAML.stringify(obj).trim()
+        );
         setUserPreviewYaml(processed.join('\n---\n'));
       } catch (e) {
         setUserPreviewYaml(yamlEditorValue);
@@ -198,12 +206,14 @@ export function useDeployWizard({
       const text =
         sourceType === 'container' ? containerConfig.config.containerPreviewYaml : yamlEditorValue;
 
-      let parsedDocs;
+      let docs;
       try {
-        parsedDocs = YAML.parseAllDocuments(text);
-        for (const doc of parsedDocs) {
-          const json = doc.toJSON();
-          if (!json || !json.kind || !json.metadata?.name) {
+        docs =
+          sourceType === 'yaml'
+            ? parseAndOverride(text, namespace)
+            : parseAndOverride(text);
+        for (const doc of docs) {
+          if (!doc || !doc.kind || !doc.metadata?.name) {
             throw new Error(t('Invalid YAML: missing required fields (kind or metadata.name)'));
           }
         }
@@ -214,11 +224,6 @@ export function useDeployWizard({
         setDeployMessage(msg || t('Invalid YAML'));
         return;
       }
-
-      const docs = parsedDocs
-        .map(d => d.toJSON())
-        .filter(Boolean)
-        .map(obj => (sourceType === 'yaml' ? applyNamespaceOverride(obj, namespace) : obj));
 
       let applied = 0;
       for (const resource of docs) {
