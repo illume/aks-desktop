@@ -117,13 +117,43 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
     ) as HTMLElement | null;
 
     if (targetElement) {
-      const messageRect = targetElement.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
+      const messageRect = targetElement.getBoundingClientRect();
       const messageTop = messageRect.top - containerRect.top + container.scrollTop;
 
-      // Scroll so the top of the new response is at the top of the viewport
+      // Try to show the preceding user question above the response for context,
+      // so the user can see what they asked alongside the start of the answer.
+      let precedingUserIndex = -1;
+      for (let i = lastResponseIndex - 1; i >= 0; i--) {
+        if (history[i].role === 'user') {
+          precedingUserIndex = i;
+          break;
+        }
+      }
+
+      if (precedingUserIndex >= 0) {
+        const userElement = container.querySelector(
+          `[data-message-index="${precedingUserIndex}"]`
+        ) as HTMLElement | null;
+
+        if (userElement) {
+          const userRect = userElement.getBoundingClientRect();
+          // Only include the user question if it's short enough that the
+          // response start stays visible (< 30% of viewport height).
+          if (userRect.height < container.clientHeight * 0.3) {
+            const userTop = userRect.top - containerRect.top + container.scrollTop;
+            container.scrollTo({
+              top: Math.max(0, userTop - 8),
+              behavior: 'smooth',
+            });
+            return;
+          }
+        }
+      }
+
+      // Fallback: scroll to the response with a small offset for breathing room
       container.scrollTo({
-        top: Math.max(0, messageTop),
+        top: Math.max(0, messageTop - 8),
         behavior: 'smooth',
       });
     }
@@ -177,10 +207,11 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   // Auto-scroll only when loading starts (not when it finishes)
   useEffect(() => {
     if (isLoading && wasNearBottomRef.current) {
-      // Small delay to ensure content has rendered
-      setTimeout(scrollToShowNewMessage, 100);
+      // Scroll to bottom when loading starts to keep user message and
+      // loading indicator visible.
+      setTimeout(scrollToBottom, 100);
     }
-  }, [isLoading, scrollToShowNewMessage]);
+  }, [isLoading, scrollToBottom]);
 
   useEffect(() => {
     // Collect tool responses

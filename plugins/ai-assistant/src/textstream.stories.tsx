@@ -118,26 +118,44 @@ Both options integrate with Grafana for dashboards.`,
   { role: 'user', content: 'How do I check my cluster networking?' },
 ];
 
+// Follow-up questions used to simulate a realistic multi-turn conversation
+const followUpQuestions = [
+  'How do I check my cluster networking?',
+  'How do I troubleshoot DNS issues in AKS?',
+  'What about network policy debugging?',
+  'How do I monitor network traffic between pods?',
+];
+
 // ── Stories ──────────────────────────────────────────────────────────────────
 
 /**
  * Demonstrates that when a new agent response arrives, the viewport scrolls
  * to the **top** of the response rather than the bottom.
- * Click "Add Agent Response" to simulate receiving a long response.
+ * Click "Ask & Get Response" to simulate sending a question and receiving a
+ * long response. Works for multiple sequential clicks — each click adds
+ * a user question (scrolls to bottom) then an agent response (scrolls to top
+ * of the response, with the user's question visible for context).
  */
 export const ScrollToTopOfResponse: StoryFn = () => {
-  const [history, setHistory] = useState<Prompt[]>(previousConversation);
+  const [history, setHistory] = useState<Prompt[]>(
+    previousConversation.slice(0, -1) // start without the trailing user question
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  const addResponse = () => {
+  const addExchange = () => {
+    const question = followUpQuestions[questionIndex % followUpQuestions.length];
+    // Add user question first (triggers scroll to bottom)
+    setHistory(prev => [...prev, { role: 'user', content: question }]);
     setIsLoading(true);
-    // Short delay to simulate loading
+    // Short delay to simulate loading, then add assistant response
     timerRef.current = setTimeout(() => {
       setHistory(prev => [...prev, { role: 'assistant', content: longAssistantResponse }]);
       setIsLoading(false);
+      setQuestionIndex(i => i + 1);
     }, 500);
   };
 
@@ -149,8 +167,8 @@ export const ScrollToTopOfResponse: StoryFn = () => {
           <TextStreamContainer history={history} isLoading={isLoading} apiError={null} />
         </Box>
         <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button variant="contained" onClick={addResponse} disabled={isLoading}>
-            Add Agent Response
+          <Button variant="contained" onClick={addExchange} disabled={isLoading}>
+            Ask &amp; Get Response
           </Button>
         </Box>
       </Box>
@@ -160,20 +178,26 @@ export const ScrollToTopOfResponse: StoryFn = () => {
 
 /**
  * Same test in dark theme. The viewport should scroll to the top of the new
- * agent response when "Add Agent Response" is clicked.
+ * agent response when "Ask & Get Response" is clicked.
  */
 export const ScrollToTopOfResponseDark: StoryFn = () => {
-  const [history, setHistory] = useState<Prompt[]>(previousConversation);
+  const [history, setHistory] = useState<Prompt[]>(
+    previousConversation.slice(0, -1)
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  const addResponse = () => {
+  const addExchange = () => {
+    const question = followUpQuestions[questionIndex % followUpQuestions.length];
+    setHistory(prev => [...prev, { role: 'user', content: question }]);
     setIsLoading(true);
     timerRef.current = setTimeout(() => {
       setHistory(prev => [...prev, { role: 'assistant', content: longAssistantResponse }]);
       setIsLoading(false);
+      setQuestionIndex(i => i + 1);
     }, 500);
   };
 
@@ -185,8 +209,8 @@ export const ScrollToTopOfResponseDark: StoryFn = () => {
           <TextStreamContainer history={history} isLoading={isLoading} apiError={null} />
         </Box>
         <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button variant="contained" onClick={addResponse} disabled={isLoading}>
-            Add Agent Response
+          <Button variant="contained" onClick={addExchange} disabled={isLoading}>
+            Ask &amp; Get Response
           </Button>
         </Box>
       </Box>
