@@ -104,6 +104,8 @@ export default function DeployPure({
           </Typography>
           <Box
             sx={{
+              flex: 1,
+              minHeight: 0,
               border: '1px solid',
               borderColor: 'divider',
               borderRadius: 1,
@@ -138,7 +140,6 @@ export default function DeployPure({
                   }
                 });
               }}
-              // set tabFocusMode the second time it is used
               options={{
                 readOnly: true,
                 minimap: { enabled: false },
