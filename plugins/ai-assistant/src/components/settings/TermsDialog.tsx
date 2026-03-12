@@ -41,7 +41,12 @@ export default function TermsDialog({ open, onClose, onAccept }: TermsDialogProp
         <List>
           <ListItem>
             <ListItemIcon>
-              <Icon icon="mdi:currency-usd" width="20px" height="20px" style={{ color: 'orange' }} />
+              <Icon
+                icon="mdi:currency-usd"
+                width="20px"
+                height="20px"
+                style={{ color: 'orange' }}
+              />
             </ListItemIcon>
             <ListItemText
               primary="Usage Costs"
@@ -61,7 +66,12 @@ export default function TermsDialog({ open, onClose, onAccept }: TermsDialogProp
 
           <ListItem>
             <ListItemIcon>
-              <Icon icon="mdi:shield-alert" width="20px" height="20px" style={{ color: 'orange' }} />
+              <Icon
+                icon="mdi:shield-alert"
+                width="20px"
+                height="20px"
+                style={{ color: 'orange' }}
+              />
             </ListItemIcon>
             <ListItemText
               primary="Data Privacy"
@@ -71,7 +81,12 @@ export default function TermsDialog({ open, onClose, onAccept }: TermsDialogProp
 
           <ListItem>
             <ListItemIcon>
-              <Icon icon="mdi:account-supervisor" width="20px" height="20px" style={{ color: 'orange' }} />
+              <Icon
+                icon="mdi:account-supervisor"
+                width="20px"
+                height="20px"
+                style={{ color: 'orange' }}
+              />
             </ListItemIcon>
             <ListItemText
               primary="Responsibility"

@@ -11,10 +11,10 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
-import { AgentModeSelector, ChatMode } from '../agent/AgentModeSelector';
 import { getProviderById } from '../../config/modelConfig';
 import { getModelDisplayName, getProviderModelsForChat } from '../../utils/modalUtils';
 import { StoredProviderConfig } from '../../utils/ProviderConfigManager';
+import { AgentModeSelector, ChatMode } from '../agent/AgentModeSelector';
 import TestModeInput from './TestModeInput';
 
 interface AIInputSectionProps {

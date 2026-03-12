@@ -26,7 +26,15 @@ const SafeIcon: React.FC<IconProps> = React.memo(({ color, style, ...rest }) => 
     return <Icon style={safeStyle} {...rest} />;
   } catch {
     // Fallback: render an empty inline span so layout doesn't break.
-    return <span style={{ display: 'inline-block', width: rest.width ?? 16, height: rest.height ?? rest.width ?? 16 }} />;
+    return (
+      <span
+        style={{
+          display: 'inline-block',
+          width: rest.width ?? 16,
+          height: rest.height ?? rest.width ?? 16,
+        }}
+      />
+    );
   }
 });
 

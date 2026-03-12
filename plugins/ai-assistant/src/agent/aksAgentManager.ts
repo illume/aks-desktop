@@ -4,6 +4,17 @@ import { clusterRequest, stream } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 declare const pluginRunCommand: typeof runCommand;
 
 /**
+ * Escape a string for safe use inside a bash single-quoted argument.
+ * Single quotes prevent all shell interpretation (no variable expansion,
+ * no command substitution). The only special case is the single quote
+ * itself, which is handled by ending the string, adding an escaped
+ * single quote, and starting a new single-quoted string.
+ */
+function shellEscapeSingleQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+/**
  * Base system prompt prepended before every AKS agent question.
  * Instructs the LLM to return YAML inside markdown code blocks and
  * to honour the conversation history that follows.
@@ -72,8 +83,20 @@ export interface AgentThinkingStep {
 export type AgentProgressCallback = (steps: AgentThinkingStep[]) => void;
 
 /**
+ * Allowed commands that can be executed via pluginRunCommand.
+ * Only 'az' is needed for AKS cluster discovery.
+ */
+const ALLOWED_COMMANDS = new Set(['az']);
+
+/**
+ * Allowed first-level subcommands for the az CLI.
+ * Only 'aks' operations are permitted.
+ */
+const ALLOWED_AZ_SUBCOMMANDS = new Set(['aks']);
+
+/**
  * Runs a local command asynchronously using pluginRunCommand.
- * Used only for `az aks list` to resolve resource groups.
+ * Restricted to allowed commands and subcommands to prevent arbitrary execution.
  */
 function runCommandAsync(
   command: string,
@@ -81,6 +104,16 @@ function runCommandAsync(
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise(resolve => {
     try {
+      if (!ALLOWED_COMMANDS.has(command)) {
+        resolve({ stdout: '', stderr: `Command not allowed: ${command}` });
+        return;
+      }
+
+      if (command === 'az' && (args.length === 0 || !ALLOWED_AZ_SUBCOMMANDS.has(args[0]))) {
+        resolve({ stdout: '', stderr: `az subcommand not allowed: ${args[0] ?? '(none)'}` });
+        return;
+      }
+
       if (typeof pluginRunCommand === 'undefined') {
         resolve({
           stdout: '',
@@ -153,15 +186,13 @@ export async function checkAksAgentInstalled(clusterName: string): Promise<AksAg
     if (podsResponse?.items) {
       const aksPod = podsResponse.items.find(
         (p: any) =>
-          p.metadata?.name?.toLowerCase().startsWith('aks-') &&
-          p.status?.phase === 'Running'
+          p.metadata?.name?.toLowerCase().startsWith('aks-') && p.status?.phase === 'Running'
       );
       if (aksPod) {
         const namespace = aksPod.metadata?.namespace || 'default';
         const podName = aksPod.metadata?.name;
         // Use the first container in the pod
-        const containerName =
-          aksPod.spec?.containers?.[0]?.name || 'aks-agent';
+        const containerName = aksPod.spec?.containers?.[0]?.name || 'aks-agent';
         console.log(
           `[AKS Agent] Found agent pod: ${podName} in namespace: ${namespace}, container: ${containerName}`
         );
@@ -260,7 +291,6 @@ function stripAnsi(text: string): string {
     .replace(/\x1b[()][AB012]/g, '') // Character set selection
     .replace(/\r/g, ''); // Carriage returns
 }
-
 
 /**
  * Convert Unicode bullet characters (•, ·, ▪, –) to markdown list syntax
@@ -365,9 +395,7 @@ function wrapBareYamlBlocks(text: string): string {
           return Math.min(min, indent);
         }, Infinity);
         const shift = minIndent === Infinity ? 0 : minIndent;
-        const dedented = yamlLines.map(l =>
-          l.trim() === '' ? '' : l.slice(shift)
-        );
+        const dedented = yamlLines.map(l => (l.trim() === '' ? '' : l.slice(shift)));
 
         result.push('```yaml');
         result.push(...dedented);
@@ -400,7 +428,7 @@ function cleanTerminalFormatting(text: string): string {
   let inCodeFence = false;
 
   for (const line of lines) {
-    const rTrimmed = line.trimEnd();       // trailing 80-char padding removed
+    const rTrimmed = line.trimEnd(); // trailing 80-char padding removed
 
     // Track code-fence boundaries — never alter content inside fences
     if (/^\s*```/.test(rTrimmed)) {
@@ -425,8 +453,8 @@ function cleanTerminalFormatting(text: string): string {
     // ┃   text   ┃  →  text  (trimming only the outer box characters + 1 space padding)
     if (stripped.startsWith('┃')) {
       const inner = stripped
-        .replace(/^┃\s?/, '')    // remove leading ┃ and at most one space
-        .replace(/\s?┃$/, '');   // remove trailing ┃ and at most one space
+        .replace(/^┃\s?/, '') // remove leading ┃ and at most one space
+        .replace(/\s?┃$/, ''); // remove trailing ┃ and at most one space
       if (inner) {
         result.push(inner);
       }
@@ -598,15 +626,19 @@ function friendlyToolLabel(rawToolLine: string): string {
  *   `| t2 | Filter pods whose name contains 'gadget'           | [✓] completed   |`
  *   `| t3 | Verify and present the matching pods                | [ ] pending     |`
  */
-function extractTaskRow(line: string): { content: string; status: 'pending' | 'in_progress' | 'completed' } | null {
-  const m = line.match(/^\|\s*t\d+\s*\|\s*(.*?)\s*\|\s*\[(.)\]\s*(pending|in_progress|completed)\s*\|$/);
+function extractTaskRow(
+  line: string
+): { content: string; status: 'pending' | 'in_progress' | 'completed' } | null {
+  const m = line.match(
+    /^\|\s*t\d+\s*\|\s*(.*?)\s*\|\s*\[(.)\]\s*(pending|in_progress|completed)\s*\|$/
+  );
   if (!m) return null;
   const statusMap: Record<string, 'pending' | 'in_progress' | 'completed'> = {
     ' ': 'pending',
     '~': 'in_progress',
     '✓': 'completed',
   };
-  return { content: m[1].trim(), status: statusMap[m[2]] || m[3] as any };
+  return { content: m[1].trim(), status: statusMap[m[2]] || (m[3] as any) };
 }
 
 /**
@@ -722,7 +754,13 @@ class ThinkingStepTracker {
       if (!label) return false; // friendlyToolLabel returns null for TodoWrite
       const stepId = this.nextId++;
       this.toolIdMap.set(toolNum, stepId);
-      this.steps.push({ id: stepId, label, status: 'running', phase: 'executing', timestamp: Date.now() });
+      this.steps.push({
+        id: stepId,
+        label,
+        status: 'running',
+        phase: 'executing',
+        timestamp: Date.now(),
+      });
       return true;
     }
 
@@ -746,14 +784,21 @@ class ThinkingStepTracker {
   }
 
   /** Apply a parsed task row to the steps list. Returns true if steps changed. */
-  private applyTaskRow(taskRow: { content: string; status: 'pending' | 'in_progress' | 'completed' }): boolean {
+  private applyTaskRow(taskRow: {
+    content: string;
+    status: 'pending' | 'in_progress' | 'completed';
+  }): boolean {
     const existingId = this.knownTasks.get(taskRow.content);
     if (existingId !== undefined) {
       // Update existing task step
       const step = this.steps.find(s => s.id === existingId);
       if (step) {
-        const newStatus: AgentThinkingStep['status'] = taskRow.status === 'completed' ? 'completed'
-          : taskRow.status === 'in_progress' ? 'running' : 'pending';
+        const newStatus: AgentThinkingStep['status'] =
+          taskRow.status === 'completed'
+            ? 'completed'
+            : taskRow.status === 'in_progress'
+            ? 'running'
+            : 'pending';
         if (newStatus !== step.status) {
           step.status = newStatus;
           step.timestamp = Date.now();
@@ -763,8 +808,12 @@ class ThinkingStepTracker {
       return false;
     }
     // New task
-    const stepStatus: AgentThinkingStep['status'] = taskRow.status === 'completed' ? 'completed'
-      : taskRow.status === 'in_progress' ? 'running' : 'pending';
+    const stepStatus: AgentThinkingStep['status'] =
+      taskRow.status === 'completed'
+        ? 'completed'
+        : taskRow.status === 'in_progress'
+        ? 'running'
+        : 'pending';
     const sid = this.nextId++;
     this.knownTasks.set(taskRow.content, sid);
     this.steps.push({
@@ -920,7 +969,9 @@ class AgentSession {
     const { namespace, podName, containerName } = this.podInfo;
     const command = ['bash'];
     const commandStr = command.map(c => '&command=' + encodeURIComponent(c)).join('');
-    const url = `/api/v1/namespaces/${namespace}/pods/${podName}/exec?container=${encodeURIComponent(containerName)}${commandStr}&stdin=1&stderr=1&stdout=1&tty=1`;
+    const url = `/api/v1/namespaces/${namespace}/pods/${podName}/exec?container=${encodeURIComponent(
+      containerName
+    )}${commandStr}&stdin=1&stderr=1&stdout=1&tty=1`;
 
     console.log(`[AKS Agent] Session exec URL: ${url}`);
 
@@ -933,17 +984,13 @@ class AgentSession {
 
     this._alive = true;
 
-    this.streamHandle = stream(
-      url,
-      (data: ArrayBuffer | string) => this.handleData(data),
-      {
-        isJson: false,
-        additionalProtocols,
-        cluster: this.clusterName,
-        reconnectOnFailure: false,
-        failCb: () => this.handleConnectionFailure(),
-      }
-    );
+    this.streamHandle = stream(url, (data: ArrayBuffer | string) => this.handleData(data), {
+      isJson: false,
+      additionalProtocols,
+      cluster: this.clusterName,
+      reconnectOnFailure: false,
+      failCb: () => this.handleConnectionFailure(),
+    });
   }
 
   // ── Question lifecycle ──────────────────────────────────────────────────
@@ -972,8 +1019,8 @@ class AgentSession {
       this.tracker = onProgress ? new ThinkingStepTracker() : null;
       this.onProgress = onProgress ?? null;
 
-      const escapedQuestion = question.replace(/"/g, '\\"');
-      const pythonCommand = `python /app/aks-agent.py ask "${escapedQuestion}" --no-interactive`;
+      const escapedQuestion = shellEscapeSingleQuote(question);
+      const pythonCommand = `python /app/aks-agent.py ask ${escapedQuestion} --no-interactive`;
 
       if (this.bashReady) {
         // Bash is already at its prompt — send immediately
@@ -1007,7 +1054,9 @@ class AgentSession {
     if (this.streamHandle) {
       try {
         this.streamHandle.cancel();
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       this.streamHandle = null;
     }
   }
@@ -1110,7 +1159,9 @@ class AgentSession {
   private handleConnectionFailure(): void {
     this._alive = false;
     this.clearTimers();
-    console.warn(`[AKS Agent] WebSocket closed. stdout: ${this.output.length}, stderr: ${this.errorOutput.length}`);
+    console.warn(
+      `[AKS Agent] WebSocket closed. stdout: ${this.output.length}, stderr: ${this.errorOutput.length}`
+    );
 
     if (!this.questionResolved && this.pendingResolve) {
       if (this.output.trim()) {
