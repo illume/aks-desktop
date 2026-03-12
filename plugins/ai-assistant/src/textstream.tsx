@@ -55,6 +55,11 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   // Track the last user message count for detecting new user messages
   const lastUserMessageCountRef = useRef<number>(0);
+  // Track whether the user was near the bottom *before* the latest history update.
+  // This avoids the race where a tall new message pushes the scroll position far
+  // from the bottom, causing isNearBottom() to return false even though the user
+  // was following the conversation.
+  const wasNearBottomRef = useRef<boolean>(true);
 
   // Check if user is near bottom for auto-scrolling
   const isNearBottom = useCallback(() => {
@@ -83,6 +88,18 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
     if (!containerRef.current || history.length === 0) return;
 
     const container = containerRef.current;
+
+    // If the newest message is from the user (e.g. loading state, before assistant
+    // response arrives), scroll to bottom so the user message and loading indicator
+    // stay visible — don't jump back to a previous assistant message.
+    const lastMessage = history[history.length - 1];
+    if (lastMessage.role === 'user') {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
+      return;
+    }
 
     // Find the latest non-user, non-system message (the newest agent response)
     let lastResponseIndex = -1;
@@ -118,6 +135,9 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
     if (containerRef.current) {
       const nearBottom = isNearBottom();
       setShowScrollButton(!nearBottom);
+      // Keep track of whether user is near bottom so the history-change effect
+      // can use the value that was current *before* React re-renders with new items.
+      wasNearBottomRef.current = nearBottom;
     }
   }, [isNearBottom]);
 
@@ -136,8 +156,10 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
       }, 100);
       // Update the ref with current count
       lastUserMessageCountRef.current = currentUserMessageCount;
-    } else if (isNearBottom()) {
-      // For non-user messages when near bottom, scroll to show the top of the new response
+    } else if (wasNearBottomRef.current) {
+      // Use the pre-update near-bottom state so that a tall new message doesn't
+      // cause us to skip auto-scroll (the new content shifts scrollHeight but the
+      // user was following the conversation before the update).
       setTimeout(() => {
         scrollToShowNewMessage();
       }, 100);
@@ -145,15 +167,15 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
       // If not at bottom, just show the scroll button — don't force scroll
       setShowScrollButton(true);
     }
-  }, [history, isNearBottom, scrollToBottom, scrollToShowNewMessage]);
+  }, [history, scrollToBottom, scrollToShowNewMessage]);
 
   // Auto-scroll only when loading starts (not when it finishes)
   useEffect(() => {
-    if (isLoading && isNearBottom()) {
+    if (isLoading && wasNearBottomRef.current) {
       // Small delay to ensure content has rendered
       setTimeout(scrollToShowNewMessage, 100);
     }
-  }, [isLoading, isNearBottom, scrollToShowNewMessage]);
+  }, [isLoading, scrollToShowNewMessage]);
 
   useEffect(() => {
     // Collect tool responses
