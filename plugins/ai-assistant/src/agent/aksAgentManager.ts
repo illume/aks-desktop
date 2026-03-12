@@ -325,6 +325,8 @@ function normalizeBullets(text: string): string {
  */
 function looksLikeYaml(trimmed: string): boolean {
   if (trimmed === '' || trimmed.startsWith('#')) return true;
+  // YAML document separator (---) and document end marker (...)
+  if (trimmed === '---' || trimmed === '...') return true;
   // key: or key:  (with optional value)
   if (/^[\w][\w.\/-]*:\s?/.test(trimmed)) return true;
   // quoted key
@@ -494,16 +496,16 @@ const AGENT_NOISE_PATTERNS: RegExp[] = [
   /^python\s+\/app\/aks-agent\.py/,
   // Task-list table decorations (borders, header, data rows, section header)
   /^Task List:\s*$/,
-  /^\+[-+]+\+$/,
+  /^\+[-+=]+\+$/,
   /^\|\s*ID\s*\|/,
   /^\|\s*t\d+\s*\|/,
   // /show N hints
   /^\s*-\s*\/show\s+\d+\s+to view contents/,
   // Echo of the user's question (User: ...)
   /^User:\s+/,
-  // Table remnant lines: only pipes, plus, dashes, whitespace — but must contain at least one
-  // pipe or plus to avoid matching YAML list items ("- foo") or markdown hr ("---")
-  /^[\s|+\-]*[|+][\s|+\-]*$/,
+  // Table remnant lines: only pipes, plus, dashes, equals, whitespace — but must contain at
+  // least one pipe or plus to avoid matching YAML list items ("- foo") or markdown hr ("---")
+  /^[\s|+=\-]*[|+][\s|+=\-]*$/,
 ];
 
 /** Return true if a trimmed line matches any agent-noise pattern. */
@@ -682,7 +684,7 @@ class ThinkingStepTracker {
     // ── Handle partial (wrapped) task-table row buffering ──
     if (this.partialTaskRow) {
       // Blank line, table border, table header, or new task row → abandon partial, fall through
-      if (!trimmed || /^\+[-+]+\+$/.test(trimmed) || /^\|\s*(ID|t\d+)\s*\|/.test(trimmed)) {
+      if (!trimmed || /^\+[-+=]+\+$/.test(trimmed) || /^\|\s*(ID|t\d+)\s*\|/.test(trimmed)) {
         this.partialTaskRow = '';
         // Fall through to normal processing below
       } else {

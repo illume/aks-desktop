@@ -17,9 +17,7 @@ export function markdownToPlainText(markdown: string): string {
       .replace(/`([^`]+)`/g, '$1')
       // Remove strikethrough
       .replace(/~~(.*?)~~/g, '$1')
-      // Clean up extra whitespace
-      .replace(/\s+/g, ' ')
-      // Remove list markers
+      // Remove list markers (must run before whitespace collapse so ^ anchors work)
       .replace(/^\s*[-*+]\s+/gm, '')
       .replace(/^\s*\d+\.\s+/gm, '')
       // Remove blockquotes
@@ -28,6 +26,8 @@ export function markdownToPlainText(markdown: string): string {
       .replace(/^-{3,}\s*$/gm, '')
       // Remove surrounding square brackets
       .replace(/^\[|\]$/g, '')
+      // Clean up extra whitespace (must be last — earlier steps rely on newlines)
+      .replace(/\s+/g, ' ')
       .trim()
   );
 }

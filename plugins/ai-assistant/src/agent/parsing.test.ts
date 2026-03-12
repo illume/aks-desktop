@@ -1119,6 +1119,19 @@ describe('malformed AI output handling', () => {
       const taskSteps = tracker.steps.filter(s => s.phase === 'executing');
       expect(taskSteps.length).toBeLessThanOrEqual(1);
     });
+
+    it('abandons partial row on equal-sign table border', () => {
+      const tracker = new ThinkingStepTracker();
+      // Start a partial row
+      tracker.processLine('| t1 | Start of partial');
+      // Equal-sign border should abandon the partial row
+      tracker.processLine('+====+====+');
+      // Now a real task row should be processed normally
+      const changed = tracker.processLine('| t1 | Full task | [ ] pending |');
+      expect(changed).toBe(true);
+      expect(tracker.steps).toHaveLength(1);
+      expect(tracker.steps[0].label).toBe('Full task');
+    });
   });
 
   describe('extractTaskRow with malformed rows', () => {
@@ -1208,6 +1221,1071 @@ describe('malformed AI output handling', () => {
     it('handles many nested escape sequences', () => {
       const input = '\x1b[1m\x1b[31m\x1b[4m\x1b[7mhello\x1b[0m\x1b[0m\x1b[0m\x1b[0m';
       expect(stripAnsi(input)).toBe('hello');
+    });
+  });
+});
+
+// ─── Kubernetes YAML block tests ───────────────────────────────────────────
+
+describe('Kubernetes YAML markdown blocks', () => {
+  describe('wrapBareYamlBlocks with real-world K8s resources', () => {
+    it('wraps a typical Deployment manifest', () => {
+      const input = [
+        'Here is a Deployment:',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name: nginx-deployment',
+        '  labels:',
+        '    app: nginx',
+        'spec:',
+        '  replicas: 3',
+        '  selector:',
+        '    matchLabels:',
+        '      app: nginx',
+        '  template:',
+        '    metadata:',
+        '      labels:',
+        '        app: nginx',
+        '    spec:',
+        '      containers:',
+        '      - name: nginx',
+        '        image: nginx:1.25',
+        '        ports:',
+        '        - containerPort: 80',
+        '        resources:',
+        '          limits:',
+        '            cpu: "500m"',
+        '            memory: "128Mi"',
+        '          requests:',
+        '            cpu: "250m"',
+        '            memory: "64Mi"',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Deployment');
+      expect(result).toContain('replicas: 3');
+      expect(result).toContain('containerPort: 80');
+      const fences = (result.match(/```/g) || []).length;
+      expect(fences).toBe(2);
+    });
+
+    it('wraps a Service manifest', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Service',
+        'metadata:',
+        '  name: my-service',
+        '  namespace: default',
+        'spec:',
+        '  type: LoadBalancer',
+        '  selector:',
+        '    app: nginx',
+        '  ports:',
+        '  - protocol: TCP',
+        '    port: 80',
+        '    targetPort: 8080',
+        '    nodePort: 30080',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('type: LoadBalancer');
+      expect(result).toContain('nodePort: 30080');
+    });
+
+    it('wraps a ConfigMap with multiline data', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: game-config',
+        'data:',
+        '  game.properties: |',
+        '    enemies=aliens',
+        '    lives=3',
+        '  ui.properties: |',
+        '    color.good=purple',
+        '    color.bad=yellow',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('game.properties: |');
+      expect(result).toContain('enemies=aliens');
+    });
+
+    it('wraps a Secret manifest', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Secret',
+        'metadata:',
+        '  name: db-credentials',
+        'type: Opaque',
+        'data:',
+        '  username: YWRtaW4=',
+        '  password: cGFzc3dvcmQ=',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('type: Opaque');
+      expect(result).toContain('username: YWRtaW4=');
+    });
+
+    it('wraps an Ingress manifest', () => {
+      const input = [
+        'apiVersion: networking.k8s.io/v1',
+        'kind: Ingress',
+        'metadata:',
+        '  name: minimal-ingress',
+        '  annotations:',
+        '    nginx.ingress.kubernetes.io/rewrite-target: /',
+        'spec:',
+        '  ingressClassName: nginx',
+        '  rules:',
+        '  - host: example.com',
+        '    http:',
+        '      paths:',
+        '      - path: /testpath',
+        '        pathType: Prefix',
+        '        backend:',
+        '          service:',
+        '            name: test',
+        '            port:',
+        '              number: 80',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('networking.k8s.io/v1');
+      expect(result).toContain('nginx.ingress.kubernetes.io/rewrite-target: /');
+    });
+
+    it('wraps a HorizontalPodAutoscaler manifest', () => {
+      const input = [
+        'apiVersion: autoscaling/v2',
+        'kind: HorizontalPodAutoscaler',
+        'metadata:',
+        '  name: php-apache',
+        'spec:',
+        '  scaleTargetRef:',
+        '    apiVersion: apps/v1',
+        '    kind: Deployment',
+        '    name: php-apache',
+        '  minReplicas: 1',
+        '  maxReplicas: 10',
+        '  metrics:',
+        '  - type: Resource',
+        '    resource:',
+        '      name: cpu',
+        '      target:',
+        '        type: Utilization',
+        '        averageUtilization: 50',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('autoscaling/v2');
+      expect(result).toContain('maxReplicas: 10');
+    });
+
+    it('wraps a PersistentVolumeClaim manifest', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: PersistentVolumeClaim',
+        'metadata:',
+        '  name: my-pvc',
+        'spec:',
+        '  accessModes:',
+        '  - ReadWriteOnce',
+        '  storageClassName: managed-premium',
+        '  resources:',
+        '    requests:',
+        '      storage: 5Gi',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('ReadWriteOnce');
+      expect(result).toContain('storage: 5Gi');
+    });
+
+    it('wraps a Namespace manifest', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Namespace',
+        'metadata:',
+        '  name: my-namespace',
+        '  labels:',
+        '    env: production',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Namespace');
+    });
+
+    it('wraps a CronJob manifest', () => {
+      const input = [
+        'apiVersion: batch/v1',
+        'kind: CronJob',
+        'metadata:',
+        '  name: backup',
+        'spec:',
+        '  schedule: "*/5 * * * *"',
+        '  jobTemplate:',
+        '    spec:',
+        '      template:',
+        '        spec:',
+        '          containers:',
+        '          - name: backup',
+        '            image: busybox',
+        '            command: ["/bin/sh", "-c", "date; echo Hello"]',
+        '          restartPolicy: OnFailure',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('schedule: "*/5 * * * *"');
+      expect(result).toContain('restartPolicy: OnFailure');
+    });
+
+    it('wraps a ClusterRole with RBAC rules', () => {
+      const input = [
+        'apiVersion: rbac.authorization.k8s.io/v1',
+        'kind: ClusterRole',
+        'metadata:',
+        '  name: pod-reader',
+        'rules:',
+        '- apiGroups: [""]',
+        '  resources: ["pods"]',
+        '  verbs: ["get", "watch", "list"]',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('rbac.authorization.k8s.io/v1');
+      expect(result).toContain('verbs: ["get", "watch", "list"]');
+    });
+  });
+
+  describe('wrapBareYamlBlocks with multi-resource responses', () => {
+    it('wraps two K8s resources separated by prose', () => {
+      const input = [
+        'First, create the Deployment:',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name: web',
+        'spec:',
+        '  replicas: 2',
+        '',
+        '',
+        'Then create the Service:',
+        'apiVersion: v1',
+        'kind: Service',
+        'metadata:',
+        '  name: web-svc',
+        'spec:',
+        '  selector:',
+        '    app: web',
+        '  ports:',
+        '  - port: 80',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      const yamlFences = (result.match(/```yaml/g) || []).length;
+      expect(yamlFences).toBe(2);
+      expect(result).toContain('kind: Deployment');
+      expect(result).toContain('kind: Service');
+    });
+
+    it('handles response with fenced YAML + bare YAML + prose', () => {
+      const input = [
+        'Here is the current pod:',
+        '```yaml',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: old-pod',
+        '```',
+        '',
+        'And here is the updated version you need:',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: new-pod',
+        '  labels:',
+        '    version: v2',
+        '',
+        '',
+        'Apply it with `kubectl apply -f pod.yaml`.',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      const fences = (result.match(/```/g) || []).length;
+      expect(fences).toBe(4); // original 2 + new 2
+      expect(result).toContain('name: old-pod');
+      expect(result).toContain('name: new-pod');
+      expect(result).toContain('version: v2');
+    });
+
+    it('handles three consecutive bare K8s resources', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Namespace',
+        'metadata:',
+        '  name: prod',
+        '',
+        '',
+        'apiVersion: v1',
+        'kind: ServiceAccount',
+        'metadata:',
+        '  name: deployer',
+        '  namespace: prod',
+        '',
+        '',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name: app',
+        '  namespace: prod',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      const yamlFences = (result.match(/```yaml/g) || []).length;
+      expect(yamlFences).toBe(3);
+    });
+  });
+
+  describe('extractAIAnswer with K8s YAML end-to-end', () => {
+    it('preserves fenced K8s Deployment YAML through pipeline', () => {
+      const input = [
+        'AI: Here is a Deployment:',
+        '',
+        '```yaml',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name: nginx',
+        'spec:',
+        '  replicas: 3',
+        '  selector:',
+        '    matchLabels:',
+        '      app: nginx',
+        '  template:',
+        '    metadata:',
+        '      labels:',
+        '        app: nginx',
+        '    spec:',
+        '      containers:',
+        '      - name: nginx',
+        '        image: nginx:latest',
+        '```',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Deployment');
+      expect(result).toContain('replicas: 3');
+      expect(result).toContain('image: nginx:latest');
+      // Should not double-wrap
+      const yamlFences = (result.match(/```yaml/g) || []).length;
+      expect(yamlFences).toBe(1);
+    });
+
+    it('wraps bare K8s Service YAML through pipeline', () => {
+      const input = [
+        'AI: Here is the service configuration:',
+        '',
+        'apiVersion: v1',
+        'kind: Service',
+        'metadata:',
+        '  name: my-svc',
+        'spec:',
+        '  type: ClusterIP',
+        '  ports:',
+        '  - port: 80',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Service');
+      expect(result).toContain('type: ClusterIP');
+    });
+
+    it('handles ANSI-wrapped K8s YAML output', () => {
+      const input = [
+        '\x1b[1mAI:\x1b[0m Here is the ConfigMap:',
+        '',
+        '\x1b[32mapiVersion: v1\x1b[0m',
+        '\x1b[32mkind: ConfigMap\x1b[0m',
+        '\x1b[32mmetadata:\x1b[0m',
+        '\x1b[32m  name: my-config\x1b[0m',
+        '\x1b[32mdata:\x1b[0m',
+        '\x1b[32m  key: value\x1b[0m',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: ConfigMap');
+      expect(result).toContain('key: value');
+    });
+
+    it('handles Rich panel wrapped K8s YAML', () => {
+      const input = [
+        'AI:',
+        '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+        '┃ apiVersion: v1               ┃',
+        '┃ kind: Pod                     ┃',
+        '┃ metadata:                     ┃',
+        '┃   name: debug-pod            ┃',
+        '┃ spec:                         ┃',
+        '┃   containers:                 ┃',
+        '┃   - name: debug              ┃',
+        '┃     image: busybox           ┃',
+        '┃     command: ["sleep", "3600"]┃',
+        '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Pod');
+      expect(result).toContain('name: debug-pod');
+    });
+  });
+});
+
+// ─── Parser edge case tests ────────────────────────────────────────────────
+
+describe('parser edge cases', () => {
+  describe('wrapBareYamlBlocks edge cases', () => {
+    it('handles YAML multi-document separator (---)', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Namespace',
+        'metadata:',
+        '  name: test',
+        '---',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test-pod',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('apiVersion: v1');
+      // The --- separator should be inside the fenced block, not bare text
+      // (bare --- in markdown would render as a horizontal rule)
+      const yamlFences = (result.match(/```yaml/g) || []).length;
+      expect(yamlFences).toBe(1);
+      expect(result).toContain('---');
+    });
+
+    it('handles YAML with pipe (|) multiline string indicator', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: scripts',
+        'data:',
+        '  init.sh: |',
+        '    #!/bin/bash',
+        '    echo "Hello, World!"',
+        '    exit 0',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('init.sh: |');
+    });
+
+    it('handles YAML with folded (>) multiline string indicator', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: desc',
+        'data:',
+        '  description: >',
+        '    This is a long',
+        '    description that gets',
+        '    folded into one line.',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('description: >');
+    });
+
+    it('handles YAML with boolean-like values', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: flags',
+        'data:',
+        '  enabled: "true"',
+        '  debug: "false"',
+        '  count: "0"',
+        '  empty: ""',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('enabled: "true"');
+    });
+
+    it('handles YAML with null/empty values', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test',
+        '  namespace:',
+        '  annotations:',
+        '  labels:',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('namespace:');
+    });
+
+    it('handles YAML with very deep nesting (6+ levels)', () => {
+      const input = [
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'spec:',
+        '  template:',
+        '    spec:',
+        '      containers:',
+        '      - name: app',
+        '        env:',
+        '        - name: DB_HOST',
+        '          valueFrom:',
+        '            configMapKeyRef:',
+        '              name: db-config',
+        '              key: host',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('configMapKeyRef:');
+      expect(result).toContain('key: host');
+    });
+
+    it('handles YAML with inline flow sequences in values', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test',
+        'spec:',
+        '  containers:',
+        '  - name: test',
+        '    command: ["sh", "-c", "echo hello"]',
+        '    args: []',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('command: ["sh", "-c", "echo hello"]');
+      expect(result).toContain('args: []');
+    });
+
+    it('handles YAML with annotation keys containing dots and slashes', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: annotated',
+        '  annotations:',
+        '    kubernetes.io/change-cause: "initial deploy"',
+        '    app.kubernetes.io/managed-by: helm',
+        '    meta.helm.sh/release-name: my-release',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kubernetes.io/change-cause:');
+      expect(result).toContain('meta.helm.sh/release-name:');
+    });
+
+    it('handles YAML with quoted keys', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: special',
+        'data:',
+        '  "key.with.dots": value1',
+        "  'key-with-dashes': value2",
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('"key.with.dots": value1');
+    });
+
+    it('handles YAML followed by a markdown code block', () => {
+      const input = [
+        'Apply this manifest:',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test',
+        '',
+        '',
+        'Then run this command:',
+        '```bash',
+        'kubectl apply -f pod.yaml',
+        '```',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('```bash');
+      expect(result).toContain('kubectl apply -f pod.yaml');
+    });
+
+    it('handles YAML where apiVersion value is on the next line', () => {
+      const input = [
+        'apiVersion:',
+        '  v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('apiVersion:');
+    });
+
+    it('handles YAML with comment lines interspersed', () => {
+      const input = [
+        'apiVersion: v1',
+        '# This is a pod for testing',
+        'kind: Pod',
+        'metadata:',
+        '  name: test',
+        '  # Add more labels as needed',
+        '  labels:',
+        '    app: test',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('# This is a pod for testing');
+      expect(result).toContain('# Add more labels as needed');
+    });
+
+    it('handles YAML with single blank line (does not split)', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Pod',
+        '',
+        'metadata:',
+        '  name: test',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      // Single blank line should be included in the same block
+      const yamlFences = (result.match(/```yaml/g) || []).length;
+      expect(yamlFences).toBe(1);
+      expect(result).toContain('name: test');
+    });
+
+    it('handles YAML with resource quantity strings', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: resource-pod',
+        'spec:',
+        '  containers:',
+        '  - name: app',
+        '    resources:',
+        '      limits:',
+        '        cpu: "2"',
+        '        memory: 2Gi',
+        '        nvidia.com/gpu: "1"',
+        '      requests:',
+        '        cpu: 500m',
+        '        memory: 256Mi',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('memory: 2Gi');
+      expect(result).toContain('nvidia.com/gpu: "1"');
+      expect(result).toContain('cpu: 500m');
+    });
+  });
+
+  describe('looksLikeYaml edge cases', () => {
+    it('accepts keys with dots like K8s annotations', () => {
+      expect(looksLikeYaml('kubernetes.io/name: test')).toBe(true);
+    });
+
+    it('accepts keys with slashes', () => {
+      expect(looksLikeYaml('app.kubernetes.io/version: v1')).toBe(true);
+    });
+
+    it('accepts keys ending with colon and no space', () => {
+      expect(looksLikeYaml('metadata:')).toBe(true);
+    });
+
+    it('accepts YAML list items with nested keys', () => {
+      expect(looksLikeYaml('- name: test')).toBe(true);
+    });
+
+    it('accepts bare list marker', () => {
+      expect(looksLikeYaml('-')).toBe(true);
+    });
+
+    it('accepts YAML anchors (&)', () => {
+      expect(looksLikeYaml('defaults: &defaults')).toBe(true);
+    });
+
+    it('accepts YAML aliases (*)', () => {
+      // *defaults would start with *, which isn't a YAML key/list/flow
+      expect(looksLikeYaml('<<: *defaults')).toBe(false);
+    });
+
+    it('rejects bare prose without colons', () => {
+      expect(looksLikeYaml('This is just text')).toBe(false);
+    });
+
+    it('rejects markdown bold/italic markers', () => {
+      expect(looksLikeYaml('**bold text**')).toBe(false);
+    });
+
+    it('accepts numeric-starting keys (\\w includes digits)', () => {
+      expect(looksLikeYaml('8080: http')).toBe(true);
+    });
+
+    it('accepts keys with hyphens', () => {
+      expect(looksLikeYaml('my-key: my-value')).toBe(true);
+    });
+
+    it('accepts indented YAML continuation (empty line treated as YAML)', () => {
+      expect(looksLikeYaml('')).toBe(true);
+    });
+
+    it('accepts YAML document separator (---)', () => {
+      expect(looksLikeYaml('---')).toBe(true);
+    });
+
+    it('accepts YAML document end marker (...)', () => {
+      expect(looksLikeYaml('...')).toBe(true);
+    });
+
+    it('rejects longer dashes (markdown horizontal rule)', () => {
+      // ---- is not a YAML separator (only exactly --- is)
+      expect(looksLikeYaml('----')).toBe(false);
+    });
+  });
+
+  describe('cleanTerminalFormatting edge cases', () => {
+    it('strips Rich border from around K8s YAML output', () => {
+      const input = [
+        '┏━━━━━━━━━━━━━━━━━━━━━━━┓',
+        '┃ apiVersion: v1         ┃',
+        '┃ kind: Service          ┃',
+        '┃ metadata:              ┃',
+        '┃   name: my-svc         ┃',
+        '┗━━━━━━━━━━━━━━━━━━━━━━━┛',
+      ].join('\n');
+      const result = cleanTerminalFormatting(input);
+      expect(result).toContain('apiVersion: v1');
+      expect(result).toContain('kind: Service');
+      expect(result).not.toContain('┃');
+      expect(result).not.toContain('┏');
+    });
+
+    it('handles Rich panel with mismatched widths', () => {
+      const input = [
+        '┏━━━━━━━━━┓',
+        '┃ short ┃',
+        '┃ this is a much longer line ┃',
+        '┗━━━━━━━━━┛',
+      ].join('\n');
+      const result = cleanTerminalFormatting(input);
+      expect(result).toContain('short');
+      expect(result).toContain('this is a much longer line');
+    });
+
+    it('preserves fenced yaml block content', () => {
+      const input = [
+        '```yaml',
+        '┃ this is inside a code fence',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        '```',
+      ].join('\n');
+      const result = cleanTerminalFormatting(input);
+      expect(result).toContain('┃ this is inside a code fence');
+      expect(result).toContain('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    });
+
+    it('handles alternating panel borders and content', () => {
+      const input = [
+        '┏━━━━━━━━━━┓',
+        '┃ Block 1  ┃',
+        '┗━━━━━━━━━━┛',
+        'Some prose text here',
+        '┏━━━━━━━━━━┓',
+        '┃ Block 2  ┃',
+        '┗━━━━━━━━━━┛',
+      ].join('\n');
+      const result = cleanTerminalFormatting(input);
+      expect(result).toContain('Block 1');
+      expect(result).toContain('Some prose text here');
+      expect(result).toContain('Block 2');
+    });
+  });
+
+  describe('stripAgentNoise edge cases', () => {
+    it('strips agent noise before K8s YAML content', () => {
+      const lines = [
+        'root@agent:/# python /app/aks-agent.py',
+        '┏━━━ Task List ━━━┓',
+        '+----+-------------+--------+',
+        '| ID | Description | Status |',
+        '+----+-------------+--------+',
+        '| t1 | Get pods    | [✓] completed |',
+        '+----+-------------+--------+',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test',
+      ];
+      const result = stripAgentNoise(lines);
+      expect(result).toContain('apiVersion: v1');
+      expect(result).toContain('kind: Pod');
+      expect(result.join('\n')).not.toContain('root@agent');
+    });
+
+    it('preserves K8s YAML inside fenced block among noise', () => {
+      const lines = [
+        'root@agent:/# command',
+        '```yaml',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name: app',
+        '```',
+        'root@agent:/#',
+      ];
+      const result = stripAgentNoise(lines);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('apiVersion: apps/v1');
+      expect(result).toContain('```');
+    });
+  });
+
+  describe('extractAIAnswer edge cases', () => {
+    it('handles response with only YAML and no prose', () => {
+      const input = [
+        'AI:',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: test-pod',
+        'spec:',
+        '  containers:',
+        '  - name: test',
+        '    image: alpine',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Pod');
+      expect(result).toContain('image: alpine');
+    });
+
+    it('handles response with multiple interspersed code blocks', () => {
+      const input = [
+        'AI: Here are the resources:',
+        '',
+        '```yaml',
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: config',
+        '```',
+        '',
+        'And the TypeScript client:',
+        '',
+        '```typescript',
+        "import * as k8s from '@kubernetes/client-node';",
+        'const kc = new k8s.KubeConfig();',
+        'kc.loadFromDefault();',
+        '```',
+        '',
+        'And a Mermaid diagram:',
+        '',
+        '```mermaid',
+        'graph TD',
+        '  A[ConfigMap] --> B[Pod]',
+        '  B --> C[Service]',
+        '```',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('```typescript');
+      expect(result).toContain('```mermaid');
+      expect(result).toContain('kind: ConfigMap');
+      expect(result).toContain('kc.loadFromDefault()');
+      expect(result).toContain('A[ConfigMap] --> B[Pod]');
+    });
+
+    it('handles response where AI says apiVersion in prose', () => {
+      const input = [
+        'AI: You should set apiVersion: apps/v1 in your Deployment manifest.',
+        'The kind should be Deployment.',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      // Should not wrap prose as YAML
+      expect(result).toContain('apiVersion: apps/v1');
+    });
+
+    it('handles response with kubectl output table', () => {
+      const input = [
+        'AI: Here are your pods:',
+        '',
+        '```',
+        'NAME                     READY   STATUS    RESTARTS   AGE',
+        'nginx-6b474476c4-abc12   1/1     Running   0          2d',
+        'nginx-6b474476c4-def34   1/1     Running   0          2d',
+        '```',
+        '',
+        'All pods are running.',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('nginx-6b474476c4-abc12');
+      expect(result).toContain('All pods are running.');
+    });
+
+    it('handles response with YAML containing emoji in labels', () => {
+      const input = [
+        'AI: Here is the manifest:',
+        '',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '  name: demo',
+        '  labels:',
+        '    app: demo',
+        'spec:',
+        '  containers:',
+        '  - name: web',
+        '    image: nginx',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('app: demo');
+    });
+
+    it('handles malformed response with partial YAML then error', () => {
+      const input = [
+        'AI: Here is your Deployment:',
+        '',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name:',
+        '',
+        '',
+        'Error: I was unable to complete the manifest due to missing information.',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('kind: Deployment');
+      expect(result).toContain('Error: I was unable to complete');
+    });
+
+    it('handles response with Windows-style CRLF line endings', () => {
+      const input =
+        'AI: Here is the pod:\r\n\r\napiVersion: v1\r\nkind: Pod\r\nmetadata:\r\n  name: test\r\n';
+      const result = extractAIAnswer(input);
+      expect(result).toContain('kind: Pod');
+    });
+
+    it('handles response with zero-width characters', () => {
+      const input = [
+        'AI: Here is the config:',
+        '',
+        'apiVersion: v1',
+        'kind: \u200BConfigMap',
+        'metadata:',
+        '  name: test',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('apiVersion: v1');
+    });
+
+    it('handles response with tab indentation instead of spaces', () => {
+      const input = [
+        'AI: Here is the pod:',
+        '',
+        'apiVersion: v1',
+        'kind: Pod',
+        'metadata:',
+        '\tname: test',
+        'spec:',
+        '\tcontainers:',
+        '\t- name: nginx',
+        '\t  image: nginx',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      expect(result).toContain('apiVersion: v1');
+      expect(result).toContain('kind: Pod');
+    });
+
+    it('wraps multi-document YAML with --- into a single fenced block', () => {
+      const input = [
+        'AI: Apply these resources:',
+        '',
+        'apiVersion: v1',
+        'kind: Namespace',
+        'metadata:',
+        '  name: prod',
+        '---',
+        'apiVersion: apps/v1',
+        'kind: Deployment',
+        'metadata:',
+        '  name: app',
+        '  namespace: prod',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      // Both documents should be in a single fenced block
+      const yamlFences = (result.match(/```yaml/g) || []).length;
+      expect(yamlFences).toBe(1);
+      expect(result).toContain('kind: Namespace');
+      expect(result).toContain('---');
+      expect(result).toContain('kind: Deployment');
+    });
+
+    it('does not treat --- in prose as YAML', () => {
+      const input = [
+        'AI: Here is some info.',
+        '',
+        'Kubernetes is a container orchestration platform.',
+        '',
+        'That is all I have to share.',
+      ].join('\n');
+      const result = extractAIAnswer(input);
+      // No YAML fence should be added for prose-only content
+      expect(result).not.toContain('```yaml');
+    });
+  });
+
+  describe('isAgentNoiseLine edge cases', () => {
+    it('detects noise with long paths', () => {
+      expect(
+        isAgentNoiseLine('root@long-hostname-12345:/very/deep/path/to/workspace#')
+      ).toBe(true);
+    });
+
+    it('does not flag K8s resource lines as noise', () => {
+      expect(isAgentNoiseLine('apiVersion: v1')).toBe(false);
+      expect(isAgentNoiseLine('kind: Deployment')).toBe(false);
+      expect(isAgentNoiseLine('  name: my-pod')).toBe(false);
+      expect(isAgentNoiseLine('  replicas: 3')).toBe(false);
+      expect(isAgentNoiseLine('  - containerPort: 80')).toBe(false);
+    });
+
+    it('does not flag prose that discusses K8s concepts as noise', () => {
+      expect(isAgentNoiseLine('The pod is in CrashLoopBackOff state.')).toBe(false);
+      expect(isAgentNoiseLine('You need to create a Service of type LoadBalancer.')).toBe(
+        false
+      );
+    });
+
+    it('detects table border variations', () => {
+      expect(isAgentNoiseLine('+---+---+---+')).toBe(true);
+      // = sign table borders (e.g. Python tabulate double_grid format)
+      expect(isAgentNoiseLine('+====+====+')).toBe(true);
+      expect(isAgentNoiseLine('+--+-+')).toBe(true);
+    });
+
+    it('detects task table data rows with various statuses', () => {
+      expect(isAgentNoiseLine('| t1 | Check status | [✓] completed |')).toBe(true);
+      expect(isAgentNoiseLine('| t2 | Fix issue   | [~] in_progress |')).toBe(true);
+      expect(isAgentNoiseLine('| t3 | Test it     | [ ] pending |')).toBe(true);
     });
   });
 });
