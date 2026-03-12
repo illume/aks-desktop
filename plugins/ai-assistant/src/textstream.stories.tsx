@@ -118,12 +118,194 @@ Both options integrate with Grafana for dashboards.`,
   { role: 'user', content: 'How do I check my cluster networking?' },
 ];
 
-// Follow-up questions used to simulate a realistic multi-turn conversation
+// Short follow-up questions used to simulate a realistic multi-turn conversation
 const followUpQuestions = [
   'How do I check my cluster networking?',
   'How do I troubleshoot DNS issues in AKS?',
   'What about network policy debugging?',
   'How do I monitor network traffic between pods?',
+];
+
+// Long user questions with YAML to test scroll behavior for tall user messages
+const longUserQuestions = [
+  `I'm trying to deploy this configuration but it keeps failing. Can you help me debug it?
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+  labels:
+    app: my-app
+    version: v2.1.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+        version: v2.1.0
+    spec:
+      containers:
+      - name: my-app
+        image: myregistry.azurecr.io/my-app:v2.1.0
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+\`\`\`
+
+The pods keep getting OOMKilled after about 5 minutes of running.`,
+
+  `I have this network policy but traffic is still getting through when it shouldn't be:
+
+\`\`\`yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: secure-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: frontend
+    - podSelector:
+        matchLabels:
+          role: api-gateway
+    ports:
+    - protocol: TCP
+      port: 443
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+\`\`\`
+
+Pods in the \`staging\` namespace can still reach the \`secure-api\` pods on port 443. What am I doing wrong?`,
+];
+
+const longQuestionResponses = [
+  `The OOMKilled issue is clear from your deployment spec. Your container has a memory limit of **512Mi** but the app is exceeding that.
+
+## Diagnosis
+
+\`\`\`bash
+# Check the OOMKilled events
+kubectl describe pod -l app=my-app -n production | grep -A 5 "Last State"
+
+# Monitor real-time memory usage
+kubectl top pods -l app=my-app -n production
+\`\`\`
+
+## Solutions
+
+1. **Increase the memory limit** — if your app genuinely needs more memory:
+\`\`\`yaml
+resources:
+  limits:
+    memory: "1Gi"  # Increase from 512Mi
+\`\`\`
+
+2. **Check for memory leaks** — profile your app's heap:
+\`\`\`bash
+kubectl exec -it <pod-name> -n production -- /bin/sh -c "curl localhost:8080/debug/pprof/heap > /tmp/heap"
+kubectl cp production/<pod-name>:/tmp/heap ./heap.prof
+\`\`\`
+
+3. **Add a VPA** to auto-tune resources:
+\`\`\`bash
+kubectl apply -f - <<EOF
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: my-app-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: my-app
+  updatePolicy:
+    updateMode: "Auto"
+EOF
+\`\`\`
+
+> **Tip**: Start by checking \`kubectl top pods\` to see actual usage patterns before raising limits.`,
+
+  `The issue is with your \`ingress.from\` rules — you're using two separate selectors which creates an **OR** condition instead of **AND**.
+
+## The Problem
+
+\`\`\`yaml
+ingress:
+- from:
+  - namespaceSelector:      # Rule 1: ANY pod from 'frontend' namespace
+      matchLabels:
+        name: frontend
+  - podSelector:             # Rule 2: ANY pod with role=api-gateway in SAME namespace
+      matchLabels:
+        role: api-gateway
+\`\`\`
+
+These are **two separate rules** (OR). Any pod from the \`frontend\` namespace OR any pod labeled \`role: api-gateway\` in the \`production\` namespace can connect.
+
+## The Fix
+
+Combine them into a **single rule** (AND):
+
+\`\`\`yaml
+ingress:
+- from:
+  - namespaceSelector:
+      matchLabels:
+        name: frontend
+    podSelector:            # Same list item = AND condition
+      matchLabels:
+        role: api-gateway
+\`\`\`
+
+Now only pods that are **both** in the \`frontend\` namespace **and** labeled \`role: api-gateway\` can connect.
+
+Verify with:
+\`\`\`bash
+# Test from staging (should be blocked)
+kubectl exec -n staging test-pod -- curl -s --max-time 3 https://secure-api.production:443
+
+# Test from frontend with correct label (should work)
+kubectl exec -n frontend -l role=api-gateway test-pod -- curl -s https://secure-api.production:443
+\`\`\``,
 ];
 
 // ── Stories ──────────────────────────────────────────────────────────────────
@@ -344,6 +526,181 @@ az aks nodepool update \\
             {step < exchanges.length
               ? `Send Next Question (${step + 1}/${exchanges.length})`
               : 'Conversation Complete'}
+          </Button>
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
+};
+
+/**
+ * Tests scroll behavior with long user questions containing YAML.
+ * For tall questions that exceed 30% of viewport height, the viewport should
+ * scroll to the bottom of the user question (showing the tail of what they
+ * asked) plus the start of the response.
+ */
+export const LongUserQuestionsWithYAML: StoryFn = () => {
+  const [history, setHistory] = useState<Prompt[]>([
+    { role: 'user', content: 'How do I get started with AKS?' },
+    {
+      role: 'assistant',
+      content: `To get started with AKS, create a cluster using the Azure CLI:
+
+\`\`\`bash
+az aks create --resource-group myRG --name myCluster --node-count 3
+az aks get-credentials --resource-group myRG --name myCluster
+kubectl get nodes
+\`\`\`
+
+Let me know if you need help with deployments or networking!`,
+    },
+  ]);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const addExchange = () => {
+    const question = longUserQuestions[questionIndex % longUserQuestions.length];
+    const response = longQuestionResponses[questionIndex % longQuestionResponses.length];
+
+    // Add long user question
+    setHistory(prev => [...prev, { role: 'user', content: question }]);
+    setIsLoading(true);
+
+    // Simulate a realistic slow AI response (3 seconds)
+    timerRef.current = setTimeout(() => {
+      setHistory(prev => [...prev, { role: 'assistant', content: response }]);
+      setIsLoading(false);
+      setQuestionIndex(i => i + 1);
+    }, 3000);
+  };
+
+  return (
+    <ThemeProvider theme={lightTheme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: 500, maxWidth: 700 }}>
+        <Box sx={{ flex: 1, overflow: 'hidden' }}>
+          <TextStreamContainer history={history} isLoading={isLoading} apiError={null} />
+        </Box>
+        <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button variant="contained" onClick={addExchange} disabled={isLoading}>
+            {isLoading ? 'Waiting for AI response...' : 'Send Long YAML Question'}
+          </Button>
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
+};
+
+/**
+ * Simulates realistic slow AI response times (2-5 seconds) to verify that
+ * the loading indicator is shown and the viewport handles the transition
+ * correctly when the response finally arrives.
+ */
+export const SlowResponsesWithLoader: StoryFn = () => {
+  const responseTimes = [2000, 4000, 3000, 5000]; // Variable delays in ms
+  const exchanges: Array<{ user: string; assistant: string; delayMs: number }> = [
+    {
+      user: 'How do I check my cluster health?',
+      assistant: `Here's how to check your AKS cluster health:
+
+\`\`\`bash
+# Overall cluster status
+az aks show --resource-group myRG --name myCluster --query "provisioningState"
+
+# Node health
+kubectl get nodes
+kubectl describe nodes | grep -A 5 "Conditions"
+
+# System pod health
+kubectl get pods -n kube-system
+\`\`\`
+
+If any nodes show **NotReady**, check the kubelet logs on that node.`,
+      delayMs: responseTimes[0],
+    },
+    {
+      user: longUserQuestions[0], // Long YAML question
+      assistant: longQuestionResponses[0],
+      delayMs: responseTimes[1],
+    },
+    {
+      user: 'What ports does AKS need open?',
+      assistant: `AKS requires these ports for proper operation:
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 443 | TCP | Kubernetes API server |
+| 10250 | TCP | Kubelet API |
+| 10255 | TCP | Kubelet read-only |
+| 30000-32767 | TCP | NodePort services |
+
+\`\`\`bash
+# Verify API server connectivity
+kubectl cluster-info
+
+# Check if you can reach the API
+curl -k https://<api-server-url>:443/healthz
+\`\`\``,
+      delayMs: responseTimes[2],
+    },
+    {
+      user: longUserQuestions[1], // Long network policy question
+      assistant: longQuestionResponses[1],
+      delayMs: responseTimes[3],
+    },
+  ];
+
+  const [history, setHistory] = useState<Prompt[]>([
+    { role: 'user', content: 'Hello, I need help debugging my AKS cluster.' },
+    {
+      role: 'assistant',
+      content:
+        "Hi! I can help with AKS debugging. What's the issue you're experiencing?",
+    },
+  ]);
+  const [step, setStep] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const addNextExchange = () => {
+    if (step >= exchanges.length) return;
+    const exchange = exchanges[step];
+
+    // Add user message
+    setHistory(prev => [...prev, { role: 'user', content: exchange.user }]);
+    setIsLoading(true);
+
+    // Simulate slow AI response with variable delay
+    timerRef.current = setTimeout(() => {
+      setHistory(prev => [...prev, { role: 'assistant', content: exchange.assistant }]);
+      setIsLoading(false);
+      setStep(s => s + 1);
+    }, exchange.delayMs);
+  };
+
+  return (
+    <ThemeProvider theme={lightTheme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: 500, maxWidth: 700 }}>
+        <Box sx={{ flex: 1, overflow: 'hidden' }}>
+          <TextStreamContainer history={history} isLoading={isLoading} apiError={null} />
+        </Box>
+        <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button
+            variant="contained"
+            onClick={addNextExchange}
+            disabled={isLoading || step >= exchanges.length}
+          >
+            {isLoading
+              ? `Waiting for AI... (~${responseTimes[step] / 1000}s)`
+              : step < exchanges.length
+                ? `Send Question ${step + 1}/${exchanges.length}${step === 1 || step === 3 ? ' (Long YAML)' : ''}`
+                : 'All Questions Answered'}
           </Button>
         </Box>
       </Box>

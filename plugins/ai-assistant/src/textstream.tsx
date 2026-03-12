@@ -138,12 +138,27 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
 
         if (userElement) {
           const userRect = userElement.getBoundingClientRect();
-          // Only include the user question if it's short enough that the
-          // response start stays visible (< 30% of viewport height).
-          if (userRect.height < container.clientHeight * 0.3) {
+          const viewportHeight = container.clientHeight;
+
+          if (userRect.height < viewportHeight * 0.3) {
+            // Short question: show the full question above the response for context
             const userTop = userRect.top - containerRect.top + container.scrollTop;
             container.scrollTo({
               top: Math.max(0, userTop - 8),
+              behavior: 'smooth',
+            });
+            return;
+          } else {
+            // Long question (e.g. contains YAML): show the bottom portion of the
+            // question so the user sees the end of what they asked, then the
+            // start of the response below it.
+            const userBottom =
+              userRect.top + userRect.height - containerRect.top + container.scrollTop;
+            // Place the bottom of the question roughly 25% down the viewport,
+            // so the user sees the tail of their question plus the response start.
+            const scrollTarget = userBottom - viewportHeight * 0.25;
+            container.scrollTo({
+              top: Math.max(0, scrollTarget),
               behavior: 'smooth',
             });
             return;
