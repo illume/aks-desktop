@@ -2596,6 +2596,13 @@ class ThinkingStepTracker {
 }
 
 /**
+ * Minimum ratio of corrected-response length to original-response length.
+ * If the agent's corrected answer is shorter than this fraction of the
+ * original, it is likely truncated or an error — fall back to the original.
+ */
+const MIN_REVIEW_LENGTH_RATIO = 0.3;
+
+/**
  * Runs a question against the AKS agent pod by exec-ing directly into it
  * via the Kubernetes exec API (WebSocket) through Headlamp's proxy.
  * Returns only the final AI answer (clean, no ANSI codes, bullets normalised).
@@ -2642,11 +2649,11 @@ export async function runAksAgent(
             const reviewAnswer = extractAIAnswer(reviewResult);
             const trimmedReview = reviewAnswer.trim();
             // If the agent confirms the response is fine, use the original
-            if (trimmedReview === 'LGTM' || trimmedReview.startsWith('LGTM')) {
+            if (trimmedReview.startsWith('LGTM')) {
               debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
             } else if (
               reviewAnswer &&
-              reviewAnswer.length > answer.length * 0.3
+              reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
             ) {
               // Use the corrected version (sanity check: must be substantial)
               debugLog(
