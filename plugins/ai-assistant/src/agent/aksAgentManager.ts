@@ -1528,6 +1528,11 @@ function wrapBareYamlBlocks(text: string): string {
       let j = i;
       let consecutiveBlanks = 0;
 
+      // Track base indentation of the apiVersion: line so we can stop the
+      // block when the indent drops below it (e.g. prose like "Apply:" at
+      // column 0 after indented YAML).
+      const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+
       while (j < lines.length) {
         const yl = lines[j];
         const yt = yl.trim();
@@ -1540,6 +1545,14 @@ function wrapBareYamlBlocks(text: string): string {
           continue;
         }
         consecutiveBlanks = 0;
+
+        // Check indentation: a non-blank line with less indent than the
+        // base apiVersion: line is outside the YAML block, UNLESS it's a
+        // YAML document separator (---).
+        const lineIndent = yl.match(/^(\s*)/)?.[1].length ?? 0;
+        if (j !== i && lineIndent < baseIndent && yt !== '---') {
+          break;
+        }
 
         if (j === i || looksLikeYaml(yt)) {
           yamlLines.push(yl);

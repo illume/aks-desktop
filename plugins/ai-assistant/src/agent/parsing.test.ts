@@ -1164,6 +1164,48 @@ describe('wrapBareYamlBlocks', () => {
     expect(wrapBareYamlBlocks('')).toBe('');
   });
 
+  it('stops indented YAML block at less-indented prose like "Apply:"', () => {
+    const input = [
+      'Kubernetes YAML:',
+      ' apiVersion: v1',
+      ' kind: Namespace',
+      ' metadata:',
+      '   name: demo',
+      '',
+      'Apply:',
+      'kubectl apply -f app.yaml',
+    ].join('\n');
+
+    const result = wrapBareYamlBlocks(input);
+    expect(result).toContain('```yaml');
+    expect(result).toContain('apiVersion: v1');
+    // Apply: must be OUTSIDE the yaml fence
+    const fenceEnd = result.indexOf('```\n', result.indexOf('```yaml') + 7);
+    const applyIdx = result.indexOf('Apply:');
+    expect(fenceEnd).toBeLessThan(applyIdx);
+  });
+
+  it('dedents indented multi-document YAML with --- separators', () => {
+    const input = [
+      ' apiVersion: v1',
+      ' kind: Namespace',
+      ' metadata:',
+      '   name: demo',
+      ' ---',
+      ' apiVersion: apps/v1',
+      ' kind: Deployment',
+      ' metadata:',
+      '   name: my-app',
+    ].join('\n');
+
+    const result = wrapBareYamlBlocks(input);
+    expect(result).toContain('```yaml');
+    // Should be dedented — no leading space
+    expect(result).toContain('\napiVersion: v1\n');
+    expect(result).toContain('\napiVersion: apps/v1\n');
+    expect(result).toContain('\n---\n');
+  });
+
   it('dedents indented YAML', () => {
     const input = '  apiVersion: v1\n  kind: Pod\n  metadata:\n    name: test';
     const result = wrapBareYamlBlocks(input);
@@ -3638,5 +3680,103 @@ describe('real-world agent responses', () => {
       expect(result).not.toContain('Received session ID');
       expect(result).not.toContain('root@aks-agent-redacted');
     });
+  });
+
+  it('extracts indented multi-document YAML (Java deployment) with commands and headings', () => {
+    const input = [
+      'AI:',
+      'Kubernetes YAML (Namespace + Deployment + Service)',
+      ' apiVersion: v1',
+      ' kind: Namespace',
+      ' metadata:',
+      '   name: demo',
+      ' ---',
+      ' apiVersion: apps/v1',
+      ' kind: Deployment',
+      ' metadata:',
+      '   name: java-demo',
+      '   namespace: demo',
+      '   labels:',
+      '     app: java-demo',
+      ' spec:',
+      '   replicas: 2',
+      '   selector:',
+      '     matchLabels:',
+      '       app: java-demo',
+      '   template:',
+      '     metadata:',
+      '       labels:',
+      '         app: java-demo',
+      '     spec:',
+      '       containers:',
+      '         - name: java-demo',
+      '           image: myacr.azurecr.io/java-demo:1.0.0',
+      '           imagePullPolicy: IfNotPresent',
+      '           ports:',
+      '             - name: http',
+      '               containerPort: 8080',
+      '           env:',
+      '             - name: JAVA_TOOL_OPTIONS',
+      '               value: "-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"',
+      '             - name: SPRING_PROFILES_ACTIVE',
+      '               value: "prod"',
+      '           resources:',
+      '             requests:',
+      '               cpu: "100m"',
+      '               memory: "256Mi"',
+      '             limits:',
+      '               cpu: "500m"',
+      '               memory: "512Mi"',
+      '           readinessProbe:',
+      '             httpGet:',
+      '               path: /actuator/health/readiness',
+      '               port: http',
+      '             initialDelaySeconds: 10',
+      '             periodSeconds: 5',
+      '           livenessProbe:',
+      '             httpGet:',
+      '               path: /actuator/health/liveness',
+      '               port: http',
+      '             initialDelaySeconds: 30',
+      '             periodSeconds: 10',
+      ' ---',
+      ' apiVersion: v1',
+      ' kind: Service',
+      ' metadata:',
+      '   name: java-demo',
+      '   namespace: demo',
+      ' spec:',
+      '   type: ClusterIP',
+      '   selector:',
+      '     app: java-demo',
+      '   ports:',
+      '     - name: http',
+      '       port: 80',
+      '       targetPort: http',
+      '',
+      'Apply:',
+      'kubectl apply -f app.yaml',
+      'kubectl get pods -n demo',
+      'kubectl get svc -n demo',
+      '',
+      '                     2) Build + push image (typical flow)',
+      '',
+      '# build',
+      'docker build -t myacr.azurecr.io/java-demo:1.0.0 .',
+    ].join('\n');
+
+    const result = extractAIAnswer(input);
+    // YAML should be in a fenced block and dedented
+    expect(result).toContain('```yaml');
+    expect(result).toContain('apiVersion: v1');
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('kind: Service');
+    // Apply: should be outside the fence
+    const yamlClose = result.indexOf('```\n', result.indexOf('```yaml') + 7);
+    const applyIdx = result.indexOf('Apply:');
+    expect(yamlClose).toBeLessThan(applyIdx);
+    // Commands should be present
+    expect(result).toContain('kubectl apply -f app.yaml');
+    expect(result).toContain('docker build -t myacr.azurecr.io/java-demo:1.0.0 .');
   });
 });
