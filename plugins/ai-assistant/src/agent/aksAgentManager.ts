@@ -35,12 +35,14 @@ apiVersion: v1
 kind: Pod
 
 ✓ Correct:
-\`\`\`bash
-kubectl get pods -n default
+\`\`\`python
+import yaml
+config = yaml.safe_load(data)
 \`\`\`
 
 ✗ Wrong:
-kubectl get pods -n default
+import yaml
+config = yaml.safe_load(data)
 
 - The conversation history below shows all previously asked questions and your answers. Keep that context in mind and answer accordingly — do not repeat information already provided unless the user explicitly asks for it.
 `;
