@@ -310,7 +310,8 @@ function stripAnsi(text: string): string {
     .replace(/\x1b[()][AB012]/g, '') // Character set selection
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
-    .replace(/\[[\d;]*m/g, ''); // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
+    .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
+    .replace(/^\d*m\s?/gm, ''); // Orphaned ANSI code continuations at line start (e.g. "0m " from "[4\n0m")
 }
 
 /**
@@ -1357,6 +1358,27 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Line continuation: ends with backslash (short lines only to avoid prose)
   if (/\\\s*$/.test(trimmed) && trimmed.length < 80) return true;
 
+  // ── Tier 4: Python-specific patterns ──
+
+  // Python import: from X import Y  or  from X.Y import Z
+  if (/^from\s+\w+(\.\w+)*\s+import\s/.test(trimmed)) return true;
+
+  // Python import: import X  or  import X.Y  or  import X, Y
+  if (/^import\s+\w+/.test(trimmed)) return true;
+
+  // Python function definition: def func_name(
+  if (/^def\s+\w+\s*\(/.test(trimmed)) return true;
+
+  // Python class definition: class Name:  or  class Name(Base):
+  if (/^class\s+[A-Z]\w*[\s(:]/.test(trimmed)) return true;
+
+  // Python decorator: @app.route(...)  or  @staticmethod
+  if (/^@\w+/.test(trimmed)) return true;
+
+  // Python dunder (double underscore) patterns: __name__, __init__, __main__
+  // These are uniquely Python and should never be interpreted as markdown bold
+  if (/__\w+__/.test(trimmed)) return true;
+
   return false;
 }
 
@@ -1590,19 +1612,40 @@ function normalizeTerminalMarkdown(text: string): string {
       }
 
       if (codeLikeLineCount >= 1) {
-        const nonBlank = blockLines.filter(l => l.trim() !== '');
-        const minIndent = nonBlank.reduce((min, l) => {
-          const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
-          return Math.min(min, indent);
-        }, Infinity);
-        const shift = minIndent === Infinity ? 0 : minIndent;
-        const dedented = blockLines.map(l => (l.trim() === '' ? '' : l.slice(shift)));
-        result.push('```');
-        result.push(...dedented);
-        result.push('```');
-        wrappedCodeBlockCount++;
-        i = j;
-        continue;
+        // Don't wrap small fragments if they're surrounded by YAML-like content.
+        // Terminal line wrapping (80 chars) can split long YAML comments into
+        // fragments that look like shell code (e.g. "call /api/*" from a split
+        // "# ... this would call /api/*").  Wrapping these fragments in code
+        // fences breaks the surrounding YAML block.
+        let prevContentTrimmed = '';
+        for (let p = i - 1; p >= 0; p--) {
+          const pt = lines[p].trim();
+          if (pt !== '' && !/^```/.test(pt)) { prevContentTrimmed = pt; break; }
+        }
+        let nextContentTrimmed = '';
+        for (let n = j; n < lines.length; n++) {
+          const nt = lines[n].trim();
+          if (nt !== '') { nextContentTrimmed = nt; break; }
+        }
+        const prevIsYaml = prevContentTrimmed !== '' && looksLikeYaml(prevContentTrimmed);
+        const nextIsYaml = nextContentTrimmed !== '' && looksLikeYaml(nextContentTrimmed);
+        const isFragmentInsideYaml = codeLikeLineCount <= 2 && prevIsYaml && nextIsYaml;
+
+        if (!isFragmentInsideYaml) {
+          const nonBlank = blockLines.filter(l => l.trim() !== '');
+          const minIndent = nonBlank.reduce((min, l) => {
+            const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
+            return Math.min(min, indent);
+          }, Infinity);
+          const shift = minIndent === Infinity ? 0 : minIndent;
+          const dedented = blockLines.map(l => (l.trim() === '' ? '' : l.slice(shift)));
+          result.push('```');
+          result.push(...dedented);
+          result.push('```');
+          wrappedCodeBlockCount++;
+          i = j;
+          continue;
+        }
       }
     }
 
