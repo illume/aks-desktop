@@ -2,6 +2,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import YAML from 'yaml';
 import { parseKubernetesYAML } from '../utils/SampleYamlLibrary';
 import { _testing } from './aksAgentManager';
+import {
+  rawMicroservicesPythonYaml,
+  rawPythonFlaskApp,
+  rawPythonImports,
+} from './testFixtures';
 
 const {
   stripAnsi,
@@ -5145,5 +5150,206 @@ describe('extractAIAnswer — real-world microservice YAML with Rich terminal fo
   it('prose paragraph appears outside the yaml fence', () => {
     const afterFence = result.split('```').pop() || '';
     expect(afterFence).toContain('If you want it even more');
+  });
+});
+
+// ─── Python code detection in looksLikeShellOrDockerCodeLine ─────────────────
+
+describe('looksLikeShellOrDockerCodeLine — Python patterns', () => {
+  it('detects Python from-import statements', () => {
+    expect(looksLikeShellOrDockerCodeLine('from flask import Flask, jsonify')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('from http.server import BaseHTTPRequestHandler, HTTPServer')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('from os.path import join')).toBe(true);
+  });
+
+  it('detects Python import statements', () => {
+    expect(looksLikeShellOrDockerCodeLine('import os')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('import json')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('import yaml')).toBe(true);
+  });
+
+  it('detects Python function definitions', () => {
+    expect(looksLikeShellOrDockerCodeLine('def main():')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('def do_GET(self):')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('def serve_forever (port=8080):')).toBe(true);
+  });
+
+  it('detects Python class definitions', () => {
+    expect(looksLikeShellOrDockerCodeLine('class MyHandler(BaseHTTPRequestHandler):')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('class H(BaseHTTPRequestHandler):')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('class Config:')).toBe(true);
+  });
+
+  it('detects Python decorators', () => {
+    expect(looksLikeShellOrDockerCodeLine('@app.route("/")')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('@staticmethod')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('@property')).toBe(true);
+  });
+
+  it('detects Python dunder patterns like __name__', () => {
+    expect(looksLikeShellOrDockerCodeLine('app = Flask(__name__)')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('if __name__ == "__main__":')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('self.__init__()')).toBe(true);
+  });
+
+  it('does NOT false-positive on plain English prose', () => {
+    expect(looksLikeShellOrDockerCodeLine('from the command line you can run')).toBe(false);
+    expect(looksLikeShellOrDockerCodeLine('class is a reserved word in JS')).toBe(false);
+  });
+});
+
+// ─── ANSI stripping edge cases ───────────────────────────────────────────────
+
+describe('stripAnsi — orphaned ANSI code continuations', () => {
+  it('strips orphaned ANSI codes missing ESC prefix', () => {
+    expect(stripAnsi('[40m text')).toBe(' text');
+    expect(stripAnsi('[0m')).toBe('');
+    expect(stripAnsi('[97;40m hello')).toBe(' hello');
+  });
+
+  it('strips orphaned ANSI code continuations at line start (split across lines)', () => {
+    expect(stripAnsi('0m kubectl get pods')).toBe('kubectl get pods');
+    expect(stripAnsi('40m some text')).toBe('some text');
+  });
+
+  it('preserves normal text that starts with digits', () => {
+    expect(stripAnsi('3 pods running')).toBe('3 pods running');
+    expect(stripAnsi('200 OK')).toBe('200 OK');
+  });
+});
+
+// ─── normalizeTerminalMarkdown — YAML context awareness ─────────────────────
+
+describe('normalizeTerminalMarkdown — does not wrap fragments inside YAML', () => {
+  it('does NOT wrap a shell-like YAML comment between YAML lines', () => {
+    const input = [
+      ' # - redis (state)',
+      '',
+      ' # - ingress routes /api/* and /',
+      '',
+      ' apiVersion: v1',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).not.toMatch(/```\s*\n.*ingress.*\n\s*```/);
+    expect(result).toContain('# - ingress routes /api/* and /');
+  });
+
+  it('does NOT wrap a terminal-split line continuation inside YAML', () => {
+    const input = [
+      '   # Simple "web" that serves a page; in real setups this would',
+      '   call /api/*',
+      '   command: ["python"]',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).not.toMatch(/```\s*\n\s*call \/api/);
+    expect(result).toContain('call /api/*');
+  });
+
+  it('still wraps legitimate indented kubectl commands', () => {
+    const input = [
+      'Check your pods:',
+      '',
+      '  kubectl get pods -n kube-system',
+      '  kubectl get svc',
+      '',
+      'Look for any CrashLoopBackOff.',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```');
+    expect(result).toContain('kubectl get pods');
+  });
+});
+
+// ─── Real-world fixture: microservices YAML with Python & terminal wrapping ──
+
+describe('extractAIAnswer — real-world microservices YAML with embedded Python (shared fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(rawMicroservicesPythonYaml);
+  });
+
+  it('produces exactly one yaml-fenced block', () => {
+    const yamlFences = (result.match(/```yaml/g) || []).length;
+    expect(yamlFences).toBe(1);
+  });
+
+  it('YAML comments with paths are inside the yaml fence, not separate code fences', () => {
+    const fenceBlocks = result.split('```');
+    const yamlBlock = fenceBlocks.find(b => b.startsWith('yaml'));
+    expect(yamlBlock).toBeDefined();
+    expect(yamlBlock).toContain('# - ingress routes /api/* and /');
+  });
+
+  it('does NOT wrap "call /api/*" terminal continuation as a separate code block', () => {
+    const lines = result.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('call /api/*')) {
+        if (i > 0) {
+          expect(lines[i - 1].trim()).not.toBe('```');
+        }
+        break;
+      }
+    }
+  });
+
+  it('preserves embedded Python code in YAML args block', () => {
+    expect(result).toContain('from http.server import BaseHTTPRequestHandler');
+    expect(result).toContain('class H(BaseHTTPRequestHandler)');
+    expect(result).toContain('def do_GET(self)');
+    expect(result).toContain('HTTPServer');
+  });
+
+  it('contains all YAML structure keywords', () => {
+    expect(result).toContain('apiVersion:');
+    expect(result).toContain('kind: Namespace');
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('kind: Service');
+    expect(result).toContain('metadata:');
+    expect(result).toContain('containers:');
+  });
+
+  it('YAML content contains multiple document separators and K8s resources', () => {
+    const yamlFenceMatch = result.match(/```yaml\n([\s\S]*?)```/);
+    expect(yamlFenceMatch).not.toBeNull();
+    const yamlContent = yamlFenceMatch![1];
+    // Terminal-padded YAML may have slight indent on --- separators, but
+    // ContentRenderer handles this via its own splitting logic.
+    // Verify the content is structurally complete:
+    const separatorCount = (yamlContent.match(/---/g) || []).length;
+    expect(separatorCount).toBeGreaterThanOrEqual(4);
+    expect(yamlContent).toContain('kind: Namespace');
+    expect(yamlContent).toContain('kind: Deployment');
+    expect(yamlContent).toContain('kind: Service');
+    expect(yamlContent).toContain('image: redis:7-alpine');
+  });
+
+  it('kubectl commands appear after the YAML fence', () => {
+    // kubectl lines should be outside the yaml fence
+    const fenceBlocks = result.split('```');
+    const afterLastFence = fenceBlocks[fenceBlocks.length - 1] || '';
+    expect(afterLastFence).toContain('kubectl apply');
+    expect(afterLastFence).toContain('kubectl get all');
+  });
+});
+
+// ─── Real-world fixture: Python __name__ dunder parsing ─────────────────────
+
+describe('extractAIAnswer — Python __name__ dunder pattern (shared fixture)', () => {
+  it('wraps bare Python code with __name__ in a code fence', () => {
+    const result = extractAIAnswer(rawPythonFlaskApp);
+    expect(result).toContain('```');
+    expect(result).toContain('__name__');
+    expect(result).toContain('Flask(__name__)');
+    expect(result).toContain('__main__');
+    expect(result).toContain('from flask import Flask');
+    expect(result).toContain('@app.route');
+    expect(result).toContain('def index():');
+  });
+
+  it('wraps bare "import os" and "from X import Y" as code', () => {
+    const result = extractAIAnswer(rawPythonImports);
+    expect(result).toContain('```');
+    expect(result).toContain('import os');
+    expect(result).toContain('from pathlib import Path');
   });
 });

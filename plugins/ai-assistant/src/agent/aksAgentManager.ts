@@ -1629,7 +1629,11 @@ function normalizeTerminalMarkdown(text: string): string {
         }
         const prevIsYaml = prevContentTrimmed !== '' && looksLikeYaml(prevContentTrimmed);
         const nextIsYaml = nextContentTrimmed !== '' && looksLikeYaml(nextContentTrimmed);
-        const isFragmentInsideYaml = codeLikeLineCount <= 2 && prevIsYaml && nextIsYaml;
+        // Previous line ends with | or > → YAML literal/folded block scalar;
+        // all indented lines that follow are scalar content (may be Python, etc.)
+        const prevIsLiteralBlockIndicator = /[|>]\s*$/.test(prevContentTrimmed);
+        const isFragmentInsideYaml =
+          (codeLikeLineCount <= 2 && prevIsYaml && nextIsYaml) || prevIsLiteralBlockIndicator;
 
         if (!isFragmentInsideYaml) {
           const nonBlank = blockLines.filter(l => l.trim() !== '');
@@ -1643,6 +1647,12 @@ function normalizeTerminalMarkdown(text: string): string {
           result.push(...dedented);
           result.push('```');
           wrappedCodeBlockCount++;
+          i = j;
+          continue;
+        } else {
+          // Inside YAML context — don't wrap, but advance past all collected
+          // block lines to prevent re-processing individual lines.
+          result.push(...blockLines);
           i = j;
           continue;
         }
@@ -1803,6 +1813,12 @@ function wrapBareYamlBlocks(text: string): string {
       // column 0 after indented YAML).
       const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
 
+      // Track YAML literal/folded block scalars (| or >) — all content
+      // indented deeper than the indicator line is part of the scalar value,
+      // regardless of content (may contain Python, shell, etc.).
+      let inLiteralBlock = false;
+      let literalBlockIndent = 0;
+
       while (j < lines.length) {
         const yl = lines[j];
         const yt = yl.trim();
@@ -1815,6 +1831,20 @@ function wrapBareYamlBlocks(text: string): string {
           continue;
         }
         consecutiveBlanks = 0;
+
+        // Inside a YAML literal/folded block scalar (| or >): include
+        // lines that are indented deeper than the indicator, regardless
+        // of their content (they may be Python, shell, etc.).
+        if (inLiteralBlock) {
+          const lineIndent = yl.match(/^(\s*)/)?.[1].length ?? 0;
+          if (lineIndent > literalBlockIndent) {
+            yamlLines.push(yl);
+            j++;
+            continue;
+          }
+          // Indentation dropped — exit literal block
+          inLiteralBlock = false;
+        }
 
         // Check indentation: a non-blank line with less indent than the
         // base apiVersion: line is outside the YAML block, UNLESS it's a
@@ -1832,6 +1862,11 @@ function wrapBareYamlBlocks(text: string): string {
           } else {
             yamlLines.push(yl);
           }
+          // Track start of literal/folded block scalar (e.g. "- |" or "key: |")
+          if (/[|>]\s*$/.test(yt)) {
+            inLiteralBlock = true;
+            literalBlockIndent = yl.match(/^(\s*)/)?.[1].length ?? 0;
+          }
           j++;
         } else {
           // Check if this line is a YAML value continuation:
@@ -1840,7 +1875,18 @@ function wrapBareYamlBlocks(text: string): string {
           if (joinYamlContinuation(yamlLines, yt)) {
             j++;
           } else {
-            break;
+            // Peek ahead: if the next non-blank line looks like YAML,
+            // this line may be a terminal line-wrap fragment — include it
+            // to avoid breaking the YAML block.
+            let peekIdx = j + 1;
+            while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+            const peekTrimmed = peekIdx < lines.length ? lines[peekIdx].trim() : '';
+            if (peekTrimmed !== '' && looksLikeYaml(peekTrimmed)) {
+              yamlLines.push(yl);
+              j++;
+            } else {
+              break;
+            }
           }
         }
       }

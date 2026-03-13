@@ -6,6 +6,10 @@ import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { _testing } from './agent/aksAgentManager';
+import {
+  rawMicroservicesPythonYaml,
+  rawPythonFlaskApp,
+} from './agent/testFixtures';
 import ContentRenderer from './ContentRenderer';
 
 const { extractAIAnswer } = _testing;
@@ -1285,6 +1289,44 @@ export const RealWorldMicroserviceYamlDark: StoryFn<typeof ContentRenderer> = ()
     <ContentRenderer
       onYamlDetected={noopYamlDetected}
       content={extractAIAnswer(rawMicroserviceYaml)}
+    />
+  </ThemeProvider>
+);
+
+// ─── Microservices YAML with embedded Python & terminal line wrapping ─────────
+
+export const RealWorldMicroservicesPythonYaml: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(rawMicroservicesPythonYaml)}
+  />
+);
+
+export const RealWorldMicroservicesPythonYamlDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      onYamlDetected={noopYamlDetected}
+      content={extractAIAnswer(rawMicroservicesPythonYaml)}
+    />
+  </ThemeProvider>
+);
+
+// ─── Python Flask app with __name__ dunder pattern ───────────────────────────
+
+export const RealWorldPythonFlaskApp: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(rawPythonFlaskApp)}
+  />
+);
+
+export const RealWorldPythonFlaskAppDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      onYamlDetected={noopYamlDetected}
+      content={extractAIAnswer(rawPythonFlaskApp)}
     />
   </ThemeProvider>
 );

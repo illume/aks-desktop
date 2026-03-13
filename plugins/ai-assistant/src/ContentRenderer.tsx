@@ -780,10 +780,26 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
         }
       }
 
-      const hasJsonKubernetesResource =
+      let hasJsonKubernetesResource = false;
+      if (
         content.includes('"apiVersion":') &&
         content.includes('"kind":') &&
-        content.includes('"metadata":');
+        content.includes('"metadata":')
+      ) {
+        // Check whether JSON K8s keywords appear outside fenced code blocks
+        const jsonLines = content.split('\n');
+        let inJsonFence = false;
+        for (const line of jsonLines) {
+          if (/^\s*```/.test(line)) {
+            inJsonFence = !inJsonFence;
+            continue;
+          }
+          if (!inJsonFence && /"apiVersion"\s*:/.test(line)) {
+            hasJsonKubernetesResource = true;
+            break;
+          }
+        }
+      }
 
       if (hasUnformattedYaml || hasJsonKubernetesResource) {
         debugLog(
