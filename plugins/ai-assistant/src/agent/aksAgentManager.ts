@@ -324,62 +324,1027 @@ function normalizeBullets(text: string): string {
   return result;
 }
 
+/**
+ * Curated set of first-word tokens that **unambiguously** indicate a shell
+ * command, Dockerfile instruction, or similar code line.  These words almost
+ * never begin an English sentence, so a first-word match is sufficient.
+ *
+ * Checked via O(1) Set lookup.  Organised by category for maintainability.
+ * Dockerfile instructions are uppercase; everything else is lowercase.
+ */
+const KNOWN_CODE_COMMANDS: ReadonlySet<string> = new Set([
+  // ── Dockerfile / OCI build instructions ──
+  'FROM',
+  'RUN',
+  'CMD',
+  'COPY',
+  'WORKDIR',
+  'EXPOSE',
+  'ENTRYPOINT',
+  'ENV',
+  'ARG',
+  'USER',
+  'LABEL',
+  'ADD',
+  'SHELL',
+  'VOLUME',
+  'STOPSIGNAL',
+  'HEALTHCHECK',
+  'ONBUILD',
+
+  // ── Container runtimes & orchestration ──
+  'docker',
+  'docker-compose',
+  'podman',
+  'nerdctl',
+  'kubectl',
+  'helm',
+  'skaffold',
+  'kustomize',
+  'kompose',
+  'minikube',
+  'kind',
+  'k3d',
+  'k3s',
+  'buildah',
+  'crictl',
+  'ctr',
+  'trivy',
+  'cosign',
+  'kaniko',
+  'podman-compose',
+  'docker-slim',
+  'dive',
+  'stern',
+  'kubectx',
+  'kubens',
+  'istioctl',
+  'linkerd',
+  'argocd',
+  'flux',
+  'velero',
+  'krew',
+  'kubeadm',
+  'kubebuilder',
+  'operator-sdk',
+
+  // ── Cloud provider CLIs ──
+  'az',
+  'gcloud',
+  'aws',
+  'eksctl',
+  'doctl',
+  'oci',
+  'ibmcloud',
+  'linode-cli',
+  'vultr-cli',
+  'hcloud',
+  'aks-preview',
+
+  // ── JavaScript / TypeScript / Node.js ──
+  'npm',
+  'npx',
+  'pnpm',
+  'yarn',
+  'bun',
+  'bunx',
+  'deno',
+  'node',
+  'nodejs',
+  'tsc',
+  'tsx',
+  'esbuild',
+  'swc',
+  'vite',
+  'webpack',
+  'rollup',
+  'parcel',
+  'turbo',
+  'turborepo',
+  'nx',
+  'lerna',
+  'jest',
+  'vitest',
+  'mocha',
+  'jasmine',
+  'karma',
+  'cypress',
+  'playwright',
+  'puppeteer',
+  'eslint',
+  'biome',
+  'prettier',
+  'stylelint',
+  'next',
+  'nuxt',
+  'gatsby',
+  'remix',
+  'astro',
+  'svelte',
+  'angular',
+  'ng',
+  'create-react-app',
+  'create-next-app',
+  'nodemon',
+  'ts-node',
+  'tsx',
+  'pm2',
+
+  // ── Python ──
+  'pip',
+  'pip3',
+  'pip2',
+  'python',
+  'python3',
+  'python2',
+  'uvicorn',
+  'gunicorn',
+  'flask',
+  'django-admin',
+  'django',
+  'poetry',
+  'pipenv',
+  'pipx',
+  'virtualenv',
+  'venv',
+  'conda',
+  'mamba',
+  'micromamba',
+  'pytest',
+  'mypy',
+  'pyright',
+  'black',
+  'ruff',
+  'pylint',
+  'flake8',
+  'isort',
+  'autopep8',
+  'yapf',
+  'celery',
+  'alembic',
+  'manage.py',
+  'streamlit',
+  'gradio',
+  'jupyter',
+  'ipython',
+  'notebook',
+  'sphinx-build',
+  'sphinx-quickstart',
+  'tox',
+  'nox',
+  'hatch',
+  'pdm',
+  'flit',
+  'twine',
+  'setuptools',
+  'cython',
+  'pyinstaller',
+  'pydantic',
+  'uvloop',
+  'hypercorn',
+  'daphne',
+  'scrapy',
+  'httpie',
+
+  // ── Ruby ──
+  'ruby',
+  'gem',
+  'bundle',
+  'bundler',
+  'rails',
+  'rake',
+  'rspec',
+  'rubocop',
+  'irb',
+  'pry',
+  'rvm',
+  'rbenv',
+  'chruby',
+  'solargraph',
+  'jekyll',
+  'middleman',
+  'capistrano',
+  'puma',
+  'unicorn',
+  'sidekiq',
+  'foreman',
+
+  // ── PHP ──
+  'php',
+  'composer',
+  'artisan',
+  'phpunit',
+  'phpstan',
+  'phpcs',
+  'phpcbf',
+  'psalm',
+  'pint',
+  'tinker',
+  'valet',
+  'sail',
+  'laravel',
+  'symfony',
+  'drush',
+  'wp-cli',
+  'wp',
+
+  // ── Java / JVM / Kotlin ──
+  'java',
+  'javac',
+  'jar',
+  'gradle',
+  'gradlew',
+  'mvn',
+  'mvnw',
+  'sbt',
+  'scala',
+  'scalac',
+  'kotlin',
+  'kotlinc',
+  'groovy',
+  'groovyc',
+  'ant',
+  'kapt',
+  'jlink',
+  'jpackage',
+  'keytool',
+  'jarsigner',
+  'javadoc',
+  'jconsole',
+  'jstack',
+  'jmap',
+  'jhat',
+  'jps',
+  'jdb',
+  'jshell',
+  'spring',
+  'quarkus',
+  'micronaut',
+
+  // ── .NET / C# ──
+  'dotnet',
+  'nuget',
+  'msbuild',
+  'csc',
+  'fsc',
+  'paket',
+  'dotnet-ef',
+
+  // ── Go ──
+  'go',
+  'gofmt',
+  'goimports',
+  'golangci-lint',
+  'dlv',
+  'air',
+  'goreleaser',
+  'ko',
+  'buf',
+  'protoc',
+
+  // ── Rust ──
+  'cargo',
+  'rustc',
+  'rustup',
+  'rustfmt',
+  'clippy',
+  'wasm-pack',
+  'trunk',
+  'cross',
+  'miri',
+
+  // ── Swift / Apple ──
+  'swift',
+  'swiftc',
+  'xcodebuild',
+  'xcrun',
+  'swift-build',
+  'swift-test',
+  'swift-run',
+  'cocoapods',
+  'pod',
+  'fastlane',
+  'xcode-select',
+
+  // ── Elixir / Erlang ──
+  'elixir',
+  'mix',
+  'iex',
+  'erl',
+  'erlc',
+  'rebar3',
+
+  // ── Dart / Flutter ──
+  'dart',
+  'flutter',
+  'pub',
+
+  // ── Haskell ──
+  'ghc',
+  'ghci',
+  'cabal',
+  'stack',
+  'runhaskell',
+
+  // ── Perl / Lua / R / Julia ──
+  'perl',
+  'cpan',
+  'cpanm',
+  'lua',
+  'luarocks',
+  'Rscript',
+  'julia',
+
+  // ── Build tools & compilers ──
+  'make',
+  'cmake',
+  'bazel',
+  'buck',
+  'buck2',
+  'ninja',
+  'meson',
+  'autoconf',
+  'automake',
+  'configure',
+  'gcc',
+  'g++',
+  'cc',
+  'c++',
+  'clang',
+  'clang++',
+  'ld',
+  'ar',
+  'strip',
+  'objdump',
+  'objcopy',
+  'nm',
+  'ldd',
+  'nasm',
+  'yasm',
+  'as',
+  'pkg-config',
+  'libtool',
+  'scons',
+  'waf',
+  'premake',
+  'xmake',
+  'vcpkg',
+  'conan',
+
+  // ── Version managers ──
+  'nvm',
+  'fnm',
+  'volta',
+  'asdf',
+  'pyenv',
+  'goenv',
+  'tfenv',
+  'corepack',
+  'mise',
+  'rtx',
+  'sdkman',
+  'jabba',
+
+  // ── General CLI tools ──
+  'curl',
+  'wget',
+  'wget2',
+  'aria2c',
+  'git',
+  'git-lfs',
+  'svn',
+  'hg',
+  'jq',
+  'yq',
+  'fq',
+  'xq',
+  'xargs',
+  'parallel',
+  'tee',
+  'sed',
+  'awk',
+  'gawk',
+  'mawk',
+  'grep',
+  'egrep',
+  'fgrep',
+  'rg',
+  'ag',
+  'fd',
+  'fzf',
+  'bat',
+  'exa',
+  'eza',
+  'lsd',
+  'tree',
+  'dust',
+  'duf',
+  'procs',
+  'btop',
+  'htop',
+  'glances',
+  'neofetch',
+  'tokei',
+  'cloc',
+  'hyperfine',
+  'entr',
+  'watchexec',
+  'direnv',
+  'starship',
+  'zoxide',
+
+  // ── File / directory operations (unambiguous subset) ──
+  'mkdir',
+  'mktemp',
+  'rmdir',
+  'chmod',
+  'chown',
+  'chgrp',
+  'chattr',
+  'lsattr',
+  'ln',
+  'rsync',
+  'scp',
+  'dd',
+  'install',
+  'shred',
+  'truncate',
+  'fallocate',
+  'mkfifo',
+  'mknod',
+  'readlink',
+  'realpath',
+  'dirname',
+  'basename',
+  'pathchk',
+
+  // ── Archive / compression ──
+  'tar',
+  'gzip',
+  'gunzip',
+  'bzip2',
+  'bunzip2',
+  'unzip',
+  'zip',
+  'xz',
+  'unxz',
+  'zstd',
+  'unzstd',
+  'pigz',
+  'unpigz',
+  'lz4',
+  'unlz4',
+  '7z',
+  '7za',
+  'rar',
+  'unrar',
+  'cpio',
+  'pax',
+  'zcat',
+  'bzcat',
+  'xzcat',
+  'zless',
+
+  // ── Process / system (unambiguous subset) ──
+  'echo',
+  'printf',
+  'nohup',
+  'crontab',
+  'lsof',
+  'fuser',
+  'strace',
+  'ltrace',
+  'perf',
+  'valgrind',
+  'gdb',
+  'lldb',
+  'pgrep',
+  'pkill',
+  'killall',
+  'renice',
+  'ionice',
+  'taskset',
+  'chrt',
+  'ulimit',
+  'prlimit',
+  'sysctl',
+  'dmesg',
+  'journalctl',
+  'logger',
+  'systemd-analyze',
+  'systemd-run',
+  'loginctl',
+  'timedatectl',
+  'localectl',
+  'hostnamectl',
+  'coredumpctl',
+  'uname',
+  'uptime',
+  'whoami',
+  'hostname',
+  'domainname',
+  'printenv',
+  'getent',
+  'nproc',
+  'free',
+  'vmstat',
+  'iostat',
+  'mpstat',
+  'sar',
+  'pidof',
+  'pmap',
+
+  // ── Shell builtins (low-ambiguity subset) ──
+  'export',
+  'source',
+  'eval',
+  'exec',
+  'alias',
+  'unalias',
+  'umask',
+  'trap',
+  'getopts',
+  'shift',
+  'shopt',
+  'typeset',
+  'declare',
+  'readonly',
+  'local',
+
+  // ── Shell interpreters ──
+  'bash',
+  'sh',
+  'zsh',
+  'fish',
+  'dash',
+  'ksh',
+  'csh',
+  'tcsh',
+  'pwsh',
+  'powershell',
+
+  // ── Package managers / system administration ──
+  'sudo',
+  'su',
+  'apt-get',
+  'apt',
+  'apt-cache',
+  'apt-key',
+  'apt-file',
+  'aptitude',
+  'dpkg',
+  'dpkg-deb',
+  'yum',
+  'dnf',
+  'rpm',
+  'zypper',
+  'brew',
+  'cask',
+  'apk',
+  'pacman',
+  'yay',
+  'paru',
+  'snap',
+  'flatpak',
+  'nix',
+  'nix-env',
+  'nix-shell',
+  'nix-build',
+  'nix-store',
+  'guix',
+  'emerge',
+  'portage',
+  'pkg',
+  'pkg_add',
+  'pkgin',
+  'xbps-install',
+  'xbps-query',
+
+  // ── User / group management ──
+  'useradd',
+  'usermod',
+  'userdel',
+  'groupadd',
+  'groupmod',
+  'groupdel',
+  'passwd',
+  'chpasswd',
+  'adduser',
+  'addgroup',
+  'deluser',
+  'delgroup',
+  'visudo',
+
+  // ── Disk / filesystem ──
+  'fdisk',
+  'gdisk',
+  'parted',
+  'mkfs',
+  'mkfs.ext4',
+  'mkfs.xfs',
+  'mkfs.btrfs',
+  'mkswap',
+  'swapon',
+  'swapoff',
+  'fsck',
+  'e2fsck',
+  'xfs_repair',
+  'blkid',
+  'lsblk',
+  'findmnt',
+  'losetup',
+  'cryptsetup',
+  'lvs',
+  'vgs',
+  'pvs',
+  'lvcreate',
+  'vgcreate',
+  'pvcreate',
+  'resize2fs',
+  'xfs_growfs',
+  'btrfs',
+
+  // ── Service / daemon management ──
+  'systemctl',
+  'supervisord',
+  'supervisorctl',
+  'initctl',
+  'rc-service',
+  'rc-update',
+  'chkconfig',
+  'update-rc.d',
+
+  // ── Database CLIs ──
+  'mysql',
+  'mysqldump',
+  'mysqladmin',
+  'mysqlimport',
+  'psql',
+  'pg_dump',
+  'pg_restore',
+  'pg_basebackup',
+  'pgbench',
+  'createdb',
+  'dropdb',
+  'createuser',
+  'dropuser',
+  'sqlite3',
+  'mongosh',
+  'mongo',
+  'mongodump',
+  'mongorestore',
+  'mongoexport',
+  'mongoimport',
+  'redis-cli',
+  'redis-server',
+  'redis-benchmark',
+  'influx',
+  'influxd',
+  'cqlsh',
+  'nodetool',
+  'clickhouse-client',
+  'etcdctl',
+  'consul',
+  'vault',
+
+  // ── Networking (unambiguous subset) ──
+  'ssh',
+  'ssh-keygen',
+  'ssh-copy-id',
+  'ssh-add',
+  'ssh-agent',
+  'sftp',
+  'sshfs',
+  'telnet',
+  'ping',
+  'ping6',
+  'traceroute',
+  'traceroute6',
+  'tracepath',
+  'mtr',
+  'dig',
+  'nslookup',
+  'whois',
+  'ifconfig',
+  'iptables',
+  'ip6tables',
+  'nftables',
+  'nft',
+  'ufw',
+  'firewall-cmd',
+  'firewalld',
+  'tcpdump',
+  'tshark',
+  'wireshark',
+  'nmap',
+  'masscan',
+  'netcat',
+  'ncat',
+  'socat',
+  'ab',
+  'wrk',
+  'hey',
+  'siege',
+  'vegeta',
+  'fortio',
+  'iperf',
+  'iperf3',
+  'mitmproxy',
+  'ngrok',
+  'localtunnel',
+  'caddy',
+  'nginx',
+  'apache2',
+  'httpd',
+  'lighttpd',
+  'haproxy',
+  'envoy',
+  'traefik',
+
+  // ── Infrastructure / CI-CD / deployment ──
+  'terraform',
+  'terragrunt',
+  'ansible',
+  'ansible-playbook',
+  'ansible-galaxy',
+  'ansible-vault',
+  'vagrant',
+  'packer',
+  'pulumi',
+  'cdk',
+  'cdktf',
+  'sam',
+  'cloudformation',
+  'serverless',
+  'sls',
+  'vercel',
+  'netlify',
+  'heroku',
+  'flyctl',
+  'gh',
+  'hub',
+  'act',
+  'circleci',
+  'gitlab-runner',
+  'jenkins-cli',
+  'tekton',
+  'argo',
+  'spinnaker',
+  'waypoint',
+
+  // ── Security / crypto tools ──
+  'openssl',
+  'gpg',
+  'gpg2',
+  'ssh-keyscan',
+  'certbot',
+  'cfssl',
+  'step',
+  'age',
+  'sops',
+  'sealed-secrets',
+  'htpasswd',
+  'fail2ban-client',
+
+  // ── Linters / formatters / code quality ──
+  'shellcheck',
+  'hadolint',
+  'yamllint',
+  'jsonlint',
+  'markdownlint',
+  'vale',
+  'proselint',
+  'semgrep',
+  'snyk',
+  'grype',
+  'syft',
+  'checkov',
+  'tflint',
+  'tfsec',
+  'kube-score',
+  'kube-linter',
+  'polaris',
+  'conftest',
+  'opa',
+  'gitleaks',
+  'trufflehog',
+
+  // ── Text processing (unambiguous subset) ──
+  'colrm',
+  'column',
+  'fmt',
+  'fold',
+  'nl',
+  'rev',
+  'shuf',
+  'tsort',
+  'unexpand',
+  'expand',
+  'csplit',
+  'iconv',
+  'dos2unix',
+  'unix2dos',
+  'xxd',
+  'hexdump',
+  'od',
+  'base64',
+  'base32',
+  'md5sum',
+  'sha256sum',
+  'sha512sum',
+  'shasum',
+  'cksum',
+  'b2sum',
+  'wc',
+]);
+
+/**
+ * Words that are both common shell commands AND common English words.
+ * These only match as code when the rest of the line contains shell-like
+ * syntax (flags, file paths, operators, quoted args) — see `hasShellSyntax`.
+ */
+const AMBIGUOUS_CODE_COMMANDS: ReadonlySet<string> = new Set([
+  // File operations
+  'cat',
+  'cp',
+  'mv',
+  'rm',
+  'ls',
+  'cd',
+  'pwd',
+  'du',
+  'df',
+  'touch',
+  'file',
+  'stat',
+  'find',
+  'head',
+  'tail',
+  'cut',
+  'tr',
+  'sort',
+  'uniq',
+  'diff',
+  'patch',
+  'split',
+  'join',
+  'paste',
+  'comm',
+  'tac',
+  'look',
+
+  // Process / control
+  'kill',
+  'wait',
+  'sleep',
+  'test',
+  'time',
+  'timeout',
+  'watch',
+  'at',
+  'nice',
+  'jobs',
+  'bg',
+  'fg',
+  'top',
+  'ps',
+  'free',
+  'last',
+  'who',
+  'w',
+  'id',
+
+  // Shell builtins
+  'set',
+  'unset',
+  'read',
+  'return',
+  'exit',
+  'enable',
+  'type',
+  'which',
+  'command',
+  'hash',
+
+  // Networking
+  'host',
+  'ip',
+  'nc',
+  'ss',
+
+  // System
+  'env',
+  'date',
+  'cal',
+  'yes',
+  'true',
+  'false',
+  'seq',
+  'expr',
+  'bc',
+  'dc',
+  'mount',
+  'link',
+  'open',
+  'write',
+
+  // Service names that double as English words
+  'service',
+]);
+
+/**
+ * Check whether a line (beyond its first word) contains syntax that is
+ * characteristic of shell commands — flags, file paths, operators, etc.
+ * Used to disambiguate words that are both commands and English words.
+ */
+function hasShellSyntax(trimmed: string): boolean {
+  // Command-line flags: -x, --flag, or -9  (space before dash to avoid prose hyphens)
+  if (/\s-{1,2}[a-zA-Z0-9]/.test(trimmed)) return true;
+
+  // Path-like arguments: word containing /  (but not http:// URLs at line start)
+  if (/\s\S*\/\w/.test(trimmed) && !/^https?:\/\//.test(trimmed)) return true;
+
+  // Glob patterns: *.ext or file.*
+  if (/[*?]/.test(trimmed) && !/[.!?]\s*$/.test(trimmed)) return true;
+
+  // Shell operators within the line: |, ;, &&
+  if (/\s[|;]\s/.test(trimmed) || /\s&&\s/.test(trimmed)) return true;
+
+  // Output redirection: > or >>
+  if (/\s>{1,2}\s/.test(trimmed) || /2>&1/.test(trimmed)) return true;
+
+  // Quoted arguments: "..." or '...'
+  if (/\s["'][^"'\s]/.test(trimmed)) return true;
+
+  // Variable references: $VAR or ${VAR}
+  if (/\$[{A-Z_]/.test(trimmed)) return true;
+
+  // Inline KEY=value assignment (e.g. env NODE_ENV=production)
+  if (/\s[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
+
+  // Backtick command substitution
+  if (/`[^`]+`/.test(trimmed)) return true;
+
+  return false;
+}
+
+/**
+ * Heuristic: does a trimmed line look like a shell command, Dockerfile
+ * instruction, or similar code that belongs in a fenced code block?
+ *
+ * Uses three tiers:
+ *  1. **Unambiguous keyword** — the first word is in `KNOWN_CODE_COMMANDS`
+ *     (~500 entries).  Immediate match.
+ *  2. **Ambiguous keyword + shell syntax** — the first word is in
+ *     `AMBIGUOUS_CODE_COMMANDS` (~50 entries: words like "cat", "find",
+ *     "sort", "kill" that are also common English) AND the rest of the line
+ *     contains shell-like syntax (flags, paths, operators).
+ *  3. **Structural patterns** — syntax like `./path`, `$ cmd`, `#!/bin/bash`,
+ *     `KEY=value`, `cmd | cmd`, `cmd && cmd`, `> file`, `$(cmd)`, and
+ *     line-continuation `\` are strong shell indicators regardless of the
+ *     specific command name.
+ *
+ * Callers should combine this with a "≥ N code-like lines" threshold (see
+ * `normalizeTerminalMarkdown`) to guard against single-line false positives.
+ */
 function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
-  // Dockerfile instructions (uppercase keywords)
-  if (
-    /^(FROM|RUN|CMD|COPY|WORKDIR|EXPOSE|ENTRYPOINT|ENV|ARG|USER|LABEL|ADD|SHELL|VOLUME|STOPSIGNAL|HEALTHCHECK|ONBUILD)\b/.test(
-      trimmed
-    )
-  ) {
-    return true;
-  }
+  if (trimmed === '') return false;
 
-  // Common CLI tools and package managers
-  if (
-    /^(docker|podman|nerdctl|kubectl|helm|az|gcloud|aws|npm|npx|pnpm|yarn|pip3?|python3?|uvicorn|gunicorn|flask|django-admin|poetry|curl|wget|git|make|cmake|go|cargo|java|javac|node|ruby|php|dotnet|terraform|ansible|vagrant|gradle|mvn)\b/.test(
-      trimmed
-    )
-  ) {
-    return true;
-  }
+  // ── Tier 1: unambiguous first-word keyword lookup ──
+  const firstWord = trimmed.split(/\s/)[0];
+  if (KNOWN_CODE_COMMANDS.has(firstWord)) return true;
 
-  // System administration and package management
-  if (
-    /^(sudo|apt-get|apt|yum|dnf|brew|apk|pacman|snap|systemctl|service|journalctl)\b/.test(
-      trimmed
-    )
-  ) {
-    return true;
-  }
+  // ── Tier 2: ambiguous keyword — require shell syntax confirmation ──
+  if (AMBIGUOUS_CODE_COMMANDS.has(firstWord) && hasShellSyntax(trimmed)) return true;
 
-  // Common Unix/shell commands (when followed by space or end-of-line for accuracy)
-  if (
-    /^(cd|mkdir|rm|rmdir|cp|mv|ln|chmod|chown|chgrp|cat|tee|echo|printf|grep|egrep|sed|awk|find|xargs|tar|gzip|gunzip|unzip|zip|ssh|scp|rsync|touch|sort|head|tail|wc|cut|tr|diff|patch|kill|export|source|bash|sh|zsh|nohup|test|sleep|wait|set|unset|eval|exec|alias)\b/.test(
-      trimmed
-    )
-  ) {
-    return true;
-  }
+  // ── Tier 3: structural / syntactic patterns ──
 
-  // Executable path: ./script.sh or /usr/bin/something
-  if (/^\.\/\w/.test(trimmed)) {
-    return true;
-  }
+  // Executable path: ./script.sh
+  if (/^\.\/\w/.test(trimmed)) return true;
 
-  // Shell prompt: $ command
-  if (/^\$\s+\w/.test(trimmed)) {
-    return true;
-  }
+  // Shell prompt marker: $ command
+  if (/^\$\s+\w/.test(trimmed)) return true;
 
-  // Shebang line: #!/bin/bash
-  if (/^#!\//.test(trimmed)) {
-    return true;
-  }
+  // Shebang: #!/bin/bash, #!/usr/bin/env python3
+  if (/^#!\//.test(trimmed)) return true;
 
   // Environment variable assignment: VAR=value or VAR="value"
-  if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) {
-    return true;
-  }
+  if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
+
+  // Pipe between commands: word | word  (but not markdown table starting with |)
+  if (/\w\s+\|\s+\w/.test(trimmed) && !/^\|/.test(trimmed)) return true;
+
+  // Output redirection: > file, >> file, 2>&1
+  if (/\s>{1,2}\s+\S/.test(trimmed) || /2>&1/.test(trimmed)) return true;
+
+  // Command chaining with &&
+  if (/\s&&\s/.test(trimmed)) return true;
+
+  // Command substitution: $(...)
+  if (/\$\(/.test(trimmed)) return true;
+
+  // Line continuation: ends with backslash (short lines only to avoid prose)
+  if (/\\\s*$/.test(trimmed) && trimmed.length < 80) return true;
 
   return false;
 }
@@ -1738,5 +2703,6 @@ export const _testing = {
   friendlyToolLabel,
   stripCommandEcho,
   looksLikeShellOrDockerCodeLine,
+  hasShellSyntax,
   normalizeTerminalMarkdown,
 };

@@ -14,6 +14,7 @@ const {
   extractTaskRow,
   friendlyToolLabel,
   looksLikeShellOrDockerCodeLine,
+  hasShellSyntax,
   normalizeTerminalMarkdown,
 } = _testing;
 
@@ -155,41 +156,180 @@ describe('looksLikeYaml', () => {
   });
 });
 
+describe('hasShellSyntax', () => {
+  it('detects single-letter flags', () => {
+    expect(hasShellSyntax('cat -n file.txt')).toBe(true);
+  });
+  it('detects long flags', () => {
+    expect(hasShellSyntax('npm install --save-dev webpack')).toBe(true);
+  });
+  it('detects file paths with /', () => {
+    expect(hasShellSyntax('cat /etc/passwd')).toBe(true);
+  });
+  it('detects glob patterns', () => {
+    expect(hasShellSyntax('find . -name "*.js"')).toBe(true);
+  });
+  it('detects pipe operator', () => {
+    expect(hasShellSyntax('ps aux | grep node')).toBe(true);
+  });
+  it('detects && chaining', () => {
+    expect(hasShellSyntax('cd /app && make')).toBe(true);
+  });
+  it('detects output redirection', () => {
+    expect(hasShellSyntax('echo hello > out.txt')).toBe(true);
+  });
+  it('detects 2>&1', () => {
+    expect(hasShellSyntax('make build 2>&1')).toBe(true);
+  });
+  it('detects quoted arguments', () => {
+    expect(hasShellSyntax("grep -r 'TODO' src/")).toBe(true);
+  });
+  it('detects variable references', () => {
+    expect(hasShellSyntax('echo $HOME')).toBe(true);
+  });
+  it('detects backtick substitution', () => {
+    expect(hasShellSyntax('echo `date`')).toBe(true);
+  });
+  it('rejects plain English prose', () => {
+    expect(hasShellSyntax('This is a regular sentence.')).toBe(false);
+  });
+  it('rejects prose with no special syntax', () => {
+    expect(hasShellSyntax('sort the results by name')).toBe(false);
+  });
+});
+
 describe('looksLikeShellOrDockerCodeLine', () => {
-  // Dockerfile instructions
-  it('detects Dockerfile FROM', () => {
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Dockerfile instructions
+  // ──────────────────────────────────────────────────────────────
+  it('detects FROM', () => {
     expect(looksLikeShellOrDockerCodeLine('FROM python:3.12-slim')).toBe(true);
   });
-  it('detects Dockerfile RUN', () => {
+  it('detects FROM with AS', () => {
+    expect(looksLikeShellOrDockerCodeLine('FROM node:18 AS builder')).toBe(true);
+  });
+  it('detects RUN', () => {
     expect(looksLikeShellOrDockerCodeLine('RUN pip install -r requirements.txt')).toBe(true);
   });
-  it('detects Dockerfile CMD', () => {
+  it('detects CMD array form', () => {
     expect(looksLikeShellOrDockerCodeLine('CMD ["uvicorn", "main:app"]')).toBe(true);
   });
-  it('detects Dockerfile COPY', () => {
+  it('detects COPY', () => {
     expect(looksLikeShellOrDockerCodeLine('COPY . .')).toBe(true);
   });
-  it('detects Dockerfile WORKDIR', () => {
+  it('detects COPY --from', () => {
+    expect(looksLikeShellOrDockerCodeLine('COPY --from=builder /app/dist /app')).toBe(true);
+  });
+  it('detects WORKDIR', () => {
     expect(looksLikeShellOrDockerCodeLine('WORKDIR /app')).toBe(true);
   });
-  it('detects Dockerfile EXPOSE', () => {
+  it('detects EXPOSE', () => {
     expect(looksLikeShellOrDockerCodeLine('EXPOSE 8000')).toBe(true);
   });
+  it('detects ENTRYPOINT', () => {
+    expect(looksLikeShellOrDockerCodeLine('ENTRYPOINT ["python", "app.py"]')).toBe(true);
+  });
+  it('detects ENV', () => {
+    expect(looksLikeShellOrDockerCodeLine('ENV NODE_ENV=production')).toBe(true);
+  });
+  it('detects ARG', () => {
+    expect(looksLikeShellOrDockerCodeLine('ARG PYTHON_VERSION=3.12')).toBe(true);
+  });
+  it('detects HEALTHCHECK', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('HEALTHCHECK CMD curl -f http://localhost/healthz')
+    ).toBe(true);
+  });
 
-  // Common CLI tools
-  it('detects docker commands', () => {
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Container & orchestration tools
+  // ──────────────────────────────────────────────────────────────
+  it('detects docker build', () => {
     expect(looksLikeShellOrDockerCodeLine('docker build -t myapp:latest .')).toBe(true);
   });
   it('detects docker run', () => {
     expect(looksLikeShellOrDockerCodeLine('docker run --rm -p 8000:8000 myapp')).toBe(true);
   });
-  it('detects kubectl', () => {
+  it('detects docker-compose', () => {
+    expect(looksLikeShellOrDockerCodeLine('docker-compose up -d')).toBe(true);
+  });
+  it('detects kubectl apply', () => {
     expect(looksLikeShellOrDockerCodeLine('kubectl apply -f deployment.yaml')).toBe(true);
   });
-  it('detects helm', () => {
+  it('detects kubectl get', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl get pods -n kube-system')).toBe(true);
+  });
+  it('detects kubectl describe', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl describe pod my-pod')).toBe(true);
+  });
+  it('detects kubectl logs', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl logs -f deployment/myapp')).toBe(true);
+  });
+  it('detects kubectl exec', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl exec -it my-pod -- bash')).toBe(true);
+  });
+  it('detects kubectl delete', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl delete -f service.yaml')).toBe(true);
+  });
+  it('detects kubectl port-forward', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl port-forward svc/myapp 8080:80')).toBe(true);
+  });
+  it('detects kubectl rollout', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl rollout status deployment/myapp')).toBe(true);
+  });
+  it('detects kubectl scale', () => {
+    expect(looksLikeShellOrDockerCodeLine('kubectl scale deployment myapp --replicas=3')).toBe(
+      true
+    );
+  });
+  it('detects helm install', () => {
     expect(looksLikeShellOrDockerCodeLine('helm install my-release ./chart')).toBe(true);
   });
-  it('detects pip', () => {
+  it('detects helm upgrade', () => {
+    expect(looksLikeShellOrDockerCodeLine('helm upgrade --install myapp ./charts/myapp')).toBe(
+      true
+    );
+  });
+  it('detects podman', () => {
+    expect(looksLikeShellOrDockerCodeLine('podman build -t myapp .')).toBe(true);
+  });
+  it('detects minikube', () => {
+    expect(looksLikeShellOrDockerCodeLine('minikube start --driver=docker')).toBe(true);
+  });
+  it('detects kind', () => {
+    expect(looksLikeShellOrDockerCodeLine('kind create cluster --name dev')).toBe(true);
+  });
+  it('detects stern', () => {
+    expect(looksLikeShellOrDockerCodeLine('stern myapp -n production')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Cloud CLIs
+  // ──────────────────────────────────────────────────────────────
+  it('detects az aks', () => {
+    expect(looksLikeShellOrDockerCodeLine('az aks get-credentials --name my-cluster')).toBe(true);
+  });
+  it('detects az group create', () => {
+    expect(looksLikeShellOrDockerCodeLine('az group create --name myRG --location eastus')).toBe(
+      true
+    );
+  });
+  it('detects gcloud', () => {
+    expect(looksLikeShellOrDockerCodeLine('gcloud container clusters get-credentials')).toBe(true);
+  });
+  it('detects aws', () => {
+    expect(looksLikeShellOrDockerCodeLine('aws eks update-kubeconfig --name my-cluster')).toBe(
+      true
+    );
+  });
+  it('detects eksctl', () => {
+    expect(looksLikeShellOrDockerCodeLine('eksctl create cluster --name dev')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Language runtimes & package managers
+  // ──────────────────────────────────────────────────────────────
+  it('detects pip install', () => {
     expect(looksLikeShellOrDockerCodeLine('pip install flask')).toBe(true);
   });
   it('detects pip3', () => {
@@ -201,49 +341,127 @@ describe('looksLikeShellOrDockerCodeLine', () => {
   it('detects python3', () => {
     expect(looksLikeShellOrDockerCodeLine('python3 -m venv .venv')).toBe(true);
   });
-  it('detects npm', () => {
+  it('detects npm install', () => {
     expect(looksLikeShellOrDockerCodeLine('npm install')).toBe(true);
+  });
+  it('detects npm run', () => {
+    expect(looksLikeShellOrDockerCodeLine('npm run build')).toBe(true);
   });
   it('detects npx', () => {
     expect(looksLikeShellOrDockerCodeLine('npx create-react-app my-app')).toBe(true);
   });
-  it('detects curl', () => {
-    expect(looksLikeShellOrDockerCodeLine('curl -sL https://example.com')).toBe(true);
+  it('detects yarn', () => {
+    expect(looksLikeShellOrDockerCodeLine('yarn add typescript --dev')).toBe(true);
   });
-  it('detects git', () => {
-    expect(looksLikeShellOrDockerCodeLine('git clone https://github.com/user/repo')).toBe(true);
-  });
-  it('detects go', () => {
+  it('detects go build', () => {
     expect(looksLikeShellOrDockerCodeLine('go build -o myapp .')).toBe(true);
   });
-  it('detects cargo', () => {
+  it('detects go mod', () => {
+    expect(looksLikeShellOrDockerCodeLine('go mod init example.com/myapp')).toBe(true);
+  });
+  it('detects cargo build', () => {
     expect(looksLikeShellOrDockerCodeLine('cargo build --release')).toBe(true);
   });
+  it('detects cargo test', () => {
+    expect(looksLikeShellOrDockerCodeLine('cargo test --all')).toBe(true);
+  });
+  it('detects java', () => {
+    expect(looksLikeShellOrDockerCodeLine('java -jar app.jar')).toBe(true);
+  });
+  it('detects gradle', () => {
+    expect(looksLikeShellOrDockerCodeLine('gradle bootRun')).toBe(true);
+  });
+  it('detects dotnet', () => {
+    expect(looksLikeShellOrDockerCodeLine('dotnet run --project ./src/MyApp')).toBe(true);
+  });
+  it('detects ruby', () => {
+    expect(looksLikeShellOrDockerCodeLine('ruby app.rb')).toBe(true);
+  });
+  it('detects bundle', () => {
+    expect(looksLikeShellOrDockerCodeLine('bundle install')).toBe(true);
+  });
+  it('detects rails', () => {
+    expect(looksLikeShellOrDockerCodeLine('rails new myapp --api')).toBe(true);
+  });
+  it('detects php', () => {
+    expect(looksLikeShellOrDockerCodeLine('php artisan migrate')).toBe(true);
+  });
+  it('detects composer', () => {
+    expect(looksLikeShellOrDockerCodeLine('composer require laravel/framework')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Build tools & compilers
+  // ──────────────────────────────────────────────────────────────
   it('detects make', () => {
     expect(looksLikeShellOrDockerCodeLine('make build')).toBe(true);
   });
-  it('detects az CLI', () => {
-    expect(looksLikeShellOrDockerCodeLine('az aks get-credentials --name my-cluster')).toBe(true);
+  it('detects cmake', () => {
+    expect(looksLikeShellOrDockerCodeLine('cmake -B build -DCMAKE_BUILD_TYPE=Release')).toBe(
+      true
+    );
   });
-  it('detects gcloud', () => {
-    expect(looksLikeShellOrDockerCodeLine('gcloud container clusters get-credentials')).toBe(true);
+  it('detects gcc', () => {
+    expect(looksLikeShellOrDockerCodeLine('gcc -o main main.c -Wall')).toBe(true);
   });
-  it('detects aws', () => {
-    expect(looksLikeShellOrDockerCodeLine('aws eks update-kubeconfig --name my-cluster')).toBe(true);
-  });
-  it('detects podman', () => {
-    expect(looksLikeShellOrDockerCodeLine('podman build -t myapp .')).toBe(true);
-  });
-  it('detects terraform', () => {
-    expect(looksLikeShellOrDockerCodeLine('terraform apply -auto-approve')).toBe(true);
+  it('detects bazel', () => {
+    expect(looksLikeShellOrDockerCodeLine('bazel build //src:main')).toBe(true);
   });
 
-  // System administration
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: General CLI tools
+  // ──────────────────────────────────────────────────────────────
+  it('detects curl', () => {
+    expect(looksLikeShellOrDockerCodeLine('curl -sL https://example.com')).toBe(true);
+  });
+  it('detects wget', () => {
+    expect(looksLikeShellOrDockerCodeLine('wget -O file.tar.gz https://example.com/f.tar.gz')).toBe(
+      true
+    );
+  });
+  it('detects git clone', () => {
+    expect(looksLikeShellOrDockerCodeLine('git clone https://github.com/user/repo')).toBe(true);
+  });
+  it('detects git commit', () => {
+    expect(looksLikeShellOrDockerCodeLine('git commit -m "initial commit"')).toBe(true);
+  });
+  it('detects jq', () => {
+    expect(looksLikeShellOrDockerCodeLine('jq ".name" package.json')).toBe(true);
+  });
+  it('detects sed', () => {
+    expect(looksLikeShellOrDockerCodeLine("sed -i 's/old/new/g' file.txt")).toBe(true);
+  });
+  it('detects grep', () => {
+    expect(looksLikeShellOrDockerCodeLine('grep -r "TODO" src/')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: File operations (unambiguous)
+  // ──────────────────────────────────────────────────────────────
+  it('detects mkdir', () => {
+    expect(looksLikeShellOrDockerCodeLine('mkdir -p /app/data')).toBe(true);
+  });
+  it('detects chmod', () => {
+    expect(looksLikeShellOrDockerCodeLine('chmod +x deploy.sh')).toBe(true);
+  });
+  it('detects tar', () => {
+    expect(looksLikeShellOrDockerCodeLine('tar -xzf archive.tar.gz')).toBe(true);
+  });
+  it('detects echo', () => {
+    expect(looksLikeShellOrDockerCodeLine('echo "hello world"')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: System administration
+  // ──────────────────────────────────────────────────────────────
   it('detects sudo', () => {
     expect(looksLikeShellOrDockerCodeLine('sudo apt-get install nginx')).toBe(true);
   });
   it('detects apt-get', () => {
     expect(looksLikeShellOrDockerCodeLine('apt-get install -y curl')).toBe(true);
+  });
+  it('detects apt', () => {
+    expect(looksLikeShellOrDockerCodeLine('apt update && apt install -y git')).toBe(true);
   });
   it('detects brew', () => {
     expect(looksLikeShellOrDockerCodeLine('brew install node')).toBe(true);
@@ -251,42 +469,223 @@ describe('looksLikeShellOrDockerCodeLine', () => {
   it('detects systemctl', () => {
     expect(looksLikeShellOrDockerCodeLine('systemctl start nginx')).toBe(true);
   });
-
-  // Common Unix commands
-  it('detects mkdir', () => {
-    expect(looksLikeShellOrDockerCodeLine('mkdir -p /app/data')).toBe(true);
-  });
-  it('detects chmod', () => {
-    expect(looksLikeShellOrDockerCodeLine('chmod +x deploy.sh')).toBe(true);
-  });
-  it('detects cat', () => {
-    expect(looksLikeShellOrDockerCodeLine('cat /etc/nginx/nginx.conf')).toBe(true);
-  });
-  it('detects echo', () => {
-    expect(looksLikeShellOrDockerCodeLine('echo "hello world"')).toBe(true);
-  });
-  it('detects grep', () => {
-    expect(looksLikeShellOrDockerCodeLine('grep -r "TODO" src/')).toBe(true);
-  });
   it('detects export', () => {
     expect(looksLikeShellOrDockerCodeLine('export PORT=8080')).toBe(true);
-  });
-  it('detects tar', () => {
-    expect(looksLikeShellOrDockerCodeLine('tar -xzf archive.tar.gz')).toBe(true);
   });
   it('detects ssh', () => {
     expect(looksLikeShellOrDockerCodeLine('ssh user@host')).toBe(true);
   });
-  it('detects cd', () => {
-    expect(looksLikeShellOrDockerCodeLine('cd /app && npm start')).toBe(true);
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Infrastructure / CI-CD
+  // ──────────────────────────────────────────────────────────────
+  it('detects terraform apply', () => {
+    expect(looksLikeShellOrDockerCodeLine('terraform apply -auto-approve')).toBe(true);
   });
-  it('detects cp', () => {
-    expect(looksLikeShellOrDockerCodeLine('cp config.yaml /etc/app/')).toBe(true);
+  it('detects terraform init', () => {
+    expect(looksLikeShellOrDockerCodeLine('terraform init')).toBe(true);
+  });
+  it('detects ansible-playbook', () => {
+    expect(looksLikeShellOrDockerCodeLine('ansible-playbook site.yml -i hosts')).toBe(true);
+  });
+  it('detects vagrant up', () => {
+    expect(looksLikeShellOrDockerCodeLine('vagrant up')).toBe(true);
+  });
+  it('detects gh pr', () => {
+    expect(looksLikeShellOrDockerCodeLine('gh pr create --title "Fix bug"')).toBe(true);
   });
 
-  // Pattern-based detection
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Database CLIs
+  // ──────────────────────────────────────────────────────────────
+  it('detects psql', () => {
+    expect(looksLikeShellOrDockerCodeLine('psql -U postgres -d mydb')).toBe(true);
+  });
+  it('detects mysql', () => {
+    expect(looksLikeShellOrDockerCodeLine('mysql -u root -p mydb')).toBe(true);
+  });
+  it('detects redis-cli', () => {
+    expect(looksLikeShellOrDockerCodeLine('redis-cli SET key value')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Ambiguous words WITH shell syntax → match
+  // ──────────────────────────────────────────────────────────────
+  it('detects "cat" with path (ambiguous + shell syntax)', () => {
+    expect(looksLikeShellOrDockerCodeLine('cat /etc/nginx/nginx.conf')).toBe(true);
+  });
+  it('detects "cat" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('cat -n file.txt')).toBe(true);
+  });
+  it('detects "find" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('find . -name "*.js" -type f')).toBe(true);
+  });
+  it('detects "find" with path', () => {
+    expect(looksLikeShellOrDockerCodeLine('find /var/log -mtime +7')).toBe(true);
+  });
+  it('detects "sort" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('sort -u -k2 data.csv')).toBe(true);
+  });
+  it('detects "head" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('head -n 10 access.log')).toBe(true);
+  });
+  it('detects "tail" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('tail -f /var/log/syslog')).toBe(true);
+  });
+  it('detects "kill" with signal flag', () => {
+    expect(looksLikeShellOrDockerCodeLine('kill -9 1234')).toBe(true);
+  });
+  it('detects "test" with flag', () => {
+    expect(looksLikeShellOrDockerCodeLine('test -f /etc/config.yaml')).toBe(true);
+  });
+  it('detects "set" with flag', () => {
+    expect(looksLikeShellOrDockerCodeLine('set -euo pipefail')).toBe(true);
+  });
+  it('detects "cp" with path', () => {
+    expect(looksLikeShellOrDockerCodeLine('cp config.yaml /etc/app/')).toBe(true);
+  });
+  it('detects "mv" with path', () => {
+    expect(looksLikeShellOrDockerCodeLine('mv old.log /var/archive/')).toBe(true);
+  });
+  it('detects "rm" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('rm -rf /tmp/build')).toBe(true);
+  });
+  it('detects "ls" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('ls -la /etc/')).toBe(true);
+  });
+  it('detects "cd" with && chaining', () => {
+    expect(looksLikeShellOrDockerCodeLine('cd /app && npm start')).toBe(true);
+  });
+  it('detects "watch" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('watch -n 5 kubectl get pods')).toBe(true);
+  });
+  it('detects "time" with sub-command path', () => {
+    expect(looksLikeShellOrDockerCodeLine('time make -j$(nproc)')).toBe(true);
+  });
+  it('detects "diff" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('diff -u old.txt new.txt')).toBe(true);
+  });
+  it('detects "host" with argument', () => {
+    expect(hasShellSyntax('host example.com')).toBe(false);
+    // "host" alone without shell syntax is ambiguous — not matched
+    expect(looksLikeShellOrDockerCodeLine('host example.com')).toBe(false);
+  });
+  it('detects "service" with flags', () => {
+    expect(looksLikeShellOrDockerCodeLine('service nginx --status-all')).toBe(true);
+  });
+  it('detects "env" with variable', () => {
+    expect(looksLikeShellOrDockerCodeLine('env NODE_ENV=production node app.js')).toBe(true);
+  });
+  it('detects "ps" with pipe', () => {
+    expect(looksLikeShellOrDockerCodeLine('ps aux | grep node')).toBe(true);
+  });
+  it('detects "touch" with path', () => {
+    expect(looksLikeShellOrDockerCodeLine('touch /tmp/healthcheck')).toBe(true);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Ambiguous words WITHOUT shell syntax → no match
+  // (This is the key accuracy feature)
+  // ──────────────────────────────────────────────────────────────
+  it('rejects "cat" as standalone word', () => {
+    expect(looksLikeShellOrDockerCodeLine('cat')).toBe(false);
+  });
+  it('rejects "find" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('find the configuration file')).toBe(false);
+  });
+  it('rejects "sort" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('sort the results by name')).toBe(false);
+  });
+  it('rejects "head" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('head over to the documentation')).toBe(false);
+  });
+  it('rejects "tail" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('tail end of the deployment')).toBe(false);
+  });
+  it('rejects "kill" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('kill the process manually')).toBe(false);
+  });
+  it('rejects "test" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('test the application locally')).toBe(false);
+  });
+  it('rejects "set" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('set up the environment variables')).toBe(false);
+  });
+  it('rejects "wait" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('wait for the process to complete')).toBe(false);
+  });
+  it('rejects "watch" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('watch the logs for errors')).toBe(false);
+  });
+  it('rejects "time" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('time to deploy the application')).toBe(false);
+  });
+  it('rejects "service" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('service mesh configuration')).toBe(false);
+  });
+  it('rejects "host" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('host the application on port 8080')).toBe(false);
+  });
+  it('rejects "date" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('date of the deployment')).toBe(false);
+  });
+  it('rejects "file" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('file structure overview')).toBe(false);
+  });
+  it('rejects "read" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('read the documentation first')).toBe(false);
+  });
+  it('rejects "open" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('open the browser and navigate to')).toBe(false);
+  });
+  it('rejects "link" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('link to the repository')).toBe(false);
+  });
+  it('rejects "split" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('split the traffic between versions')).toBe(false);
+  });
+  it('rejects "join" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('join the two tables on ID')).toBe(false);
+  });
+  it('rejects "mount" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('mount the volume in the container')).toBe(false);
+  });
+  it('rejects "top" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('top priority for the next sprint')).toBe(false);
+  });
+  it('rejects "jobs" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('jobs running in the cluster')).toBe(false);
+  });
+  it('rejects "env" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('env vars need to be configured')).toBe(false);
+  });
+  it('rejects "exit" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('exit the application gracefully')).toBe(false);
+  });
+  it('rejects "cut" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('cut down on unnecessary resources')).toBe(false);
+  });
+  it('rejects "diff" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('diff between the two versions')).toBe(false);
+  });
+  it('rejects "true" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('true for production environments')).toBe(false);
+  });
+  it('rejects "false" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('false positives may occur in edge cases')).toBe(false);
+  });
+  it('rejects "sleep" without shell syntax', () => {
+    expect(looksLikeShellOrDockerCodeLine('sleep between retries is configurable')).toBe(false);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // POSITIVE: Structural patterns (no specific command)
+  // ──────────────────────────────────────────────────────────────
   it('detects executable paths (./)', () => {
     expect(looksLikeShellOrDockerCodeLine('./deploy.sh')).toBe(true);
+  });
+  it('detects executable paths with args', () => {
+    expect(looksLikeShellOrDockerCodeLine('./gradlew build --parallel')).toBe(true);
   });
   it('detects shell prompts ($ command)', () => {
     expect(looksLikeShellOrDockerCodeLine('$ kubectl get pods')).toBe(true);
@@ -294,37 +693,311 @@ describe('looksLikeShellOrDockerCodeLine', () => {
   it('detects shebang lines', () => {
     expect(looksLikeShellOrDockerCodeLine('#!/bin/bash')).toBe(true);
   });
+  it('detects shebang with env', () => {
+    expect(looksLikeShellOrDockerCodeLine('#!/usr/bin/env python3')).toBe(true);
+  });
   it('detects environment variable assignments', () => {
     expect(looksLikeShellOrDockerCodeLine('DATABASE_URL=postgres://localhost/mydb')).toBe(true);
   });
+  it('detects NODE_ENV assignment', () => {
+    expect(looksLikeShellOrDockerCodeLine('NODE_ENV=production')).toBe(true);
+  });
+  it('detects pipe chains (structural)', () => {
+    expect(looksLikeShellOrDockerCodeLine('something | another thing')).toBe(true);
+  });
+  it('detects output redirection (structural)', () => {
+    expect(looksLikeShellOrDockerCodeLine('mycommand > output.txt')).toBe(true);
+  });
+  it('detects append redirection', () => {
+    expect(looksLikeShellOrDockerCodeLine('mycommand >> log.txt')).toBe(true);
+  });
+  it('detects stderr redirection', () => {
+    expect(looksLikeShellOrDockerCodeLine('mycommand 2>&1')).toBe(true);
+  });
+  it('detects && chaining (structural)', () => {
+    expect(looksLikeShellOrDockerCodeLine('something && another')).toBe(true);
+  });
+  it('detects command substitution', () => {
+    expect(looksLikeShellOrDockerCodeLine('echo $(date)')).toBe(true);
+  });
+  it('detects line continuation', () => {
+    expect(looksLikeShellOrDockerCodeLine('docker build \\')).toBe(true);
+  });
 
-  // False negatives — these should NOT match
-  it('rejects regular English prose', () => {
+  // ──────────────────────────────────────────────────────────────
+  // NEGATIVE: English prose — should NOT match
+  // ──────────────────────────────────────────────────────────────
+  it('rejects simple sentence', () => {
     expect(looksLikeShellOrDockerCodeLine('This is a regular sentence.')).toBe(false);
   });
+  it('rejects question', () => {
+    expect(looksLikeShellOrDockerCodeLine('Which deployment target do you mean?')).toBe(false);
+  });
+  it('rejects exclamation', () => {
+    expect(looksLikeShellOrDockerCodeLine('Great job on the deployment!')).toBe(false);
+  });
+  it('rejects instruction prose', () => {
+    expect(looksLikeShellOrDockerCodeLine('Reply with: target + framework')).toBe(false);
+  });
+  it('rejects advice prose', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        "While you answer, here's a solid default pattern that works almost everywhere:"
+      )
+    ).toBe(false);
+  });
+  it('rejects prose starting with "I"', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'I can give you the exact Kubernetes YAML once you confirm.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose starting with "You"', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('You can apply it with kubectl apply -f deployment.yaml.')
+    ).toBe(false);
+  });
+  it('rejects prose starting with "The"', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('The deployment will be created in the default namespace.')
+    ).toBe(false);
+  });
+  it('rejects prose about best practices', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Always use environment variables for secrets instead of hardcoding them.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about configuration', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Configure the readiness probe to check the health endpoint.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about architecture', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Each microservice should have its own deployment and service resource.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about networking', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Traffic is routed through the ingress controller to the backend pods.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose with technical terms', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Horizontal Pod Autoscaler scales based on CPU utilization metrics.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about containers', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Containers share the host kernel and are isolated via namespaces.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about scaling', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('Scale the deployment to three replicas for high availability.')
+    ).toBe(false);
+  });
+  it('rejects prose about monitoring', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('Monitoring should be set up with Prometheus and Grafana.')
+    ).toBe(false);
+  });
+  it('rejects prose about security', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Network policies restrict traffic between namespaces for security.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about CI/CD', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine(
+        'Continuous deployment pipelines should include automated testing stages.'
+      )
+    ).toBe(false);
+  });
+  it('rejects prose about databases', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('Database migrations should run before the application starts.')
+    ).toBe(false);
+  });
+  it('rejects conversational prose', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine("Here's how to set up a basic Python web application:")
+    ).toBe(false);
+  });
+  it('rejects comparative prose', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('Gunicorn is generally preferred over the Flask dev server.')
+    ).toBe(false);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // NEGATIVE: Markdown syntax — should NOT match
+  // ──────────────────────────────────────────────────────────────
   it('rejects markdown bullet list', () => {
     expect(looksLikeShellOrDockerCodeLine('- Create requirements.txt')).toBe(false);
   });
-  it('rejects capitalized Python (prose)', () => {
-    expect(looksLikeShellOrDockerCodeLine('Python web app deployment checklist')).toBe(false);
+  it('rejects nested bullet list', () => {
+    expect(looksLikeShellOrDockerCodeLine('  - Flask/Django (WSGI): gunicorn')).toBe(false);
   });
-  it('rejects numbered prose', () => {
+  it('rejects numbered list', () => {
     expect(looksLikeShellOrDockerCodeLine('1. Install the dependencies')).toBe(false);
   });
-  it('rejects title-case words', () => {
+  it('rejects markdown heading', () => {
+    expect(looksLikeShellOrDockerCodeLine('## Installation Guide')).toBe(false);
+  });
+  it('rejects markdown h3', () => {
+    expect(looksLikeShellOrDockerCodeLine('### Step 1: Clone the Repository')).toBe(false);
+  });
+  it('rejects markdown blockquote', () => {
+    expect(looksLikeShellOrDockerCodeLine('> Note: this requires admin privileges')).toBe(false);
+  });
+  it('rejects markdown link', () => {
+    expect(looksLikeShellOrDockerCodeLine('[See the docs](https://example.com)')).toBe(false);
+  });
+  it('rejects markdown bold', () => {
+    expect(looksLikeShellOrDockerCodeLine('**Important:** always back up first')).toBe(false);
+  });
+  it('rejects markdown table separator', () => {
+    expect(looksLikeShellOrDockerCodeLine('|---|---|---|')).toBe(false);
+  });
+  it('rejects markdown table row', () => {
+    expect(looksLikeShellOrDockerCodeLine('| Pod Name | Status | Restarts |')).toBe(false);
+  });
+  it('rejects markdown checkbox', () => {
+    expect(looksLikeShellOrDockerCodeLine('- [x] Deploy to staging')).toBe(false);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // NEGATIVE: YAML / Kubernetes manifest lines — should NOT match
+  // ──────────────────────────────────────────────────────────────
+  it('rejects apiVersion YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('apiVersion: v1')).toBe(false);
+  });
+  it('rejects kind YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('kind: Deployment')).toBe(false);
+  });
+  it('rejects metadata YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('metadata:')).toBe(false);
+  });
+  it('rejects name YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('  name: my-deployment')).toBe(false);
+  });
+  it('rejects namespace YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('  namespace: production')).toBe(false);
+  });
+  it('rejects spec YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('spec:')).toBe(false);
+  });
+  it('rejects replicas YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('  replicas: 3')).toBe(false);
+  });
+  it('rejects containers YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('  containers:')).toBe(false);
+  });
+  it('rejects image YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('    image: nginx:1.25')).toBe(false);
+  });
+  it('rejects ports YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('    - containerPort: 80')).toBe(false);
+  });
+  it('rejects YAML document separator', () => {
+    expect(looksLikeShellOrDockerCodeLine('---')).toBe(false);
+  });
+  it('rejects labels YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('    app: my-app')).toBe(false);
+  });
+  it('rejects selector YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('  selector:')).toBe(false);
+  });
+  it('rejects matchLabels YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('    matchLabels:')).toBe(false);
+  });
+  it('rejects resources YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('    resources:')).toBe(false);
+  });
+  it('rejects limits YAML', () => {
+    expect(looksLikeShellOrDockerCodeLine('      memory: "128Mi"')).toBe(false);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // NEGATIVE: Labels, headings, titles — should NOT match
+  // ──────────────────────────────────────────────────────────────
+  it('rejects capitalized Python prose', () => {
+    expect(looksLikeShellOrDockerCodeLine('Python web app deployment checklist')).toBe(false);
+  });
+  it('rejects Dockerfile as title', () => {
     expect(looksLikeShellOrDockerCodeLine('Dockerfile (FastAPI example)')).toBe(false);
   });
-  it('rejects questions', () => {
-    expect(looksLikeShellOrDockerCodeLine('Which deployment target do you mean?')).toBe(false);
-  });
-  it('rejects paragraphs with technical terms', () => {
-    expect(looksLikeShellOrDockerCodeLine('Reply with: target + framework')).toBe(false);
-  });
-  it('rejects label-style text', () => {
+  it('rejects "Build + run:" label', () => {
     expect(looksLikeShellOrDockerCodeLine('Build + run:')).toBe(false);
   });
+  it('rejects "Example:" label', () => {
+    expect(looksLikeShellOrDockerCodeLine('Example: containerize (works for AKS)')).toBe(false);
+  });
+  it('rejects "Prerequisites:" label', () => {
+    expect(looksLikeShellOrDockerCodeLine('Prerequisites: Docker and kubectl installed')).toBe(
+      false
+    );
+  });
+  it('rejects "Note:" label', () => {
+    expect(
+      looksLikeShellOrDockerCodeLine('Note: Make sure your cluster is running before proceeding.')
+    ).toBe(false);
+  });
+  it('rejects "Step 1" label', () => {
+    expect(looksLikeShellOrDockerCodeLine('Step 1: Create the Dockerfile')).toBe(false);
+  });
+  it('rejects "Option A" label', () => {
+    expect(looksLikeShellOrDockerCodeLine('Option A: Use Kubernetes Deployment')).toBe(false);
+  });
+  it('rejects "Summary" heading', () => {
+    expect(looksLikeShellOrDockerCodeLine('Summary of deployment options')).toBe(false);
+  });
+  it('rejects "Troubleshooting" heading', () => {
+    expect(looksLikeShellOrDockerCodeLine('Troubleshooting common deployment issues')).toBe(false);
+  });
+  it('rejects status output', () => {
+    expect(looksLikeShellOrDockerCodeLine('Status: Running')).toBe(false);
+  });
+  it('rejects key-value output', () => {
+    expect(looksLikeShellOrDockerCodeLine('Name: my-pod-abc123')).toBe(false);
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // NEGATIVE: Other non-code patterns
+  // ──────────────────────────────────────────────────────────────
   it('rejects empty string', () => {
     expect(looksLikeShellOrDockerCodeLine('')).toBe(false);
+  });
+  it('rejects URL', () => {
+    expect(looksLikeShellOrDockerCodeLine('https://kubernetes.io/docs/tutorials/')).toBe(false);
+  });
+  it('rejects email-like text', () => {
+    expect(looksLikeShellOrDockerCodeLine('admin@example.com')).toBe(false);
+  });
+  it('rejects version numbers', () => {
+    expect(looksLikeShellOrDockerCodeLine('v1.28.0')).toBe(false);
+  });
+  it('rejects plain numbers', () => {
+    expect(looksLikeShellOrDockerCodeLine('8080')).toBe(false);
+  });
+  it('rejects just whitespace', () => {
+    expect(looksLikeShellOrDockerCodeLine('   ')).toBe(false);
   });
 });
 
@@ -370,6 +1043,63 @@ describe('normalizeTerminalMarkdown', () => {
     const result = normalizeTerminalMarkdown(input);
     expect(result).toContain('Example: containerize');
     expect(result).not.toContain('```');
+  });
+
+  it('wraps code blocks with empty lines between code lines', () => {
+    const input =
+      'Steps:\n\n docker build -t myapp .\n\n docker run --rm -p 8000:8000 myapp\n\nDone.';
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```');
+    expect(result).toContain('docker build -t myapp .');
+    expect(result).toContain('docker run --rm -p 8000:8000 myapp');
+  });
+
+  it('wraps Dockerfile blocks with empty lines between instructions', () => {
+    const input =
+      'Dockerfile:\n\n FROM python:3.12-slim\n\n WORKDIR /app\n COPY . .\n\n RUN pip install -r requirements.txt\n\nDone.';
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```');
+    expect(result).toContain('FROM python:3.12-slim');
+    expect(result).toContain('WORKDIR /app');
+    expect(result).toContain('RUN pip install -r requirements.txt');
+  });
+
+  it('does not wrap Kubernetes YAML as code (handled separately by wrapBareYamlBlocks)', () => {
+    const input =
+      'Here is the deployment:\n\n apiVersion: apps/v1\n kind: Deployment\n metadata:\n   name: my-app\n';
+    const result = normalizeTerminalMarkdown(input);
+    // YAML lines don't match looksLikeShellOrDockerCodeLine, so no wrapping
+    expect(result).not.toContain('```');
+    expect(result).toContain('apiVersion: apps/v1');
+  });
+
+  it('does not wrap indented prose as code', () => {
+    const input =
+      '\n service mesh configuration\n service discovery is built-in\n service accounts are used\n';
+    const result = normalizeTerminalMarkdown(input);
+    // "service" is ambiguous and these lines have no shell syntax → not wrapped
+    expect(result).not.toContain('```');
+  });
+
+  it('handles mixed content: numbered list + code block + prose', () => {
+    const input = [
+      ' 1 Option A',
+      ' 2 Option B',
+      '',
+      '                 Setup instructions',
+      '',
+      ' docker pull nginx',
+      ' docker run -d -p 80:80 nginx',
+      '',
+      'That should work.',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('1. Option A');
+    expect(result).toContain('2. Option B');
+    expect(result).toContain('Setup instructions');
+    expect(result).toContain('```');
+    expect(result).toContain('docker pull nginx');
+    expect(result).toContain('That should work.');
   });
 });
 
