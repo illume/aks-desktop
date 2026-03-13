@@ -311,7 +311,7 @@ function stripAnsi(text: string): string {
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
-    .replace(/^0m\s?/gm, '') // Orphaned ANSI reset at line start (from split "[4\n0m")
+    .replace(/\s?\[\d{0,3}(;\d{1,3})*$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m")
     .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, ''); // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
 }
 
@@ -1322,6 +1322,29 @@ function isFileHeaderComment(trimmed: string): boolean {
 }
 
 /**
+ * Detect standalone filename headings — lines like `Cargo.toml`, `src/main.rs`,
+ * `Dockerfile` that Rich terminal renders as bold headings outside code panels.
+ * After ANSI stripping these become bare filenames on their own line.
+ *
+ * Used by `normalizeTerminalMarkdown` and `wrapBareCodeBlocks` to recognise
+ * that the next block of space-prefixed lines is a code file.
+ *
+ * YAML file headings are excluded — handled by `wrapBareYamlBlocks`.
+ */
+function isBoldFileHeading(trimmed: string): boolean {
+  // filename.ext  or  path/to/file.ext  (standalone on a line, no other words)
+  if (/^(\S+\/)*\S+\.\w+$/.test(trimmed)) {
+    // Exclude YAML file headings
+    if (/\.ya?ml$/i.test(trimmed)) return false;
+    return true;
+  }
+  // Well-known extensionless filenames
+  if (/^(Dockerfile|Makefile|Vagrantfile|Gemfile|Rakefile|Procfile|Brewfile)$/.test(trimmed))
+    return true;
+  return false;
+}
+
+/**
  * Heuristic: does a trimmed line look like a shell command, Dockerfile
  * instruction, or similar code that belongs in a fenced code block?
  *
@@ -1631,6 +1654,70 @@ function normalizeTerminalMarkdown(text: string): string {
       trimmedHeadingCount++;
       result.push(trimmed);
       i++;
+      continue;
+    }
+
+    // Bold file headings (e.g. "Cargo.toml", "src/main.rs", "Dockerfile")
+    // Rich terminal renders these as bold text outside code panels.
+    // After ANSI stripping they appear as bare filenames on their own line,
+    // followed by a blank line and then space-prefixed code content.
+    // Emit the heading, then collect subsequent space-prefixed lines as a
+    // code block (the content may be TOML, Rust, Dockerfile, etc.).
+    if (!/^\s+/.test(line) && isBoldFileHeading(trimmed)) {
+      result.push(line);
+      i++;
+      // Skip blank lines after the heading
+      while (i < lines.length && lines[i].trim() === '') {
+        result.push(lines[i]);
+        i++;
+      }
+      // Collect space-prefixed content lines as a code block
+      if (i < lines.length && /^\s+\S/.test(lines[i])) {
+        const blockLines: string[] = [];
+        let j = i;
+        while (j < lines.length) {
+          const bl = lines[j];
+          const bt = bl.trim();
+          if (bt === '') {
+            // Allow single blank lines within the block
+            let peekIdx = j + 1;
+            while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+            const blankCount = peekIdx - j;
+            if (blankCount >= 2 || peekIdx >= lines.length) break;
+            const peekLine = lines[peekIdx];
+            const peekTrimmed = peekLine.trim();
+            if (!/^\s+\S/.test(peekLine)) break;
+            // Break at next file heading boundary
+            if (isBoldFileHeading(peekTrimmed)) break;
+            // Break at centered headings (deeply indented non-code content,
+            // e.g. "                 2) Containerize it ..." section headings).
+            // Code panel content typically has 1-8 spaces indent; centered
+            // headings have 6+ and don't match code patterns.
+            const peekIndent = peekLine.match(/^(\s*)/)?.[1].length ?? 0;
+            if (peekIndent > 6 && !looksLikeShellOrDockerCodeLine(peekTrimmed)) break;
+            blockLines.push(bl);
+            j++;
+            continue;
+          }
+          if (!/^\s+\S/.test(bl)) break;
+          // Also break at centered headings appearing directly (no blank line)
+          const lineIndent = bl.match(/^(\s*)/)?.[1].length ?? 0;
+          if (lineIndent > 6 && !looksLikeShellOrDockerCodeLine(bt)) break;
+          blockLines.push(bl);
+          j++;
+        }
+        // Trim trailing blank lines
+        while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+          blockLines.pop();
+        }
+        if (blockLines.length > 0) {
+          result.push('```');
+          for (const bl of blockLines) result.push(bl);
+          result.push('```');
+          i = j;
+          continue;
+        }
+      }
       continue;
     }
 
@@ -2111,10 +2198,10 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
       /^@\w/.test(t) ||
       /__\w+__/.test(t) ||
       // Rust
-      /^(pub\s+)?(async\s+)?fn\s/.test(t) ||
-      /^(pub\s+)?use\s/.test(t) ||
+      /^(pub(\s*\(\s*crate\s*\))?\s+)?(async\s+)?fn\s/.test(t) ||
+      /^(pub(\s*\(\s*crate\s*\))?\s+)?use\s/.test(t) ||
       /^let\s/.test(t) ||
-      /^(struct|enum|impl|trait|mod)\s/.test(t) ||
+      /^(pub(\s*\(\s*crate\s*\))?\s+)?(struct|enum|impl|trait|mod)\s/.test(t) ||
       /^#\[/.test(t) ||
       // Go
       /^(func|package)\s/.test(t) ||
@@ -3394,4 +3481,6 @@ export const _testing = {
   hasShellSyntax,
   normalizeTerminalMarkdown,
   isFileHeaderComment,
+  isBoldFileHeading,
+  hasStructuredCodeContext,
 };

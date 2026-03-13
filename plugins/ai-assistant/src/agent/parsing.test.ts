@@ -27,6 +27,8 @@ const {
   hasShellSyntax,
   normalizeTerminalMarkdown,
   isFileHeaderComment,
+  isBoldFileHeading,
+  hasStructuredCodeContext,
 } = _testing;
 
 describe('stripAnsi', () => {
@@ -5335,9 +5337,21 @@ describe('stripAnsi — orphaned ANSI code continuations', () => {
   });
 
   it('strips orphaned ANSI reset code at line start (split across lines)', () => {
-    expect(stripAnsi('0m kubectl get pods')).toBe('kubectl get pods');
+    // The trailing "[4" fragment is stripped from the end of the previous line
+    expect(stripAnsi('hello [4\n0m world')).toBe('hello\n0m world');
+    // Full orphaned bracket+code at line start is still stripped
+    expect(stripAnsi('[0m text')).toBe(' text');
     // Multi-part codes (with ;) are stripped
     expect(stripAnsi('97;40m some text')).toBe('some text');
+  });
+
+  it('strips trailing orphan bracket fragments from split sequences', () => {
+    expect(stripAnsi('hello [4')).toBe('hello');
+    expect(stripAnsi('text [97;40')).toBe('text');
+    expect(stripAnsi('line [0')).toBe('line');
+    // Does not strip brackets in legitimate content
+    expect(stripAnsi('array[0]')).toBe('array[0]');
+    expect(stripAnsi('see [RFC 123]')).toBe('see [RFC 123]');
   });
 
   it('preserves normal text that starts with digits', () => {
@@ -5349,7 +5363,9 @@ describe('stripAnsi — orphaned ANSI code continuations', () => {
     expect(stripAnsi('200m')).toBe('200m');
     expect(stripAnsi('200m cpu-limit')).toBe('200m cpu-limit');
     expect(stripAnsi('500m memory')).toBe('500m memory');
-    // Single-part codes like 25m, 40m, 50m are preserved (could be millicores)
+    // Single-part codes like 0m, 25m, 40m, 50m are preserved (could be millicores or K8s quantities)
+    expect(stripAnsi('0m')).toBe('0m');
+    expect(stripAnsi('0m cpu-idle')).toBe('0m cpu-idle');
     expect(stripAnsi('25m')).toBe('25m');
     expect(stripAnsi('40m some text')).toBe('40m some text');
     expect(stripAnsi('50m cpu-request')).toBe('50m cpu-request');
@@ -5518,10 +5534,9 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
     expect(braceOutsideFence.length).toBe(0);
   });
 
-  it('splits shell commands, Cargo.toml, and Rust source into separate code blocks', () => {
+  it('splits Cargo.toml, Rust source, and Dockerfile into separate code blocks', () => {
     const result = extractAIAnswer(rawRustAxumApp);
-    // Shell commands should be in their own block, separate from Cargo.toml
-    // Find the block containing 'cargo init' — it should NOT contain '[package]'
+    // Extract code blocks from the fenced output
     const blocks: string[] = [];
     let current = '';
     let inFence = false;
@@ -5536,17 +5551,15 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
       }
       if (inFence) current += line + '\n';
     }
-    const shellBlock = blocks.find(b => b.includes('cargo init'));
-    const cargoBlock = blocks.find(b => b.includes('# Cargo.toml'));
-    const rustBlock = blocks.find(b => b.includes('// src/main.rs'));
+    // In real Rich panel output, file headings are bold text (not comments),
+    // so blocks are identified by their content, not by "# Cargo.toml" headers.
+    const cargoBlock = blocks.find(b => b.includes('[package]'));
+    const rustBlock = blocks.find(b => b.includes('use axum'));
+    const dockerBlock = blocks.find(b => b.includes('FROM rust'));
 
-    expect(shellBlock).toBeDefined();
     expect(cargoBlock).toBeDefined();
     expect(rustBlock).toBeDefined();
-
-    // Shell block should NOT contain TOML or Rust code
-    expect(shellBlock).not.toContain('[package]');
-    expect(shellBlock).not.toContain('use axum');
+    expect(dockerBlock).toBeDefined();
 
     // Cargo.toml block should contain TOML config
     expect(cargoBlock).toContain('[package]');
@@ -5557,11 +5570,16 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
     expect(rustBlock).toContain('use axum');
     expect(rustBlock).toContain('async fn main()');
     expect(rustBlock).not.toContain('[package]');
+
+    // Dockerfile block should be separate from Rust source
+    expect(dockerBlock).toContain('FROM');
+    expect(dockerBlock).toContain('ENTRYPOINT');
+    expect(dockerBlock).not.toContain('async fn');
   });
 
   it('contains Dockerfile block with FROM and ENTRYPOINT', () => {
     const result = extractAIAnswer(rawRustAxumApp);
-    expect(result).toContain('FROM rust:1.76-bookworm AS build');
+    expect(result).toContain('FROM rust:1.76 as builder');
     expect(result).toContain('ENTRYPOINT ["/app/rust-k8s-example"]');
   });
 
@@ -5570,6 +5588,21 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
     expect(result).toContain('apiVersion: apps/v1');
     expect(result).toContain('kind: Deployment');
     expect(result).toContain('kind: Service');
+  });
+
+  it('does not wrap section headings in code fences', () => {
+    const result = extractAIAnswer(rawRustAxumApp);
+    const lines = result.split('\n');
+    let inFence = false;
+    for (const line of lines) {
+      if (/^```/.test(line.trim())) {
+        inFence = !inFence;
+        continue;
+      }
+      if (inFence && /Containerize it/.test(line)) {
+        throw new Error('Section heading "Containerize it" should not be inside a code fence');
+      }
+    }
   });
 });
 
@@ -5612,5 +5645,86 @@ describe('isFileHeaderComment', () => {
 
   it('does not match Dockerfile directives', () => {
     expect(isFileHeaderComment('# syntax=docker/dockerfile:1')).toBe(false);
+  });
+});
+
+// ─── isBoldFileHeading — standalone filename detection ──────────────────────
+
+describe('isBoldFileHeading', () => {
+  it('matches filename with extension', () => {
+    expect(isBoldFileHeading('Cargo.toml')).toBe(true);
+    expect(isBoldFileHeading('main.py')).toBe(true);
+    expect(isBoldFileHeading('package.json')).toBe(true);
+    expect(isBoldFileHeading('values.ini')).toBe(true);
+  });
+
+  it('matches path/to/file.ext', () => {
+    expect(isBoldFileHeading('src/main.rs')).toBe(true);
+    expect(isBoldFileHeading('app/config.toml')).toBe(true);
+    expect(isBoldFileHeading('tests/test_app.py')).toBe(true);
+  });
+
+  it('matches well-known extensionless filenames', () => {
+    expect(isBoldFileHeading('Dockerfile')).toBe(true);
+    expect(isBoldFileHeading('Makefile')).toBe(true);
+  });
+
+  it('excludes YAML file headings', () => {
+    expect(isBoldFileHeading('k8s.yaml')).toBe(false);
+    expect(isBoldFileHeading('deploy.yml')).toBe(false);
+  });
+
+  it('does not match prose or multi-word lines', () => {
+    expect(isBoldFileHeading('This is text')).toBe(false);
+    expect(isBoldFileHeading('Build + push')).toBe(false);
+    expect(isBoldFileHeading('Apply + test:')).toBe(false);
+    expect(isBoldFileHeading('')).toBe(false);
+  });
+});
+
+// ─── hasStructuredCodeContext — Rust pub/pub(crate) support ──────────────────
+
+describe('hasStructuredCodeContext — Rust pub/pub(crate) prefix support', () => {
+  it('detects pub struct', () => {
+    expect(hasStructuredCodeContext(['pub struct Foo {'])).toBe(true);
+  });
+
+  it('detects pub enum', () => {
+    expect(hasStructuredCodeContext(['pub enum Color {'])).toBe(true);
+  });
+
+  it('detects pub(crate) mod', () => {
+    expect(hasStructuredCodeContext(['pub(crate) mod utils'])).toBe(true);
+  });
+
+  it('detects pub(crate) fn', () => {
+    expect(hasStructuredCodeContext(['pub(crate) fn helper()'])).toBe(true);
+  });
+
+  it('detects pub async fn', () => {
+    expect(hasStructuredCodeContext(['pub async fn main()'])).toBe(true);
+  });
+
+  it('detects pub(crate) async fn', () => {
+    expect(hasStructuredCodeContext(['pub(crate) async fn handler()'])).toBe(true);
+  });
+
+  it('still detects unprefixed Rust declarations', () => {
+    expect(hasStructuredCodeContext(['struct Bar'])).toBe(true);
+    expect(hasStructuredCodeContext(['enum Baz'])).toBe(true);
+    expect(hasStructuredCodeContext(['fn main()'])).toBe(true);
+    expect(hasStructuredCodeContext(['async fn root()'])).toBe(true);
+  });
+
+  it('detects Python patterns', () => {
+    expect(hasStructuredCodeContext(['def hello():'])).toBe(true);
+    expect(hasStructuredCodeContext(['class Foo:'])).toBe(true);
+    expect(hasStructuredCodeContext(['from flask import Flask'])).toBe(true);
+    expect(hasStructuredCodeContext(['import os'])).toBe(true);
+  });
+
+  it('returns false for plain prose', () => {
+    expect(hasStructuredCodeContext(['This is just text.'])).toBe(false);
+    expect(hasStructuredCodeContext(['Use this command to start.'])).toBe(false);
   });
 });
