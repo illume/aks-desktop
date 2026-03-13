@@ -26,6 +26,7 @@ const {
   looksLikeShellOrDockerCodeLine,
   hasShellSyntax,
   normalizeTerminalMarkdown,
+  isFileHeaderComment,
 } = _testing;
 
 describe('stripAnsi', () => {
@@ -5432,6 +5433,47 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
     expect(braceOutsideFence.length).toBe(0);
   });
 
+  it('splits shell commands, Cargo.toml, and Rust source into separate code blocks', () => {
+    const result = extractAIAnswer(rawRustAxumApp);
+    // Shell commands should be in their own block, separate from Cargo.toml
+    // Find the block containing 'cargo init' — it should NOT contain '[package]'
+    const blocks: string[] = [];
+    let current = '';
+    let inFence = false;
+    for (const line of result.split('\n')) {
+      if (/^```/.test(line.trim())) {
+        if (inFence) {
+          blocks.push(current);
+          current = '';
+        }
+        inFence = !inFence;
+        continue;
+      }
+      if (inFence) current += line + '\n';
+    }
+    const shellBlock = blocks.find(b => b.includes('cargo init'));
+    const cargoBlock = blocks.find(b => b.includes('# Cargo.toml'));
+    const rustBlock = blocks.find(b => b.includes('// src/main.rs'));
+
+    expect(shellBlock).toBeDefined();
+    expect(cargoBlock).toBeDefined();
+    expect(rustBlock).toBeDefined();
+
+    // Shell block should NOT contain TOML or Rust code
+    expect(shellBlock).not.toContain('[package]');
+    expect(shellBlock).not.toContain('use axum');
+
+    // Cargo.toml block should contain TOML config
+    expect(cargoBlock).toContain('[package]');
+    expect(cargoBlock).toContain('[dependencies]');
+    expect(cargoBlock).not.toContain('async fn');
+
+    // Rust source block should contain the full source
+    expect(rustBlock).toContain('use axum');
+    expect(rustBlock).toContain('async fn main()');
+    expect(rustBlock).not.toContain('[package]');
+  });
+
   it('contains Dockerfile block with FROM and ENTRYPOINT', () => {
     const result = extractAIAnswer(rawRustAxumApp);
     expect(result).toContain('FROM rust:1.76-bookworm AS build');
@@ -5443,5 +5485,47 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
     expect(result).toContain('apiVersion: apps/v1');
     expect(result).toContain('kind: Deployment');
     expect(result).toContain('kind: Service');
+  });
+});
+
+// ─── isFileHeaderComment ─────────────────────────────────────────────────────
+
+describe('isFileHeaderComment', () => {
+  it('matches filename with extension', () => {
+    expect(isFileHeaderComment('# Cargo.toml')).toBe(true);
+    expect(isFileHeaderComment('# main.py')).toBe(true);
+    expect(isFileHeaderComment('# package.json')).toBe(true);
+    expect(isFileHeaderComment('# values.ini')).toBe(true);
+    expect(isFileHeaderComment('# config.cfg')).toBe(true);
+  });
+
+  it('matches path/filename with extension', () => {
+    expect(isFileHeaderComment('// src/main.rs')).toBe(true);
+    expect(isFileHeaderComment('// cmd/server/main.go')).toBe(true);
+    expect(isFileHeaderComment('# src/app.py')).toBe(true);
+  });
+
+  it('matches well-known extensionless filenames', () => {
+    expect(isFileHeaderComment('# Dockerfile')).toBe(true);
+    expect(isFileHeaderComment('# Makefile')).toBe(true);
+    expect(isFileHeaderComment('# Gemfile')).toBe(true);
+    expect(isFileHeaderComment('# Procfile')).toBe(true);
+  });
+
+  it('excludes YAML file headers', () => {
+    expect(isFileHeaderComment('# k8s.yaml')).toBe(false);
+    expect(isFileHeaderComment('# deploy.yml')).toBe(false);
+    expect(isFileHeaderComment('# values.yaml')).toBe(false);
+  });
+
+  it('does not match regular comments', () => {
+    expect(isFileHeaderComment('# cache deps')).toBe(false);
+    expect(isFileHeaderComment('# build real app')).toBe(false);
+    expect(isFileHeaderComment('# This is a heading')).toBe(false);
+    expect(isFileHeaderComment('# Install dependencies first')).toBe(false);
+  });
+
+  it('does not match Dockerfile directives', () => {
+    expect(isFileHeaderComment('# syntax=docker/dockerfile:1')).toBe(false);
   });
 });

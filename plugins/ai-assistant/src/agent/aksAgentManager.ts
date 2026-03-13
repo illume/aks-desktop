@@ -1292,6 +1292,30 @@ function hasShellSyntax(trimmed: string): boolean {
 }
 
 /**
+ * Detect "file header" comments — lines like `# Cargo.toml`, `// src/main.rs`,
+ * `# Dockerfile` that signal the start of a different file's content.
+ * Used by `normalizeTerminalMarkdown` to break code blocks at file-type
+ * boundaries (e.g. shell commands → Cargo.toml → Rust source).
+ *
+ * Matches comment lines where the comment body is a bare filename or path
+ * (with extension), or a well-known extensionless filename.
+ *
+ * YAML file headers (e.g. `# k8s.yaml`, `# deploy.yml`) are excluded
+ * because their content should be handled by `wrapBareYamlBlocks` instead.
+ */
+function isFileHeaderComment(trimmed: string): boolean {
+  // # filename.ext  or  // path/to/file.ext
+  if (/^(#|\/\/)\s+\S+\.\w+\s*$/.test(trimmed)) {
+    // Exclude YAML file headers — let wrapBareYamlBlocks handle those
+    if (/\.ya?ml\s*$/i.test(trimmed)) return false;
+    return true;
+  }
+  // Well-known extensionless filenames
+  if (/^(#|\/\/)\s+(Dockerfile|Makefile|Vagrantfile|Gemfile|Rakefile|Procfile|Brewfile)\s*$/.test(trimmed)) return true;
+  return false;
+}
+
+/**
  * Heuristic: does a trimmed line look like a shell command, Dockerfile
  * instruction, or similar code that belongs in a fenced code block?
  *
@@ -1499,6 +1523,13 @@ function collapseTerminalBlankLines(text: string): string {
       // Both sides are terminal-formatted code lines
       if (blankCount <= 1) {
         // Single blank = terminal chunk artefact → drop entirely
+        // EXCEPT: preserve when next line is a file header comment
+        // (e.g. "# Cargo.toml", "// src/main.rs") to keep a blank line
+        // at file-type boundaries so normalizeTerminalMarkdown can split
+        // the code into separate blocks.
+        if (isFileHeaderComment(nextLine.trim())) {
+          result.push('');
+        }
         collapsedCount++;
       } else {
         // Multiple blanks = intentional blank in source code → keep one
@@ -1589,7 +1620,7 @@ function normalizeTerminalMarkdown(text: string): string {
       continue;
     }
 
-    if (/^\s+\S/.test(line) && looksLikeShellOrDockerCodeLine(trimmed)) {
+    if (/^\s+\S/.test(line) && (looksLikeShellOrDockerCodeLine(trimmed) || isFileHeaderComment(trimmed))) {
       // Don't wrap indented lines that are Python function/class/if bodies.
       // If the previous non-blank line is an unindented Python block opener
       // (e.g. "def index():", "if __name__:"), this line is part of its body
@@ -1625,6 +1656,15 @@ function normalizeTerminalMarkdown(text: string): string {
       let j = i;
       let codeLikeLineCount = 0;
       const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+      // Track whether this block was started by a file header comment
+      // (e.g. "# Cargo.toml"): if so, we collect ALL space-prefixed lines
+      // regardless of whether they match looksLikeShellOrDockerCodeLine,
+      // since the content may be TOML, INI, or other config that has no
+      // shell/Dockerfile syntax markers.
+      const startedByFileHeader = isFileHeaderComment(trimmed);
+      if (startedByFileHeader) {
+        codeLikeLineCount++; // count the file header itself
+      }
 
       while (j < lines.length) {
         const blockLine = lines[j];
@@ -1636,6 +1676,26 @@ function normalizeTerminalMarkdown(text: string): string {
           while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
           if (peekIdx < lines.length) {
             const peekTrimmed = lines[peekIdx].trim();
+            // Break at file-type boundaries: a blank line followed by a
+            // "file header" comment (e.g. "# Cargo.toml", "// src/main.rs")
+            // signals a transition to different file content — the code
+            // block should end here and a new one will start for the next
+            // section.
+            if (isFileHeaderComment(peekTrimmed)) {
+              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+                blockLines.pop();
+              }
+              break;
+            }
+            // For file-header blocks (e.g. started by "# Cargo.toml"):
+            // a blank line always terminates the block, since config/source
+            // file content within terminal output doesn't span blank lines.
+            if (startedByFileHeader) {
+              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+                blockLines.pop();
+              }
+              break;
+            }
             if (!looksLikeShellOrDockerCodeLine(peekTrimmed)) {
               // Trim trailing blank lines already in blockLines
               while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
@@ -1643,6 +1703,12 @@ function normalizeTerminalMarkdown(text: string): string {
               }
               break;
             }
+          } else if (startedByFileHeader) {
+            // End of input — break
+            while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+              blockLines.pop();
+            }
+            break;
           }
           blockLines.push(blockLine);
           j++;
@@ -1654,8 +1720,10 @@ function normalizeTerminalMarkdown(text: string): string {
         }
 
         // Stop at heavily-indented non-code lines (centered headings)
+        // Skip this check for file-header blocks since config/YAML files
+        // commonly have deep indentation.
         const lineIndent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
-        if (lineIndent > baseIndent + 4 && !looksLikeShellOrDockerCodeLine(blockTrimmed)) {
+        if (!startedByFileHeader && lineIndent > baseIndent + 4 && !looksLikeShellOrDockerCodeLine(blockTrimmed)) {
           break;
         }
 
@@ -2077,6 +2145,11 @@ function wrapBareCodeBlocks(text: string): string {
           if (peekIdx < lines.length) {
             const peekTrimmed = lines[peekIdx].trim();
             const peekIsIndented = /^\s+/.test(lines[peekIdx]);
+            // Break at file-type boundaries (e.g. "# Cargo.toml",
+            // "// src/main.rs") to avoid merging different file contents.
+            if (isFileHeaderComment(peekTrimmed)) {
+              break;
+            }
             // In Python context, allow blank lines followed by indented
             // continuation (function/class body) or by the next top-level
             // Python statement.
@@ -3279,4 +3352,5 @@ export const _testing = {
   looksLikeShellOrDockerCodeLine,
   hasShellSyntax,
   normalizeTerminalMarkdown,
+  isFileHeaderComment,
 };
