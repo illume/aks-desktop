@@ -652,9 +652,10 @@ function extractAIAnswer(rawOutput: string): string {
     .map(l => stripAnsi(l).trimEnd())
     .join('\n');
 
+  const normalisedLines = normalised.split('\n');
   debugLog(
     '[AKS Agent Parse] extractAIAnswer: normalised line count:',
-    normalised.split('\n').length,
+    normalisedLines.length,
     'char count:',
     normalised.length
   );
@@ -663,7 +664,7 @@ function extractAIAnswer(rawOutput: string): string {
   // the entire multi-line command (including conversation history) is echoed
   // back through stdout as the python invocation line followed by bash
   // continuation prompt lines ("> ...").
-  const lines = stripCommandEcho(normalised.split('\n'));
+  const lines = stripCommandEcho(normalisedLines);
   debugLog(
     '[AKS Agent Parse] extractAIAnswer: after stripCommandEcho:',
     lines.length,
