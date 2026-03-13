@@ -1,5 +1,6 @@
 import { runCommand } from '@kinvolk/headlamp-plugin/lib';
 import { clusterRequest, stream } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
+import { debugLog, detailLog, dumpForTestCase, verboseLog } from './debugLog';
 
 declare const pluginRunCommand: typeof runCommand;
 
@@ -307,7 +308,9 @@ function stripAnsi(text: string): string {
   return text
     .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '') // CSI sequences (colors, cursor, bracketed paste)
     .replace(/\x1b[()][AB012]/g, '') // Character set selection
-    .replace(/\r/g, ''); // Carriage returns
+    .replace(/\r/g, '') // Carriage returns
+    .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
+    .replace(/\[[\d;]*m/g, ''); // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
 }
 
 /**
@@ -316,7 +319,1310 @@ function stripAnsi(text: string): string {
  * Preserves any leading indentation so nested lists render correctly.
  */
 function normalizeBullets(text: string): string {
-  return text.replace(/^(\s*)[•·▪▸–]\s+/gm, '$1- ');
+  const result = text.replace(/^(\s*)[•·▪▸–]\s+/gm, '$1- ');
+  if (result !== text) {
+    verboseLog('[AKS Agent Parse] normalizeBullets: converted Unicode bullets to markdown dashes');
+  }
+  return result;
+}
+
+/**
+ * Curated set of first-word tokens that **unambiguously** indicate a shell
+ * command, Dockerfile instruction, or similar code line.  These words almost
+ * never begin an English sentence, so a first-word match is sufficient.
+ *
+ * Checked via O(1) Set lookup.  Organised by category for maintainability.
+ * Dockerfile instructions are uppercase; everything else is lowercase.
+ */
+const KNOWN_CODE_COMMANDS: ReadonlySet<string> = new Set([
+  // ── Dockerfile / OCI build instructions ──
+  'FROM',
+  'RUN',
+  'CMD',
+  'COPY',
+  'WORKDIR',
+  'EXPOSE',
+  'ENTRYPOINT',
+  'ENV',
+  'ARG',
+  'USER',
+  'LABEL',
+  'ADD',
+  'SHELL',
+  'VOLUME',
+  'STOPSIGNAL',
+  'HEALTHCHECK',
+  'ONBUILD',
+
+  // ── Container runtimes & orchestration ──
+  'docker',
+  'docker-compose',
+  'podman',
+  'nerdctl',
+  'kubectl',
+  'helm',
+  'skaffold',
+  'kustomize',
+  'kompose',
+  'minikube',
+  'kind',
+  'k3d',
+  'k3s',
+  'buildah',
+  'crictl',
+  'ctr',
+  'trivy',
+  'cosign',
+  'kaniko',
+  'podman-compose',
+  'docker-slim',
+  'dive',
+  'stern',
+  'kubectx',
+  'kubens',
+  'istioctl',
+  'linkerd',
+  'argocd',
+  'flux',
+  'velero',
+  'krew',
+  'kubeadm',
+  'kubebuilder',
+  'operator-sdk',
+
+  // ── Cloud provider CLIs ──
+  'az',
+  'gcloud',
+  'aws',
+  'eksctl',
+  'doctl',
+  'oci',
+  'ibmcloud',
+  'linode-cli',
+  'vultr-cli',
+  'hcloud',
+  'aks-preview',
+
+  // ── JavaScript / TypeScript / Node.js ──
+  'npm',
+  'npx',
+  'pnpm',
+  'yarn',
+  'bun',
+  'bunx',
+  'deno',
+  'node',
+  'nodejs',
+  'tsc',
+  'tsx',
+  'esbuild',
+  'swc',
+  'vite',
+  'webpack',
+  'rollup',
+  'parcel',
+  'turbo',
+  'turborepo',
+  'nx',
+  'lerna',
+  'jest',
+  'vitest',
+  'mocha',
+  'jasmine',
+  'karma',
+  'cypress',
+  'playwright',
+  'puppeteer',
+  'eslint',
+  'biome',
+  'prettier',
+  'stylelint',
+  'next',
+  'nuxt',
+  'gatsby',
+  'remix',
+  'astro',
+  'svelte',
+  'angular',
+  'ng',
+  'create-react-app',
+  'create-next-app',
+  'nodemon',
+  'ts-node',
+  'tsx',
+  'pm2',
+
+  // ── Python ──
+  'pip',
+  'pip3',
+  'pip2',
+  'python',
+  'python3',
+  'python2',
+  'uvicorn',
+  'gunicorn',
+  'flask',
+  'django-admin',
+  'django',
+  'poetry',
+  'pipenv',
+  'pipx',
+  'virtualenv',
+  'venv',
+  'conda',
+  'mamba',
+  'micromamba',
+  'pytest',
+  'mypy',
+  'pyright',
+  'black',
+  'ruff',
+  'pylint',
+  'flake8',
+  'isort',
+  'autopep8',
+  'yapf',
+  'celery',
+  'alembic',
+  'manage.py',
+  'streamlit',
+  'gradio',
+  'jupyter',
+  'ipython',
+  'notebook',
+  'sphinx-build',
+  'sphinx-quickstart',
+  'tox',
+  'nox',
+  'hatch',
+  'pdm',
+  'flit',
+  'twine',
+  'setuptools',
+  'cython',
+  'pyinstaller',
+  'pydantic',
+  'uvloop',
+  'hypercorn',
+  'daphne',
+  'scrapy',
+  'httpie',
+
+  // ── Ruby ──
+  'ruby',
+  'gem',
+  'bundle',
+  'bundler',
+  'rails',
+  'rake',
+  'rspec',
+  'rubocop',
+  'irb',
+  'pry',
+  'rvm',
+  'rbenv',
+  'chruby',
+  'solargraph',
+  'jekyll',
+  'middleman',
+  'capistrano',
+  'puma',
+  'unicorn',
+  'sidekiq',
+  'foreman',
+
+  // ── PHP ──
+  'php',
+  'composer',
+  'artisan',
+  'phpunit',
+  'phpstan',
+  'phpcs',
+  'phpcbf',
+  'psalm',
+  'pint',
+  'tinker',
+  'valet',
+  'sail',
+  'laravel',
+  'symfony',
+  'drush',
+  'wp-cli',
+  'wp',
+
+  // ── Java / JVM / Kotlin ──
+  'java',
+  'javac',
+  'jar',
+  'gradle',
+  'gradlew',
+  'mvn',
+  'mvnw',
+  'sbt',
+  'scala',
+  'scalac',
+  'kotlin',
+  'kotlinc',
+  'groovy',
+  'groovyc',
+  'ant',
+  'kapt',
+  'jlink',
+  'jpackage',
+  'keytool',
+  'jarsigner',
+  'javadoc',
+  'jconsole',
+  'jstack',
+  'jmap',
+  'jhat',
+  'jps',
+  'jdb',
+  'jshell',
+  'spring',
+  'quarkus',
+  'micronaut',
+
+  // ── .NET / C# ──
+  'dotnet',
+  'nuget',
+  'msbuild',
+  'csc',
+  'fsc',
+  'paket',
+  'dotnet-ef',
+
+  // ── Go ──
+  'go',
+  'gofmt',
+  'goimports',
+  'golangci-lint',
+  'dlv',
+  'air',
+  'goreleaser',
+  'ko',
+  'buf',
+  'protoc',
+
+  // ── Rust ──
+  'cargo',
+  'rustc',
+  'rustup',
+  'rustfmt',
+  'clippy',
+  'wasm-pack',
+  'trunk',
+  'cross',
+  'miri',
+
+  // ── Swift / Apple ──
+  'swift',
+  'swiftc',
+  'xcodebuild',
+  'xcrun',
+  'swift-build',
+  'swift-test',
+  'swift-run',
+  'cocoapods',
+  'pod',
+  'fastlane',
+  'xcode-select',
+
+  // ── Elixir / Erlang ──
+  'elixir',
+  'mix',
+  'iex',
+  'erl',
+  'erlc',
+  'rebar3',
+
+  // ── Dart / Flutter ──
+  'dart',
+  'flutter',
+  'pub',
+
+  // ── Haskell ──
+  'ghc',
+  'ghci',
+  'cabal',
+  'stack',
+  'runhaskell',
+
+  // ── Perl / Lua / R / Julia ──
+  'perl',
+  'cpan',
+  'cpanm',
+  'lua',
+  'luarocks',
+  'Rscript',
+  'julia',
+
+  // ── Build tools & compilers ──
+  'make',
+  'cmake',
+  'bazel',
+  'buck',
+  'buck2',
+  'ninja',
+  'meson',
+  'autoconf',
+  'automake',
+  'configure',
+  'gcc',
+  'g++',
+  'cc',
+  'c++',
+  'clang',
+  'clang++',
+  'ld',
+  'ar',
+  'strip',
+  'objdump',
+  'objcopy',
+  'nm',
+  'ldd',
+  'nasm',
+  'yasm',
+  'as',
+  'pkg-config',
+  'libtool',
+  'scons',
+  'waf',
+  'premake',
+  'xmake',
+  'vcpkg',
+  'conan',
+
+  // ── Version managers ──
+  'nvm',
+  'fnm',
+  'volta',
+  'asdf',
+  'pyenv',
+  'goenv',
+  'tfenv',
+  'corepack',
+  'mise',
+  'rtx',
+  'sdkman',
+  'jabba',
+
+  // ── General CLI tools ──
+  'curl',
+  'wget',
+  'wget2',
+  'aria2c',
+  'git',
+  'git-lfs',
+  'svn',
+  'hg',
+  'jq',
+  'yq',
+  'fq',
+  'xq',
+  'xargs',
+  'parallel',
+  'tee',
+  'sed',
+  'awk',
+  'gawk',
+  'mawk',
+  'grep',
+  'egrep',
+  'fgrep',
+  'rg',
+  'ag',
+  'fd',
+  'fzf',
+  'bat',
+  'exa',
+  'eza',
+  'lsd',
+  'tree',
+  'dust',
+  'duf',
+  'procs',
+  'btop',
+  'htop',
+  'glances',
+  'neofetch',
+  'tokei',
+  'cloc',
+  'hyperfine',
+  'entr',
+  'watchexec',
+  'direnv',
+  'starship',
+  'zoxide',
+
+  // ── File / directory operations (unambiguous subset) ──
+  'mkdir',
+  'mktemp',
+  'rmdir',
+  'chmod',
+  'chown',
+  'chgrp',
+  'chattr',
+  'lsattr',
+  'ln',
+  'rsync',
+  'scp',
+  'dd',
+  'install',
+  'shred',
+  'truncate',
+  'fallocate',
+  'mkfifo',
+  'mknod',
+  'readlink',
+  'realpath',
+  'dirname',
+  'basename',
+  'pathchk',
+
+  // ── Archive / compression ──
+  'tar',
+  'gzip',
+  'gunzip',
+  'bzip2',
+  'bunzip2',
+  'unzip',
+  'zip',
+  'xz',
+  'unxz',
+  'zstd',
+  'unzstd',
+  'pigz',
+  'unpigz',
+  'lz4',
+  'unlz4',
+  '7z',
+  '7za',
+  'rar',
+  'unrar',
+  'cpio',
+  'pax',
+  'zcat',
+  'bzcat',
+  'xzcat',
+  'zless',
+
+  // ── Process / system (unambiguous subset) ──
+  'echo',
+  'printf',
+  'nohup',
+  'crontab',
+  'lsof',
+  'fuser',
+  'strace',
+  'ltrace',
+  'perf',
+  'valgrind',
+  'gdb',
+  'lldb',
+  'pgrep',
+  'pkill',
+  'killall',
+  'renice',
+  'ionice',
+  'taskset',
+  'chrt',
+  'ulimit',
+  'prlimit',
+  'sysctl',
+  'dmesg',
+  'journalctl',
+  'logger',
+  'systemd-analyze',
+  'systemd-run',
+  'loginctl',
+  'timedatectl',
+  'localectl',
+  'hostnamectl',
+  'coredumpctl',
+  'uname',
+  'uptime',
+  'whoami',
+  'hostname',
+  'domainname',
+  'printenv',
+  'getent',
+  'nproc',
+  'free',
+  'vmstat',
+  'iostat',
+  'mpstat',
+  'sar',
+  'pidof',
+  'pmap',
+
+  // ── Shell builtins (low-ambiguity subset) ──
+  'export',
+  'source',
+  'eval',
+  'exec',
+  'alias',
+  'unalias',
+  'umask',
+  'trap',
+  'getopts',
+  'shift',
+  'shopt',
+  'typeset',
+  'declare',
+  'readonly',
+  'local',
+
+  // ── Shell interpreters ──
+  'bash',
+  'sh',
+  'zsh',
+  'fish',
+  'dash',
+  'ksh',
+  'csh',
+  'tcsh',
+  'pwsh',
+  'powershell',
+
+  // ── Package managers / system administration ──
+  'sudo',
+  'su',
+  'apt-get',
+  'apt',
+  'apt-cache',
+  'apt-key',
+  'apt-file',
+  'aptitude',
+  'dpkg',
+  'dpkg-deb',
+  'yum',
+  'dnf',
+  'rpm',
+  'zypper',
+  'brew',
+  'cask',
+  'apk',
+  'pacman',
+  'yay',
+  'paru',
+  'snap',
+  'flatpak',
+  'nix',
+  'nix-env',
+  'nix-shell',
+  'nix-build',
+  'nix-store',
+  'guix',
+  'emerge',
+  'portage',
+  'pkg',
+  'pkg_add',
+  'pkgin',
+  'xbps-install',
+  'xbps-query',
+
+  // ── User / group management ──
+  'useradd',
+  'usermod',
+  'userdel',
+  'groupadd',
+  'groupmod',
+  'groupdel',
+  'passwd',
+  'chpasswd',
+  'adduser',
+  'addgroup',
+  'deluser',
+  'delgroup',
+  'visudo',
+
+  // ── Disk / filesystem ──
+  'fdisk',
+  'gdisk',
+  'parted',
+  'mkfs',
+  'mkfs.ext4',
+  'mkfs.xfs',
+  'mkfs.btrfs',
+  'mkswap',
+  'swapon',
+  'swapoff',
+  'fsck',
+  'e2fsck',
+  'xfs_repair',
+  'blkid',
+  'lsblk',
+  'findmnt',
+  'losetup',
+  'cryptsetup',
+  'lvs',
+  'vgs',
+  'pvs',
+  'lvcreate',
+  'vgcreate',
+  'pvcreate',
+  'resize2fs',
+  'xfs_growfs',
+  'btrfs',
+
+  // ── Service / daemon management ──
+  'systemctl',
+  'supervisord',
+  'supervisorctl',
+  'initctl',
+  'rc-service',
+  'rc-update',
+  'chkconfig',
+  'update-rc.d',
+
+  // ── Database CLIs ──
+  'mysql',
+  'mysqldump',
+  'mysqladmin',
+  'mysqlimport',
+  'psql',
+  'pg_dump',
+  'pg_restore',
+  'pg_basebackup',
+  'pgbench',
+  'createdb',
+  'dropdb',
+  'createuser',
+  'dropuser',
+  'sqlite3',
+  'mongosh',
+  'mongo',
+  'mongodump',
+  'mongorestore',
+  'mongoexport',
+  'mongoimport',
+  'redis-cli',
+  'redis-server',
+  'redis-benchmark',
+  'influx',
+  'influxd',
+  'cqlsh',
+  'nodetool',
+  'clickhouse-client',
+  'etcdctl',
+  'consul',
+  'vault',
+
+  // ── Networking (unambiguous subset) ──
+  'ssh',
+  'ssh-keygen',
+  'ssh-copy-id',
+  'ssh-add',
+  'ssh-agent',
+  'sftp',
+  'sshfs',
+  'telnet',
+  'ping',
+  'ping6',
+  'traceroute',
+  'traceroute6',
+  'tracepath',
+  'mtr',
+  'dig',
+  'nslookup',
+  'whois',
+  'ifconfig',
+  'iptables',
+  'ip6tables',
+  'nftables',
+  'nft',
+  'ufw',
+  'firewall-cmd',
+  'firewalld',
+  'tcpdump',
+  'tshark',
+  'wireshark',
+  'nmap',
+  'masscan',
+  'netcat',
+  'ncat',
+  'socat',
+  'ab',
+  'wrk',
+  'hey',
+  'siege',
+  'vegeta',
+  'fortio',
+  'iperf',
+  'iperf3',
+  'mitmproxy',
+  'ngrok',
+  'localtunnel',
+  'caddy',
+  'nginx',
+  'apache2',
+  'httpd',
+  'lighttpd',
+  'haproxy',
+  'envoy',
+  'traefik',
+
+  // ── Infrastructure / CI-CD / deployment ──
+  'terraform',
+  'terragrunt',
+  'ansible',
+  'ansible-playbook',
+  'ansible-galaxy',
+  'ansible-vault',
+  'vagrant',
+  'packer',
+  'pulumi',
+  'cdk',
+  'cdktf',
+  'sam',
+  'cloudformation',
+  'serverless',
+  'sls',
+  'vercel',
+  'netlify',
+  'heroku',
+  'flyctl',
+  'gh',
+  'hub',
+  'act',
+  'circleci',
+  'gitlab-runner',
+  'jenkins-cli',
+  'tekton',
+  'argo',
+  'spinnaker',
+  'waypoint',
+
+  // ── Security / crypto tools ──
+  'openssl',
+  'gpg',
+  'gpg2',
+  'ssh-keyscan',
+  'certbot',
+  'cfssl',
+  'step',
+  'age',
+  'sops',
+  'sealed-secrets',
+  'htpasswd',
+  'fail2ban-client',
+
+  // ── Linters / formatters / code quality ──
+  'shellcheck',
+  'hadolint',
+  'yamllint',
+  'jsonlint',
+  'markdownlint',
+  'vale',
+  'proselint',
+  'semgrep',
+  'snyk',
+  'grype',
+  'syft',
+  'checkov',
+  'tflint',
+  'tfsec',
+  'kube-score',
+  'kube-linter',
+  'polaris',
+  'conftest',
+  'opa',
+  'gitleaks',
+  'trufflehog',
+
+  // ── Text processing (unambiguous subset) ──
+  'colrm',
+  'column',
+  'fmt',
+  'fold',
+  'nl',
+  'rev',
+  'shuf',
+  'tsort',
+  'unexpand',
+  'expand',
+  'csplit',
+  'iconv',
+  'dos2unix',
+  'unix2dos',
+  'xxd',
+  'hexdump',
+  'od',
+  'base64',
+  'base32',
+  'md5sum',
+  'sha256sum',
+  'sha512sum',
+  'shasum',
+  'cksum',
+  'b2sum',
+  'wc',
+]);
+
+/**
+ * Words that are both common shell commands AND common English words.
+ * These only match as code when the rest of the line contains shell-like
+ * syntax (flags, file paths, operators, quoted args) — see `hasShellSyntax`.
+ */
+const AMBIGUOUS_CODE_COMMANDS: ReadonlySet<string> = new Set([
+  // File operations
+  'cat',
+  'cp',
+  'mv',
+  'rm',
+  'ls',
+  'cd',
+  'pwd',
+  'du',
+  'df',
+  'touch',
+  'file',
+  'stat',
+  'find',
+  'head',
+  'tail',
+  'cut',
+  'tr',
+  'sort',
+  'uniq',
+  'diff',
+  'patch',
+  'split',
+  'join',
+  'paste',
+  'comm',
+  'tac',
+  'look',
+
+  // Process / control
+  'kill',
+  'wait',
+  'sleep',
+  'test',
+  'time',
+  'timeout',
+  'watch',
+  'at',
+  'nice',
+  'jobs',
+  'bg',
+  'fg',
+  'top',
+  'ps',
+  'free',
+  'last',
+  'who',
+  'w',
+  'id',
+
+  // Shell builtins
+  'set',
+  'unset',
+  'read',
+  'return',
+  'exit',
+  'enable',
+  'type',
+  'which',
+  'command',
+  'hash',
+
+  // Networking
+  'host',
+  'ip',
+  'nc',
+  'ss',
+
+  // System
+  'env',
+  'date',
+  'cal',
+  'yes',
+  'true',
+  'false',
+  'seq',
+  'expr',
+  'bc',
+  'dc',
+  'mount',
+  'link',
+  'open',
+  'write',
+
+  // Service names that double as English words
+  'service',
+]);
+
+/**
+ * Check whether a line (beyond its first word) contains syntax that is
+ * characteristic of shell commands — flags, file paths, operators, etc.
+ * Used to disambiguate words that are both commands and English words.
+ */
+function hasShellSyntax(trimmed: string): boolean {
+  // Command-line flags: -x, --flag, or -9  (space before dash to avoid prose hyphens)
+  if (/\s-{1,2}[a-zA-Z0-9]/.test(trimmed)) return true;
+
+  // Path-like arguments: word containing /  (but not http:// URLs at line start)
+  if (/\s\S*\/\w/.test(trimmed) && !/^https?:\/\//.test(trimmed)) return true;
+
+  // Glob patterns: *.ext or file.*
+  if (/[*?]/.test(trimmed) && !/[.!?]\s*$/.test(trimmed)) return true;
+
+  // Shell operators within the line: |, ;, &&
+  if (/\s[|;]\s/.test(trimmed) || /\s&&\s/.test(trimmed)) return true;
+
+  // Output redirection: > or >>
+  if (/\s>{1,2}\s/.test(trimmed) || /2>&1/.test(trimmed)) return true;
+
+  // Quoted arguments: "..." or '...'
+  if (/\s["'][^"'\s]/.test(trimmed)) return true;
+
+  // Variable references: $VAR or ${VAR}
+  if (/\$[{A-Z_]/.test(trimmed)) return true;
+
+  // Inline KEY=value assignment (e.g. env NODE_ENV=production)
+  if (/\s[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
+
+  // Backtick command substitution
+  if (/`[^`]+`/.test(trimmed)) return true;
+
+  return false;
+}
+
+/**
+ * Heuristic: does a trimmed line look like a shell command, Dockerfile
+ * instruction, or similar code that belongs in a fenced code block?
+ *
+ * Uses three tiers:
+ *  1. **Unambiguous keyword** — the first word is in `KNOWN_CODE_COMMANDS`
+ *     (~500 entries).  Immediate match.
+ *  2. **Ambiguous keyword + shell syntax** — the first word is in
+ *     `AMBIGUOUS_CODE_COMMANDS` (~50 entries: words like "cat", "find",
+ *     "sort", "kill" that are also common English) AND the rest of the line
+ *     contains shell-like syntax (flags, paths, operators).
+ *  3. **Structural patterns** — syntax like `./path`, `$ cmd`, `#!/bin/bash`,
+ *     `KEY=value`, `cmd | cmd`, `cmd && cmd`, `> file`, `$(cmd)`, and
+ *     line-continuation `\` are strong shell indicators regardless of the
+ *     specific command name.
+ *
+ * Callers should combine this with a "≥ N code-like lines" threshold (see
+ * `normalizeTerminalMarkdown`) to guard against single-line false positives.
+ */
+function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
+  if (trimmed === '') return false;
+
+  // ── Tier 1: unambiguous first-word keyword lookup ──
+  const firstWord = trimmed.split(/\s/)[0];
+  if (KNOWN_CODE_COMMANDS.has(firstWord)) return true;
+
+  // ── Tier 2: ambiguous keyword — require shell syntax confirmation ──
+  if (AMBIGUOUS_CODE_COMMANDS.has(firstWord) && hasShellSyntax(trimmed)) return true;
+
+  // ── Tier 3: structural / syntactic patterns ──
+
+  // Executable path: ./script.sh
+  if (/^\.\/\w/.test(trimmed)) return true;
+
+  // Shell prompt marker: $ command
+  if (/^\$\s+\w/.test(trimmed)) return true;
+
+  // Shebang: #!/bin/bash, #!/usr/bin/env python3
+  if (/^#!\//.test(trimmed)) return true;
+
+  // Dockerfile parser directive: # syntax=..., # escape=..., # check=...
+  if (/^#\s*\w+=.+/.test(trimmed)) return true;
+
+  // Shell comment containing a URL (e.g. "# then open http://localhost:8080")
+  // or an absolute path — these appear inside code blocks as documentation comments.
+  // The path check requires the slash to be preceded by whitespace or start-of-string
+  // so that prose like "config/secrets" doesn't false-positive.
+  if (/^#\s/.test(trimmed) && /https?:\/\/|localhost|(?:^|\s)\/\w/.test(trimmed)) return true;
+
+  // Environment variable assignment: VAR=value or VAR="value"
+  if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
+
+  // Pipe between commands: word | word  (but not markdown table starting with |)
+  if (/\w\s+\|\s+\w/.test(trimmed) && !/^\|/.test(trimmed)) return true;
+
+  // Output redirection: > file, >> file, 2>&1
+  if (/\s>{1,2}\s+\S/.test(trimmed) || /2>&1/.test(trimmed)) return true;
+
+  // Command chaining with &&
+  if (/\s&&\s/.test(trimmed)) return true;
+
+  // Command substitution: $(...)
+  if (/\$\(/.test(trimmed)) return true;
+
+  // Line continuation: ends with backslash (short lines only to avoid prose)
+  if (/\\\s*$/.test(trimmed) && trimmed.length < 80) return true;
+
+  return false;
+}
+
+/**
+ * Collapse blank lines that result from terminal-formatted output.
+ *
+ * Rich / terminal output pads every line to 80 chars and sends each line as a
+ * separate chunk followed by \r\n.  After ANSI stripping the chunks produce a
+ * blank line between every pair of content lines.  This function removes those
+ * artefact blank lines so that downstream transforms (normalizeTerminalMarkdown,
+ * wrapBareYamlBlocks) see clean, contiguous content.
+ *
+ * Heuristics:
+ *  - Between two space-prefixed lines (terminal code): a single blank line is
+ *    a terminal artefact → remove.  Two or more blanks indicate an intentional
+ *    blank line in the source code → collapse to one.
+ *  - Between two prose lines where the previous line is long (≥ 60 chars) and
+ *    the next starts with a lowercase letter: terminal line-wrapping artefact →
+ *    remove (markdown will join adjacent lines into one paragraph).
+ *  - Otherwise: collapse runs of multiple blank lines to one.
+ */
+function collapseTerminalBlankLines(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inCodeFence = false;
+  let collapsedCount = 0;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Track code fences — never alter content inside existing fences
+    if (/^\s*```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // Non-blank line → push as-is
+    if (trimmed !== '') {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // ── Blank line: count the full run ──
+    let blankCount = 0;
+    let j = i;
+    while (j < lines.length && lines[j].trim() === '') {
+      blankCount++;
+      j++;
+    }
+
+    // Find the previous non-blank line (already in result)
+    let prevLine = '';
+    for (let p = result.length - 1; p >= 0; p--) {
+      if (result[p].trim() !== '') {
+        prevLine = result[p];
+        break;
+      }
+    }
+    // Find the next non-blank line (still in input)
+    const nextLine = j < lines.length ? lines[j] : '';
+
+    // A line is "terminal code" if it starts with 1–4 spaces (Rich panel
+    // padding) and is non-empty.  Lines with ≥ 5 leading spaces are usually
+    // centered headings from terminal formatting, not code, so we exclude
+    // them unless they actually look like code or YAML.
+    const isTermCodeLine = (ln: string): boolean => {
+      if (!ln.startsWith(' ') || ln.trim() === '') return false;
+      const indent = ln.match(/^(\s*)/)?.[1].length ?? 0;
+      if (indent <= 4) return true; // typical Rich panel indentation
+      // Heavily indented — only treat as code if it looks like code/YAML
+      const t = ln.trim();
+      return looksLikeShellOrDockerCodeLine(t) || looksLikeYaml(t);
+    };
+    const prevIsTermCode = isTermCodeLine(prevLine);
+    const nextIsTermCode = isTermCodeLine(nextLine);
+
+    if (prevIsTermCode && nextIsTermCode) {
+      // Both sides are terminal-formatted code lines
+      if (blankCount <= 1) {
+        // Single blank = terminal chunk artefact → drop entirely
+        collapsedCount++;
+      } else {
+        // Multiple blanks = intentional blank in source code → keep one
+        result.push('');
+        collapsedCount++;
+      }
+    } else if (
+      !prevIsTermCode &&
+      !nextIsTermCode &&
+      prevLine.trimEnd().length >= 60 &&
+      !/[.!?:]\s*$/.test(prevLine.trimEnd())
+    ) {
+      // Prose continuation: long line wrapped at terminal width that doesn't
+      // end with sentence-ending punctuation → join (remove blank)
+      collapsedCount++;
+    } else {
+      // Default: keep at most one blank line
+      result.push('');
+      if (blankCount > 1) collapsedCount++;
+    }
+
+    i = j; // skip past all blanks in this run
+  }
+
+  if (collapsedCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] collapseTerminalBlankLines: collapsed',
+      collapsedCount,
+      'blank line groups'
+    );
+  }
+
+  return result.join('\n');
+}
+
+/**
+ * Normalize terminal-styled AI output into markdown-friendly formatting:
+ *  - numbered choice lines like " 1 Kubernetes..." → "1. Kubernetes..."
+ *  - centered heading lines get trimmed
+ *  - indented Dockerfile / shell command blocks get wrapped in code fences
+ */
+function normalizeTerminalMarkdown(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inCodeFence = false;
+  let orderedListCount = 0;
+  let trimmedHeadingCount = 0;
+  let wrappedCodeBlockCount = 0;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^\s*```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    if (/^\s+\d+\s+\S/.test(line)) {
+      const converted = line.replace(/^\s+(\d+)\s+/, '$1. ');
+      if (converted !== line) {
+        orderedListCount++;
+        result.push(converted);
+        i++;
+        continue;
+      }
+    }
+
+    const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
+    const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : '';
+    if (
+      /^\s{6,}\S/.test(line) &&
+      prevTrimmed === '' &&
+      nextTrimmed === '' &&
+      !looksLikeShellOrDockerCodeLine(trimmed)
+    ) {
+      trimmedHeadingCount++;
+      result.push(trimmed);
+      i++;
+      continue;
+    }
+
+    if (/^\s+\S/.test(line) && looksLikeShellOrDockerCodeLine(trimmed)) {
+      const blockLines: string[] = [];
+      let j = i;
+      let codeLikeLineCount = 0;
+      const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
+
+      while (j < lines.length) {
+        const blockLine = lines[j];
+        const blockTrimmed = blockLine.trim();
+
+        if (blockTrimmed === '') {
+          // Peek ahead: if next non-blank line isn't code-like, stop here
+          let peekIdx = j + 1;
+          while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+          if (peekIdx < lines.length) {
+            const peekTrimmed = lines[peekIdx].trim();
+            if (!looksLikeShellOrDockerCodeLine(peekTrimmed)) {
+              // Trim trailing blank lines already in blockLines
+              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+                blockLines.pop();
+              }
+              break;
+            }
+          }
+          blockLines.push(blockLine);
+          j++;
+          continue;
+        }
+
+        if (!/^\s+\S/.test(blockLine)) {
+          break;
+        }
+
+        // Stop at heavily-indented non-code lines (centered headings)
+        const lineIndent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
+        if (lineIndent > baseIndent + 4 && !looksLikeShellOrDockerCodeLine(blockTrimmed)) {
+          break;
+        }
+
+        if (looksLikeShellOrDockerCodeLine(blockTrimmed)) {
+          codeLikeLineCount++;
+        }
+
+        blockLines.push(blockLine);
+        j++;
+      }
+
+      // Trim trailing blank lines from the block
+      while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+        blockLines.pop();
+      }
+
+      if (codeLikeLineCount >= 1) {
+        const nonBlank = blockLines.filter(l => l.trim() !== '');
+        const minIndent = nonBlank.reduce((min, l) => {
+          const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
+          return Math.min(min, indent);
+        }, Infinity);
+        const shift = minIndent === Infinity ? 0 : minIndent;
+        const dedented = blockLines.map(l => (l.trim() === '' ? '' : l.slice(shift)));
+        result.push('```');
+        result.push(...dedented);
+        result.push('```');
+        wrappedCodeBlockCount++;
+        i = j;
+        continue;
+      }
+    }
+
+    result.push(line);
+    i++;
+  }
+
+  if (orderedListCount > 0 || trimmedHeadingCount > 0 || wrappedCodeBlockCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] normalizeTerminalMarkdown: converted',
+      orderedListCount,
+      'ordered-list lines, trimmed',
+      trimmedHeadingCount,
+      'heading lines, wrapped',
+      wrappedCodeBlockCount,
+      'code blocks'
+    );
+  }
+
+  return result.join('\n');
 }
 
 /**
@@ -333,8 +1639,12 @@ function looksLikeYaml(trimmed: string): boolean {
   if (/^["'][^"']+["']:\s?/.test(trimmed)) return true;
   // list item:  - something
   if (/^-\s/.test(trimmed) || trimmed === '-') return true;
-  // flow mapping/sequence: { ... } or [ ... ]
+  // flow mapping/sequence opener: { ... } or [ ... ]
   if (/^[{\[]/.test(trimmed)) return true;
+  // flow mapping/sequence closer: } or ] (continuation from previous line)
+  if (/^[}\]]/.test(trimmed)) return true;
+  // Quoted scalar value (e.g. "http://..." on its own line after key:)
+  if (/^["'][^"']*["']$/.test(trimmed)) return true;
   // continuation value (indented scalar, e.g. multiline string)
   return false;
 }
@@ -349,11 +1659,39 @@ function looksLikeYaml(trimmed: string): boolean {
  * single blank lines) and stops at two consecutive blanks or a line that
  * is clearly not YAML.
  */
+
+/**
+ * Join a YAML continuation value onto the previous line in `yamlLines`.
+ * Returns true if the line was joined, false otherwise.
+ * Handles: key: on one line + "value" on next; unclosed { or [ flow expressions.
+ */
+function joinYamlContinuation(yamlLines: string[], trimmedLine: string): boolean {
+  if (yamlLines.length === 0) return false;
+  const prev = yamlLines[yamlLines.length - 1].trim();
+  const prevEndsWithColon = /:\s*$/.test(prev);
+  const openBraces = prev.split('{').length - prev.split('}').length;
+  const openBrackets = prev.split('[').length - prev.split(']').length;
+  const prevUnclosed = openBraces > 0 || openBrackets > 0;
+  const lineIsQuotedOrCloser = /^["']/.test(trimmedLine) || /^[}\]]/.test(trimmedLine);
+  // A bare word value like "Kustomization" after "kind:" — single token, no colon
+  const lineIsBareValue = /^\w[\w./-]*$/.test(trimmedLine) && !trimmedLine.includes(':');
+
+  if (
+    (prevEndsWithColon && (lineIsQuotedOrCloser || lineIsBareValue)) ||
+    (prevUnclosed && lineIsQuotedOrCloser)
+  ) {
+    yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + trimmedLine;
+    return true;
+  }
+  return false;
+}
+
 function wrapBareYamlBlocks(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];
   let i = 0;
   let inCodeFence = false;
+  let wrappedBlockCount = 0;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -374,9 +1712,53 @@ function wrapBareYamlBlocks(text: string): string {
 
     // Detect start of a bare YAML block: apiVersion: (with optional value)
     if (/^\s*apiVersion:\s*/.test(line)) {
-      const yamlLines: string[] = [];
+      verboseLog(
+        '[AKS Agent Parse] wrapBareYamlBlocks: detected bare apiVersion: at line',
+        i,
+        ':',
+        line.trim()
+      );
+
+      // Look back: include preceding YAML comment lines (# ...) and
+      // document separators (---) that belong to this YAML block.
+      // This handles the common pattern of section headers before apiVersion.
+      const prefixLines: string[] = [];
+      let backIdx = result.length - 1;
+      // Skip trailing blank lines
+      while (backIdx >= 0 && result[backIdx].trim() === '') backIdx--;
+      // Collect YAML comments / separators going backwards
+      while (backIdx >= 0) {
+        const bt = result[backIdx].trim();
+        if (bt.startsWith('#') || bt === '---') {
+          prefixLines.unshift(result[backIdx]);
+          backIdx--;
+        } else {
+          break;
+        }
+      }
+      // Remove the prefix lines from result (they'll go inside the fence)
+      if (prefixLines.length > 0) {
+        // First remove the prefix lines themselves
+        for (let p = 0; p < prefixLines.length; p++) {
+          result.pop();
+        }
+        // Then remove trailing blank lines, keeping one for readability
+        while (result.length > 0 && result[result.length - 1].trim() === '') {
+          result.pop();
+        }
+        if (result.length > 0) {
+          result.push('');
+        }
+      }
+
+      const yamlLines: string[] = [...prefixLines];
       let j = i;
       let consecutiveBlanks = 0;
+
+      // Track base indentation of the apiVersion: line so we can stop the
+      // block when the indent drops below it (e.g. prose like "Apply:" at
+      // column 0 after indented YAML).
+      const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
 
       while (j < lines.length) {
         const yl = lines[j];
@@ -391,11 +1773,32 @@ function wrapBareYamlBlocks(text: string): string {
         }
         consecutiveBlanks = 0;
 
+        // Check indentation: a non-blank line with less indent than the
+        // base apiVersion: line is outside the YAML block, UNLESS it's a
+        // YAML document separator (---).
+        const lineIndent = yl.match(/^(\s*)/)?.[1].length ?? 0;
+        if (j !== i && lineIndent < baseIndent && yt !== '---') {
+          break;
+        }
+
         if (j === i || looksLikeYaml(yt)) {
-          yamlLines.push(yl);
+          // Check if this is a YAML value that should be joined to the
+          // previous key line (terminal line wrapping split key: value)
+          if (joinYamlContinuation(yamlLines, yt)) {
+            // Joined to previous line
+          } else {
+            yamlLines.push(yl);
+          }
           j++;
         } else {
-          break;
+          // Check if this line is a YAML value continuation:
+          // - Previous line ended with ':' (key with value on next line)
+          // - Previous line had unclosed braces/brackets (flow expression continues)
+          if (joinYamlContinuation(yamlLines, yt)) {
+            j++;
+          } else {
+            break;
+          }
         }
       }
 
@@ -417,6 +1820,7 @@ function wrapBareYamlBlocks(text: string): string {
         result.push('```yaml');
         result.push(...dedented);
         result.push('```');
+        wrappedBlockCount++;
         i = j;
       } else {
         result.push(line);
@@ -426,6 +1830,133 @@ function wrapBareYamlBlocks(text: string): string {
       result.push(line);
       i++;
     }
+  }
+
+  if (wrappedBlockCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] wrapBareYamlBlocks: wrapped',
+      wrappedBlockCount,
+      'bare YAML blocks'
+    );
+  }
+
+  return result.join('\n');
+}
+
+/**
+ * Detect contiguous blocks of bare shell/Docker commands (not already inside
+ * markdown code fences and not indented) and wrap each one in ``` fences so
+ * that ReactMarkdown renders them as code blocks.
+ *
+ * This handles the case where the AI response includes bare commands like
+ *   curl http://localhost:8080
+ *   kubectl apply -f deploy.yaml
+ * that are not indented (so normalizeTerminalMarkdown doesn't catch them)
+ * and are not YAML (so wrapBareYamlBlocks doesn't catch them).
+ *
+ * Detection starts when a non-blank, non-indented line matches
+ * looksLikeShellOrDockerCodeLine(). It collects consecutive code lines
+ * (allowing single blank lines between them) and wraps them in ``` fences.
+ */
+function wrapBareCodeBlocks(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let i = 0;
+  let inCodeFence = false;
+  let wrappedBlockCount = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Track existing code fences
+    if (/^```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // Detect start of a bare code block: non-blank, non-indented, looks like code
+    // Exclude lines that start with # (could be markdown headings) unless they
+    // match a Dockerfile directive or shell comment with URL/path
+    if (
+      trimmed !== '' &&
+      !/^\s+/.test(line) &&
+      looksLikeShellOrDockerCodeLine(trimmed) &&
+      !looksLikeYaml(trimmed)
+    ) {
+      const codeLines: string[] = [];
+      let j = i;
+
+      while (j < lines.length) {
+        const cl = lines[j];
+        const ct = cl.trim();
+
+        // Allow single blank lines within a code block
+        if (ct === '') {
+          // Peek ahead: if next non-blank line is also code, keep collecting
+          let peekIdx = j + 1;
+          while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+          if (peekIdx < lines.length) {
+            const peekTrimmed = lines[peekIdx].trim();
+            if (
+              looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+              !looksLikeYaml(peekTrimmed) &&
+              !/^\s+/.test(lines[peekIdx])
+            ) {
+              codeLines.push(cl);
+              j++;
+              continue;
+            }
+          }
+          break;
+        }
+
+        // Stop if line is indented (belongs to different formatting)
+        if (/^\s+/.test(cl)) {
+          break;
+        }
+
+        // Stop if line doesn't look like code
+        if (!looksLikeShellOrDockerCodeLine(ct) || looksLikeYaml(ct)) {
+          break;
+        }
+
+        codeLines.push(cl);
+        j++;
+      }
+
+      // Trim trailing blank lines
+      while (codeLines.length > 0 && codeLines[codeLines.length - 1].trim() === '') {
+        codeLines.pop();
+      }
+
+      if (codeLines.length > 0) {
+        result.push('```');
+        result.push(...codeLines);
+        result.push('```');
+        wrappedBlockCount++;
+        i = j;
+        continue;
+      }
+    }
+
+    result.push(line);
+    i++;
+  }
+
+  if (wrappedBlockCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] wrapBareCodeBlocks: wrapped',
+      wrappedBlockCount,
+      'bare code blocks'
+    );
   }
 
   return result.join('\n');
@@ -443,6 +1974,8 @@ function cleanTerminalFormatting(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];
   let inCodeFence = false;
+  let droppedBorders = 0;
+  let unwrappedPanels = 0;
 
   for (const line of lines) {
     const rTrimmed = line.trimEnd(); // trailing 80-char padding removed
@@ -461,10 +1994,16 @@ function cleanTerminalFormatting(text: string): string {
     const stripped = rTrimmed.trimStart(); // leading indentation removed (for box detection only)
 
     // Drop Rich panel border lines — may be indented: ┏━━━━┓ and ┗━━━━┛
-    if (/^[┏┗][━\s]*[┓┛]$/.test(stripped)) continue;
+    if (/^[┏┗][━\s]*[┓┛]$/.test(stripped)) {
+      droppedBorders++;
+      continue;
+    }
 
     // Drop Rich horizontal rule lines — only pure box-drawing chars, at least 4 wide
-    if (/^[─━═]{4,}$/.test(stripped)) continue;
+    if (/^[─━═]{4,}$/.test(stripped)) {
+      droppedBorders++;
+      continue;
+    }
 
     // Unwrap Rich panel content lines — preserve internal indentation
     // ┃   text   ┃  →  text  (trimming only the outer box characters + 1 space padding)
@@ -473,12 +2012,23 @@ function cleanTerminalFormatting(text: string): string {
         .replace(/^┃\s?/, '') // remove leading ┃ and at most one space
         .replace(/\s?┃$/, ''); // remove trailing ┃ and at most one space
       if (inner) {
+        unwrappedPanels++;
         result.push(inner);
       }
       continue;
     }
 
     result.push(rTrimmed);
+  }
+
+  if (droppedBorders > 0 || unwrappedPanels > 0) {
+    verboseLog(
+      '[AKS Agent Parse] cleanTerminalFormatting: dropped',
+      droppedBorders,
+      'border lines, unwrapped',
+      unwrappedPanels,
+      'panel lines'
+    );
   }
 
   return result.join('\n');
@@ -510,9 +2060,10 @@ const AGENT_NOISE_PATTERNS: RegExp[] = [
   /^IMPORTANT INSTRUCTIONS:\s*$/,
   /^---\s*(CONVERSATION HISTORY|END OF CONVERSATION HISTORY)\s*---\s*$/,
   /^Now answer the following new question:\s*$/,
-  // Table remnant lines: only pipes, plus, dashes, equals, whitespace — but must contain at
-  // least one pipe or plus to avoid matching YAML list items ("- foo") or markdown hr ("---")
-  /^[\s|+=\-]*[|+][\s|+=\-]*$/,
+  // Table remnant lines: only pipes, plus, dashes, equals, whitespace — must contain at
+  // least one "+" to distinguish agent task-table borders (+---+---+) from GFM markdown
+  // table separators (|---|---|) which must be preserved for proper table rendering.
+  /^[\s|+=\-]*\+[\s|+=\-]*$/,
 ];
 
 /** Return true if a trimmed line matches any agent-noise pattern. */
@@ -528,6 +2079,7 @@ function stripAgentNoise(lines: string[]): string[] {
   const cleaned: string[] = [];
   let prevBlank = false;
   let inCodeFence = false;
+  let droppedCount = 0;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -545,7 +2097,11 @@ function stripAgentNoise(lines: string[]): string[] {
     }
 
     // Drop noise lines
-    if (isAgentNoiseLine(trimmed)) continue;
+    if (isAgentNoiseLine(trimmed)) {
+      droppedCount++;
+      verboseLog('[AKS Agent Parse] stripAgentNoise: dropping noise line:', trimmed);
+      continue;
+    }
 
     // Collapse multiple blank lines
     if (trimmed === '') {
@@ -556,6 +2112,10 @@ function stripAgentNoise(lines: string[]): string[] {
     }
 
     cleaned.push(line);
+  }
+
+  if (droppedCount > 0) {
+    verboseLog('[AKS Agent Parse] stripAgentNoise: dropped', droppedCount, 'noise lines total');
   }
 
   return cleaned;
@@ -570,13 +2130,25 @@ function stripAgentNoise(lines: string[]): string[] {
  */
 function stripCommandEcho(lines: string[]): string[] {
   const cmdIdx = lines.findIndex(l => /python\s+\/app\/aks-agent\.py/.test(l));
-  if (cmdIdx < 0) return lines;
+  if (cmdIdx < 0) {
+    verboseLog(
+      '[AKS Agent Parse] stripCommandEcho: no python command line found, returning all lines'
+    );
+    return lines;
+  }
 
   // Skip the command line and all subsequent bash continuation prompt lines
   let end = cmdIdx + 1;
   while (end < lines.length && /^\s*>/.test(lines[end])) {
     end++;
   }
+  verboseLog(
+    '[AKS Agent Parse] stripCommandEcho: found command at line',
+    cmdIdx,
+    '— stripping',
+    end - cmdIdx,
+    'lines (command + continuation prompts)'
+  );
 
   return [...lines.slice(0, cmdIdx), ...lines.slice(end)];
 }
@@ -588,6 +2160,8 @@ function stripCommandEcho(lines: string[]): string[] {
  * Converts Unicode bullets to markdown syntax.
  */
 function extractAIAnswer(rawOutput: string): string {
+  detailLog('[AKS Agent Parse] extractAIAnswer: raw input length:', rawOutput.length);
+
   // Split the raw output into terminal line chunks (each chunk = one terminal line)
   // and reassemble with proper \n separators, trimming 80-char padding as we go.
   const normalised = rawOutput
@@ -595,14 +2169,28 @@ function extractAIAnswer(rawOutput: string): string {
     .map(l => stripAnsi(l).trimEnd())
     .join('\n');
 
+  const normalisedLines = normalised.split('\n');
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: normalised line count:',
+    normalisedLines.length,
+    'char count:',
+    normalised.length
+  );
+
   // Strip the echoed command block before parsing — when tty echo is on,
   // the entire multi-line command (including conversation history) is echoed
   // back through stdout as the python invocation line followed by bash
   // continuation prompt lines ("> ...").
-  const lines = stripCommandEcho(normalised.split('\n'));
+  const lines = stripCommandEcho(normalisedLines);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after stripCommandEcho:',
+    lines.length,
+    'lines remaining'
+  );
 
   // Locate the "AI:" line — it may be alone or have content after the colon
   const aiLineIdx = lines.findIndex(l => /^AI:\s*$/.test(l.trim()) || /^AI:\s+\S/.test(l));
+  detailLog('[AKS Agent Parse] extractAIAnswer: AI: line index:', aiLineIdx);
 
   let contentLines: string[];
 
@@ -612,19 +2200,35 @@ function extractAIAnswer(rawOutput: string): string {
     if (/^AI:\s*$/.test(aiLine.trim())) {
       // "AI:" alone on its own line — content starts on the next line
       contentLines = lines.slice(aiLineIdx + 1);
+      detailLog(
+        '[AKS Agent Parse] extractAIAnswer: AI: on own line, content lines:',
+        contentLines.length
+      );
     } else {
       // "AI: content…" on the same line — strip the prefix and keep the rest
       contentLines = [aiLine.replace(/^AI:\s+/, ''), ...lines.slice(aiLineIdx + 1)];
+      detailLog(
+        '[AKS Agent Parse] extractAIAnswer: AI: with inline content, content lines:',
+        contentLines.length
+      );
     }
   } else {
     // Fallback: use all lines (will be cleaned below)
     contentLines = [...lines];
+    detailLog('[AKS Agent Parse] extractAIAnswer: no AI: line found — using all lines as fallback');
   }
 
   // Strip agent infrastructure noise from content lines
+  const beforeNoiseStrip = contentLines.length;
   contentLines = stripAgentNoise(contentLines);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: stripAgentNoise removed',
+    beforeNoiseStrip - contentLines.length,
+    'lines'
+  );
 
   // Drop trailing blank lines and bash-prompt line(s).
+  const beforeTrim = contentLines.length;
   while (contentLines.length > 0) {
     const last = contentLines[contentLines.length - 1].trim();
     if (last === '' || /^root@/.test(last)) {
@@ -638,9 +2242,55 @@ function extractAIAnswer(rawOutput: string): string {
   while (contentLines.length > 0 && contentLines[0].trim() === '') {
     contentLines.shift();
   }
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: trimmed',
+    beforeTrim - contentLines.length,
+    'leading/trailing blank/prompt lines, remaining:',
+    contentLines.length
+  );
 
-  const result = contentLines.join('\n').trim();
-  return wrapBareYamlBlocks(normalizeBullets(cleanTerminalFormatting(result)));
+  const joined = contentLines.join('\n').trim();
+  detailLog('[AKS Agent Parse] extractAIAnswer: after trim, content length:', joined.length);
+
+  const afterTerminal = cleanTerminalFormatting(joined);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after cleanTerminalFormatting, length:',
+    afterTerminal.length
+  );
+
+  const afterCollapse = collapseTerminalBlankLines(afterTerminal);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after collapseTerminalBlankLines, length:',
+    afterCollapse.length
+  );
+
+  const afterBullets = normalizeBullets(afterCollapse);
+  const afterTerminalMarkdown = normalizeTerminalMarkdown(afterBullets);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after normalizeTerminalMarkdown, length:',
+    afterTerminalMarkdown.length
+  );
+  const afterYamlWrap = wrapBareYamlBlocks(afterTerminalMarkdown);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after wrapBareYamlBlocks, length:',
+    afterYamlWrap.length
+  );
+  const result = wrapBareCodeBlocks(afterYamlWrap);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: final result length:',
+    result.length,
+    'result:',
+    result
+  );
+
+  if (!result) {
+    detailLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
+  }
+
+  // Dump raw→parsed as JSON strings for easy copy-paste into test cases
+  dumpForTestCase('extractAIAnswer', rawOutput, result);
+
+  return result;
 }
 
 // ─── Real-time thinking-step parser ──────────────────────────────────────────
@@ -716,6 +2366,7 @@ class ThinkingStepTracker {
     if (this.partialTaskRow) {
       // Blank line, table border, table header, or new task row → abandon partial, fall through
       if (!trimmed || /^\+[-+=]+\+$/.test(trimmed) || /^\|\s*(ID|t\d+)\s*\|/.test(trimmed)) {
+        verboseLog('[AKS Agent Parse] ThinkingStepTracker: abandoning partial task row');
         this.partialTaskRow = '';
         // Fall through to normal processing below
       } else {
@@ -723,6 +2374,11 @@ class ThinkingStepTracker {
         const joined = (this.partialTaskRow + ' ' + trimmed).replace(/\s+/g, ' ').trim();
         const taskRow = extractTaskRow(joined);
         if (taskRow) {
+          verboseLog(
+            '[AKS Agent Parse] ThinkingStepTracker: completed wrapped task row:',
+            taskRow.content,
+            taskRow.status
+          );
           this.partialTaskRow = '';
           return this.applyTaskRow(taskRow);
         }
@@ -741,6 +2397,7 @@ class ThinkingStepTracker {
     const modelMatch = trimmed.match(/^Loaded models:\s*\[(.+)\]/);
     if (modelMatch) {
       const models = modelMatch[1].replace(/'/g, '').trim();
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: model loaded:', models);
       this.steps.push({
         id: this.nextId++,
         label: `Model: ${models}`,
@@ -780,10 +2437,16 @@ class ThinkingStepTracker {
     // ── Planning phase: task-list rows ──
     const taskRow = extractTaskRow(trimmed);
     if (taskRow) {
+      verboseLog(
+        '[AKS Agent Parse] ThinkingStepTracker: task row:',
+        taskRow.content,
+        taskRow.status
+      );
       return this.applyTaskRow(taskRow);
     }
     // Start buffering if this looks like a partial (wrapped) task row
     if (/^\|\s*t\d+\s*\|/.test(trimmed)) {
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: buffering partial task row');
       this.partialTaskRow = trimmed;
       return false;
     }
@@ -792,6 +2455,7 @@ class ThinkingStepTracker {
     const runMatch = trimmed.match(/^Running tool\s+#(\d+)\s+/);
     if (runMatch) {
       const toolNum = parseInt(runMatch[1], 10);
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: running tool #' + toolNum + ':', trimmed);
       // Skip TodoWrite and kubectl tools — they're tracked via the task table
       if (/TodoWrite/i.test(trimmed) || /call_kubectl/i.test(trimmed)) {
         // Still record the tool number so we can mark it finished without noise
@@ -907,6 +2571,7 @@ export async function runAksAgent(
   const result = await session.ask(enrichedPrompt, onProgress);
 
   if (result && result.trim().length > 0) {
+    debugLog('[AKS Agent Parse] runAksAgent: raw result length:', result.length, 'result:', result);
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
@@ -1122,16 +2787,26 @@ class AgentSession {
       const bytes = new Uint8Array(data);
       const channel = bytes[0];
       const text = new TextDecoder().decode(bytes.slice(1));
+      debugLog(
+        '[AKS Agent Data] handleData: ArrayBuffer channel:',
+        channel,
+        'text length:',
+        text.length,
+        'text:',
+        text
+      );
 
       this.handleChannel(channel, text);
     } else {
       // Plain string data (base64 protocol)
+      debugLog('[AKS Agent Data] handleData: string data length:', data.length);
       console.log('[AKS Agent] string data from exec:', data);
       this.output += data;
     }
   }
 
   private handleChannel(channel: number, text: string): void {
+    detailLog('[AKS Agent Data] handleChannel:', channel, 'text length:', text.length);
     if (channel === 1) {
       this.handleStdout(text);
     } else if (channel === 2) {
@@ -1187,7 +2862,14 @@ class AgentSession {
     if (this.questionResolved || !this.pendingResolve) return;
 
     this.resetIdleTimer();
-    console.log('[AKS Agent] stdout chunk from exec:', text);
+    debugLog(
+      '[AKS Agent Data] handleStdout: chunk length:',
+      text.length,
+      'accumulated output length:',
+      this.output.length,
+      'chunk:',
+      text
+    );
 
     // Ensure each terminal line chunk is newline-terminated.
     this.output += text.endsWith('\n') ? text : text + '\n';
@@ -1200,6 +2882,10 @@ class AgentSession {
         if (this.tracker.processLine(cl)) anyChanged = true;
       }
       if (anyChanged) {
+        detailLog(
+          '[AKS Agent Data] handleStdout: thinking steps updated, count:',
+          this.tracker.steps.length
+        );
         this.onProgress([...this.tracker.steps]);
       }
     }
@@ -1207,12 +2893,19 @@ class AgentSession {
     // Detect the returning bash prompt — the command has finished.
     // Only close once we've already seen "AI:" in the output.
     const plainText = stripAnsi(text);
-    if (
-      this.commandSent &&
-      this.output.includes('AI:') &&
-      /root@[^:]+:[^#]*#\s*$/.test(plainText.trim())
-    ) {
+    const hasAiMarker = this.output.includes('AI:');
+    const hasPrompt = /root@[^:]+:[^#]*#\s*$/.test(plainText.trim());
+    detailLog(
+      '[AKS Agent Data] handleStdout: completion check — commandSent:',
+      this.commandSent,
+      'hasAiMarker:',
+      hasAiMarker,
+      'hasPrompt:',
+      hasPrompt
+    );
+    if (this.commandSent && hasAiMarker && hasPrompt) {
       console.log('[AKS Agent] Bash prompt detected after AI answer — question complete.');
+      debugLog('[AKS Agent Data] handleStdout: total output length:', this.output.length);
       this.resolveCurrentQuestion(this.output);
     }
   }
@@ -1221,6 +2914,7 @@ class AgentSession {
     if (this.questionResolved || !this.pendingResolve) return;
     this.resetIdleTimer();
     this.errorOutput += text;
+    debugLog('[AKS Agent Data] handleStderr: stderr chunk length:', text.length, 'text:', text);
     console.warn(`[AKS Agent] exec stderr: ${text}`);
   }
 
@@ -1240,6 +2934,14 @@ class AgentSession {
   private handleConnectionFailure(): void {
     this._alive = false;
     this.clearTimers();
+    debugLog(
+      '[AKS Agent Session] handleConnectionFailure: stdout length:',
+      this.output.length,
+      'stderr length:',
+      this.errorOutput.length,
+      'questionResolved:',
+      this.questionResolved
+    );
     console.warn(
       `[AKS Agent] WebSocket closed. stdout: ${this.output.length}, stderr: ${this.errorOutput.length}`
     );
@@ -1274,6 +2976,14 @@ class AgentSession {
   private resolveCurrentQuestion(result: string): void {
     this.clearTimers();
     this.questionResolved = true;
+    debugLog(
+      '[AKS Agent Session] resolveCurrentQuestion: output length:',
+      result.length,
+      'has AI: marker:',
+      result.includes('AI:'),
+      'output:',
+      result
+    );
     const resolve = this.pendingResolve;
     this.pendingResolve = null;
     this.pendingReject = null;
@@ -1373,7 +3083,9 @@ export const _testing = {
   normalizeBullets,
   looksLikeYaml,
   wrapBareYamlBlocks,
+  wrapBareCodeBlocks,
   cleanTerminalFormatting,
+  collapseTerminalBlankLines,
   stripAgentNoise,
   isAgentNoiseLine,
   extractAIAnswer,
@@ -1381,4 +3093,7 @@ export const _testing = {
   extractTaskRow,
   friendlyToolLabel,
   stripCommandEcho,
+  looksLikeShellOrDockerCodeLine,
+  hasShellSyntax,
+  normalizeTerminalMarkdown,
 };

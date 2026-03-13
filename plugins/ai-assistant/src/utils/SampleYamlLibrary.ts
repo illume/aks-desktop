@@ -199,27 +199,26 @@ export function parseKubernetesYAML(yamlStr: string): {
   namespace?: string;
 } {
   try {
-    const parsed = YAML.parse(yamlStr);
+    // Try multi-document YAML first (handles both single and multi-document)
+    const docs = YAML.parseAllDocuments(yamlStr);
+    // Find the first non-null document with apiVersion and kind
+    for (const doc of docs) {
+      if (doc.errors.length > 0) continue;
+      const parsed = doc.toJSON();
+      if (!parsed || typeof parsed !== 'object') continue;
+      if (!parsed.apiVersion || !parsed.kind) continue;
 
-    if (!parsed || typeof parsed !== 'object') {
-      return { isValid: false };
+      const name = parsed.metadata?.name;
+      const namespace = parsed.metadata?.namespace || 'default';
+
+      return {
+        isValid: true,
+        resourceType: parsed.kind,
+        name,
+        namespace,
+      };
     }
-
-    // Check if it has the basic Kubernetes resource structure - just need apiVersion and kind
-    if (!parsed.apiVersion || !parsed.kind) {
-      return { isValid: false };
-    }
-
-    // Extract resource name and namespace if available
-    const name = parsed.metadata?.name;
-    const namespace = parsed.metadata?.namespace || 'default';
-
-    return {
-      isValid: true,
-      resourceType: parsed.kind,
-      name,
-      namespace,
-    };
+    return { isValid: false };
   } catch (error) {
     console.debug('Failed to parse YAML:', error);
     return { isValid: false };
