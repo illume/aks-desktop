@@ -324,6 +324,135 @@ function normalizeBullets(text: string): string {
   return result;
 }
 
+function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
+  return (
+    /^(FROM|RUN|CMD|COPY|WORKDIR|EXPOSE|ENTRYPOINT|ENV|ARG|USER|LABEL|ADD|SHELL|VOLUME|STOPSIGNAL|HEALTHCHECK|ONBUILD)\b/.test(
+      trimmed
+    ) ||
+    /^(docker|kubectl|helm|az|npm|pnpm|yarn|pip|python|uvicorn|gunicorn|flask|django-admin|poetry|curl|wget|git)\b/.test(
+      trimmed
+    )
+  );
+}
+
+/**
+ * Normalize terminal-styled AI output into markdown-friendly formatting:
+ *  - numbered choice lines like " 1 Kubernetes..." → "1. Kubernetes..."
+ *  - centered heading lines get trimmed
+ *  - indented Dockerfile / shell command blocks get wrapped in code fences
+ */
+function normalizeTerminalMarkdown(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inCodeFence = false;
+  let orderedListCount = 0;
+  let trimmedHeadingCount = 0;
+  let wrappedCodeBlockCount = 0;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^\s*```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    if (/^\s+\d+\s+\S/.test(line)) {
+      const converted = line.replace(/^\s+(\d+)\s+/, '$1. ');
+      if (converted !== line) {
+        orderedListCount++;
+        result.push(converted);
+        i++;
+        continue;
+      }
+    }
+
+    const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
+    const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : '';
+    if (
+      /^\s{6,}\S/.test(line) &&
+      prevTrimmed === '' &&
+      nextTrimmed === '' &&
+      !looksLikeShellOrDockerCodeLine(trimmed)
+    ) {
+      trimmedHeadingCount++;
+      result.push(trimmed);
+      i++;
+      continue;
+    }
+
+    if (/^\s+\S/.test(line) && looksLikeShellOrDockerCodeLine(trimmed)) {
+      const blockLines: string[] = [];
+      let j = i;
+      let codeLikeLineCount = 0;
+
+      while (j < lines.length) {
+        const blockLine = lines[j];
+        const blockTrimmed = blockLine.trim();
+
+        if (blockTrimmed === '') {
+          blockLines.push(blockLine);
+          j++;
+          continue;
+        }
+
+        if (!/^\s+\S/.test(blockLine)) {
+          break;
+        }
+
+        if (looksLikeShellOrDockerCodeLine(blockTrimmed)) {
+          codeLikeLineCount++;
+        }
+
+        blockLines.push(blockLine);
+        j++;
+      }
+
+      if (codeLikeLineCount >= 2) {
+        const nonBlank = blockLines.filter(l => l.trim() !== '');
+        const minIndent = nonBlank.reduce((min, l) => {
+          const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
+          return Math.min(min, indent);
+        }, Infinity);
+        const shift = minIndent === Infinity ? 0 : minIndent;
+        const dedented = blockLines.map(l => (l.trim() === '' ? '' : l.slice(shift)));
+        result.push('```');
+        result.push(...dedented);
+        result.push('```');
+        wrappedCodeBlockCount++;
+        i = j;
+        continue;
+      }
+    }
+
+    result.push(line);
+    i++;
+  }
+
+  if (orderedListCount > 0 || trimmedHeadingCount > 0 || wrappedCodeBlockCount > 0) {
+    debugLog(
+      '[AKS Agent Parse] normalizeTerminalMarkdown: converted',
+      orderedListCount,
+      'ordered-list lines, trimmed',
+      trimmedHeadingCount,
+      'heading lines, wrapped',
+      wrappedCodeBlockCount,
+      'code blocks'
+    );
+  }
+
+  return result.join('\n');
+}
+
 /**
  * Check whether a trimmed line looks like YAML content (key-value,
  * list item, comment, flow-mapping shorthand, etc.).
@@ -742,7 +871,12 @@ function extractAIAnswer(rawOutput: string): string {
   );
 
   const afterBullets = normalizeBullets(afterTerminal);
-  const result = wrapBareYamlBlocks(afterBullets);
+  const afterTerminalMarkdown = normalizeTerminalMarkdown(afterBullets);
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: after normalizeTerminalMarkdown, length:',
+    afterTerminalMarkdown.length
+  );
+  const result = wrapBareYamlBlocks(afterTerminalMarkdown);
   debugLog(
     '[AKS Agent Parse] extractAIAnswer: final result length:',
     result.length,

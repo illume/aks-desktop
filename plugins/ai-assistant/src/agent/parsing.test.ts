@@ -2583,5 +2583,110 @@ describe('real-world agent responses', () => {
       expect(result).not.toContain('root@aks-agent');
       expect(result).not.toContain('Loaded models');
     });
+
+    it('normalizes terminal-formatted deployment guidance into markdown lists and code blocks', () => {
+      const input = [
+        'stty -echo',
+        '\x1b[?2004l',
+        '\x1b[?2004hroot@aks-agent-redacted:/app# ',
+        '\x1b[?2004l',
+        '',
+        '\x1b[?2004h',
+        '> ',
+        '\x1b[?2004l',
+        '',
+        '\x1b[?2004h> ',
+        '\x1b[?2004l',
+        '',
+        "Loaded models: ['azure/gpt-5.x']",
+        '✅ Toolset core_investigation',
+        '✅ Toolset internet',
+        'Received session ID: mcp-session-REDACTED',
+        'Negotiated protocol version: 2025-06-18',
+        '✅ Toolset aks_mcp',
+        'Using 3 datasources (toolsets). To refresh: use flag `--refresh-toolsets`',
+        'NO ENABLED LOGGING TOOLSET',
+        'Using model: azure/gpt-5.x (272,000 total tokens, 54,400 output tokens)',
+        'This tool uses AI to generate responses and may not always be accurate.',
+        'User: IMPORTANT INSTRUCTIONS:',
+        '- When returning any YAML content, always wrap it inside a markdown code block',
+        'using ```yaml ... ``` so it renders properly.',
+        '- The conversation history below shows all previously asked questions and your',
+        'answers. Keep that context in mind and answer accordingly — do not repeat',
+        'information already provided unless the user explicitly asks for it.',
+        'Now answer the following new question:',
+        'How do I deploy a python application?',
+        'The AI requested 1 tool call(s).',
+        'Running tool #1 TodoWrite: Update investigation tasks',
+        'Task List:',
+        '+----+--------------------------------------+-----------------+',
+        '| ID | Content                              | Status          |',
+        '+----+--------------------------------------+-----------------+',
+        '| 1  | Clarify deployment target           | [~] in_progress |',
+        '| 2  | Provide deployment examples         | [ ] pending     |',
+        '| 3  | Include runtime best practices      | [ ] pending     |',
+        '| 4  | Final review                        | [ ] pending     |',
+        '+----+--------------------------------------+-----------------+',
+        'Finished #1 in 0.00s, output length: 787 characters (12 lines) - /show 1 to',
+        'view contents',
+        '',
+        '\x1b[1;96mAI:\x1b[0m ',
+        'Which deployment target do you mean?',
+        '',
+        '\x1b[1;33m 1 \x1b[0m\x1b[1mKubernetes (AKS)\x1b[0m (Deployment/Service/Ingress YAML)',
+        '\x1b[1;33m 2 \x1b[0m\x1b[1mContainer on a VM\x1b[0m (Dockerfile + \x1b[1;36;40mdocker run\x1b[0m or compose)',
+        '\x1b[1;33m 3 \x1b[0m\x1b[1mPaaS\x1b[0m (Azure App Service / Container Apps / Cloud Run / Heroku-like)',
+        '\x1b[1;33m 4 \x1b[0m\x1b[1mBare VM\x1b[0m (systemd + nginx + venv)',
+        '',
+        'Reply with: \x1b[1mtarget + framework\x1b[0m (e.g., “AKS + FastAPI” or “Docker VM + Flask”)',
+        'and \x1b[1mhow it should be exposed\x1b[0m (public HTTP, internal-only, background',
+        'worker/cron).',
+        '',
+        'While you answer, here’s a solid default pattern that works almost everywhere:',
+        '',
+        '                 \x1b[1;4mPython web app deployment checklist (generic)\x1b[0m',
+        '',
+        '\x1b[1;33m • \x1b[0mCreate \x1b[1;36;40mrequirements.txt\x1b[0m (or \x1b[1;36;40mpyproject.toml\x1b[0m)',
+        '\x1b[1;33m • \x1b[0mAdd a production server:',
+        '\x1b[1;33m   \x1b[0m\x1b[1;33m • \x1b[0m\x1b[1mFlask/Django (WSGI):\x1b[0m \x1b[1;36;40mgunicorn\x1b[0m',
+        '\x1b[1;33m   \x1b[0m\x1b[1;33m • \x1b[0m\x1b[1mFastAPI/Starlette (ASGI):\x1b[0m \x1b[1;36;40muvicorn\x1b[0m (often behind gunicorn worker)',
+        '\x1b[1;33m • \x1b[0mRead config from \x1b[1menv vars\x1b[0m (no secrets in code)',
+        '\x1b[1;33m • \x1b[0mAdd \x1b[1;36;40m/healthz\x1b[0m endpoint for health checks',
+        '\x1b[1;33m • \x1b[0mPin Python version (e.g., \x1b[1;36;40mpython:3.12-slim\x1b[0m)',
+        '',
+        '          \x1b[1;4mExample: containerize (works for AKS, any container runtime)\x1b[0m',
+        '',
+        '\x1b[1mDockerfile (FastAPI example)\x1b[0m',
+        '',
+        '\x1b[40m \x1b[0m\x1b[96;40mFROM\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40mpython:3.12-slim\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[96;40mWORKDIR\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m/app\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[96;40mCOPY\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mrequirements.txt\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m.\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[96;40mRUN\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mpip install --no-cache-dir -r requirements.txt\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[96;40mCOPY\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m.\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m.\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[96;40mEXPOSE\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m8000\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[96;40mCMD\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m[\x1b[0m\x1b[93;40m"uvicorn"\x1b[0m\x1b[97;40m, "main:app", "--host", "0.0.0.0", "--port", "8000"]\x1b[0m',
+        '',
+        'Build + run:',
+        '',
+        '\x1b[40m \x1b[0m\x1b[97;40mdocker build -t myapp:latest .\x1b[0m',
+        '\x1b[40m \x1b[0m\x1b[97;40mdocker run --rm -p 8000:8000 myapp:latest\x1b[0m',
+        '',
+        'I can give you the exact \x1b[1mKubernetes YAML\x1b[0m (Deployment/Service/Ingress) or',
+        '\x1b[1msystemd/nginx\x1b[0m setup once you confirm the target.',
+        '\x1b[?2004hroot@aks-agent-redacted:/app# ',
+      ].join('\n');
+
+      const result = extractAIAnswer(input);
+      expect(result).toContain('Which deployment target do you mean?');
+      expect(result).toContain('1. Kubernetes (AKS) (Deployment/Service/Ingress YAML)');
+      expect(result).toContain('2. Container on a VM (Dockerfile + docker run or compose)');
+      expect(result).toContain('Python web app deployment checklist (generic)');
+      expect(result).toContain('```');
+      expect(result).toContain('FROM python:3.12-slim');
+      expect(result).toContain('docker build -t myapp:latest .');
+      expect(result).not.toContain('Task List');
+      expect(result).not.toContain('Received session ID');
+      expect(result).not.toContain('root@aks-agent-redacted');
+    });
   });
 });
