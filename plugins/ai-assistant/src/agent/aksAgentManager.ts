@@ -311,7 +311,7 @@ function stripAnsi(text: string): string {
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
-    .replace(/^\d*m\s?/gm, ''); // Orphaned ANSI code continuations at line start (e.g. "0m " from "[4\n0m")
+    .replace(/^[\d;]+m\s?/gm, ''); // Orphaned ANSI code continuations at line start (e.g. "0m " from "[4\n0m")
 }
 
 /**

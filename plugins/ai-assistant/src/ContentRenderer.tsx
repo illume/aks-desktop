@@ -121,11 +121,11 @@ const looksLikeYamlContent = (text: string): boolean => {
   for (const line of lines) {
     const trimmed = line.trim();
     // key: value pair
-    if (/^[\w][\w./-]*:\s/.test(trimmed)) yamlLikeLines++;
+    if (/^\w[\w./-]*:\s/.test(trimmed)) yamlLikeLines++;
     // list item: - something
     else if (/^-\s/.test(trimmed)) yamlLikeLines++;
     // indented key: value
-    else if (/^\s+[\w][\w./-]*:\s/.test(line)) yamlLikeLines++;
+    else if (/^\s+\w[\w./-]*:\s/.test(line)) yamlLikeLines++;
     // indented list item
     else if (/^\s+-\s/.test(line)) yamlLikeLines++;
   }
