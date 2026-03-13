@@ -11,7 +11,7 @@
  * Always silent in production builds and tests regardless of the value.
  */
 
-const DEBUG: number | boolean = false;
+const DEBUG: number | boolean = 3;
 
 function level(): number {
   // Always silent in tests and production
