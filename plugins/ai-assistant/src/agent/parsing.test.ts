@@ -4042,3 +4042,562 @@ describe('extractAIAnswer — terminal-formatted Java deployment with Rich code 
     expect(result).toContain('- Apply: kubectl apply -f k8s.yaml');
   });
 });
+
+// ─── Real-world Java deployment with Option A / Option B structure ────────────
+
+describe('extractAIAnswer — real-world Java deploy with Option A/B and Rich panels', () => {
+  // Reconstructed from real dev console logs: aks-agent response with
+  // Rich-panel YAML and kubectl code blocks, centered "Option B" heading,
+  // Java source code, and Dockerfile.
+  const rawJavaDeployOptionAB = [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-649f94dbb9-whtf8:/app# ',
+    '\x1b[?2004l',
+    '',
+    '\x1b[?2004h> ',
+    '\x1b[?2004l',
+    '',
+    '\x1b[?2004h> ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: \x1b[1m[\x1b[0m\x1b[32m'azure/gpt-5.2'\x1b[0m\x1b[1m]\x1b[0m",
+    '\u2705 Toolset core_investigation',
+    '\u2705 Toolset internet',
+    '\u2705 Toolset aks_mcp',
+    'Using \x1b[1;36m3\x1b[0m datasources',
+    'NO ENABLED LOGGING TOOLSET',
+    '\x1b[1;97mUser:\x1b[0m IMPORTANT INSTRUCTIONS:',
+    'Now answer the following new question:',
+    'Show me how to deploy an example java application on kubernetes?',
+    'The AI requested \x1b[1;36m1\x1b[0m tool call.',
+    'Running tool #\x1b[1;36m1\x1b[0m \x1b[1mTodoWrite\x1b[0m: Update investigation tasks',
+    'Task List:',
+    '+----+----------+---------------+',
+    '| ID | Content  | Status        |',
+    '+----+----------+---------------+',
+    '| 1  | Deploy   | completed     |',
+    '+----+----------+---------------+',
+    '  Finished #1 in 0.00s',
+    '',
+    '\x1b[1;96mAI:\x1b[0m ',
+    // ── Option A: prebuilt image ──
+    '     \x1b[1mOption A (fastest): deploy a prebuilt example Java (Spring Boot) image\x1b[0m     ',
+    '',
+    'Apply this manifest:                                                            ',
+    '',
+    // YAML in Rich panel (black background, syntax-highlighted)
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mNamespace                                                               \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mjava-demo                                                             \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mapps/v1                                                           \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mDeployment                                                              \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mspring-boot-demo                                                      \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mnamespace\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mjava-demo                                                        \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mspec\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                         \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mreplicas\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m2                                                                 \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mselector\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m    \x1b[0m\x1b[91;40mmatchLabels\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                              \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m      \x1b[0m\x1b[91;40mapp\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mspring-boot-demo                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mService                                                                 \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mspring-boot-demo                                                      \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mspec\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                         \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mselector\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m    \x1b[0m\x1b[91;40mapp\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mspring-boot-demo                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mports\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                      \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m    \x1b[0m\x1b[40m-\x1b[0m\x1b[97;40m \x1b[0m\x1b[91;40mport\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m80                                                                \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m      \x1b[0m\x1b[91;40mtargetPort\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m8080                                                        \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mtype\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mClusterIP                                                             \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    'Run:                                                                            ',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40mkubectl\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mapply\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-f\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mapp.yaml\x1b[0m\x1b[40m                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40mkubectl\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mget\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mpods\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-n\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mjava-demo\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-w\x1b[0m\x1b[40m                                              \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40mkubectl\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mport-forward\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-n\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mjava-demo\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40msvc/spring-boot-demo\x1b[0m\x1b[97;40m \x1b[0m\x1b[37;40m8080\x1b[0m\x1b[97;40m:80\x1b[0m\x1b[40m                \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[37;40m# then open http://localhost:8080\x1b[0m\x1b[40m                                             \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '',
+    // Rich separator and centered heading
+    '\x1b[33m\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\x1b[0m',
+    '            \x1b[1mOption B: build your own tiny Java app image + deploy it\x1b[0m            ',
+    '',
+    '\x1b[1m1) Minimal Spring Boot app + Dockerfile\x1b[0m                                         ',
+    '',
+    'Use Spring Initializr (Web dependency), then add a controller like:             ',
+    '',
+    // Java code in Rich panel
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[92;40m@RestController\x1b[0m\x1b[40m                                                               \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mclass\x1b[0m\x1b[97;40m \x1b[0m\x1b[92;40mHelloController\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m{\x1b[0m\x1b[40m                                                       \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[92;40m@GetMapping\x1b[0m\x1b[97;40m(\x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40m/\x1b[0m\x1b[93;40m"\x1b[0m\x1b[97;40m)\x1b[0m\x1b[40m                                                            \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[97;40mString\x1b[0m\x1b[97;40m \x1b[0m\x1b[92;40mhello\x1b[0m\x1b[97;40m(\x1b[0m\x1b[97;40m)\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m{\x1b[0m\x1b[97;40m \x1b[0m\x1b[96;40mreturn\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40mhello from k8s\x1b[0m\x1b[93;40m"\x1b[0m\x1b[97;40m;\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m}\x1b[0m\x1b[40m                                 \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m}\x1b[0m\x1b[40m                                                                             \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    'Dockerfile (builds and runs jar):                                               ',
+    '',
+    // Dockerfile in Rich panel
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mFROM\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40meclipse-temurin:21-jdk\x1b[0m\x1b[97;40m \x1b[0m\x1b[96;40mAS\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40mbuild\x1b[0m\x1b[40m                                          \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mWORKDIR\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m/src\x1b[0m\x1b[40m                                                                  \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mCOPY\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m.\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m.\x1b[0m\x1b[40m                                                                      \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mRUN\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m./mvnw\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-q\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-DskipTests\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mpackage\x1b[0m\x1b[40m                                             \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[40m                                                                              \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mFROM\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40meclipse-temurin:21-jre\x1b[0m\x1b[40m                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mWORKDIR\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m/app\x1b[0m\x1b[40m                                                                  \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mCOPY\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m--from\x1b[0m\x1b[91;40m=\x1b[0m\x1b[97;40mbuild\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m/src/target/*.jar\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m/app/app.jar\x1b[0m\x1b[40m                              \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mEXPOSE\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m8080\x1b[0m\x1b[40m                                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[96;40mENTRYPOINT\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m[\x1b[0m\x1b[93;40m"java"\x1b[0m\x1b[97;40m,\x1b[0m\x1b[93;40m"-jar"\x1b[0m\x1b[97;40m,\x1b[0m\x1b[93;40m"/app/app.jar"\x1b[0m\x1b[97;40m]\x1b[0m\x1b[40m                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '\x1b[1m2) Build + push\x1b[0m                                                                 ',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40mdocker\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mbuild\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-t\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m<your-registry>/<your-repo>/spring-boot-demo:1.0\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m.\x1b[0m\x1b[40m            \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40mdocker\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mpush\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m<your-registry>/<your-repo>/spring-boot-demo:1.0\x1b[0m\x1b[40m                  \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '\x1b[1m3) Update Deployment image\x1b[0m In the Deployment above, set:                        ',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mimage\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m<your-registry>/<your-repo>/spring-boot-demo:1.0                       \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    'Then:                                                                           ',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40mkubectl\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mapply\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-f\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mapp.yaml\x1b[0m\x1b[40m                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '\x1b[?2004hroot@aks-agent-649f94dbb9-whtf8:/app# ',
+  ].join('\r\n');
+
+  it('does not absorb "Option B" heading into kubectl code block', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    // After the kubectl code fence closes, "Option B:" should appear as prose
+    expect(result).toMatch(/# then open http:\/\/localhost:8080\n```[\s\S]*Option B/);
+    // "Option B:" should be visible as prose/heading text
+    expect(result).toContain('Option B');
+  });
+
+  it('wraps kubectl commands in a code fence', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    expect(result).toContain('kubectl apply -f app.yaml');
+    expect(result).toContain('kubectl get pods -n java-demo -w');
+    expect(result).toContain('kubectl port-forward');
+    // Shell comment should be in same code block as kubectl commands
+    expect(result).toContain('# then open http://localhost:8080');
+  });
+
+  it('wraps YAML in a yaml-fenced code block', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    expect(result).toContain('```yaml');
+    expect(result).toMatch(/apiVersion: v1\nkind: Namespace/);
+    expect(result).toMatch(/apiVersion: apps\/v1\nkind: Deployment/);
+    expect(result).toMatch(/apiVersion: v1\nkind: Service/);
+  });
+
+  it('wraps Dockerfile in a code fence', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    expect(result).toContain('FROM eclipse-temurin:21-jdk AS build');
+    expect(result).toContain('WORKDIR /src');
+    expect(result).toContain('COPY . .');
+    expect(result).toContain('RUN ./mvnw -q -DskipTests package');
+    expect(result).toContain('ENTRYPOINT ["java","-jar","/app/app.jar"]');
+  });
+
+  it('wraps docker build/push commands in a code fence', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    expect(result).toContain('docker build -t');
+    expect(result).toContain('docker push');
+  });
+
+  it('preserves numbered section headers outside code blocks', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    expect(result).toMatch(/1\).*Minimal Spring Boot/);
+    expect(result).toMatch(/2\).*Build \+ push/);
+    expect(result).toMatch(/3\).*Update Deployment image/);
+  });
+
+  it('keeps prose text outside code fences', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    expect(result).toContain('Apply this manifest:');
+    expect(result).toContain('Run:');
+    expect(result).toContain('Use Spring Initializr');
+    expect(result).toContain('Then:');
+  });
+});
+
+// ─── Kubernetes-focused normalizeTerminalMarkdown tests ──────────────────────
+
+describe('normalizeTerminalMarkdown — Kubernetes / kubectl scenarios', () => {
+  it('wraps indented kubectl commands in a code fence', () => {
+    const input = [
+      'Run these commands:',
+      '',
+      ' kubectl apply -f deployment.yaml',
+      ' kubectl get pods -n my-namespace',
+      ' kubectl rollout status deployment/my-app',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```\nkubectl apply -f deployment.yaml');
+    expect(result).toContain('kubectl rollout status deployment/my-app\n```');
+  });
+
+  it('wraps indented helm commands in a code fence', () => {
+    const input = [
+      'Install the chart:',
+      '',
+      ' helm repo add bitnami https://charts.bitnami.com/bitnami',
+      ' helm install my-release bitnami/nginx',
+      ' helm upgrade my-release bitnami/nginx --set replicaCount=3',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```\nhelm repo add');
+    expect(result).toContain('helm upgrade my-release');
+  });
+
+  it('stops code block before centered heading after kubectl commands', () => {
+    const input = [
+      ' kubectl apply -f app.yaml',
+      ' kubectl get pods -n java-demo -w',
+      ' kubectl port-forward -n java-demo svc/demo 8080:80',
+      ' # then open http://localhost:8080',
+      '            Option B: build your own app',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    // kubectl commands should be in a code fence
+    expect(result).toContain('```\nkubectl apply');
+    // "Option B:" should NOT be inside the code fence
+    expect(result).not.toMatch(/```[^`]*Option B[^`]*```/s);
+    expect(result).toContain('Option B: build your own app');
+  });
+
+  it('stops code block at blank line followed by non-code prose', () => {
+    const input = [
+      ' kubectl apply -f app.yaml',
+      ' kubectl get pods -w',
+      '',
+      'Next, configure the ingress:',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```\nkubectl apply');
+    expect(result).toContain('kubectl get pods -w\n```');
+    expect(result).toContain('Next, configure the ingress:');
+  });
+
+  it('keeps shell comments with URLs inside kubectl code blocks', () => {
+    const input = [
+      ' kubectl port-forward svc/my-app 8080:80',
+      ' # then visit http://localhost:8080',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('kubectl port-forward');
+    expect(result).toContain('# then visit http://localhost:8080');
+  });
+
+  it('wraps az aks commands in code fence', () => {
+    const input = [
+      'Create your cluster:',
+      '',
+      ' az aks create -g myRG -n myCluster --node-count 3',
+      ' az aks get-credentials -g myRG -n myCluster',
+      ' kubectl get nodes',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```\naz aks create');
+    expect(result).toContain('kubectl get nodes\n```');
+  });
+
+  it('does not absorb prose into kubectl code blocks across blank lines', () => {
+    const input = [
+      ' kubectl create namespace monitoring',
+      ' kubectl apply -f prometheus.yaml',
+      '',
+      ' This will create the monitoring stack.',
+    ].join('\n');
+    const result = normalizeTerminalMarkdown(input);
+    // The prose line starts with space but isn't code
+    expect(result).toContain('```\nkubectl create namespace monitoring');
+    expect(result).toContain('kubectl apply -f prometheus.yaml\n```');
+  });
+});
+
+// ─── Kubernetes-focused collapseTerminalBlankLines tests ─────────────────────
+
+describe('collapseTerminalBlankLines — Kubernetes / centered heading scenarios', () => {
+  it('preserves blank line between kubectl code and a centered heading', () => {
+    const input = [
+      ' kubectl apply -f app.yaml',
+      '',
+      '            Option B: build your own app',
+    ].join('\n');
+    const result = collapseTerminalBlankLines(input);
+    // The blank should be preserved (centered heading is NOT terminal code)
+    expect(result).toContain('kubectl apply -f app.yaml\n\n');
+    expect(result).toContain('Option B: build your own app');
+  });
+
+  it('still collapses blanks between kubectl commands (both 1-space indented)', () => {
+    const input = [
+      ' kubectl apply -f deployment.yaml',
+      '',
+      ' kubectl get pods -n default',
+    ].join('\n');
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe(' kubectl apply -f deployment.yaml\n kubectl get pods -n default');
+  });
+
+  it('collapses blanks between YAML lines with typical Rich indentation', () => {
+    const input = [
+      ' apiVersion: v1',
+      '',
+      ' kind: Service',
+      '',
+      ' metadata:',
+    ].join('\n');
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe(' apiVersion: v1\n kind: Service\n metadata:');
+  });
+});
+
+// ─── Shell comment detection in looksLikeShellOrDockerCodeLine ───────────────
+
+describe('looksLikeShellOrDockerCodeLine — shell comments with URLs', () => {
+  it('detects shell comments containing URLs', () => {
+    expect(looksLikeShellOrDockerCodeLine('# then open http://localhost:8080')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('# visit https://example.com/api')).toBe(true);
+  });
+
+  it('detects shell comments containing paths', () => {
+    expect(looksLikeShellOrDockerCodeLine('# edit /etc/nginx/nginx.conf')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('# see /var/log/syslog for details')).toBe(true);
+  });
+
+  it('does NOT detect generic prose comments as code', () => {
+    // No URL, no path — this is more like markdown
+    expect(looksLikeShellOrDockerCodeLine('# This is a heading')).toBe(false);
+    expect(looksLikeShellOrDockerCodeLine('# Notes about deployment')).toBe(false);
+  });
+
+  it('still detects Dockerfile parser directives', () => {
+    expect(looksLikeShellOrDockerCodeLine('# syntax=docker/dockerfile:1')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('# escape=\\')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('# check=skip=all')).toBe(true);
+  });
+});
+
+// ─── More Kubernetes YAML / kubectl extractAIAnswer tests ────────────────────
+
+describe('extractAIAnswer — Kubernetes kubectl and YAML patterns', () => {
+  it('handles kubectl get with wide output and JSON format', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Check your pods:',
+      '',
+      ' kubectl get pods -n kube-system -o wide',
+      ' kubectl get svc -o json | jq .items[].metadata.name',
+      '',
+      'Look for any pods in CrashLoopBackOff state.',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('kubectl get pods -n kube-system -o wide');
+    expect(result).toContain('kubectl get svc -o json');
+    expect(result).toContain('CrashLoopBackOff');
+  });
+
+  it('handles mixed kubectl describe and logs commands', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Debug the failing pod:',
+      '',
+      ' kubectl describe pod my-app-xyz -n default',
+      ' kubectl logs my-app-xyz -n default --previous',
+      ' kubectl get events -n default --sort-by=.lastTimestamp',
+      '',
+      'The events will show scheduling failures and OOM kills.',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('kubectl describe pod');
+    expect(result).toContain('kubectl logs my-app-xyz');
+    expect(result).toContain('kubectl get events');
+    expect(result).toContain('The events will show scheduling failures');
+  });
+
+  it('handles kubectl apply with multi-resource YAML', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Apply the following:',
+      '',
+      '```yaml',
+      'apiVersion: v1',
+      'kind: ConfigMap',
+      'metadata:',
+      '  name: app-config',
+      '  namespace: default',
+      'data:',
+      '  APP_ENV: production',
+      '---',
+      'apiVersion: apps/v1',
+      'kind: Deployment',
+      'metadata:',
+      '  name: my-app',
+      '  namespace: default',
+      'spec:',
+      '  replicas: 3',
+      '  selector:',
+      '    matchLabels:',
+      '      app: my-app',
+      '  template:',
+      '    metadata:',
+      '      labels:',
+      '        app: my-app',
+      '    spec:',
+      '      containers:',
+      '        - name: app',
+      '          image: myregistry/my-app:latest',
+      '          envFrom:',
+      '            - configMapRef:',
+      '                name: app-config',
+      '```',
+      '',
+      'Then run:',
+      '',
+      ' kubectl apply -f manifests.yaml',
+      ' kubectl rollout status deployment/my-app -n default',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```yaml\napiVersion: v1');
+    expect(result).toContain('kind: ConfigMap');
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('envFrom:');
+    expect(result).toContain('kubectl apply -f manifests.yaml');
+    expect(result).toContain('kubectl rollout status');
+  });
+
+  it('handles kubectl exec and port-forward commands', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Connect to your pod:',
+      '',
+      ' kubectl exec -it my-app-pod -n default -- /bin/bash',
+      ' kubectl port-forward svc/my-app 8080:80 -n default',
+      ' # then curl http://localhost:8080/healthz',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('kubectl exec -it');
+    expect(result).toContain('kubectl port-forward');
+    expect(result).toContain('# then curl http://localhost:8080/healthz');
+  });
+
+  it('handles bare YAML with HPA resource', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Here is a HorizontalPodAutoscaler:',
+      '',
+      'apiVersion: autoscaling/v2',
+      'kind: HorizontalPodAutoscaler',
+      'metadata:',
+      '  name: my-app',
+      '  namespace: default',
+      'spec:',
+      '  scaleTargetRef:',
+      '    apiVersion: apps/v1',
+      '    kind: Deployment',
+      '    name: my-app',
+      '  minReplicas: 2',
+      '  maxReplicas: 10',
+      '  metrics:',
+      '    - type: Resource',
+      '      resource:',
+      '        name: cpu',
+      '        target:',
+      '          type: Utilization',
+      '          averageUtilization: 70',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```yaml');
+    expect(result).toContain('kind: HorizontalPodAutoscaler');
+    expect(result).toContain('averageUtilization: 70');
+  });
+
+  it('handles kubectl with Azure AKS commands', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Scale your AKS cluster:',
+      '',
+      ' az aks scale -g myRG -n myCluster --node-count 5',
+      ' az aks nodepool add -g myRG --cluster-name myCluster -n gpupool --node-count 2 --node-vm-size Standard_NC6',
+      ' kubectl get nodes -o wide',
+      '',
+      'The GPU nodepool will take a few minutes to provision.',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('az aks scale');
+    expect(result).toContain('az aks nodepool add');
+    expect(result).toContain('kubectl get nodes -o wide');
+  });
+
+  it('handles Kubernetes NetworkPolicy YAML', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Create a NetworkPolicy to restrict traffic:',
+      '',
+      '```yaml',
+      'apiVersion: networking.k8s.io/v1',
+      'kind: NetworkPolicy',
+      'metadata:',
+      '  name: deny-all',
+      '  namespace: production',
+      'spec:',
+      '  podSelector: {}',
+      '  policyTypes:',
+      '    - Ingress',
+      '    - Egress',
+      '```',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```yaml');
+    expect(result).toContain('kind: NetworkPolicy');
+    expect(result).toContain('podSelector: {}');
+    expect(result).toContain('policyTypes:');
+  });
+
+  it('handles kubectl create secret and configmap', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Create secrets and config:',
+      '',
+      ' kubectl create secret generic db-creds --from-literal=password=s3cret -n default',
+      ' kubectl create configmap app-config --from-file=config.yaml -n default',
+      ' kubectl get secrets -n default',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('kubectl create secret generic');
+    expect(result).toContain('kubectl create configmap');
+    expect(result).toContain('kubectl get secrets');
+  });
+});

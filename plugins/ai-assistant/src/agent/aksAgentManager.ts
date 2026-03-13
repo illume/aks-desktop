@@ -1331,6 +1331,10 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Dockerfile parser directive: # syntax=..., # escape=..., # check=...
   if (/^#\s*\w+=.+/.test(trimmed)) return true;
 
+  // Shell comment containing a URL (e.g. "# then open http://localhost:8080")
+  // or a path/flag — these appear inside code blocks as documentation comments
+  if (/^#\s/.test(trimmed) && /https?:\/\/|localhost|\/\w/.test(trimmed)) return true;
+
   // Environment variable assignment: VAR=value or VAR="value"
   if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
 
@@ -1420,8 +1424,20 @@ function collapseTerminalBlankLines(text: string): string {
     // Find the next non-blank line (still in input)
     const nextLine = j < lines.length ? lines[j] : '';
 
-    const prevIsTermCode = prevLine.startsWith(' ') && prevLine.trim() !== '';
-    const nextIsTermCode = nextLine.startsWith(' ') && nextLine.trim() !== '';
+    // A line is "terminal code" if it starts with 1–4 spaces (Rich panel
+    // padding) and is non-empty.  Lines with ≥ 5 leading spaces are usually
+    // centered headings from terminal formatting, not code, so we exclude
+    // them unless they actually look like code or YAML.
+    const isTermCodeLine = (ln: string): boolean => {
+      if (!ln.startsWith(' ') || ln.trim() === '') return false;
+      const indent = ln.match(/^(\s*)/)?.[1].length ?? 0;
+      if (indent <= 4) return true; // typical Rich panel indentation
+      // Heavily indented — only treat as code if it looks like code/YAML
+      const t = ln.trim();
+      return looksLikeShellOrDockerCodeLine(t) || looksLikeYaml(t);
+    };
+    const prevIsTermCode = isTermCodeLine(prevLine);
+    const nextIsTermCode = isTermCodeLine(nextLine);
 
     if (prevIsTermCode && nextIsTermCode) {
       // Both sides are terminal-formatted code lines
@@ -1521,12 +1537,26 @@ function normalizeTerminalMarkdown(text: string): string {
       const blockLines: string[] = [];
       let j = i;
       let codeLikeLineCount = 0;
+      const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
 
       while (j < lines.length) {
         const blockLine = lines[j];
         const blockTrimmed = blockLine.trim();
 
         if (blockTrimmed === '') {
+          // Peek ahead: if next non-blank line isn't code-like, stop here
+          let peekIdx = j + 1;
+          while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+          if (peekIdx < lines.length) {
+            const peekTrimmed = lines[peekIdx].trim();
+            if (!looksLikeShellOrDockerCodeLine(peekTrimmed)) {
+              // Trim trailing blank lines already in blockLines
+              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+                blockLines.pop();
+              }
+              break;
+            }
+          }
           blockLines.push(blockLine);
           j++;
           continue;
@@ -1536,12 +1566,26 @@ function normalizeTerminalMarkdown(text: string): string {
           break;
         }
 
+        // Stop at heavily-indented non-code lines (centered headings)
+        const lineIndent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
+        if (
+          lineIndent > baseIndent + 4 &&
+          !looksLikeShellOrDockerCodeLine(blockTrimmed)
+        ) {
+          break;
+        }
+
         if (looksLikeShellOrDockerCodeLine(blockTrimmed)) {
           codeLikeLineCount++;
         }
 
         blockLines.push(blockLine);
         j++;
+      }
+
+      // Trim trailing blank lines from the block
+      while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+        blockLines.pop();
       }
 
       if (codeLikeLineCount >= 2) {
