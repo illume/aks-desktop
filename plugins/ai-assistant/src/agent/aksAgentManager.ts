@@ -1548,9 +1548,21 @@ function collapseTerminalBlankLines(text: string): string {
     const isTermCodeLine = (ln: string): boolean => {
       if (!ln.startsWith(' ') || ln.trim() === '') return false;
       const indent = ln.match(/^(\s*)/)?.[1].length ?? 0;
-      if (indent <= 4) return true; // typical Rich panel indentation
-      // Heavily indented — only treat as code if it looks like code/YAML
       const t = ln.trim();
+      if (indent <= 4) {
+        // Typical Rich panel indentation.  However, Rich also renders bold
+        // section headings with 1-space indent (e.g. " Kubernetes manifests
+        // (Namespace + ...)") — those are prose, not code.  Distinguish by
+        // checking if the content actually looks like code or YAML.
+        if (looksLikeShellOrDockerCodeLine(t) || looksLikeYaml(t)) return true;
+        // Short lines that are just YAML values/keys also count
+        if (/^[\w.-]+:\s/.test(t) || /^---\s*$/.test(t) || /^- /.test(t)) return true;
+        // If the line has many words and doesn't look like code, it's prose
+        const wordCount = t.split(/\s+/).length;
+        if (wordCount >= 5 && !looksLikeShellOrDockerCodeLine(t)) return false;
+        return true; // default: treat as code for short lines
+      }
+      // Heavily indented — only treat as code if it looks like code/YAML
       return looksLikeShellOrDockerCodeLine(t) || looksLikeYaml(t);
     };
     const prevIsTermCode = isTermCodeLine(prevLine);
@@ -1819,6 +1831,20 @@ function normalizeTerminalMarkdown(text: string): string {
         }
 
         if (!/^\s+\S/.test(blockLine)) {
+          break;
+        }
+
+        // Stop at prose lines: if the trimmed content is long (5+ words),
+        // doesn't look like code/YAML, and isn't a continuation of the
+        // previous code, it's likely a wrapped bold heading or description
+        // (e.g. "Kubernetes manifests (Namespace + ConfigMap + ...)").
+        const blockWords = blockTrimmed.split(/\s+/).length;
+        if (
+          !startedByFileHeader &&
+          blockWords >= 5 &&
+          !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
+          !looksLikeYaml(blockTrimmed)
+        ) {
           break;
         }
 
@@ -2412,6 +2438,30 @@ function cleanTerminalFormatting(text: string): string {
       'border lines, unwrapped',
       unwrappedPanels,
       'panel lines'
+    );
+  }
+
+  // Rejoin YAML keys split across lines by terminal wrapping.
+  // e.g. "          averageUtilization\n : 70" → "          averageUtilization: 70"
+  // This happens when a YAML key is too long for the 80-char terminal width
+  // and the colon + value wraps to the next line.
+  let rejoinedCount = 0;
+  for (let idx = 0; idx < result.length - 1; idx++) {
+    const cur = result[idx];
+    const next = result[idx + 1];
+    // Current line ends with a bare word (no colon) and is space-indented
+    // Next line starts with optional space + colon + space + value
+    if (/^\s+\w+$/.test(cur) && /^\s*:\s+\S/.test(next)) {
+      result[idx] = cur + next.replace(/^\s*/, '');
+      result.splice(idx + 1, 1);
+      rejoinedCount++;
+    }
+  }
+  if (rejoinedCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] cleanTerminalFormatting: rejoined',
+      rejoinedCount,
+      'split YAML key-value lines'
     );
   }
 

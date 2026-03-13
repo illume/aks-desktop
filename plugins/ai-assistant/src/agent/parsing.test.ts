@@ -7,6 +7,7 @@ import {
   rawPythonFlaskApp,
   rawPythonImports,
   rawRustAxumApp,
+  rawRustK8sDeployment,
 } from './testFixtures';
 
 const {
@@ -5603,6 +5604,100 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
         throw new Error('Section heading "Containerize it" should not be inside a code fence');
       }
     }
+  });
+});
+
+// ─── Real-world fixture: Rust K8s deployment with bold section headings ───────
+
+describe('extractAIAnswer — Rust K8s deployment with bold headings (shared fixture)', () => {
+  it('separates Dockerfile from section heading', () => {
+    const result = extractAIAnswer(rawRustK8sDeployment);
+    // The heading should NOT be inside the Dockerfile code fence
+    const lines = result.split('\n');
+    let inFence = false;
+    for (const line of lines) {
+      if (/^```/.test(line.trim())) {
+        inFence = !inFence;
+        continue;
+      }
+      if (inFence && line.includes('Kubernetes manifests')) {
+        throw new Error('Section heading "Kubernetes manifests" should not be inside a code fence');
+      }
+    }
+  });
+
+  it('rejoins split YAML key averageUtilization: 70', () => {
+    const result = extractAIAnswer(rawRustK8sDeployment);
+    expect(result).toContain('averageUtilization: 70');
+    // Should NOT have orphaned ": 70" as a separate line outside fences
+    const lines = result.split('\n');
+    let inFence = false;
+    const colonOutside = lines.filter(l => {
+      if (/^```/.test(l.trim())) {
+        inFence = !inFence;
+        return false;
+      }
+      return !inFence && l.trim() === ': 70';
+    });
+    expect(colonOutside.length).toBe(0);
+  });
+
+  it('renders all YAML K8s resources in a single yaml block', () => {
+    const result = extractAIAnswer(rawRustK8sDeployment);
+    // Extract yaml code blocks
+    const blocks: string[] = [];
+    let current = '';
+    let inYaml = false;
+    for (const line of result.split('\n')) {
+      if (/^```yaml/.test(line.trim())) {
+        inYaml = true;
+        continue;
+      }
+      if (/^```/.test(line.trim()) && inYaml) {
+        blocks.push(current);
+        current = '';
+        inYaml = false;
+        continue;
+      }
+      if (inYaml) current += line + '\n';
+    }
+    // Should have exactly one yaml block containing all resources
+    expect(blocks.length).toBe(1);
+    expect(blocks[0]).toContain('kind: Namespace');
+    expect(blocks[0]).toContain('kind: ConfigMap');
+    expect(blocks[0]).toContain('kind: Deployment');
+    expect(blocks[0]).toContain('kind: Service');
+    expect(blocks[0]).toContain('kind: Ingress');
+    expect(blocks[0]).toContain('kind: HorizontalPodAutoscaler');
+  });
+
+  it('keeps Dockerfile content in a code block', () => {
+    const result = extractAIAnswer(rawRustK8sDeployment);
+    expect(result).toContain('FROM rust:1.76-bullseye AS builder');
+    expect(result).toContain('ENTRYPOINT ["/app/my-rust-app"]');
+  });
+
+  it('keeps kubectl command in a code block', () => {
+    const result = extractAIAnswer(rawRustK8sDeployment);
+    expect(result).toContain('kubectl apply -f k8s.yaml');
+  });
+});
+
+// ─── cleanTerminalFormatting — YAML key rejoining ───────────────────────────
+
+describe('cleanTerminalFormatting — YAML key rejoining', () => {
+  it('rejoins YAML key split from colon by terminal wrapping', () => {
+    const input = '          averageUtilization\n : 70';
+    const result = cleanTerminalFormatting(input);
+    expect(result).toContain('averageUtilization: 70');
+    expect(result).not.toContain('\n :');
+  });
+
+  it('does not rejoin non-YAML lines', () => {
+    const input = 'hello world\n : not yaml';
+    const result = cleanTerminalFormatting(input);
+    // "hello world" is not a bare word with indent, so no rejoining
+    expect(result).toContain('hello world');
   });
 });
 

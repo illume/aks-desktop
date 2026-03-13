@@ -10,6 +10,7 @@ import {
   rawMicroservicesPythonYaml,
   rawPythonFlaskApp,
   rawRustAxumApp,
+  rawRustK8sDeployment,
 } from './agent/testFixtures';
 import ContentRenderer from './ContentRenderer';
 
@@ -1339,5 +1340,22 @@ export const RealWorldRustAxumAppDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
     <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawRustAxumApp)} />
+  </ThemeProvider>
+);
+
+export const RealWorldRustK8sDeployment: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(rawRustK8sDeployment)}
+  />
+);
+
+export const RealWorldRustK8sDeploymentDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      onYamlDetected={noopYamlDetected}
+      content={extractAIAnswer(rawRustK8sDeployment)}
+    />
   </ThemeProvider>
 );
