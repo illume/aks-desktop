@@ -25,6 +25,62 @@ export const BASE_AKS_AGENT_PROMPT = `IMPORTANT INSTRUCTIONS:
 - The conversation history below shows all previously asked questions and your answers. Keep that context in mind and answer accordingly — do not repeat information already provided unless the user explicitly asks for it.
 `;
 
+/**
+ * Prompt sent back to the agent after its initial response to verify
+ * formatting and correctness.  The placeholder `{RESPONSE}` is replaced
+ * with the extracted answer.
+ */
+export const SELF_REVIEW_PROMPT = `Review your previous response shown below for formatting and correctness issues.
+
+---BEGIN RESPONSE---
+{RESPONSE}
+---END RESPONSE---
+
+Check:
+1. ALL code (YAML, JSON, bash/shell, Python, Dockerfile, HCL, Go, etc.) MUST be wrapped inside fenced markdown code blocks with the correct language tag (e.g. \`\`\`yaml, \`\`\`bash, \`\`\`python).
+2. No code appears as plain text outside of code blocks.
+3. The code inside the blocks is syntactically correct and complete.
+4. Markdown formatting is clean (headings, lists, etc.).
+
+If the response is already well-formatted, respond with EXACTLY: LGTM
+If there are ANY issues, respond with the COMPLETE corrected response only — no extra commentary or explanation.`;
+
+/**
+ * Build the self-review prompt by injecting the original answer.
+ */
+export function buildSelfReviewPrompt(answer: string): string {
+  return SELF_REVIEW_PROMPT.replace('{RESPONSE}', answer);
+}
+
+/**
+ * Detect whether `text` contains code-like content that is NOT inside
+ * fenced markdown code blocks.  Used to decide whether a self-review
+ * round-trip is worthwhile.
+ */
+export function hasUnfencedCode(text: string): boolean {
+  // Strip all fenced code blocks (``` ... ```) so we only inspect prose
+  const withoutFenced = text.replace(/```[\s\S]*?```/g, '');
+
+  // Patterns that strongly indicate code content
+  const codePatterns: RegExp[] = [
+    // CLI tools
+    /\b(?:kubectl|docker|helm|az|terraform|pip|npm|yarn|go|cargo|make)\s+\w/,
+    // Kubernetes YAML keys at start of line
+    /^(?:apiVersion|kind|metadata|spec|status):/m,
+    // Dockerfile directives
+    /^(?:FROM|RUN|CMD|ENTRYPOINT|COPY|ADD|WORKDIR|ENV|EXPOSE|VOLUME|ARG|LABEL)\s/m,
+    // Python imports / definitions
+    /^(?:import |from \S+ import |def \w|class \w)/m,
+    // Shell prompt or shebang
+    /^\$\s/m,
+    /^#!\/(?:bin|usr)/m,
+    // Variable assignments / exports
+    /^(?:export |alias )\w/m,
+  ];
+
+  return codePatterns.some(p => p.test(withoutFenced));
+}
+
 /** Represents a single exchange (question + answer) from the conversation history. */
 export interface ConversationEntry {
   role: 'user' | 'assistant';
@@ -2575,6 +2631,41 @@ export async function runAksAgent(
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
+      // Self-review: if the response contains code-like content outside of
+      // fenced code blocks, ask the agent to review and reformat its answer.
+      if (hasUnfencedCode(answer)) {
+        debugLog('[AKS Agent] Unfenced code detected — starting self-review');
+        try {
+          const reviewPrompt = buildSelfReviewPrompt(answer);
+          const reviewResult = await session.ask(reviewPrompt);
+          if (reviewResult && reviewResult.trim().length > 0) {
+            const reviewAnswer = extractAIAnswer(reviewResult);
+            const trimmedReview = reviewAnswer.trim();
+            // If the agent confirms the response is fine, use the original
+            if (trimmedReview === 'LGTM' || trimmedReview.startsWith('LGTM')) {
+              debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
+            } else if (
+              reviewAnswer &&
+              reviewAnswer.length > answer.length * 0.3
+            ) {
+              // Use the corrected version (sanity check: must be substantial)
+              debugLog(
+                '[AKS Agent] Self-review: using corrected response, length:',
+                reviewAnswer.length
+              );
+              return reviewAnswer;
+            } else {
+              debugLog(
+                '[AKS Agent] Self-review: corrected response too short — keeping original'
+              );
+            }
+          }
+        } catch (e) {
+          console.warn('[AKS Agent] Self-review failed, using original response:', e);
+        }
+      } else {
+        debugLog('[AKS Agent] No unfenced code detected — skipping self-review');
+      }
       return answer;
     }
     // extractAIAnswer stripped everything — the agent ran but produced no
@@ -3096,4 +3187,5 @@ export const _testing = {
   looksLikeShellOrDockerCodeLine,
   hasShellSyntax,
   normalizeTerminalMarkdown,
+  hasUnfencedCode,
 };
