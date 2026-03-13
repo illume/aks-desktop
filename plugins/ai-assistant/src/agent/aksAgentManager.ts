@@ -572,7 +572,7 @@ function stripAgentNoise(lines: string[]): string[] {
     // Drop noise lines
     if (isAgentNoiseLine(trimmed)) {
       droppedCount++;
-      debugLog('[AKS Agent Parse] stripAgentNoise: dropping noise line:', trimmed.slice(0, 120));
+      debugLog('[AKS Agent Parse] stripAgentNoise: dropping noise line:', trimmed);
       continue;
     }
 
@@ -678,12 +678,7 @@ function extractAIAnswer(rawOutput: string): string {
 
   const afterBullets = normalizeBullets(afterTerminal);
   const result = wrapBareYamlBlocks(afterBullets);
-  debugLog(
-    '[AKS Agent Parse] extractAIAnswer: final result length:',
-    result.length,
-    'first 200 chars:',
-    result.slice(0, 200)
-  );
+  debugLog('[AKS Agent Parse] extractAIAnswer: final result length:', result.length, 'result:', result);
 
   if (!result) {
     debugLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
@@ -853,10 +848,7 @@ class ThinkingStepTracker {
     const runMatch = trimmed.match(/^Running tool\s+#(\d+)\s+/);
     if (runMatch) {
       const toolNum = parseInt(runMatch[1], 10);
-      debugLog(
-        '[AKS Agent Parse] ThinkingStepTracker: running tool #' + toolNum + ':',
-        trimmed.slice(0, 100)
-      );
+      debugLog('[AKS Agent Parse] ThinkingStepTracker: running tool #' + toolNum + ':', trimmed);
       // Skip TodoWrite and kubectl tools — they're tracked via the task table
       if (/TodoWrite/i.test(trimmed) || /call_kubectl/i.test(trimmed)) {
         // Still record the tool number so we can mark it finished without noise
@@ -972,12 +964,7 @@ export async function runAksAgent(
   const result = await session.ask(enrichedPrompt, onProgress);
 
   if (result && result.trim().length > 0) {
-    debugLog(
-      '[AKS Agent Parse] runAksAgent: raw result length:',
-      result.length,
-      'first 300 chars:',
-      result.slice(0, 300)
-    );
+    debugLog('[AKS Agent Parse] runAksAgent: raw result length:', result.length, 'result:', result);
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
@@ -1195,7 +1182,7 @@ class AgentSession {
         'text length:',
         text.length,
         'text:',
-        text.slice(0, 200)
+        text
       );
 
       this.handleChannel(channel, text);
@@ -1241,7 +1228,7 @@ class AgentSession {
       'accumulated output length:',
       this.output.length,
       'chunk:',
-      text.slice(0, 300)
+      text
     );
 
     // Ensure each terminal line chunk is newline-terminated.

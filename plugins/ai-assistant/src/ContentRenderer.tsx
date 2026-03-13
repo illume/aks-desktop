@@ -555,12 +555,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
     const processedContent = useMemo(() => {
       if (!content) return null;
 
-      debugLog(
-        '[ContentRenderer] Processing content, length:',
-        content.length,
-        'first 200 chars:',
-        content.slice(0, 200)
-      );
+      debugLog('[ContentRenderer] Processing content, length:', content.length, 'content:', content);
 
       // First, check if content is a JSON response with error or success keys
       const jsonParseResult = parseJsonContent(content.trim());
