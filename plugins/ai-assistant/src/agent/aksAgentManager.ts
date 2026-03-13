@@ -636,7 +636,7 @@ function extractAIAnswer(rawOutput: string): string {
     .map(l => stripAnsi(l).trimEnd())
     .join('\n');
 
-  debugLog('[AKS Agent Parse] extractAIAnswer: normalised line count:', normalized.length);
+  debugLog('[AKS Agent Parse] extractAIAnswer: normalised line count:', normalised.length);
 
   // Strip the echoed command block before parsing — when tty echo is on,
   // the entire multi-line command (including conversation history) is echoed

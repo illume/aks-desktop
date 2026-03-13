@@ -435,3 +435,209 @@ metadata:
     />
   </ThemeProvider>
 );
+
+// ── Real-world agent response stories ────────────────────────────────────────
+
+/** Real agent response: pod status table with markdown formatting. */
+export const RealWorldPodStatus: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`Here are the running pods in the \`kube-system\` namespace:
+
+| Pod Name | Status | Restarts |
+|----------|--------|----------|
+| coredns-7c6bf4f | Running | 0 |
+| kube-proxy-abc12 | Running | 0 |
+| metrics-server-xyz | Running | 2 |
+
+All pods are healthy.`}
+  />
+);
+
+/** Real agent response: diagnostic info with code blocks and markdown. */
+export const RealWorldCrashDiagnosis: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`Your pod \`web-app-6f8b9c4d7-x2k9p\` is in a **CrashLoopBackOff** state. Here is what I found:
+
+## Root Cause
+
+The container is failing because it cannot connect to the database. The logs show:
+
+\`\`\`
+Error: connect ECONNREFUSED 10.0.0.5:5432
+    at TCPConnectWrap.afterConnect [as oncomplete]
+\`\`\`
+
+## Recommended Steps
+
+1. Check if the database pod is running: \`kubectl get pods -l app=postgres\`
+2. Verify the service endpoint: \`kubectl get endpoints postgres-svc\`
+3. Check network policies that might block traffic between namespaces
+
+> **Note**: The pod has restarted 15 times in the last hour.`}
+  />
+);
+
+/** Real agent response: best practices bullet list. */
+export const RealWorldBestPractices: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`Here are the key best practices for AKS:
+
+- **Use managed identities** instead of service principals for authentication
+- **Enable Azure Policy** to enforce organizational standards
+- **Configure autoscaling** for both cluster and pods:
+  - Cluster Autoscaler for node pools
+  - Horizontal Pod Autoscaler (HPA) for workloads
+- **Use Azure CNI** networking for better integration with VNets
+- **Enable monitoring** with Container Insights and Prometheus
+- **Implement network policies** to control pod-to-pod traffic
+- **Use node pools** to separate system and user workloads
+
+For more details, see the [AKS best practices documentation](https://learn.microsoft.com/en-us/azure/aks/best-practices).`}
+  />
+);
+
+/** Real agent response: multiple YAML resources with headings. */
+export const RealWorldMultiResource: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    content={`Here is a complete application setup with a Deployment and Service:
+
+### Deployment
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  labels:
+    app: web-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: web
+        image: myregistry.azurecr.io/web-app:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+\`\`\`
+
+### Service
+
+\`\`\`yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+  - port: 80
+    targetPort: 3000
+\`\`\`
+
+Apply both with: \`kubectl apply -f app.yaml\``}
+  />
+);
+
+/** Real agent response: multi-resource in dark theme. */
+export const RealWorldMultiResourceDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      content={`Here is a complete application setup with a Deployment and Service:
+
+### Deployment
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  labels:
+    app: web-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: web
+        image: myregistry.azurecr.io/web-app:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+\`\`\`
+
+### Service
+
+\`\`\`yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+  - port: 80
+    targetPort: 3000
+\`\`\`
+
+Apply both with: \`kubectl apply -f app.yaml\``}
+    />
+  </ThemeProvider>
+);
+
+/** Real agent response: crash diagnosis in dark theme. */
+export const RealWorldCrashDiagnosisDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      content={`Your pod \`web-app-6f8b9c4d7-x2k9p\` is in a **CrashLoopBackOff** state. Here is what I found:
+
+## Root Cause
+
+The container is failing because it cannot connect to the database. The logs show:
+
+\`\`\`
+Error: connect ECONNREFUSED 10.0.0.5:5432
+    at TCPConnectWrap.afterConnect [as oncomplete]
+\`\`\`
+
+## Recommended Steps
+
+1. Check if the database pod is running: \`kubectl get pods -l app=postgres\`
+2. Verify the service endpoint: \`kubectl get endpoints postgres-svc\`
+3. Check network policies that might block traffic between namespaces
+
+> **Note**: The pod has restarted 15 times in the last hour.`}
+    />
+  </ThemeProvider>
+);
