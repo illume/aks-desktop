@@ -540,9 +540,10 @@ const AGENT_NOISE_PATTERNS: RegExp[] = [
   /^IMPORTANT INSTRUCTIONS:\s*$/,
   /^---\s*(CONVERSATION HISTORY|END OF CONVERSATION HISTORY)\s*---\s*$/,
   /^Now answer the following new question:\s*$/,
-  // Table remnant lines: only pipes, plus, dashes, equals, whitespace — but must contain at
-  // least one pipe or plus to avoid matching YAML list items ("- foo") or markdown hr ("---")
-  /^[\s|+=\-]*[|+][\s|+=\-]*$/,
+  // Table remnant lines: only pipes, plus, dashes, equals, whitespace — must contain at
+  // least one "+" to distinguish agent task-table borders (+---+---+) from GFM markdown
+  // table separators (|---|---|) which must be preserved for proper table rendering.
+  /^[\s|+=\-]*\+[\s|+=\-]*$/,
 ];
 
 /** Return true if a trimmed line matches any agent-noise pattern. */

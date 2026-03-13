@@ -5,7 +5,10 @@ import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import { _testing } from './agent/aksAgentManager';
 import ContentRenderer from './ContentRenderer';
+
+const { extractAIAnswer } = _testing;
 
 const darkTheme = createTheme({
   palette: {
@@ -436,208 +439,224 @@ metadata:
   </ThemeProvider>
 );
 
-// ── Real-world agent response stories ────────────────────────────────────────
+// ── Real-world agent response stories (raw exec output → extractAIAnswer → render) ──
+// These stories feed raw terminal output (matching real dev console captures) through
+// the extractAIAnswer parsing pipeline, then render the result. All identifiers are
+// redacted to generic values.
 
-/** Real agent response: pod status table with markdown formatting. */
+const rawPodStatus = [
+  '\x1b[?2004hroot@aks-agent-abc1234def-x9y8z:/app#',
+  "python /app/aks-agent.py ask 'what pods are running?'",
+  '\x1b[?2004l',
+  "Loaded models: ['gpt-4']",
+  'Task List:',
+  '+------+------------------+---------+',
+  '| ID   | Description      | Status  |',
+  '+------+------------------+---------+',
+  '| t1   | Check pods       | [~] in_progress |',
+  '+------+------------------+---------+',
+  'AI: Here are the running pods in the `kube-system` namespace:',
+  '',
+  '| Pod Name | Status | Restarts |',
+  '|----------|--------|----------|',
+  '| coredns-7c6bf4f | Running | 0 |',
+  '| kube-proxy-abc12 | Running | 0 |',
+  '| metrics-server-xyz | Running | 2 |',
+  '',
+  'All pods are healthy.',
+  'root@aks-agent-abc1234def-x9y8z:/app#',
+].join('\n');
+
+/** Raw exec output → parsed: pod status table with markdown formatting. */
 export const RealWorldPodStatus: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    content={`Here are the running pods in the \`kube-system\` namespace:
-
-| Pod Name | Status | Restarts |
-|----------|--------|----------|
-| coredns-7c6bf4f | Running | 0 |
-| kube-proxy-abc12 | Running | 0 |
-| metrics-server-xyz | Running | 2 |
-
-All pods are healthy.`}
-  />
+  <ContentRenderer content={extractAIAnswer(rawPodStatus)} />
 );
 
-/** Real agent response: diagnostic info with code blocks and markdown. */
+const rawCrashDiagnosis = [
+  '\x1b[?2004hroot@aks-agent-abc1234def-x9y8z:/app#',
+  "python /app/aks-agent.py ask 'why is my pod crashing?'",
+  '\x1b[?2004l',
+  "Loaded models: ['gpt-4']",
+  '+------+-------------------+-------------------+',
+  '| t1   | Check pod status  | [✓] completed     |',
+  '| t2   | Get pod logs      | [✓] completed     |',
+  '+------+-------------------+-------------------+',
+  'AI: Your pod `web-app-6f8b9c4d7-x2k9p` is in a **CrashLoopBackOff** state. Here is what I found:',
+  '',
+  '## Root Cause',
+  '',
+  'The container is failing because it cannot connect to the database. The logs show:',
+  '',
+  '```',
+  'Error: connect ECONNREFUSED 10.0.0.5:5432',
+  '    at TCPConnectWrap.afterConnect [as oncomplete]',
+  '```',
+  '',
+  '## Recommended Steps',
+  '',
+  '1. Check if the database pod is running: `kubectl get pods -l app=postgres`',
+  '2. Verify the service endpoint: `kubectl get endpoints postgres-svc`',
+  '3. Check network policies that might block traffic between namespaces',
+  '',
+  '> **Note**: The pod has restarted 15 times in the last hour.',
+  'root@aks-agent-abc1234def-x9y8z:/app#',
+].join('\n');
+
+/** Raw exec output → parsed: diagnostic info with headings, code blocks, lists. */
 export const RealWorldCrashDiagnosis: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    content={`Your pod \`web-app-6f8b9c4d7-x2k9p\` is in a **CrashLoopBackOff** state. Here is what I found:
-
-## Root Cause
-
-The container is failing because it cannot connect to the database. The logs show:
-
-\`\`\`
-Error: connect ECONNREFUSED 10.0.0.5:5432
-    at TCPConnectWrap.afterConnect [as oncomplete]
-\`\`\`
-
-## Recommended Steps
-
-1. Check if the database pod is running: \`kubectl get pods -l app=postgres\`
-2. Verify the service endpoint: \`kubectl get endpoints postgres-svc\`
-3. Check network policies that might block traffic between namespaces
-
-> **Note**: The pod has restarted 15 times in the last hour.`}
-  />
+  <ContentRenderer content={extractAIAnswer(rawCrashDiagnosis)} />
 );
 
-/** Real agent response: best practices bullet list. */
-export const RealWorldBestPractices: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    content={`Here are the key best practices for AKS:
-
-- **Use managed identities** instead of service principals for authentication
-- **Enable Azure Policy** to enforce organizational standards
-- **Configure autoscaling** for both cluster and pods:
-  - Cluster Autoscaler for node pools
-  - Horizontal Pod Autoscaler (HPA) for workloads
-- **Use Azure CNI** networking for better integration with VNets
-- **Enable monitoring** with Container Insights and Prometheus
-- **Implement network policies** to control pod-to-pod traffic
-- **Use node pools** to separate system and user workloads
-
-For more details, see the [AKS best practices documentation](https://learn.microsoft.com/en-us/azure/aks/best-practices).`}
-  />
-);
-
-/** Real agent response: multiple YAML resources with headings. */
-export const RealWorldMultiResource: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    content={`Here is a complete application setup with a Deployment and Service:
-
-### Deployment
-
-\`\`\`yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: web-app
-  labels:
-    app: web-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: web-app
-  template:
-    metadata:
-      labels:
-        app: web-app
-    spec:
-      containers:
-      - name: web
-        image: myregistry.azurecr.io/web-app:latest
-        ports:
-        - containerPort: 3000
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 250m
-            memory: 256Mi
-\`\`\`
-
-### Service
-
-\`\`\`yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: web-app-svc
-spec:
-  type: LoadBalancer
-  selector:
-    app: web-app
-  ports:
-  - port: 80
-    targetPort: 3000
-\`\`\`
-
-Apply both with: \`kubectl apply -f app.yaml\``}
-  />
-);
-
-/** Real agent response: multi-resource in dark theme. */
-export const RealWorldMultiResourceDark: StoryFn<typeof ContentRenderer> = () => (
-  <ThemeProvider theme={darkTheme}>
-    <CssBaseline />
-    <ContentRenderer
-      content={`Here is a complete application setup with a Deployment and Service:
-
-### Deployment
-
-\`\`\`yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: web-app
-  labels:
-    app: web-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: web-app
-  template:
-    metadata:
-      labels:
-        app: web-app
-    spec:
-      containers:
-      - name: web
-        image: myregistry.azurecr.io/web-app:latest
-        ports:
-        - containerPort: 3000
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 250m
-            memory: 256Mi
-\`\`\`
-
-### Service
-
-\`\`\`yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: web-app-svc
-spec:
-  type: LoadBalancer
-  selector:
-    app: web-app
-  ports:
-  - port: 80
-    targetPort: 3000
-\`\`\`
-
-Apply both with: \`kubectl apply -f app.yaml\``}
-    />
-  </ThemeProvider>
-);
-
-/** Real agent response: crash diagnosis in dark theme. */
+/** Same crash diagnosis in dark theme. */
 export const RealWorldCrashDiagnosisDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer
-      content={`Your pod \`web-app-6f8b9c4d7-x2k9p\` is in a **CrashLoopBackOff** state. Here is what I found:
-
-## Root Cause
-
-The container is failing because it cannot connect to the database. The logs show:
-
-\`\`\`
-Error: connect ECONNREFUSED 10.0.0.5:5432
-    at TCPConnectWrap.afterConnect [as oncomplete]
-\`\`\`
-
-## Recommended Steps
-
-1. Check if the database pod is running: \`kubectl get pods -l app=postgres\`
-2. Verify the service endpoint: \`kubectl get endpoints postgres-svc\`
-3. Check network policies that might block traffic between namespaces
-
-> **Note**: The pod has restarted 15 times in the last hour.`}
-    />
+    <ContentRenderer content={extractAIAnswer(rawCrashDiagnosis)} />
   </ThemeProvider>
+);
+
+const rawBestPractices = [
+  '\x1b[?2004hroot@aks-agent-abc1234def-x9y8z:/app#',
+  "python /app/aks-agent.py ask 'IMPORTANT INSTRUCTIONS:",
+  '\x1b[?2004l',
+  '\x1b[?2004h>',
+  '- When returning any YAML content, always wrap it inside a markdown code block using ```yaml ... ``` so it renders properly.',
+  '\x1b[?2004l',
+  '\x1b[?2004h>',
+  '- The conversation history below shows all previously asked questions and your answers.',
+  '\x1b[?2004l',
+  '\x1b[?2004h>',
+  'Now answer the following new question:',
+  '\x1b[?2004l',
+  '\x1b[?2004h>',
+  "what best practices should I follow for AKS?'",
+  '\x1b[?2004l',
+  "Loaded models: ['gpt-4']",
+  'AI: Here are the key best practices for AKS:',
+  '',
+  '- **Use managed identities** instead of service principals for authentication',
+  '- **Enable Azure Policy** to enforce organizational standards',
+  '- **Configure autoscaling** for both cluster and pods:',
+  '  - Cluster Autoscaler for node pools',
+  '  - Horizontal Pod Autoscaler (HPA) for workloads',
+  '- **Use Azure CNI** networking for better integration with VNets',
+  '- **Enable monitoring** with Container Insights and Prometheus',
+  '- **Implement network policies** to control pod-to-pod traffic',
+  '- **Use node pools** to separate system and user workloads',
+  '',
+  'For more details, see the [AKS best practices documentation](https://learn.microsoft.com/en-us/azure/aks/best-practices).',
+  'root@aks-agent-abc1234def-x9y8z:/app#',
+].join('\n');
+
+/** Raw exec output → parsed: bullet list with conversation history echo stripped. */
+export const RealWorldBestPractices: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer content={extractAIAnswer(rawBestPractices)} />
+);
+
+const rawMultiResource = [
+  '\x1b[?2004hroot@aks-agent-abc1234def-x9y8z:/app#',
+  "python /app/aks-agent.py ask 'create a complete app with deployment and service'",
+  '\x1b[?2004l',
+  "Loaded models: ['gpt-4']",
+  '| t1 | Create resources | [✓] completed |',
+  'AI: Here is a complete application setup with a Deployment and Service:',
+  '',
+  '### Deployment',
+  '',
+  '```yaml',
+  'apiVersion: apps/v1',
+  'kind: Deployment',
+  'metadata:',
+  '  name: web-app',
+  '  labels:',
+  '    app: web-app',
+  'spec:',
+  '  replicas: 2',
+  '  selector:',
+  '    matchLabels:',
+  '      app: web-app',
+  '  template:',
+  '    metadata:',
+  '      labels:',
+  '        app: web-app',
+  '    spec:',
+  '      containers:',
+  '      - name: web',
+  '        image: myregistry.azurecr.io/web-app:latest',
+  '        ports:',
+  '        - containerPort: 3000',
+  '        resources:',
+  '          requests:',
+  '            cpu: 100m',
+  '            memory: 128Mi',
+  '          limits:',
+  '            cpu: 250m',
+  '            memory: 256Mi',
+  '```',
+  '',
+  '### Service',
+  '',
+  '```yaml',
+  'apiVersion: v1',
+  'kind: Service',
+  'metadata:',
+  '  name: web-app-svc',
+  'spec:',
+  '  type: LoadBalancer',
+  '  selector:',
+  '    app: web-app',
+  '  ports:',
+  '  - port: 80',
+  '    targetPort: 3000',
+  '```',
+  '',
+  'Apply both with: `kubectl apply -f app.yaml`',
+  'root@aks-agent-abc1234def-x9y8z:/app#',
+].join('\n');
+
+/** Raw exec output → parsed: multiple YAML resources with headings. */
+export const RealWorldMultiResource: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer content={extractAIAnswer(rawMultiResource)} />
+);
+
+/** Same multi-resource in dark theme. */
+export const RealWorldMultiResourceDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer content={extractAIAnswer(rawMultiResource)} />
+  </ThemeProvider>
+);
+
+const rawBareYamlService = [
+  '\x1b[?2004hroot@aks-agent-abc1234def-x9y8z:/app#',
+  "python /app/aks-agent.py ask 'create a service'",
+  '\x1b[?2004l',
+  "\x1b[1mLoaded models:\x1b[0m [\x1b[32m'gpt-4'\x1b[0m]",
+  '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+  '┃ Task List                       ┃',
+  '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛',
+  '| t1 | Create service | [✓] completed |',
+  '\x1b[1mAI:\x1b[0m Here is a Service:',
+  '',
+  'apiVersion: v1',
+  'kind: Service',
+  'metadata:',
+  '  name: my-service',
+  '  namespace: default',
+  'spec:',
+  '  type: LoadBalancer',
+  '  selector:',
+  '    app: nginx',
+  '  ports:',
+  '  - protocol: TCP',
+  '    port: 80',
+  '    targetPort: 8080',
+  '',
+  'This Service exposes your application on port 80.',
+  'root@aks-agent-abc1234def-x9y8z:/app#',
+].join('\n');
+
+/** Raw exec output → parsed: bare YAML (no code fences) auto-wrapped by parser. */
+export const RealWorldBareYamlService: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer content={extractAIAnswer(rawBareYamlService)} />
 );

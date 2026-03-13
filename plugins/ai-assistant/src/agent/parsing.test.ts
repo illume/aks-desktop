@@ -2266,6 +2266,14 @@ describe('parser edge cases', () => {
       expect(isAgentNoiseLine('+--+-+')).toBe(true);
     });
 
+    it('preserves GFM markdown table separator rows', () => {
+      // GFM table separators use |---|---| (no + characters) and must be preserved
+      // for markdown tables to render correctly
+      expect(isAgentNoiseLine('|----------|--------|----------|')).toBe(false);
+      expect(isAgentNoiseLine('| --- | --- | --- |')).toBe(false);
+      expect(isAgentNoiseLine('|:---|:---:|---:|')).toBe(false);
+    });
+
     it('detects task table data rows with various statuses', () => {
       expect(isAgentNoiseLine('| t1 | Check status | [✓] completed |')).toBe(true);
       expect(isAgentNoiseLine('| t2 | Fix issue   | [~] in_progress |')).toBe(true);
@@ -2307,6 +2315,8 @@ describe('real-world agent responses', () => {
       expect(result).toContain('kube-system');
       expect(result).toContain('coredns-7c6bf4f');
       expect(result).toContain('All pods are healthy.');
+      // GFM table separator must be preserved for markdown table rendering
+      expect(result).toContain('|----------|--------|----------|');
       expect(result).not.toContain('root@aks-agent');
       expect(result).not.toContain('Task List');
       expect(result).not.toContain('[?2004');
