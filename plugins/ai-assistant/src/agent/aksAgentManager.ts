@@ -311,7 +311,7 @@ function stripAnsi(text: string): string {
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
-    .replace(/\s?\[\d{0,3}(;\d{1,3})*$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m")
+    .replace(/\s?\[\d{1,3}(;\d{1,3})*$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m")
     .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, ''); // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
 }
 
@@ -1333,7 +1333,7 @@ function isFileHeaderComment(trimmed: string): boolean {
  */
 function isBoldFileHeading(trimmed: string): boolean {
   // filename.ext  or  path/to/file.ext  (standalone on a line, no other words)
-  if (/^(\S+\/)*\S+\.\w+$/.test(trimmed)) {
+  if (/^([\w.-]+\/)*[\w.-]+\.\w+$/.test(trimmed)) {
     // Exclude YAML file headings
     if (/\.ya?ml$/i.test(trimmed)) return false;
     return true;
