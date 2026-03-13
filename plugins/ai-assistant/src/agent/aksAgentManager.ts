@@ -1674,40 +1674,32 @@ function normalizeTerminalMarkdown(text: string): string {
           // Peek ahead: if next non-blank line isn't code-like, stop here
           let peekIdx = j + 1;
           while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+
+          const trimTrailingBlanks = () => {
+            while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
+              blockLines.pop();
+            }
+          };
+
           if (peekIdx < lines.length) {
             const peekTrimmed = lines[peekIdx].trim();
             // Break at file-type boundaries: a blank line followed by a
             // "file header" comment (e.g. "# Cargo.toml", "// src/main.rs")
-            // signals a transition to different file content — the code
-            // block should end here and a new one will start for the next
-            // section.
-            if (isFileHeaderComment(peekTrimmed)) {
-              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
-                blockLines.pop();
-              }
-              break;
-            }
-            // For file-header blocks (e.g. started by "# Cargo.toml"):
-            // a blank line always terminates the block, since config/source
-            // file content within terminal output doesn't span blank lines.
-            if (startedByFileHeader) {
-              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
-                blockLines.pop();
-              }
-              break;
-            }
-            if (!looksLikeShellOrDockerCodeLine(peekTrimmed)) {
-              // Trim trailing blank lines already in blockLines
-              while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
-                blockLines.pop();
-              }
+            // signals a transition to different file content.
+            // Also break for file-header blocks (started by e.g. "# Cargo.toml"):
+            // config/source file content within terminal output doesn't
+            // span blank lines.
+            // Also break when peek line doesn't look like code.
+            if (
+              isFileHeaderComment(peekTrimmed) ||
+              startedByFileHeader ||
+              !looksLikeShellOrDockerCodeLine(peekTrimmed)
+            ) {
+              trimTrailingBlanks();
               break;
             }
           } else if (startedByFileHeader) {
-            // End of input — break
-            while (blockLines.length > 0 && blockLines[blockLines.length - 1].trim() === '') {
-              blockLines.pop();
-            }
+            trimTrailingBlanks();
             break;
           }
           blockLines.push(blockLine);
