@@ -35,6 +35,7 @@ export default meta;
 /** Simple markdown text with headings and paragraphs. */
 export const MarkdownText: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`# Cluster Overview
 
 Your AKS cluster is running **3 nodes** in the \`eastus\` region.
@@ -54,6 +55,7 @@ The default node pool uses \`Standard_DS2_v2\` instances.
 /** Code blocks in both inline and block styles. */
 export const CodeBlocks: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`To check your cluster status, run \`kubectl get nodes\` in your terminal.
 
 Here's a more detailed command:
@@ -75,6 +77,7 @@ CoreDNS is running at https://myaks-dns-12345678.hcp.eastus.azmk8s.io:443/api/v1
 /** Table content with GFM tables. */
 export const TableContent: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`## Pod Status
 
 | Pod Name | Status | Restarts | Age |
@@ -92,6 +95,7 @@ export const TableContent: StoryFn<typeof ContentRenderer> = () => (
 /** Blockquote and mixed content. */
 export const BlockquoteContent: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`## Important Notes
 
 > **Warning**: The cluster is running low on memory. Consider scaling up your node pool or optimizing resource requests.
@@ -109,6 +113,7 @@ These values exceed the recommended threshold of 80%.`}
 /** Error JSON response. */
 export const ErrorResponse: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={JSON.stringify({
       error: true,
       content:
@@ -120,6 +125,7 @@ export const ErrorResponse: StoryFn<typeof ContentRenderer> = () => (
 /** Success JSON response. */
 export const SuccessResponse: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={JSON.stringify({
       success: true,
       content: 'Successfully scaled deployment api-server to 5 replicas.',
@@ -130,6 +136,7 @@ export const SuccessResponse: StoryFn<typeof ContentRenderer> = () => (
 /** Links to Kubernetes resources. */
 export const LinksContent: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`Check out the [Kubernetes documentation](https://kubernetes.io/docs/) for more details.
 
 You can also review your [AKS best practices](https://learn.microsoft.com/en-us/azure/aks/best-practices) guide.`}
@@ -139,6 +146,7 @@ You can also review your [AKS best practices](https://learn.microsoft.com/en-us/
 /** Mixed content with multiple element types. */
 export const MixedContent: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`# Troubleshooting Guide
 
 Your pod \`frontend-xyz98\` is in a **CrashLoopBackOff** state. Here's what to check:
@@ -176,6 +184,7 @@ export const CodeBlocksDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
     <ContentRenderer
+      onYamlDetected={noopYamlDetected}
       content={`To check your cluster status, run \`kubectl get nodes\` in your terminal.
 
 Here's a more detailed command:
@@ -200,6 +209,7 @@ export const MixedContentDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
     <ContentRenderer
+      onYamlDetected={noopYamlDetected}
       content={`# Dark Theme Contrast Check
 
 Your pod \`frontend-xyz98\` is in a **CrashLoopBackOff** state.
@@ -228,6 +238,7 @@ export const AlertsDark: StoryFn<typeof ContentRenderer> = () => (
     <CssBaseline />
     <div>
       <ContentRenderer
+        onYamlDetected={noopYamlDetected}
         content={JSON.stringify({
           error: true,
           content: 'Failed to connect to the Kubernetes API server.',
@@ -235,6 +246,7 @@ export const AlertsDark: StoryFn<typeof ContentRenderer> = () => (
       />
       <br />
       <ContentRenderer
+        onYamlDetected={noopYamlDetected}
         content={JSON.stringify({ success: true, content: 'Successfully scaled deployment.' })}
       />
     </div>
@@ -244,29 +256,30 @@ export const AlertsDark: StoryFn<typeof ContentRenderer> = () => (
 // ── Edge cases ───────────────────────────────────────────────────────────────
 
 /** Empty string content - should not crash. */
-export const EmptyContent: StoryFn<typeof ContentRenderer> = () => <ContentRenderer content="" />;
+export const EmptyContent: StoryFn<typeof ContentRenderer> = () => <ContentRenderer onYamlDetected={noopYamlDetected} content="" />;
 
 /** Plain text with no markdown formatting. */
 export const PlainText: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content="This is just plain text with no formatting at all. No bold, no code, no links." />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content="This is just plain text with no formatting at all. No bold, no code, no links." />
 );
 
 /** Content with only inline code - many backtick segments. */
 export const InlineCodeOnly: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content="Run `kubectl get pods`, then `kubectl describe pod my-pod`, check `kubectl logs my-pod -f`, and use `kubectl exec -it my-pod -- /bin/bash` to debug." />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content="Run `kubectl get pods`, then `kubectl describe pod my-pod`, check `kubectl logs my-pod -f`, and use `kubectl exec -it my-pod -- /bin/bash` to debug." />
 );
 
 /** Inline code in dark theme - verify inline backtick contrast. */
 export const InlineCodeOnlyDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer content="Run `kubectl get pods`, then `kubectl describe pod my-pod`, check `kubectl logs my-pod -f`, and use `kubectl exec -it my-pod -- /bin/bash` to debug." />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content="Run `kubectl get pods`, then `kubectl describe pod my-pod`, check `kubectl logs my-pod -f`, and use `kubectl exec -it my-pod -- /bin/bash` to debug." />
   </ThemeProvider>
 );
 
 /** YAML code block (Kubernetes resource). */
 export const YamlCodeBlock: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`Here's a sample deployment:
 
 \`\`\`yaml
@@ -300,6 +313,7 @@ export const YamlCodeBlockDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
     <ContentRenderer
+      onYamlDetected={noopYamlDetected}
       content={`Here's a sample deployment:
 
 \`\`\`yaml
@@ -332,6 +346,7 @@ spec:
 /** Deeply nested markdown - headings, lists, bold, inline code together. */
 export const DeeplyNestedContent: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`# Level 1
 
 ## Level 2
@@ -355,6 +370,7 @@ export const DeeplyNestedContent: StoryFn<typeof ContentRenderer> = () => (
 /** Very long unbroken strings and URLs. */
 export const LongUnbrokenStrings: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`The error log contains the following message:
 
 \`\`\`
@@ -368,6 +384,7 @@ Check https://learn.microsoft.com/en-us/azure/aks/troubleshooting-common-issues-
 /** Multiple sequential code blocks of different languages. */
 export const MultipleCodeBlocks: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
+    onYamlDetected={noopYamlDetected}
     content={`First, check with bash:
 
 \`\`\`bash
@@ -411,6 +428,7 @@ export const MultipleCodeBlocksDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
     <ContentRenderer
+      onYamlDetected={noopYamlDetected}
       content={`Check with bash:
 
 \`\`\`bash
@@ -527,7 +545,7 @@ const rawPodStatus = [
 
 /** Raw exec output → parsed: pod status table with markdown formatting. */
 export const RealWorldPodStatus: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawPodStatus)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawPodStatus)} />
 );
 
 const rawCrashDiagnosis = [
@@ -562,14 +580,14 @@ const rawCrashDiagnosis = [
 
 /** Raw exec output → parsed: diagnostic info with headings, code blocks, lists. */
 export const RealWorldCrashDiagnosis: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawCrashDiagnosis)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawCrashDiagnosis)} />
 );
 
 /** Same crash diagnosis in dark theme. */
 export const RealWorldCrashDiagnosisDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer content={extractAIAnswer(rawCrashDiagnosis)} />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawCrashDiagnosis)} />
   </ThemeProvider>
 );
 
@@ -608,7 +626,7 @@ const rawBestPractices = [
 
 /** Raw exec output → parsed: bullet list with conversation history echo stripped. */
 export const RealWorldBestPractices: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawBestPractices)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawBestPractices)} />
 );
 
 const rawMultiResource = [
@@ -674,14 +692,14 @@ const rawMultiResource = [
 
 /** Raw exec output → parsed: multiple YAML resources with headings. */
 export const RealWorldMultiResource: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawMultiResource)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawMultiResource)} />
 );
 
 /** Same multi-resource in dark theme. */
 export const RealWorldMultiResourceDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer content={extractAIAnswer(rawMultiResource)} />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawMultiResource)} />
   </ThemeProvider>
 );
 
@@ -716,7 +734,7 @@ const rawBareYamlService = [
 
 /** Raw exec output → parsed: bare YAML (no code fences) auto-wrapped by parser. */
 export const RealWorldBareYamlService: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawBareYamlService)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawBareYamlService)} />
 );
 
 const rawPythonDeploymentAdvice = [
@@ -812,7 +830,7 @@ const rawPythonDeploymentAdvice = [
 
 /** Raw exec output → parsed: terminal-formatted guidance normalized into markdown lists and code blocks. */
 export const RealWorldPythonDeploymentAdvice: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawPythonDeploymentAdvice)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawPythonDeploymentAdvice)} />
 );
 
 // Real-world Java deployment response with Rich terminal-formatted Dockerfile
@@ -928,12 +946,12 @@ const rawJavaDeployTerminal = [
 ].join('\r\n');
 
 export const RealWorldJavaDeployTerminal: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawJavaDeployTerminal)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawJavaDeployTerminal)} />
 );
 
 export const RealWorldJavaDeployTerminalDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
-    <ContentRenderer content={extractAIAnswer(rawJavaDeployTerminal)} />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawJavaDeployTerminal)} />
   </ThemeProvider>
 );
 
@@ -1064,12 +1082,12 @@ const rawJavaDeployOptionAB = [
 ].join('\r\n');
 
 export const RealWorldJavaDeployOptionAB: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawJavaDeployOptionAB)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawJavaDeployOptionAB)} />
 );
 
 export const RealWorldJavaDeployOptionABDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
-    <ContentRenderer content={extractAIAnswer(rawJavaDeployOptionAB)} />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawJavaDeployOptionAB)} />
   </ThemeProvider>
 );
 
@@ -1144,13 +1162,13 @@ const rawK8sDeployWithCurl = [
 ].join('\r\n');
 
 export const RealWorldK8sDeployWithCurl: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawK8sDeployWithCurl)} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawK8sDeployWithCurl)} />
 );
 
 export const RealWorldK8sDeployWithCurlDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer content={extractAIAnswer(rawK8sDeployWithCurl)} />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawK8sDeployWithCurl)} />
   </ThemeProvider>
 );
 
@@ -1213,12 +1231,12 @@ const rawMicroserviceYaml = [
 ].join('\r\n');
 
 export const RealWorldMicroserviceYaml: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawMicroserviceYaml)} onYamlDetected={noopYamlDetected} />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawMicroserviceYaml)} />
 );
 
 export const RealWorldMicroserviceYamlDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer content={extractAIAnswer(rawMicroserviceYaml)} onYamlDetected={noopYamlDetected} />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawMicroserviceYaml)} />
   </ThemeProvider>
 );
