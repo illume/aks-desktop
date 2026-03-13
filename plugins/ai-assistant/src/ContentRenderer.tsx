@@ -327,6 +327,19 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           typeof children === 'string' &&
           (className === 'language-json' || isJsonKubernetesResource(children));
 
+        debugLog(
+          '[ContentRenderer] CodeComponent: className:',
+          className,
+          'inline:',
+          props.inline,
+          'isYamlBlock:',
+          isYamlBlock,
+          'isJsonK8s:',
+          isJsonKubernetesBlock,
+          'content length:',
+          typeof children === 'string' ? children.length : 'N/A'
+        );
+
         if (isYamlBlock && onYamlDetected && typeof children === 'string') {
           const parsed = parseKubernetesYAML(children);
           if (parsed.isValid) {
@@ -462,6 +475,11 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
         // Split content by YAML document separators or detect YAML blocks
         const yamlSeparatorRegex = /^---+$/gm;
         const parts = content.split(yamlSeparatorRegex);
+        debugLog(
+          '[ContentRenderer] processUnformattedYaml: split into',
+          parts.length,
+          'parts by --- separators'
+        );
 
         parts.forEach((part, index) => {
           const trimmedPart = part.trim();
@@ -469,6 +487,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
 
           // Check if this part is a JSON Kubernetes resource
           if (isJsonKubernetesResource(trimmedPart)) {
+            debugLog('[ContentRenderer] processUnformattedYaml: part', index, 'is JSON K8s resource');
             const yamlContent = convertJsonToYaml(trimmedPart);
             const parsed = parseKubernetesYAML(yamlContent);
             if (parsed.isValid) {
@@ -493,6 +512,14 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           if (isYamlPart) {
             // Try to parse as Kubernetes YAML
             const parsed = parseKubernetesYAML(trimmedPart);
+            debugLog(
+              '[ContentRenderer] processUnformattedYaml: part',
+              index,
+              'is YAML, valid:',
+              parsed.isValid,
+              'type:',
+              parsed.resourceType
+            );
             if (parsed.isValid) {
               sections.push(
                 <YamlDisplay
@@ -504,6 +531,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
               );
             } else {
               // Not valid YAML, display as code
+              debugLog('[ContentRenderer] processUnformattedYaml: part', index, 'invalid YAML, rendering as code block');
               sections.push(
                 <Box
                   component="pre"
@@ -524,6 +552,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
             }
           } else {
             // Regular text content - use ReactMarkdown with simplified components
+            debugLog('[ContentRenderer] processUnformattedYaml: part', index, 'is regular text, rendering as markdown');
             sections.push(
               <ReactMarkdown
                 key={`text-${index}-${sectionIndex++}`}
@@ -546,6 +575,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           }
         });
 
+        debugLog('[ContentRenderer] processUnformattedYaml: rendered', sections.length, 'sections');
         return <Box>{sections}</Box>;
       },
       [onYamlDetected, LinkComponent, CodeComponent]

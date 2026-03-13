@@ -317,7 +317,11 @@ function stripAnsi(text: string): string {
  * Preserves any leading indentation so nested lists render correctly.
  */
 function normalizeBullets(text: string): string {
-  return text.replace(/^(\s*)[•·▪▸–]\s+/gm, '$1- ');
+  const result = text.replace(/^(\s*)[•·▪▸–]\s+/gm, '$1- ');
+  if (result !== text) {
+    debugLog('[AKS Agent Parse] normalizeBullets: converted Unicode bullets to markdown dashes');
+  }
+  return result;
 }
 
 /**
@@ -376,6 +380,7 @@ function wrapBareYamlBlocks(text: string): string {
 
     // Detect start of a bare YAML block: apiVersion: (with optional value)
     if (/^\s*apiVersion:\s*/.test(line)) {
+      debugLog('[AKS Agent Parse] wrapBareYamlBlocks: detected bare apiVersion: at line', i, ':', line.trim());
       const yamlLines: string[] = [];
       let j = i;
       let consecutiveBlanks = 0;
@@ -610,13 +615,23 @@ function stripAgentNoise(lines: string[]): string[] {
  */
 function stripCommandEcho(lines: string[]): string[] {
   const cmdIdx = lines.findIndex(l => /python\s+\/app\/aks-agent\.py/.test(l));
-  if (cmdIdx < 0) return lines;
+  if (cmdIdx < 0) {
+    debugLog('[AKS Agent Parse] stripCommandEcho: no python command line found, returning all lines');
+    return lines;
+  }
 
   // Skip the command line and all subsequent bash continuation prompt lines
   let end = cmdIdx + 1;
   while (end < lines.length && /^\s*>/.test(lines[end])) {
     end++;
   }
+  debugLog(
+    '[AKS Agent Parse] stripCommandEcho: found command at line',
+    cmdIdx,
+    '— stripping',
+    end - cmdIdx,
+    'lines (command + continuation prompts)'
+  );
 
   return [...lines.slice(0, cmdIdx), ...lines.slice(end)];
 }
@@ -637,13 +652,23 @@ function extractAIAnswer(rawOutput: string): string {
     .map(l => stripAnsi(l).trimEnd())
     .join('\n');
 
-  debugLog('[AKS Agent Parse] extractAIAnswer: normalised line count:', normalised.length);
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: normalised line count:',
+    normalised.split('\n').length,
+    'char count:',
+    normalised.length
+  );
 
   // Strip the echoed command block before parsing — when tty echo is on,
   // the entire multi-line command (including conversation history) is echoed
   // back through stdout as the python invocation line followed by bash
   // continuation prompt lines ("> ...").
   const lines = stripCommandEcho(normalised.split('\n'));
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: after stripCommandEcho:',
+    lines.length,
+    'lines remaining'
+  );
 
   // Locate the "AI:" line — it may be alone or have content after the colon
   const aiLineIdx = lines.findIndex(l => /^AI:\s*$/.test(l.trim()) || /^AI:\s+\S/.test(l));
@@ -685,6 +710,7 @@ function extractAIAnswer(rawOutput: string): string {
   );
 
   // Drop trailing blank lines and bash-prompt line(s).
+  const beforeTrim = contentLines.length;
   while (contentLines.length > 0) {
     const last = contentLines[contentLines.length - 1].trim();
     if (last === '' || /^root@/.test(last)) {
@@ -698,6 +724,12 @@ function extractAIAnswer(rawOutput: string): string {
   while (contentLines.length > 0 && contentLines[0].trim() === '') {
     contentLines.shift();
   }
+  debugLog(
+    '[AKS Agent Parse] extractAIAnswer: trimmed',
+    beforeTrim - contentLines.length,
+    'leading/trailing blank/prompt lines, remaining:',
+    contentLines.length
+  );
 
   const joined = contentLines.join('\n').trim();
   debugLog('[AKS Agent Parse] extractAIAnswer: after trim, content length:', joined.length);
@@ -1323,11 +1355,17 @@ class AgentSession {
     // Detect the returning bash prompt — the command has finished.
     // Only close once we've already seen "AI:" in the output.
     const plainText = stripAnsi(text);
-    if (
-      this.commandSent &&
-      this.output.includes('AI:') &&
-      /root@[^:]+:[^#]*#\s*$/.test(plainText.trim())
-    ) {
+    const hasAiMarker = this.output.includes('AI:');
+    const hasPrompt = /root@[^:]+:[^#]*#\s*$/.test(plainText.trim());
+    debugLog(
+      '[AKS Agent Data] handleStdout: completion check — commandSent:',
+      this.commandSent,
+      'hasAiMarker:',
+      hasAiMarker,
+      'hasPrompt:',
+      hasPrompt
+    );
+    if (this.commandSent && hasAiMarker && hasPrompt) {
       console.log('[AKS Agent] Bash prompt detected after AI answer — question complete.');
       debugLog('[AKS Agent Data] handleStdout: total output length:', this.output.length);
       this.resolveCurrentQuestion(this.output);
@@ -1338,6 +1376,7 @@ class AgentSession {
     if (this.questionResolved || !this.pendingResolve) return;
     this.resetIdleTimer();
     this.errorOutput += text;
+    debugLog('[AKS Agent Data] handleStderr: stderr chunk length:', text.length, 'text:', text);
     console.warn(`[AKS Agent] exec stderr: ${text}`);
   }
 
@@ -1357,6 +1396,14 @@ class AgentSession {
   private handleConnectionFailure(): void {
     this._alive = false;
     this.clearTimers();
+    debugLog(
+      '[AKS Agent Session] handleConnectionFailure: stdout length:',
+      this.output.length,
+      'stderr length:',
+      this.errorOutput.length,
+      'questionResolved:',
+      this.questionResolved
+    );
     console.warn(
       `[AKS Agent] WebSocket closed. stdout: ${this.output.length}, stderr: ${this.errorOutput.length}`
     );
@@ -1391,6 +1438,14 @@ class AgentSession {
   private resolveCurrentQuestion(result: string): void {
     this.clearTimers();
     this.questionResolved = true;
+    debugLog(
+      '[AKS Agent Session] resolveCurrentQuestion: output length:',
+      result.length,
+      'has AI: marker:',
+      result.includes('AI:'),
+      'output:',
+      result
+    );
     const resolve = this.pendingResolve;
     this.pendingResolve = null;
     this.pendingReject = null;
