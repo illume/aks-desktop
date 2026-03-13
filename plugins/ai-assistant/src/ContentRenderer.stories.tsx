@@ -1316,10 +1316,7 @@ export const RealWorldMicroservicesPythonYamlDark: StoryFn<typeof ContentRendere
 // ─── Python Flask app with __name__ dunder pattern ───────────────────────────
 
 export const RealWorldPythonFlaskApp: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    onYamlDetected={noopYamlDetected}
-    content={extractAIAnswer(rawPythonFlaskApp)}
-  />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawPythonFlaskApp)} />
 );
 
 export const RealWorldPythonFlaskAppDark: StoryFn<typeof ContentRenderer> = () => (
@@ -1335,18 +1332,12 @@ export const RealWorldPythonFlaskAppDark: StoryFn<typeof ContentRenderer> = () =
 // ─── Rust Axum app with method chains and {-blocks ───────────────────────────
 
 export const RealWorldRustAxumApp: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    onYamlDetected={noopYamlDetected}
-    content={extractAIAnswer(rawRustAxumApp)}
-  />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawRustAxumApp)} />
 );
 
 export const RealWorldRustAxumAppDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer
-      onYamlDetected={noopYamlDetected}
-      content={extractAIAnswer(rawRustAxumApp)}
-    />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(rawRustAxumApp)} />
   </ThemeProvider>
 );

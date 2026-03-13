@@ -5160,7 +5160,9 @@ describe('extractAIAnswer — real-world microservice YAML with Rich terminal fo
 describe('looksLikeShellOrDockerCodeLine — Python patterns', () => {
   it('detects Python from-import statements', () => {
     expect(looksLikeShellOrDockerCodeLine('from flask import Flask, jsonify')).toBe(true);
-    expect(looksLikeShellOrDockerCodeLine('from http.server import BaseHTTPRequestHandler, HTTPServer')).toBe(true);
+    expect(
+      looksLikeShellOrDockerCodeLine('from http.server import BaseHTTPRequestHandler, HTTPServer')
+    ).toBe(true);
     expect(looksLikeShellOrDockerCodeLine('from os.path import join')).toBe(true);
   });
 
@@ -5202,7 +5204,7 @@ describe('looksLikeShellOrDockerCodeLine — Python patterns', () => {
 
   it('detects Rust fn definition', () => {
     expect(looksLikeShellOrDockerCodeLine('fn main() {')).toBe(true);
-    expect(looksLikeShellOrDockerCodeLine('async fn root() -> &\'static str {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine("async fn root() -> &'static str {")).toBe(true);
     expect(looksLikeShellOrDockerCodeLine('pub fn new() -> Self {')).toBe(true);
     expect(looksLikeShellOrDockerCodeLine('pub async fn handle() {')).toBe(true);
   });
@@ -5271,6 +5273,12 @@ describe('stripAnsi — orphaned ANSI code continuations', () => {
   it('preserves normal text that starts with digits', () => {
     expect(stripAnsi('3 pods running')).toBe('3 pods running');
     expect(stripAnsi('200 OK')).toBe('200 OK');
+  });
+
+  it('preserves K8s CPU millicores like 200m at line start', () => {
+    expect(stripAnsi('200m')).toBe('200m');
+    expect(stripAnsi('200m cpu-limit')).toBe('200m cpu-limit');
+    expect(stripAnsi('500m memory')).toBe('500m memory');
   });
 });
 
@@ -5427,7 +5435,10 @@ describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)'
     const lines = result.split('\n');
     let inFence = false;
     const braceOutsideFence = lines.filter(l => {
-      if (/^```/.test(l.trim())) { inFence = !inFence; return false; }
+      if (/^```/.test(l.trim())) {
+        inFence = !inFence;
+        return false;
+      }
       return !inFence && l.trim() === '}';
     });
     expect(braceOutsideFence.length).toBe(0);

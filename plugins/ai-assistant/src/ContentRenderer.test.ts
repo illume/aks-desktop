@@ -37,6 +37,7 @@ vi.mock('./utils/SampleYamlLibrary', () => ({
 import {
   convertJsonToYaml,
   isJsonKubernetesResource,
+  looksLikeYamlContent,
   parseJsonContent,
   parseLogsButtonData,
 } from './ContentRenderer';
@@ -410,5 +411,53 @@ describe('malformed AI output handling', () => {
     it('returns original for boolean JSON string', () => {
       expect(convertJsonToYaml('true')).toBe('true');
     });
+  });
+});
+
+describe('looksLikeYamlContent', () => {
+  it('detects key: value pairs', () => {
+    expect(looksLikeYamlContent('name: my-app\nversion: v1')).toBe(true);
+  });
+
+  it('detects key: without value (e.g. metadata:, spec:)', () => {
+    expect(looksLikeYamlContent('metadata:\n  name: x')).toBe(true);
+  });
+
+  it('detects indented key: value pairs', () => {
+    expect(looksLikeYamlContent('spec:\n  replicas: 3\n  selector:\n    app: test')).toBe(true);
+  });
+
+  it('detects list items', () => {
+    expect(looksLikeYamlContent('- name: container1\n- name: container2')).toBe(true);
+  });
+
+  it('detects indented list items', () => {
+    expect(looksLikeYamlContent('containers:\n  - name: app\n  - name: sidecar')).toBe(true);
+  });
+
+  it('returns false for single-line input', () => {
+    expect(looksLikeYamlContent('just one line')).toBe(false);
+  });
+
+  it('returns false for plain prose', () => {
+    expect(looksLikeYamlContent('This is a sentence.\nAnother sentence here.')).toBe(false);
+  });
+
+  it('handles mixed content at threshold boundary', () => {
+    // 2 YAML-like out of 4 = 0.5 ratio, should return true (>= 0.5)
+    expect(looksLikeYamlContent('name: test\nsome text\nversion: v1\nmore text')).toBe(true);
+  });
+
+  it('returns false when below threshold', () => {
+    // 1 YAML-like out of 3 = 0.33 ratio, should return false
+    expect(looksLikeYamlContent('name: test\nsome text\nmore text')).toBe(false);
+  });
+
+  it('handles dotted keys like helm values', () => {
+    expect(looksLikeYamlContent('global.image: nginx\nservice.port: 80')).toBe(true);
+  });
+
+  it('returns false for empty input', () => {
+    expect(looksLikeYamlContent('')).toBe(false);
   });
 });

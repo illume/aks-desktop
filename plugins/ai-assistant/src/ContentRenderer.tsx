@@ -113,25 +113,25 @@ const parseLogsButtonData = (content: string, logsButtonIndex: number): ParseRes
  * list items) even without Kubernetes-specific keywords.
  * Used to catch orphaned YAML parts from --- splitting.
  */
-const looksLikeYamlContent = (text: string): boolean => {
+export const looksLikeYamlContent = (text: string): boolean => {
   const lines = text.split('\n').filter(l => l.trim() !== '');
   if (lines.length < 2) return false;
 
   let yamlLikeLines = 0;
   for (const line of lines) {
     const trimmed = line.trim();
-    // key: value pair
-    if (/^\w[\w./-]*:\s/.test(trimmed)) yamlLikeLines++;
+    // key: value pair  OR  key: (no value, e.g. metadata:, spec:)
+    if (/^\w[\w./-]*:\s/.test(trimmed) || /^\w[\w./-]*:\s*$/.test(trimmed)) yamlLikeLines++;
     // list item: - something
     else if (/^-\s/.test(trimmed)) yamlLikeLines++;
-    // indented key: value
-    else if (/^\s+\w[\w./-]*:\s/.test(line)) yamlLikeLines++;
+    // indented key: value  OR  indented key: (no value)
+    else if (/^\s+\w[\w./-]*:(\s|$)/.test(line)) yamlLikeLines++;
     // indented list item
     else if (/^\s+-\s/.test(line)) yamlLikeLines++;
   }
 
-  // If more than half the lines look like YAML, treat it as YAML
-  return yamlLikeLines / lines.length > 0.5;
+  // If at least half the lines look like YAML, treat it as YAML
+  return yamlLikeLines / lines.length >= 0.5;
 };
 
 interface ContentRendererProps {

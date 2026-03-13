@@ -17,11 +17,6 @@ function commentLine(content: string): string {
   return termLine(content, '37;40');
 }
 
-/** Helper: YAML key line (red key, white colon/value) */
-function yamlKeyLine(content: string): string {
-  return termLine(content, '91;40');
-}
-
 /** Helper: Cyan-coloured code line (embedded Python in YAML) */
 function codeLine(content: string): string {
   return termLine(content, '96;40');
@@ -263,11 +258,11 @@ export const rawRustAxumApp = [
   commentLine('// src/main.rs'),
   termLine('use axum::{routing::get, Router};'),
   termLine(''),
-  termLine('async fn root() -> &\'static str {'),
+  termLine("async fn root() -> &'static str {"),
   termLine('    "hello from rust\\n"'),
   termLine('}'),
   termLine(''),
-  termLine('async fn healthz() -> &\'static str {'),
+  termLine("async fn healthz() -> &'static str {"),
   termLine('    "ok\\n"'),
   termLine('}'),
   termLine(''),

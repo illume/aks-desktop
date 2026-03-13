@@ -311,7 +311,7 @@ function stripAnsi(text: string): string {
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
-    .replace(/^[\d;]+m\s?/gm, ''); // Orphaned ANSI code continuations at line start (e.g. "0m " from "[4\n0m")
+    .replace(/^(?:\d{1,2}(?:;\d{1,3})*)m\s?/gm, ''); // Orphaned ANSI code continuations at line start (e.g. "0m" from "[4\n0m")
 }
 
 /**
@@ -1311,7 +1311,12 @@ function isFileHeaderComment(trimmed: string): boolean {
     return true;
   }
   // Well-known extensionless filenames
-  if (/^(#|\/\/)\s+(Dockerfile|Makefile|Vagrantfile|Gemfile|Rakefile|Procfile|Brewfile)\s*$/.test(trimmed)) return true;
+  if (
+    /^(#|\/\/)\s+(Dockerfile|Makefile|Vagrantfile|Gemfile|Rakefile|Procfile|Brewfile)\s*$/.test(
+      trimmed
+    )
+  )
+    return true;
   return false;
 }
 
@@ -1407,7 +1412,8 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // Rust use statement: use axum::{...}; — require :: (path separator) or ;
   // to distinguish from English prose like "use this command"
-  if (/^(pub\s+)?use\s+\w+/.test(trimmed) && (/::/.test(trimmed) || /;\s*$/.test(trimmed))) return true;
+  if (/^(pub\s+)?use\s+\w+/.test(trimmed) && (/::/.test(trimmed) || /;\s*$/.test(trimmed)))
+    return true;
 
   // Rust/Go function definition: fn main(), async fn root(), pub fn new()
   if (/^(pub\s+)?(async\s+)?fn\s+\w+/.test(trimmed)) return true;
@@ -1416,7 +1422,8 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^let\s+(mut\s+)?\w+\s*[:=]/.test(trimmed)) return true;
 
   // Rust/Go type definitions: struct, enum, trait, impl, mod, type
-  if (/^(pub(\s*\(\s*crate\s*\))?\s+)?(struct|enum|trait|impl|mod)\s+\w+/.test(trimmed)) return true;
+  if (/^(pub(\s*\(\s*crate\s*\))?\s+)?(struct|enum|trait|impl|mod)\s+\w+/.test(trimmed))
+    return true;
 
   // Rust attribute: #[derive(...)], #[tokio::main]
   if (/^#\[[\w:]+/.test(trimmed)) return true;
@@ -1424,7 +1431,13 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Method chain continuation: .route("/", ...), .await, .unwrap()
   // Require the dot to be followed by a typical method name pattern (word + paren
   // or .await / .unwrap style) — excludes prose like ". However, the API..."
-  if (/^\.\w+\(/.test(trimmed) || /^\.(await|unwrap|expect|then|catch|map|filter|and_then|or_else|into|collect|iter)\b/.test(trimmed)) return true;
+  if (
+    /^\.\w+\(/.test(trimmed) ||
+    /^\.(await|unwrap|expect|then|catch|map|filter|and_then|or_else|into|collect|iter)\b/.test(
+      trimmed
+    )
+  )
+    return true;
 
   // Lone closing brace (with optional semicolon): }  or };
   if (/^\}\s*;?\s*$/.test(trimmed)) return true;
@@ -1620,18 +1633,19 @@ function normalizeTerminalMarkdown(text: string): string {
       continue;
     }
 
-    if (/^\s+\S/.test(line) && (looksLikeShellOrDockerCodeLine(trimmed) || isFileHeaderComment(trimmed))) {
+    if (
+      /^\s+\S/.test(line) &&
+      (looksLikeShellOrDockerCodeLine(trimmed) || isFileHeaderComment(trimmed))
+    ) {
       // Don't wrap indented lines that are Python function/class/if bodies.
       // If the previous non-blank line is an unindented Python block opener
       // (e.g. "def index():", "if __name__:"), this line is part of its body
       // and should be left for wrapBareCodeBlocks to handle as one block.
       let prevNonBlankLine = '';
-      let prevNonBlankIdx = -1;
       for (let p = i - 1; p >= 0; p--) {
         const pt = lines[p].trim();
         if (pt !== '' && !/^```/.test(pt)) {
           prevNonBlankLine = lines[p];
-          prevNonBlankIdx = p;
           break;
         }
       }
@@ -1715,7 +1729,11 @@ function normalizeTerminalMarkdown(text: string): string {
         // Skip this check for file-header blocks since config/YAML files
         // commonly have deep indentation.
         const lineIndent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
-        if (!startedByFileHeader && lineIndent > baseIndent + 4 && !looksLikeShellOrDockerCodeLine(blockTrimmed)) {
+        if (
+          !startedByFileHeader &&
+          lineIndent > baseIndent + 4 &&
+          !looksLikeShellOrDockerCodeLine(blockTrimmed)
+        ) {
           break;
         }
 
@@ -1741,12 +1759,18 @@ function normalizeTerminalMarkdown(text: string): string {
         let prevContentTrimmed = '';
         for (let p = i - 1; p >= 0; p--) {
           const pt = lines[p].trim();
-          if (pt !== '' && !/^```/.test(pt)) { prevContentTrimmed = pt; break; }
+          if (pt !== '' && !/^```/.test(pt)) {
+            prevContentTrimmed = pt;
+            break;
+          }
         }
         let nextContentTrimmed = '';
         for (let n = j; n < lines.length; n++) {
           const nt = lines[n].trim();
-          if (nt !== '') { nextContentTrimmed = nt; break; }
+          if (nt !== '') {
+            nextContentTrimmed = nt;
+            break;
+          }
         }
         const prevIsYaml = prevContentTrimmed !== '' && looksLikeYaml(prevContentTrimmed);
         const nextIsYaml = nextContentTrimmed !== '' && looksLikeYaml(nextContentTrimmed);
@@ -1945,6 +1969,14 @@ function wrapBareYamlBlocks(text: string): string {
         const yt = yl.trim();
 
         if (yt === '') {
+          // Inside a YAML literal/folded block scalar (| or >): blank lines
+          // are part of the scalar content and should NOT count toward
+          // the "two consecutive blank lines = end of block" rule.
+          if (inLiteralBlock) {
+            yamlLines.push(yl);
+            j++;
+            continue;
+          }
           consecutiveBlanks++;
           if (consecutiveBlanks >= 2) break; // two blank lines = end of block
           yamlLines.push(yl);
@@ -2064,12 +2096,18 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
     const t = l.trim();
     return (
       // Python
-      /^(from|import|def|class)\s/.test(t) || /^@\w/.test(t) || /__\w+__/.test(t) ||
+      /^(from|import|def|class)\s/.test(t) ||
+      /^@\w/.test(t) ||
+      /__\w+__/.test(t) ||
       // Rust
-      /^(pub\s+)?(async\s+)?fn\s/.test(t) || /^(pub\s+)?use\s/.test(t) ||
-      /^let\s/.test(t) || /^(struct|enum|impl|trait|mod)\s/.test(t) || /^#\[/.test(t) ||
+      /^(pub\s+)?(async\s+)?fn\s/.test(t) ||
+      /^(pub\s+)?use\s/.test(t) ||
+      /^let\s/.test(t) ||
+      /^(struct|enum|impl|trait|mod)\s/.test(t) ||
+      /^#\[/.test(t) ||
       // Go
-      /^(func|package)\s/.test(t) || /^(var|type)\s+\w+\s+\w+/.test(t)
+      /^(func|package)\s/.test(t) ||
+      /^(var|type)\s+\w+\s+\w+/.test(t)
     );
   });
 }
