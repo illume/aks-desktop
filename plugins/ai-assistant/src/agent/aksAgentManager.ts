@@ -329,6 +329,13 @@ function normalizeBullets(text: string): string {
 }
 
 /**
+ * Minimum word count for a line to be considered prose (rather than code).
+ * Used by isTermCodeLine and normalizeTerminalMarkdown to distinguish
+ * wrapped bold section headings from actual code content.
+ */
+const PROSE_WORD_THRESHOLD = 5;
+
+/**
  * Curated set of first-word tokens that **unambiguously** indicate a shell
  * command, Dockerfile instruction, or similar code line.  These words almost
  * never begin an English sentence, so a first-word match is sufficient.
@@ -1557,9 +1564,14 @@ function collapseTerminalBlankLines(text: string): string {
         if (looksLikeShellOrDockerCodeLine(t) || looksLikeYaml(t)) return true;
         // Short lines that are just YAML values/keys also count
         if (/^[\w.-]+:\s/.test(t) || /^---\s*$/.test(t) || /^- /.test(t)) return true;
-        // If the line has many words and doesn't look like code, it's prose
+        // If the line has many words and doesn't look like code/YAML, it's prose
         const wordCount = t.split(/\s+/).length;
-        if (wordCount >= 5 && !looksLikeShellOrDockerCodeLine(t)) return false;
+        if (
+          wordCount >= PROSE_WORD_THRESHOLD &&
+          !looksLikeShellOrDockerCodeLine(t) &&
+          !looksLikeYaml(t)
+        )
+          return false;
         return true; // default: treat as code for short lines
       }
       // Heavily indented — only treat as code if it looks like code/YAML
@@ -1841,7 +1853,7 @@ function normalizeTerminalMarkdown(text: string): string {
         const blockWords = blockTrimmed.split(/\s+/).length;
         if (
           !startedByFileHeader &&
-          blockWords >= 5 &&
+          blockWords >= PROSE_WORD_THRESHOLD &&
           !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
           !looksLikeYaml(blockTrimmed)
         ) {
@@ -2451,7 +2463,7 @@ function cleanTerminalFormatting(text: string): string {
     const next = result[idx + 1];
     // Current line ends with a bare word (no colon) and is space-indented
     // Next line starts with optional space + colon + space + value
-    if (/^\s+\w+$/.test(cur) && /^\s*:\s+\S/.test(next)) {
+    if (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s+\S/.test(next)) {
       result[idx] = cur + next.replace(/^\s*/, '');
       result.splice(idx + 1, 1);
       rejoinedCount++;
