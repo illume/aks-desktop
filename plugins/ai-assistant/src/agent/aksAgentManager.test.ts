@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BASE_AKS_AGENT_PROMPT,
-  MAX_SELF_REVIEW_ATTEMPTS,
   SELF_REVIEW_PROMPT,
   buildEnrichedPrompt,
   buildSelfReviewPrompt,
-  hasUnfencedCode,
   shellEscapeSingleQuote,
 } from './aksAgentManager';
 
@@ -104,102 +102,6 @@ describe('buildEnrichedPrompt', () => {
   });
 });
 
-describe('hasUnfencedCode', () => {
-  it('returns false for plain prose with no code', () => {
-    expect(hasUnfencedCode('Here is a description of Kubernetes pods.')).toBe(false);
-  });
-
-  it('returns false when all code is inside fenced blocks', () => {
-    const text = [
-      'Run this command:',
-      '```bash',
-      'kubectl get pods',
-      '```',
-    ].join('\n');
-    expect(hasUnfencedCode(text)).toBe(false);
-  });
-
-  it('detects kubectl outside code blocks', () => {
-    expect(hasUnfencedCode('Run kubectl get pods to see pods.')).toBe(true);
-  });
-
-  it('detects docker outside code blocks', () => {
-    expect(hasUnfencedCode('Use docker build -t myapp .')).toBe(true);
-  });
-
-  it('detects helm outside code blocks', () => {
-    expect(hasUnfencedCode('Run helm install my-release stable/nginx')).toBe(true);
-  });
-
-  it('detects az CLI outside code blocks', () => {
-    expect(hasUnfencedCode('Run az aks get-credentials to configure kubectl')).toBe(true);
-  });
-
-  it('detects terraform outside code blocks', () => {
-    expect(hasUnfencedCode('Run terraform apply to deploy')).toBe(true);
-  });
-
-  it('detects bare YAML keys (apiVersion)', () => {
-    const text = 'The resource looks like:\napiVersion: v1\nkind: Pod';
-    expect(hasUnfencedCode(text)).toBe(true);
-  });
-
-  it('detects bare Dockerfile directives', () => {
-    const text = 'Your Dockerfile should start with:\nFROM node:18\nRUN npm install';
-    expect(hasUnfencedCode(text)).toBe(true);
-  });
-
-  it('detects Python imports outside code blocks', () => {
-    const text = 'You need:\nimport os\nfrom flask import Flask';
-    expect(hasUnfencedCode(text)).toBe(true);
-  });
-
-  it('detects shell prompt ($) outside code blocks', () => {
-    expect(hasUnfencedCode('Run:\n$ echo hello')).toBe(true);
-  });
-
-  it('detects shebang outside code blocks', () => {
-    expect(hasUnfencedCode('Create script:\n#!/bin/bash\necho done')).toBe(true);
-  });
-
-  it('detects export statements outside code blocks', () => {
-    expect(hasUnfencedCode('Set the variable:\nexport KUBECONFIG=~/.kube/config')).toBe(true);
-  });
-
-  it('ignores code patterns that are inside fenced blocks', () => {
-    const text = [
-      'Apply this:',
-      '```yaml',
-      'apiVersion: v1',
-      'kind: Pod',
-      '```',
-      '',
-      'That will create a pod.',
-    ].join('\n');
-    expect(hasUnfencedCode(text)).toBe(false);
-  });
-
-  it('detects code when some is fenced and some is not', () => {
-    const text = [
-      '```yaml',
-      'apiVersion: v1',
-      '```',
-      '',
-      'Also run kubectl get pods to check.',
-    ].join('\n');
-    expect(hasUnfencedCode(text)).toBe(true);
-  });
-
-  it('returns false for empty string', () => {
-    expect(hasUnfencedCode('')).toBe(false);
-  });
-
-  it('returns false for text mentioning tools in prose without command syntax', () => {
-    // 'kubectl' at end of sentence — no following subcommand
-    expect(hasUnfencedCode('Learn about kubectl.')).toBe(false);
-  });
-});
-
 describe('buildSelfReviewPrompt', () => {
   it('includes the original answer in the prompt', () => {
     const answer = 'Here is a deployment:\napiVersion: apps/v1';
@@ -239,16 +141,5 @@ describe('SELF_REVIEW_PROMPT', () => {
 
   it('checks for code block formatting', () => {
     expect(SELF_REVIEW_PROMPT).toContain('fenced markdown code blocks');
-  });
-});
-
-describe('MAX_SELF_REVIEW_ATTEMPTS', () => {
-  it('is a positive integer', () => {
-    expect(Number.isInteger(MAX_SELF_REVIEW_ATTEMPTS)).toBe(true);
-    expect(MAX_SELF_REVIEW_ATTEMPTS).toBeGreaterThan(0);
-  });
-
-  it('is bounded to a small value to prevent runaway loops', () => {
-    expect(MAX_SELF_REVIEW_ATTEMPTS).toBeLessThanOrEqual(3);
   });
 });

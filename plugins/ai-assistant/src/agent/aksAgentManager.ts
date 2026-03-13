@@ -52,35 +52,6 @@ export function buildSelfReviewPrompt(answer: string): string {
   return SELF_REVIEW_PROMPT.replace('{RESPONSE}', answer);
 }
 
-/**
- * Detect whether `text` contains code-like content that is NOT inside
- * fenced markdown code blocks.  Used to decide whether a self-review
- * round-trip is worthwhile.
- */
-export function hasUnfencedCode(text: string): boolean {
-  // Strip all fenced code blocks (``` ... ```) so we only inspect prose
-  const withoutFenced = text.replace(/```[\s\S]*?```/g, '');
-
-  // Patterns that strongly indicate code content
-  const codePatterns: RegExp[] = [
-    // CLI tools
-    /\b(?:kubectl|docker|helm|az|terraform|pip|npm|yarn|go|cargo|make)\s+\w/,
-    // Kubernetes YAML keys at start of line
-    /^(?:apiVersion|kind|metadata|spec|status):/m,
-    // Dockerfile directives
-    /^(?:FROM|RUN|CMD|ENTRYPOINT|COPY|ADD|WORKDIR|ENV|EXPOSE|VOLUME|ARG|LABEL)\s/m,
-    // Python imports / definitions
-    /^(?:import |from \S+ import |def \w|class \w)/m,
-    // Shell prompt or shebang
-    /^\$\s/m,
-    /^#!\/(?:bin|usr)/m,
-    // Variable assignments / exports
-    /^(?:export |alias )\w/m,
-  ];
-
-  return codePatterns.some(p => p.test(withoutFenced));
-}
-
 /** Represents a single exchange (question + answer) from the conversation history. */
 export interface ConversationEntry {
   role: 'user' | 'assistant';
@@ -2603,16 +2574,6 @@ class ThinkingStepTracker {
 const MIN_REVIEW_LENGTH_RATIO = 0.3;
 
 /**
- * Maximum number of self-review round-trips allowed.
- * Guards against infinite loops if the agent keeps producing unfenced code
- * in its corrected responses.  Set to 1 for a single review pass; increase
- * to 2–3 if the agent consistently needs a second correction attempt.
- * A `for` loop is used (rather than an `if`) so the guard works correctly
- * when this value is raised.
- */
-export const MAX_SELF_REVIEW_ATTEMPTS = 1;
-
-/**
  * Runs a question against the AKS agent pod by exec-ing directly into it
  * via the Kubernetes exec API (WebSocket) through Headlamp's proxy.
  * Returns only the final AI answer (clean, no ANSI codes, bullets normalised).
@@ -2648,53 +2609,39 @@ export async function runAksAgent(
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
-      // Self-review: if the response contains code-like content outside of
-      // fenced code blocks, ask the agent to review and reformat its answer.
-      // Bounded by MAX_SELF_REVIEW_ATTEMPTS to prevent infinite loops.
-      let currentAnswer = answer;
-      for (let attempt = 0; attempt < MAX_SELF_REVIEW_ATTEMPTS; attempt++) {
-        if (!hasUnfencedCode(currentAnswer)) {
-          debugLog('[AKS Agent] No unfenced code detected — skipping self-review');
-          break;
-        }
-        debugLog(
-          `[AKS Agent] Unfenced code detected — self-review attempt ${attempt + 1}/${MAX_SELF_REVIEW_ATTEMPTS}`
-        );
-        try {
-          const reviewPrompt = buildSelfReviewPrompt(currentAnswer);
-          const reviewResult = await session.ask(reviewPrompt);
-          if (reviewResult && reviewResult.trim().length > 0) {
-            const reviewAnswer = extractAIAnswer(reviewResult);
-            const trimmedReview = reviewAnswer.trim();
-            // If the agent confirms the response is fine, use the original
-            if (trimmedReview.startsWith('LGTM')) {
-              debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
-              break;
-            } else if (
-              reviewAnswer &&
-              reviewAnswer.length > currentAnswer.length * MIN_REVIEW_LENGTH_RATIO
-            ) {
-              // Use the corrected version (sanity check: must be substantial)
-              debugLog(
-                '[AKS Agent] Self-review: using corrected response, length:',
-                reviewAnswer.length
-              );
-              currentAnswer = reviewAnswer;
-            } else {
-              debugLog(
-                '[AKS Agent] Self-review: corrected response too short — keeping original'
-              );
-              break;
-            }
+      // Self-review: always ask the agent to review its response once for
+      // formatting and correctness.  A single pass — no loop.
+      debugLog('[AKS Agent] Starting self-review');
+      try {
+        const reviewPrompt = buildSelfReviewPrompt(answer);
+        const reviewResult = await session.ask(reviewPrompt);
+        if (reviewResult && reviewResult.trim().length > 0) {
+          const reviewAnswer = extractAIAnswer(reviewResult);
+          const trimmedReview = reviewAnswer.trim();
+          // If the agent confirms the response is fine, use the original
+          if (trimmedReview.startsWith('LGTM')) {
+            debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
+            return answer;
+          } else if (
+            reviewAnswer &&
+            reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
+          ) {
+            // Use the corrected version (sanity check: must be substantial)
+            debugLog(
+              '[AKS Agent] Self-review: using corrected response, length:',
+              reviewAnswer.length
+            );
+            return reviewAnswer;
           } else {
-            break;
+            debugLog(
+              '[AKS Agent] Self-review: corrected response too short — keeping original'
+            );
           }
-        } catch (e) {
-          console.warn('[AKS Agent] Self-review failed, using current response:', e);
-          break;
         }
+      } catch (e) {
+        console.warn('[AKS Agent] Self-review failed, using original response:', e);
       }
-      return currentAnswer;
+      return answer;
     }
     // extractAIAnswer stripped everything — the agent ran but produced no
     // user-visible answer.  Return a generic message instead of raw noise.
@@ -3215,5 +3162,4 @@ export const _testing = {
   looksLikeShellOrDockerCodeLine,
   hasShellSyntax,
   normalizeTerminalMarkdown,
-  hasUnfencedCode,
 };
