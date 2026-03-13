@@ -16,11 +16,11 @@ export function shellEscapeSingleQuote(s: string): string {
 
 /**
  * Base system prompt prepended before every AKS agent question.
- * Instructs the LLM to return YAML inside markdown code blocks and
- * to honour the conversation history that follows.
+ * Instructs the LLM to return all code inside raw markdown fenced code blocks
+ * and to honour the conversation history that follows.
  */
 export const BASE_AKS_AGENT_PROMPT = `IMPORTANT INSTRUCTIONS:
-- When returning any YAML content, always wrap it inside a markdown code block using \`\`\`yaml ... \`\`\` so it renders properly.
+- Always wrap ALL code in a raw markdown fenced code block with the appropriate language tag. Use \`\`\`yaml for YAML, \`\`\`json for JSON, \`\`\`bash or \`\`\`sh for shell/bash commands, \`\`\`python for Python, \`\`\`dockerfile for Dockerfiles, and so on. Never return bare/unformatted code outside a code block.
 - The conversation history below shows all previously asked questions and your answers. Keep that context in mind and answer accordingly — do not repeat information already provided unless the user explicitly asks for it.
 `;
 

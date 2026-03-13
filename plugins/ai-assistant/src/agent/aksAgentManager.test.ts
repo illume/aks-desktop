@@ -67,6 +67,16 @@ describe('buildEnrichedPrompt', () => {
     expect(result).toContain('Now answer the following new question:');
   });
 
+  it('base prompt instructs wrapping all code in markdown code blocks', () => {
+    // Ensure the base prompt covers all common code types, not just YAML
+    expect(BASE_AKS_AGENT_PROMPT).toContain('ALL code');
+    expect(BASE_AKS_AGENT_PROMPT).toContain('yaml');
+    expect(BASE_AKS_AGENT_PROMPT).toContain('json');
+    expect(BASE_AKS_AGENT_PROMPT).toContain('bash');
+    expect(BASE_AKS_AGENT_PROMPT).toContain('python');
+    expect(BASE_AKS_AGENT_PROMPT).toContain('dockerfile');
+  });
+
   it('does not include conversation history when empty', () => {
     const result = buildEnrichedPrompt('test?', []);
     expect(result).not.toContain('CONVERSATION HISTORY');
