@@ -1,6 +1,6 @@
 import { runCommand } from '@kinvolk/headlamp-plugin/lib';
 import { clusterRequest, stream } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
-import { debugLog, dumpForTestCase } from './debugLog';
+import { debugLog, detailLog, verboseLog, dumpForTestCase } from './debugLog';
 
 declare const pluginRunCommand: typeof runCommand;
 
@@ -319,7 +319,7 @@ function stripAnsi(text: string): string {
 function normalizeBullets(text: string): string {
   const result = text.replace(/^(\s*)[•·▪▸–]\s+/gm, '$1- ');
   if (result !== text) {
-    debugLog('[AKS Agent Parse] normalizeBullets: converted Unicode bullets to markdown dashes');
+    verboseLog('[AKS Agent Parse] normalizeBullets: converted Unicode bullets to markdown dashes');
   }
   return result;
 }
@@ -1453,7 +1453,7 @@ function normalizeTerminalMarkdown(text: string): string {
   }
 
   if (orderedListCount > 0 || trimmedHeadingCount > 0 || wrappedCodeBlockCount > 0) {
-    debugLog(
+    verboseLog(
       '[AKS Agent Parse] normalizeTerminalMarkdown: converted',
       orderedListCount,
       'ordered-list lines, trimmed',
@@ -1523,7 +1523,7 @@ function wrapBareYamlBlocks(text: string): string {
 
     // Detect start of a bare YAML block: apiVersion: (with optional value)
     if (/^\s*apiVersion:\s*/.test(line)) {
-      debugLog('[AKS Agent Parse] wrapBareYamlBlocks: detected bare apiVersion: at line', i, ':', line.trim());
+      verboseLog('[AKS Agent Parse] wrapBareYamlBlocks: detected bare apiVersion: at line', i, ':', line.trim());
       const yamlLines: string[] = [];
       let j = i;
       let consecutiveBlanks = 0;
@@ -1580,7 +1580,7 @@ function wrapBareYamlBlocks(text: string): string {
   }
 
   if (wrappedBlockCount > 0) {
-    debugLog(
+    verboseLog(
       '[AKS Agent Parse] wrapBareYamlBlocks: wrapped',
       wrappedBlockCount,
       'bare YAML blocks'
@@ -1650,7 +1650,7 @@ function cleanTerminalFormatting(text: string): string {
   }
 
   if (droppedBorders > 0 || unwrappedPanels > 0) {
-    debugLog(
+    verboseLog(
       '[AKS Agent Parse] cleanTerminalFormatting: dropped',
       droppedBorders,
       'border lines, unwrapped',
@@ -1727,7 +1727,7 @@ function stripAgentNoise(lines: string[]): string[] {
     // Drop noise lines
     if (isAgentNoiseLine(trimmed)) {
       droppedCount++;
-      debugLog('[AKS Agent Parse] stripAgentNoise: dropping noise line:', trimmed);
+      verboseLog('[AKS Agent Parse] stripAgentNoise: dropping noise line:', trimmed);
       continue;
     }
 
@@ -1743,7 +1743,7 @@ function stripAgentNoise(lines: string[]): string[] {
   }
 
   if (droppedCount > 0) {
-    debugLog('[AKS Agent Parse] stripAgentNoise: dropped', droppedCount, 'noise lines total');
+    verboseLog('[AKS Agent Parse] stripAgentNoise: dropped', droppedCount, 'noise lines total');
   }
 
   return cleaned;
@@ -1759,7 +1759,7 @@ function stripAgentNoise(lines: string[]): string[] {
 function stripCommandEcho(lines: string[]): string[] {
   const cmdIdx = lines.findIndex(l => /python\s+\/app\/aks-agent\.py/.test(l));
   if (cmdIdx < 0) {
-    debugLog('[AKS Agent Parse] stripCommandEcho: no python command line found, returning all lines');
+    verboseLog('[AKS Agent Parse] stripCommandEcho: no python command line found, returning all lines');
     return lines;
   }
 
@@ -1768,7 +1768,7 @@ function stripCommandEcho(lines: string[]): string[] {
   while (end < lines.length && /^\s*>/.test(lines[end])) {
     end++;
   }
-  debugLog(
+  verboseLog(
     '[AKS Agent Parse] stripCommandEcho: found command at line',
     cmdIdx,
     '— stripping',
@@ -1786,7 +1786,7 @@ function stripCommandEcho(lines: string[]): string[] {
  * Converts Unicode bullets to markdown syntax.
  */
 function extractAIAnswer(rawOutput: string): string {
-  debugLog('[AKS Agent Parse] extractAIAnswer: raw input length:', rawOutput.length);
+  detailLog('[AKS Agent Parse] extractAIAnswer: raw input length:', rawOutput.length);
 
   // Split the raw output into terminal line chunks (each chunk = one terminal line)
   // and reassemble with proper \n separators, trimming 80-char padding as we go.
@@ -1796,7 +1796,7 @@ function extractAIAnswer(rawOutput: string): string {
     .join('\n');
 
   const normalisedLines = normalised.split('\n');
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: normalised line count:',
     normalisedLines.length,
     'char count:',
@@ -1808,7 +1808,7 @@ function extractAIAnswer(rawOutput: string): string {
   // back through stdout as the python invocation line followed by bash
   // continuation prompt lines ("> ...").
   const lines = stripCommandEcho(normalisedLines);
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: after stripCommandEcho:',
     lines.length,
     'lines remaining'
@@ -1816,7 +1816,7 @@ function extractAIAnswer(rawOutput: string): string {
 
   // Locate the "AI:" line — it may be alone or have content after the colon
   const aiLineIdx = lines.findIndex(l => /^AI:\s*$/.test(l.trim()) || /^AI:\s+\S/.test(l));
-  debugLog('[AKS Agent Parse] extractAIAnswer: AI: line index:', aiLineIdx);
+  detailLog('[AKS Agent Parse] extractAIAnswer: AI: line index:', aiLineIdx);
 
   let contentLines: string[];
 
@@ -1826,14 +1826,14 @@ function extractAIAnswer(rawOutput: string): string {
     if (/^AI:\s*$/.test(aiLine.trim())) {
       // "AI:" alone on its own line — content starts on the next line
       contentLines = lines.slice(aiLineIdx + 1);
-      debugLog(
+      detailLog(
         '[AKS Agent Parse] extractAIAnswer: AI: on own line, content lines:',
         contentLines.length
       );
     } else {
       // "AI: content…" on the same line — strip the prefix and keep the rest
       contentLines = [aiLine.replace(/^AI:\s+/, ''), ...lines.slice(aiLineIdx + 1)];
-      debugLog(
+      detailLog(
         '[AKS Agent Parse] extractAIAnswer: AI: with inline content, content lines:',
         contentLines.length
       );
@@ -1841,13 +1841,13 @@ function extractAIAnswer(rawOutput: string): string {
   } else {
     // Fallback: use all lines (will be cleaned below)
     contentLines = [...lines];
-    debugLog('[AKS Agent Parse] extractAIAnswer: no AI: line found — using all lines as fallback');
+    detailLog('[AKS Agent Parse] extractAIAnswer: no AI: line found — using all lines as fallback');
   }
 
   // Strip agent infrastructure noise from content lines
   const beforeNoiseStrip = contentLines.length;
   contentLines = stripAgentNoise(contentLines);
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: stripAgentNoise removed',
     beforeNoiseStrip - contentLines.length,
     'lines'
@@ -1868,7 +1868,7 @@ function extractAIAnswer(rawOutput: string): string {
   while (contentLines.length > 0 && contentLines[0].trim() === '') {
     contentLines.shift();
   }
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: trimmed',
     beforeTrim - contentLines.length,
     'leading/trailing blank/prompt lines, remaining:',
@@ -1876,22 +1876,22 @@ function extractAIAnswer(rawOutput: string): string {
   );
 
   const joined = contentLines.join('\n').trim();
-  debugLog('[AKS Agent Parse] extractAIAnswer: after trim, content length:', joined.length);
+  detailLog('[AKS Agent Parse] extractAIAnswer: after trim, content length:', joined.length);
 
   const afterTerminal = cleanTerminalFormatting(joined);
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: after cleanTerminalFormatting, length:',
     afterTerminal.length
   );
 
   const afterBullets = normalizeBullets(afterTerminal);
   const afterTerminalMarkdown = normalizeTerminalMarkdown(afterBullets);
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: after normalizeTerminalMarkdown, length:',
     afterTerminalMarkdown.length
   );
   const result = wrapBareYamlBlocks(afterTerminalMarkdown);
-  debugLog(
+  detailLog(
     '[AKS Agent Parse] extractAIAnswer: final result length:',
     result.length,
     'result:',
@@ -1899,7 +1899,7 @@ function extractAIAnswer(rawOutput: string): string {
   );
 
   if (!result) {
-    debugLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
+    detailLog('[AKS Agent Parse] extractAIAnswer: result is empty after all transforms');
   }
 
   // Dump raw→parsed as JSON strings for easy copy-paste into test cases
@@ -1981,7 +1981,7 @@ class ThinkingStepTracker {
     if (this.partialTaskRow) {
       // Blank line, table border, table header, or new task row → abandon partial, fall through
       if (!trimmed || /^\+[-+=]+\+$/.test(trimmed) || /^\|\s*(ID|t\d+)\s*\|/.test(trimmed)) {
-        debugLog('[AKS Agent Parse] ThinkingStepTracker: abandoning partial task row');
+        verboseLog('[AKS Agent Parse] ThinkingStepTracker: abandoning partial task row');
         this.partialTaskRow = '';
         // Fall through to normal processing below
       } else {
@@ -1989,7 +1989,7 @@ class ThinkingStepTracker {
         const joined = (this.partialTaskRow + ' ' + trimmed).replace(/\s+/g, ' ').trim();
         const taskRow = extractTaskRow(joined);
         if (taskRow) {
-          debugLog(
+          verboseLog(
             '[AKS Agent Parse] ThinkingStepTracker: completed wrapped task row:',
             taskRow.content,
             taskRow.status
@@ -2012,7 +2012,7 @@ class ThinkingStepTracker {
     const modelMatch = trimmed.match(/^Loaded models:\s*\[(.+)\]/);
     if (modelMatch) {
       const models = modelMatch[1].replace(/'/g, '').trim();
-      debugLog('[AKS Agent Parse] ThinkingStepTracker: model loaded:', models);
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: model loaded:', models);
       this.steps.push({
         id: this.nextId++,
         label: `Model: ${models}`,
@@ -2052,12 +2052,12 @@ class ThinkingStepTracker {
     // ── Planning phase: task-list rows ──
     const taskRow = extractTaskRow(trimmed);
     if (taskRow) {
-      debugLog('[AKS Agent Parse] ThinkingStepTracker: task row:', taskRow.content, taskRow.status);
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: task row:', taskRow.content, taskRow.status);
       return this.applyTaskRow(taskRow);
     }
     // Start buffering if this looks like a partial (wrapped) task row
     if (/^\|\s*t\d+\s*\|/.test(trimmed)) {
-      debugLog('[AKS Agent Parse] ThinkingStepTracker: buffering partial task row');
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: buffering partial task row');
       this.partialTaskRow = trimmed;
       return false;
     }
@@ -2066,7 +2066,7 @@ class ThinkingStepTracker {
     const runMatch = trimmed.match(/^Running tool\s+#(\d+)\s+/);
     if (runMatch) {
       const toolNum = parseInt(runMatch[1], 10);
-      debugLog('[AKS Agent Parse] ThinkingStepTracker: running tool #' + toolNum + ':', trimmed);
+      verboseLog('[AKS Agent Parse] ThinkingStepTracker: running tool #' + toolNum + ':', trimmed);
       // Skip TodoWrite and kubectl tools — they're tracked via the task table
       if (/TodoWrite/i.test(trimmed) || /call_kubectl/i.test(trimmed)) {
         // Still record the tool number so we can mark it finished without noise
@@ -2417,7 +2417,7 @@ class AgentSession {
   }
 
   private handleChannel(channel: number, text: string): void {
-    debugLog('[AKS Agent Data] handleChannel:', channel, 'text length:', text.length);
+    detailLog('[AKS Agent Data] handleChannel:', channel, 'text length:', text.length);
     if (channel === 1) {
       this.handleStdout(text);
     } else if (channel === 2) {
@@ -2493,7 +2493,7 @@ class AgentSession {
         if (this.tracker.processLine(cl)) anyChanged = true;
       }
       if (anyChanged) {
-        debugLog(
+        detailLog(
           '[AKS Agent Data] handleStdout: thinking steps updated, count:',
           this.tracker.steps.length
         );
@@ -2506,7 +2506,7 @@ class AgentSession {
     const plainText = stripAnsi(text);
     const hasAiMarker = this.output.includes('AI:');
     const hasPrompt = /root@[^:]+:[^#]*#\s*$/.test(plainText.trim());
-    debugLog(
+    detailLog(
       '[AKS Agent Data] handleStdout: completion check — commandSent:',
       this.commandSent,
       'hasAiMarker:',
