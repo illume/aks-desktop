@@ -308,7 +308,9 @@ function stripAnsi(text: string): string {
   return text
     .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '') // CSI sequences (colors, cursor, bracketed paste)
     .replace(/\x1b[()][AB012]/g, '') // Character set selection
-    .replace(/\r/g, ''); // Carriage returns
+    .replace(/\r/g, '') // Carriage returns
+    .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
+    .replace(/\[[\d;]*m/g, ''); // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
 }
 
 /**
