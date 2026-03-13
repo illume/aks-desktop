@@ -5243,11 +5243,8 @@ describe('looksLikeShellOrDockerCodeLine — Python patterns', () => {
     // That's acceptable since it will be in an ambiguous context.
     // The word "Let" capitalized at sentence start won't match "let" (lowercase).
     expect(looksLikeShellOrDockerCodeLine('Let me explain the concept.')).toBe(false);
-    // Note: lowercase "use something" WILL match — this is an accepted trade-off
-    // because bare prose lines rarely start with lowercase "use" followed by a
-    // single word without punctuation. In real AI output, such lines are
-    // typically inside sentences rather than at line start.
-    expect(looksLikeShellOrDockerCodeLine('use this method to solve the problem')).toBe(true);
+    // "use" in English prose without :: or ; does NOT match (tightened pattern)
+    expect(looksLikeShellOrDockerCodeLine('use this method to solve the problem')).toBe(false);
   });
 
   it('does NOT false-positive on plain English prose', () => {

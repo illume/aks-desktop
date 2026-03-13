@@ -1381,8 +1381,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // ── Tier 5: Rust / Go / general C-family patterns ──
 
-  // Rust use statement: use axum::{routing::get, Router};
-  if (/^(pub\s+)?use\s+\w+/.test(trimmed)) return true;
+  // Rust use statement: use axum::{...}; — require :: (path separator) or ;
+  // to distinguish from English prose like "use this command"
+  if (/^(pub\s+)?use\s+\w+/.test(trimmed) && (/::/.test(trimmed) || /;\s*$/.test(trimmed))) return true;
 
   // Rust/Go function definition: fn main(), async fn root(), pub fn new()
   if (/^(pub\s+)?(async\s+)?fn\s+\w+/.test(trimmed)) return true;
@@ -1397,7 +1398,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^#\[[\w:]+/.test(trimmed)) return true;
 
   // Method chain continuation: .route("/", ...), .await, .unwrap()
-  if (/^\.\w+[\s(]/.test(trimmed)) return true;
+  // Require the dot to be followed by a typical method name pattern (word + paren
+  // or .await / .unwrap style) — excludes prose like ". However, the API..."
+  if (/^\.\w+\(/.test(trimmed) || /^\.(await|unwrap|expect|then|catch|map|filter|and_then|or_else|into|collect|iter)\b/.test(trimmed)) return true;
 
   // Lone closing brace (with optional semicolon): }  or };
   if (/^\}\s*;?\s*$/.test(trimmed)) return true;
