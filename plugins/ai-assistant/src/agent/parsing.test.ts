@@ -6,6 +6,8 @@ const {
   normalizeBullets,
   looksLikeYaml,
   wrapBareYamlBlocks,
+  wrapBareShellBlocks,
+  wrapBareJsonBlocks,
   cleanTerminalFormatting,
   stripAgentNoise,
   isAgentNoiseLine,
@@ -243,6 +245,138 @@ describe('wrapBareYamlBlocks', () => {
     const result = wrapBareYamlBlocks(input);
     const yamlFences = (result.match(/```yaml/g) || []).length;
     expect(yamlFences).toBe(2);
+  });
+});
+
+describe('wrapBareShellBlocks', () => {
+  it('wraps a single "$ cmd" line in a bash code fence', () => {
+    const input = 'Run this:\n$ kubectl get pods\nDone.';
+    const result = wrapBareShellBlocks(input);
+    expect(result).toContain('```bash');
+    expect(result).toContain('$ kubectl get pods');
+    expect(result).toContain('```');
+    expect(result).toContain('Run this:');
+    expect(result).toContain('Done.');
+  });
+
+  it('wraps multiple consecutive "$ cmd" lines together', () => {
+    const input = '$ kubectl apply -f deployment.yaml\n$ kubectl get pods\n$ kubectl describe pod my-pod';
+    const result = wrapBareShellBlocks(input);
+    // All three commands should be inside a single bash fence
+    expect(result).toContain('```bash');
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(2);
+    expect(result).toContain('$ kubectl apply -f deployment.yaml');
+    expect(result).toContain('$ kubectl describe pod my-pod');
+  });
+
+  it('wraps ">" bash continuation lines together with preceding "$ cmd"', () => {
+    const input = '$ kubectl apply \\\n> -f deployment.yaml';
+    const result = wrapBareShellBlocks(input);
+    expect(result).toContain('```bash');
+    expect(result).toContain('> -f deployment.yaml');
+  });
+
+  it('does not wrap lines already inside a code fence', () => {
+    const input = '```bash\n$ kubectl get pods\n```\n$ kubectl get nodes';
+    const result = wrapBareShellBlocks(input);
+    // The second "$ kubectl get nodes" should be wrapped but not the first
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(4); // original 2 + new 2
+  });
+
+  it('does not wrap content already inside any code fence', () => {
+    const input = '```yaml\n$ not-a-command: true\n```';
+    const result = wrapBareShellBlocks(input);
+    expect(result).toBe(input);
+  });
+
+  it('does not modify text with no shell commands', () => {
+    const input = 'Here is some text.\nNo commands here.';
+    expect(wrapBareShellBlocks(input)).toBe(input);
+  });
+
+  it('handles empty string', () => {
+    expect(wrapBareShellBlocks('')).toBe('');
+  });
+
+  it('wraps a bare "$" (no arguments) as a shell prompt', () => {
+    const input = 'Try this:\n$\nDone.';
+    const result = wrapBareShellBlocks(input);
+    expect(result).toContain('```bash');
+  });
+
+  it('preserves text before and after a shell block', () => {
+    const input = 'Before\n$ helm install myapp ./chart\nAfter';
+    const result = wrapBareShellBlocks(input);
+    const lines = result.split('\n');
+    const beforeIdx = lines.indexOf('Before');
+    const fenceIdx = lines.indexOf('```bash');
+    const afterIdx = lines.indexOf('After');
+    expect(beforeIdx).toBeLessThan(fenceIdx);
+    expect(fenceIdx).toBeLessThan(afterIdx);
+  });
+});
+
+describe('wrapBareJsonBlocks', () => {
+  it('wraps a bare multi-line JSON object in a json code fence', () => {
+    const input = 'Response:\n{\n  "apiVersion": "v1",\n  "kind": "Pod"\n}\nEnd.';
+    const result = wrapBareJsonBlocks(input);
+    expect(result).toContain('```json');
+    expect(result).toContain('"apiVersion": "v1"');
+    expect(result).toContain('```');
+  });
+
+  it('wraps a bare multi-line JSON array in a json code fence', () => {
+    const input = '[\n  "item1",\n  "item2"\n]';
+    const result = wrapBareJsonBlocks(input);
+    expect(result).toContain('```json');
+    expect(result).toContain('"item1"');
+  });
+
+  it('does not wrap a single-line inline JSON object', () => {
+    // Single-line JSON stays as-is (trimmed line is "{" but only one line)
+    const input = 'The object is: {"key": "val"}';
+    expect(wrapBareJsonBlocks(input)).toBe(input);
+  });
+
+  it('does not wrap JSON already inside a code fence', () => {
+    const input = '```json\n{\n  "key": "value"\n}\n```';
+    const result = wrapBareJsonBlocks(input);
+    // Should not add extra fences
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(2);
+  });
+
+  it('does not wrap unbalanced JSON-like content', () => {
+    // Unbalanced braces — should not be wrapped (stack never empties)
+    const input = '{\n  "broken": "json"';
+    expect(wrapBareJsonBlocks(input)).toBe(input);
+  });
+
+  it('does not wrap mismatched bracket types', () => {
+    // Mismatched: opens with "{" but closes with "]" — stack-based check rejects this
+    const input = '{\n  "key": "value"\n]';
+    // Should not be wrapped because the closing bracket doesn't match
+    const result = wrapBareJsonBlocks(input);
+    expect(result).not.toContain('```json');
+  });
+
+  it('does not modify text with no JSON', () => {
+    const input = 'Hello world\nNo JSON here.';
+    expect(wrapBareJsonBlocks(input)).toBe(input);
+  });
+
+  it('handles empty string', () => {
+    expect(wrapBareJsonBlocks('')).toBe('');
+  });
+
+  it('preserves surrounding text', () => {
+    const input = 'Before\n{\n  "x": 1\n}\nAfter';
+    const result = wrapBareJsonBlocks(input);
+    const lines = result.split('\n');
+    expect(lines[0]).toBe('Before');
+    expect(lines[lines.length - 1]).toBe('After');
   });
 });
 
@@ -499,6 +633,20 @@ describe('extractAIAnswer', () => {
     const input = 'root@host:/# python /app/aks-agent.py\nTask List:\n+----+';
     const result = extractAIAnswer(input);
     expect(result).toBe('');
+  });
+
+  it('wraps bare shell command blocks in the pipeline', () => {
+    const input = 'AI: To apply the config run:\n$ kubectl apply -f deployment.yaml\n$ kubectl get pods';
+    const result = extractAIAnswer(input);
+    expect(result).toContain('```bash');
+    expect(result).toContain('$ kubectl apply -f deployment.yaml');
+  });
+
+  it('wraps bare multi-line JSON objects in the pipeline', () => {
+    const input = 'AI: Here is the response:\n{\n  "apiVersion": "v1",\n  "kind": "Pod"\n}';
+    const result = extractAIAnswer(input);
+    expect(result).toContain('```json');
+    expect(result).toContain('"apiVersion": "v1"');
   });
 });
 

@@ -432,6 +432,140 @@ function wrapBareYamlBlocks(text: string): string {
 }
 
 /**
+ * Detects bare shell command blocks (consecutive lines starting with "$ ")
+ * outside of existing code fences and wraps them in ```bash fenced code blocks.
+ *
+ * "$ cmd" lines are a standard shell-prompt convention used by many AI models
+ * when they don't always follow instructions to use code fences.  Collecting
+ * bash ">" multi-line continuation lines is also supported.
+ */
+function wrapBareShellBlocks(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let i = 0;
+  let inCodeFence = false;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Track existing code fences — never modify content inside them
+    if (/^```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // Detect shell command: line starting with "$ " (dollar + space) or just "$"
+    if (/^\$(\s|$)/.test(trimmed)) {
+      const shellLines: string[] = [];
+      let j = i;
+      while (j < lines.length) {
+        const sl = lines[j].trim();
+        // Collect "$ cmd" and ">" bash continuation prompt lines
+        if (/^\$(\s|$)/.test(sl) || /^>\s/.test(sl)) {
+          shellLines.push(lines[j]);
+          j++;
+        } else {
+          break;
+        }
+      }
+      if (shellLines.length > 0) {
+        result.push('```bash');
+        result.push(...shellLines);
+        result.push('```');
+        i = j;
+        continue;
+      }
+    }
+
+    result.push(line);
+    i++;
+  }
+
+  return result.join('\n');
+}
+
+/**
+ * Detects bare multi-line JSON objects (starting with "{" or "[" at the
+ * beginning of a line, outside of code fences) and wraps them in ```json
+ * fenced code blocks.
+ *
+ * This catches the case where an AI model returns a raw Kubernetes API
+ * response or config JSON without a code fence.  Only wraps blocks that
+ * span at least 2 lines and whose braces/brackets are fully balanced so
+ * we never accidentally wrap prose that starts with "{".
+ *
+ * A stack-based approach ensures that "{" only matches "}" and "[" only
+ * matches "]", preventing false-positive detection on mismatched brackets.
+ */
+function wrapBareJsonBlocks(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let i = 0;
+  let inCodeFence = false;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Track existing code fences
+    if (/^```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // Detect start of a bare JSON block: a line that is *just* "{" or "["
+    // (possibly with leading whitespace) so we don't match inline prose.
+    if (trimmed === '{' || trimmed === '[') {
+      const jsonLines: string[] = [line];
+      // Stack tracks the expected closing character for each opening bracket.
+      // '{' expects '}', '[' expects ']'.
+      const stack: string[] = [trimmed === '{' ? '}' : ']'];
+      let j = i + 1;
+
+      while (j < lines.length && stack.length > 0) {
+        const jl = lines[j];
+        jsonLines.push(jl);
+        for (const ch of jl) {
+          if (ch === '{') stack.push('}');
+          else if (ch === '[') stack.push(']');
+          else if (ch === stack[stack.length - 1]) stack.pop();
+        }
+        j++;
+      }
+
+      // Only wrap if balanced (stack empty) and spans multiple lines
+      if (stack.length === 0 && jsonLines.length > 1) {
+        result.push('```json');
+        result.push(...jsonLines);
+        result.push('```');
+        i = j;
+        continue;
+      }
+    }
+
+    result.push(line);
+    i++;
+  }
+
+  return result.join('\n');
+}
+
+/**
  * Clean up Rich terminal UI decorations and terminal line-padding:
  *  - Remove Rich panel border lines  (┏━━━┓ / ┗━━━┛)
  *  - Unwrap Rich panel content lines (┃  text  ┃  →  text)
@@ -640,7 +774,17 @@ function extractAIAnswer(rawOutput: string): string {
   }
 
   const result = contentLines.join('\n').trim();
-  return wrapBareYamlBlocks(normalizeBullets(cleanTerminalFormatting(result)));
+  // Apply post-processing pipeline to wrap bare code blocks:
+  //   1. cleanTerminalFormatting – remove Rich UI decorations
+  //   2. normalizeBullets       – convert Unicode bullets to markdown
+  //   3. wrapBareYamlBlocks     – fence bare Kubernetes YAML (apiVersion: …)
+  //   4. wrapBareShellBlocks    – fence bare shell commands ($ cmd)
+  //   5. wrapBareJsonBlocks     – fence bare multi-line JSON objects
+  const cleaned = cleanTerminalFormatting(result);
+  const bulleted = normalizeBullets(cleaned);
+  const withYaml = wrapBareYamlBlocks(bulleted);
+  const withShell = wrapBareShellBlocks(withYaml);
+  return wrapBareJsonBlocks(withShell);
 }
 
 // ─── Real-time thinking-step parser ──────────────────────────────────────────
@@ -1373,6 +1517,8 @@ export const _testing = {
   normalizeBullets,
   looksLikeYaml,
   wrapBareYamlBlocks,
+  wrapBareShellBlocks,
+  wrapBareJsonBlocks,
   cleanTerminalFormatting,
   stripAgentNoise,
   isAgentNoiseLine,
