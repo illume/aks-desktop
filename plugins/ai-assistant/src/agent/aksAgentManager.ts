@@ -21,8 +21,8 @@ export function shellEscapeSingleQuote(s: string): string {
  * to honour the conversation history that follows.
  */
 export const BASE_AKS_AGENT_PROMPT = `IMPORTANT INSTRUCTIONS:
-- ALWAYS wrap code in fenced markdown code blocks with the correct language tag. This applies to ALL code types including yaml, json, bash, sh, python, dockerfile, go, javascript, typescript, hcl, toml, ini, xml, sql, and any other language or configuration format.
-- NEVER output bare/unformatted code outside a fenced code block.
+- ALWAYS wrap code in a raw markdown code block with the correct language tag. This applies to ALL code types including yaml, json, bash, sh, python, dockerfile, go, javascript, typescript, hcl, toml, ini, xml, sql, and any other language or configuration format.
+- NEVER output bare/unformatted code outside a code block.
 
 ✓ Correct:
 \`\`\`yaml
