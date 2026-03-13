@@ -9,6 +9,7 @@ import { _testing } from './agent/aksAgentManager';
 import {
   rawMicroservicesPythonYaml,
   rawPythonFlaskApp,
+  rawRustAxumApp,
 } from './agent/testFixtures';
 import ContentRenderer from './ContentRenderer';
 
@@ -1327,6 +1328,25 @@ export const RealWorldPythonFlaskAppDark: StoryFn<typeof ContentRenderer> = () =
     <ContentRenderer
       onYamlDetected={noopYamlDetected}
       content={extractAIAnswer(rawPythonFlaskApp)}
+    />
+  </ThemeProvider>
+);
+
+// ─── Rust Axum app with method chains and {-blocks ───────────────────────────
+
+export const RealWorldRustAxumApp: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(rawRustAxumApp)}
+  />
+);
+
+export const RealWorldRustAxumAppDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer
+      onYamlDetected={noopYamlDetected}
+      content={extractAIAnswer(rawRustAxumApp)}
     />
   </ThemeProvider>
 );

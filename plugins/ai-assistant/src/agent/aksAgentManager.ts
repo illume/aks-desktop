@@ -1379,6 +1379,33 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // These are uniquely Python and should never be interpreted as markdown bold
   if (/__\w+__/.test(trimmed)) return true;
 
+  // ── Tier 5: Rust / Go / general C-family patterns ──
+
+  // Rust use statement: use axum::{routing::get, Router};
+  if (/^(pub\s+)?use\s+\w+/.test(trimmed)) return true;
+
+  // Rust/Go function definition: fn main(), async fn root(), pub fn new()
+  if (/^(pub\s+)?(async\s+)?fn\s+\w+/.test(trimmed)) return true;
+
+  // Rust let binding: let app = ..., let mut x = ...
+  if (/^let\s+(mut\s+)?\w+\s*[:=]/.test(trimmed)) return true;
+
+  // Rust/Go type definitions: struct, enum, trait, impl, mod, type
+  if (/^(pub(\s*\(\s*crate\s*\))?\s+)?(struct|enum|trait|impl|mod)\s+\w+/.test(trimmed)) return true;
+
+  // Rust attribute: #[derive(...)], #[tokio::main]
+  if (/^#\[[\w:]+/.test(trimmed)) return true;
+
+  // Method chain continuation: .route("/", ...), .await, .unwrap()
+  if (/^\.\w+[\s(]/.test(trimmed)) return true;
+
+  // Lone closing brace (with optional semicolon): }  or };
+  if (/^\}\s*;?\s*$/.test(trimmed)) return true;
+
+  // Go-specific: func, var, package, type keywords
+  if (/^(func|package)\s+\w+/.test(trimmed)) return true;
+  if (/^(var|type)\s+\w+\s+\w+/.test(trimmed)) return true;
+
   return false;
 }
 
@@ -1560,6 +1587,37 @@ function normalizeTerminalMarkdown(text: string): string {
     }
 
     if (/^\s+\S/.test(line) && looksLikeShellOrDockerCodeLine(trimmed)) {
+      // Don't wrap indented lines that are Python function/class/if bodies.
+      // If the previous non-blank line is an unindented Python block opener
+      // (e.g. "def index():", "if __name__:"), this line is part of its body
+      // and should be left for wrapBareCodeBlocks to handle as one block.
+      let prevNonBlankLine = '';
+      let prevNonBlankIdx = -1;
+      for (let p = i - 1; p >= 0; p--) {
+        const pt = lines[p].trim();
+        if (pt !== '' && !/^```/.test(pt)) {
+          prevNonBlankLine = lines[p];
+          prevNonBlankIdx = p;
+          break;
+        }
+      }
+      const prevTrim = prevNonBlankLine.trim();
+      // Check if previous non-blank line is a block opener — either
+      // Python-style (ends with :) or C-family (ends with {).
+      // If so, this indented line is a body continuation and should
+      // be left for wrapBareCodeBlocks to handle as one unified block.
+      const prevIsBlockOpener =
+        prevTrim !== '' &&
+        /[{:]\s*$/.test(prevTrim) &&
+        !/^\s+/.test(prevNonBlankLine) &&
+        looksLikeShellOrDockerCodeLine(prevTrim);
+      if (prevIsBlockOpener) {
+        // Leave for wrapBareCodeBlocks to handle
+        result.push(line);
+        i++;
+        continue;
+      }
+
       const blockLines: string[] = [];
       let j = i;
       let codeLikeLineCount = 0;
@@ -1933,6 +1991,27 @@ function wrapBareYamlBlocks(text: string): string {
 }
 
 /**
+ * Check if any line in the collected code block contains patterns from a
+ * structured language (Python, Rust, Go, etc.) that uses indentation for
+ * function/class/block bodies.  Used by wrapBareCodeBlocks to decide
+ * whether to keep collecting indented continuation lines.
+ */
+function hasStructuredCodeContext(codeLines: string[]): boolean {
+  return codeLines.some(l => {
+    const t = l.trim();
+    return (
+      // Python
+      /^(from|import|def|class)\s/.test(t) || /^@\w/.test(t) || /__\w+__/.test(t) ||
+      // Rust
+      /^(pub\s+)?(async\s+)?fn\s/.test(t) || /^(pub\s+)?use\s/.test(t) ||
+      /^let\s/.test(t) || /^(struct|enum|impl|trait|mod)\s/.test(t) || /^#\[/.test(t) ||
+      // Go
+      /^(func|package)\s/.test(t) || /^(var|type)\s+\w+\s+\w+/.test(t)
+    );
+  });
+}
+
+/**
  * Detect contiguous blocks of bare shell/Docker commands (not already inside
  * markdown code fences and not indented) and wrap each one in ``` fences so
  * that ReactMarkdown renders them as code blocks.
@@ -1994,10 +2073,15 @@ function wrapBareCodeBlocks(text: string): string {
           while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
           if (peekIdx < lines.length) {
             const peekTrimmed = lines[peekIdx].trim();
+            const peekIsIndented = /^\s+/.test(lines[peekIdx]);
+            // In Python context, allow blank lines followed by indented
+            // continuation (function/class body) or by the next top-level
+            // Python statement.
+            const hasCodeCtx = hasStructuredCodeContext(codeLines);
             if (
               looksLikeShellOrDockerCodeLine(peekTrimmed) &&
               !looksLikeYaml(peekTrimmed) &&
-              !/^\s+/.test(lines[peekIdx])
+              (!peekIsIndented || hasCodeCtx)
             ) {
               codeLines.push(cl);
               j++;
@@ -2008,7 +2092,14 @@ function wrapBareCodeBlocks(text: string): string {
         }
 
         // Stop if line is indented (belongs to different formatting)
+        // UNLESS we are inside a Python code block — Python uses indentation
+        // for function/class bodies (e.g. the body of `def index():`)
         if (/^\s+/.test(cl)) {
+          if (hasStructuredCodeContext(codeLines)) {
+            codeLines.push(cl);
+            j++;
+            continue;
+          }
           break;
         }
 

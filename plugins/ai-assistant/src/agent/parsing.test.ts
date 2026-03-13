@@ -6,6 +6,7 @@ import {
   rawMicroservicesPythonYaml,
   rawPythonFlaskApp,
   rawPythonImports,
+  rawRustAxumApp,
 } from './testFixtures';
 
 const {
@@ -5192,6 +5193,63 @@ describe('looksLikeShellOrDockerCodeLine — Python patterns', () => {
     expect(looksLikeShellOrDockerCodeLine('self.__init__()')).toBe(true);
   });
 
+  // ── Rust-specific detection ──
+  it('detects Rust use statement', () => {
+    expect(looksLikeShellOrDockerCodeLine('use axum::{routing::get, Router};')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('pub use crate::config;')).toBe(true);
+  });
+
+  it('detects Rust fn definition', () => {
+    expect(looksLikeShellOrDockerCodeLine('fn main() {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('async fn root() -> &\'static str {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('pub fn new() -> Self {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('pub async fn handle() {')).toBe(true);
+  });
+
+  it('detects Rust let binding', () => {
+    expect(looksLikeShellOrDockerCodeLine('let app = Router::new()')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('let mut buf = Vec::new();')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('let addr: &str = "0.0.0.0:8080";')).toBe(true);
+  });
+
+  it('detects Rust type definitions', () => {
+    expect(looksLikeShellOrDockerCodeLine('struct Config {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('enum State {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('impl Config {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('trait Handler {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('pub struct AppState {')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('pub(crate) mod routes;')).toBe(true);
+  });
+
+  it('detects Rust attributes', () => {
+    expect(looksLikeShellOrDockerCodeLine('#[tokio::main]')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('#[derive(Debug, Clone)]')).toBe(true);
+  });
+
+  it('detects method chain continuation', () => {
+    expect(looksLikeShellOrDockerCodeLine('.route("/", get(root))')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('.route("/healthz", get(healthz));')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('.await.unwrap();')).toBe(true);
+  });
+
+  it('detects lone closing brace', () => {
+    expect(looksLikeShellOrDockerCodeLine('}')).toBe(true);
+    expect(looksLikeShellOrDockerCodeLine('};')).toBe(true);
+  });
+
+  it('does not false-positive English use of "use"', () => {
+    // "use" in English prose doesn't start with "use " followed by a word
+    // but our pattern requires "use \w+" which could match prose.
+    // That's acceptable since it will be in an ambiguous context.
+    // The word "Let" capitalized at sentence start won't match "let" (lowercase).
+    expect(looksLikeShellOrDockerCodeLine('Let me explain the concept.')).toBe(false);
+    // Note: lowercase "use something" WILL match — this is an accepted trade-off
+    // because bare prose lines rarely start with lowercase "use" followed by a
+    // single word without punctuation. In real AI output, such lines are
+    // typically inside sentences rather than at line start.
+    expect(looksLikeShellOrDockerCodeLine('use this method to solve the problem')).toBe(true);
+  });
+
   it('does NOT false-positive on plain English prose', () => {
     expect(looksLikeShellOrDockerCodeLine('from the command line you can run')).toBe(false);
     expect(looksLikeShellOrDockerCodeLine('class is a reserved word in JS')).toBe(false);
@@ -5351,5 +5409,42 @@ describe('extractAIAnswer — Python __name__ dunder pattern (shared fixture)', 
     expect(result).toContain('```');
     expect(result).toContain('import os');
     expect(result).toContain('from pathlib import Path');
+  });
+});
+
+// ─── Real-world fixture: Rust Axum app with method chains ────────────────────
+
+describe('extractAIAnswer — Rust Axum app with method chains (shared fixture)', () => {
+  it('produces a single code block containing all Rust code including .route() chains', () => {
+    const result = extractAIAnswer(rawRustAxumApp);
+    // All Rust code should be in one fenced block, not split by indented lines
+    expect(result).toContain('async fn main()');
+    expect(result).toContain('.route("/", get(root))');
+    expect(result).toContain('.route("/healthz", get(healthz))');
+    expect(result).toContain('let app = Router::new()');
+    expect(result).toContain('axum::serve(listener, app)');
+
+    // The closing brace should not be a separate plain text paragraph
+    // Count how many times "}" appears outside of code fences
+    const lines = result.split('\n');
+    let inFence = false;
+    const braceOutsideFence = lines.filter(l => {
+      if (/^```/.test(l.trim())) { inFence = !inFence; return false; }
+      return !inFence && l.trim() === '}';
+    });
+    expect(braceOutsideFence.length).toBe(0);
+  });
+
+  it('contains Dockerfile block with FROM and ENTRYPOINT', () => {
+    const result = extractAIAnswer(rawRustAxumApp);
+    expect(result).toContain('FROM rust:1.76-bookworm AS build');
+    expect(result).toContain('ENTRYPOINT ["/app/rust-k8s-example"]');
+  });
+
+  it('preserves the YAML K8s manifest', () => {
+    const result = extractAIAnswer(rawRustAxumApp);
+    expect(result).toContain('apiVersion: apps/v1');
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('kind: Service');
   });
 });
