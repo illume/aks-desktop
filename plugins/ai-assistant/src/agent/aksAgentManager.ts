@@ -311,7 +311,8 @@ function stripAnsi(text: string): string {
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
-    .replace(/^(?:\d{1,2}(?:;\d{1,3})*)m\s?/gm, ''); // Orphaned ANSI code continuations at line start (e.g. "0m" from "[4\n0m")
+    .replace(/^0m\s?/gm, '') // Orphaned ANSI reset at line start (from split "[4\n0m")
+    .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, ''); // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
 }
 
 /**
@@ -1697,18 +1698,27 @@ function normalizeTerminalMarkdown(text: string): string {
 
           if (peekIdx < lines.length) {
             const peekTrimmed = lines[peekIdx].trim();
+            const peekLine = lines[peekIdx];
             // Break at file-type boundaries: a blank line followed by a
             // "file header" comment (e.g. "# Cargo.toml", "// src/main.rs")
             // signals a transition to different file content.
-            // Also break for file-header blocks (started by e.g. "# Cargo.toml"):
-            // config/source file content within terminal output doesn't
-            // span blank lines.
-            // Also break when peek line doesn't look like code.
-            if (
-              isFileHeaderComment(peekTrimmed) ||
-              startedByFileHeader ||
-              !looksLikeShellOrDockerCodeLine(peekTrimmed)
-            ) {
+            if (isFileHeaderComment(peekTrimmed)) {
+              trimTrailingBlanks();
+              break;
+            }
+            // For file-header blocks (started by e.g. "# Cargo.toml"):
+            // allow blank lines within the block (config/source files
+            // often contain them), but break if the next content is no
+            // longer space-prefixed (left the terminal code area) or
+            // two consecutive blank lines were found.
+            if (startedByFileHeader) {
+              const consecutiveBlanks = peekIdx - j;
+              if (consecutiveBlanks >= 2 || !/^\s+\S/.test(peekLine)) {
+                trimTrailingBlanks();
+                break;
+              }
+            } else if (!looksLikeShellOrDockerCodeLine(peekTrimmed)) {
+              // Non-file-header blocks: break when peek line doesn't look like code.
               trimTrailingBlanks();
               break;
             }
@@ -2016,7 +2026,8 @@ function wrapBareYamlBlocks(text: string): string {
             yamlLines.push(yl);
           }
           // Track start of literal/folded block scalar (e.g. "- |" or "key: |")
-          if (/[|>]\s*$/.test(yt)) {
+          // Also matches chomping indicators (|-, |+, >-) and explicit indent (|2, >2)
+          if (/[|>][-+]?\d?\s*$/.test(yt)) {
             inLiteralBlock = true;
             literalBlockIndent = yl.match(/^(\s*)/)?.[1].length ?? 0;
           }

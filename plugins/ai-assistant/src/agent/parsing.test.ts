@@ -2891,6 +2891,75 @@ describe('parser edge cases', () => {
       expect(result).toContain('description: >');
     });
 
+    it('handles YAML with literal block scalar with chomping indicator (|-)', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: script',
+        'data:',
+        '  run.sh: |-',
+        '    #!/bin/bash',
+        '    echo "hello"',
+        '    exit 0',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('run.sh: |-');
+      expect(result).toContain('echo "hello"');
+    });
+
+    it('handles YAML with literal block scalar with keep indicator (|+)', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: config',
+        'data:',
+        '  content: |+',
+        '    line1',
+        '',
+        '    line3',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('content: |+');
+      expect(result).toContain('line1');
+      expect(result).toContain('line3');
+    });
+
+    it('handles YAML with folded block scalar with strip indicator (>-)', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: desc',
+        'data:',
+        '  description: >-',
+        '    This is a long',
+        '    description.',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('description: >-');
+    });
+
+    it('handles YAML with literal block scalar with explicit indent indicator (|2)', () => {
+      const input = [
+        'apiVersion: v1',
+        'kind: ConfigMap',
+        'metadata:',
+        '  name: indented',
+        'data:',
+        '  config: |2',
+        '      indented content',
+        '      more content',
+      ].join('\n');
+      const result = wrapBareYamlBlocks(input);
+      expect(result).toContain('```yaml');
+      expect(result).toContain('config: |2');
+    });
+
     it('handles YAML with boolean-like values', () => {
       const input = [
         'apiVersion: v1',
@@ -5265,9 +5334,10 @@ describe('stripAnsi — orphaned ANSI code continuations', () => {
     expect(stripAnsi('[97;40m hello')).toBe(' hello');
   });
 
-  it('strips orphaned ANSI code continuations at line start (split across lines)', () => {
+  it('strips orphaned ANSI reset code at line start (split across lines)', () => {
     expect(stripAnsi('0m kubectl get pods')).toBe('kubectl get pods');
-    expect(stripAnsi('40m some text')).toBe('some text');
+    // Multi-part codes (with ;) are stripped
+    expect(stripAnsi('97;40m some text')).toBe('some text');
   });
 
   it('preserves normal text that starts with digits', () => {
@@ -5275,10 +5345,14 @@ describe('stripAnsi — orphaned ANSI code continuations', () => {
     expect(stripAnsi('200 OK')).toBe('200 OK');
   });
 
-  it('preserves K8s CPU millicores like 200m at line start', () => {
+  it('preserves K8s CPU millicores at line start', () => {
     expect(stripAnsi('200m')).toBe('200m');
     expect(stripAnsi('200m cpu-limit')).toBe('200m cpu-limit');
     expect(stripAnsi('500m memory')).toBe('500m memory');
+    // Single-part codes like 25m, 40m, 50m are preserved (could be millicores)
+    expect(stripAnsi('25m')).toBe('25m');
+    expect(stripAnsi('40m some text')).toBe('40m some text');
+    expect(stripAnsi('50m cpu-request')).toBe('50m cpu-request');
   });
 });
 
