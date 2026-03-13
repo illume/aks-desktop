@@ -1437,10 +1437,10 @@ function collapseTerminalBlankLines(text: string): string {
       !prevIsTermCode &&
       !nextIsTermCode &&
       prevLine.trimEnd().length >= 60 &&
-      /^[a-z]/.test(nextLine.trim())
+      !/[.!?:]\s*$/.test(prevLine.trimEnd())
     ) {
-      // Prose continuation: long line wrapped at terminal width, next line
-      // continues with a lowercase letter → join (remove blank)
+      // Prose continuation: long line wrapped at terminal width that doesn't
+      // end with sentence-ending punctuation → join (remove blank)
       collapsedCount++;
     } else {
       // Default: keep at most one blank line

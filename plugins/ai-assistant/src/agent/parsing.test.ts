@@ -3795,12 +3795,32 @@ describe('collapseTerminalBlankLines', () => {
     expect(result).toBe(' RUN mvn package\n\n FROM eclipse-temurin:17-jre');
   });
 
-  it('joins prose continuation lines (long line + lowercase start)', () => {
+  it('joins prose continuation lines (long line wrapped at terminal width)', () => {
     const input =
       "Here's a minimal, production-ready example for deploying a Java (Spring Boot)\n\napp on Kubernetes.";
     const result = collapseTerminalBlankLines(input);
     expect(result).toBe(
       "Here's a minimal, production-ready example for deploying a Java (Spring Boot)\napp on Kubernetes."
+    );
+  });
+
+  it('joins uppercase continuation when previous line lacks sentence punctuation', () => {
+    const input =
+      "Adjust health probe paths if you don't use Spring Boot\n\nActuator.";
+    const result = collapseTerminalBlankLines(input);
+    // "...Spring Boot" (55 chars) is short, so NOT joined
+    expect(result).toBe(
+      "Adjust health probe paths if you don't use Spring Boot\n\nActuator."
+    );
+  });
+
+  it('joins uppercase continuation when previous line is long and lacks ending punctuation', () => {
+    const input =
+      "app on Kubernetes. Adjust health probe paths if you don't use Spring Boot\n\nActuator.";
+    const result = collapseTerminalBlankLines(input);
+    // "...Spring Boot" (74 chars) >= 60, doesn't end with punctuation → join
+    expect(result).toBe(
+      "app on Kubernetes. Adjust health probe paths if you don't use Spring Boot\nActuator."
     );
   });
 
@@ -3976,6 +3996,8 @@ describe('extractAIAnswer — terminal-formatted Java deployment with Rich code 
     expect(result).not.toMatch(
       /Here's a minimal.*\(Spring Boot\)\s*\n\n\s*app on Kubernetes/
     );
+    // "...Spring Boot" + "Actuator." continuation should also be joined
+    expect(result).toMatch(/Spring Boot\nActuator\./);
   });
 
   it('wraps Dockerfile in a code fence including # syntax line', () => {
