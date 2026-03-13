@@ -2611,13 +2611,15 @@ export async function runAksAgent(
     if (answer) {
       // Self-review: always ask the agent to review its response once for
       // formatting and correctness.  A single pass — no loop.
-      debugLog('[AKS Agent] Starting self-review');
+      debugLog('[AKS Agent] Starting self-review, original answer length:', answer.length, 'answer:', answer);
       try {
         const reviewPrompt = buildSelfReviewPrompt(answer);
         const reviewResult = await session.ask(reviewPrompt);
         if (reviewResult && reviewResult.trim().length > 0) {
+          debugLog('[AKS Agent] Self-review: raw reviewResult length:', reviewResult.length, 'reviewResult:', reviewResult);
           const reviewAnswer = extractAIAnswer(reviewResult);
           const trimmedReview = reviewAnswer.trim();
+          debugLog('[AKS Agent] Self-review: extracted reviewAnswer length:', reviewAnswer.length, 'reviewAnswer:', reviewAnswer);
           // If the agent confirms the response is fine, use the original
           if (trimmedReview.startsWith('LGTM')) {
             debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
@@ -2629,12 +2631,17 @@ export async function runAksAgent(
             // Use the corrected version (sanity check: must be substantial)
             debugLog(
               '[AKS Agent] Self-review: using corrected response, length:',
-              reviewAnswer.length
+              reviewAnswer.length,
+              'corrected response:',
+              reviewAnswer
             );
             return reviewAnswer;
           } else {
             debugLog(
-              '[AKS Agent] Self-review: corrected response too short — keeping original'
+              '[AKS Agent] Self-review: corrected response too short — keeping original.',
+              'original length:', answer.length,
+              'review length:', reviewAnswer.length,
+              'reviewAnswer:', reviewAnswer
             );
           }
         }
