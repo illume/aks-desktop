@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BASE_AKS_AGENT_PROMPT,
+  MAX_SELF_REVIEW_ATTEMPTS,
   SELF_REVIEW_PROMPT,
   buildEnrichedPrompt,
   buildSelfReviewPrompt,
@@ -238,5 +239,16 @@ describe('SELF_REVIEW_PROMPT', () => {
 
   it('checks for code block formatting', () => {
     expect(SELF_REVIEW_PROMPT).toContain('fenced markdown code blocks');
+  });
+});
+
+describe('MAX_SELF_REVIEW_ATTEMPTS', () => {
+  it('is a positive integer', () => {
+    expect(Number.isInteger(MAX_SELF_REVIEW_ATTEMPTS)).toBe(true);
+    expect(MAX_SELF_REVIEW_ATTEMPTS).toBeGreaterThan(0);
+  });
+
+  it('is bounded to a small value to prevent runaway loops', () => {
+    expect(MAX_SELF_REVIEW_ATTEMPTS).toBeLessThanOrEqual(3);
   });
 });

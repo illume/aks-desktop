@@ -2603,6 +2603,16 @@ class ThinkingStepTracker {
 const MIN_REVIEW_LENGTH_RATIO = 0.3;
 
 /**
+ * Maximum number of self-review round-trips allowed.
+ * Guards against infinite loops if the agent keeps producing unfenced code
+ * in its corrected responses.  Set to 1 for a single review pass; increase
+ * to 2–3 if the agent consistently needs a second correction attempt.
+ * A `for` loop is used (rather than an `if`) so the guard works correctly
+ * when this value is raised.
+ */
+export const MAX_SELF_REVIEW_ATTEMPTS = 1;
+
+/**
  * Runs a question against the AKS agent pod by exec-ing directly into it
  * via the Kubernetes exec API (WebSocket) through Headlamp's proxy.
  * Returns only the final AI answer (clean, no ANSI codes, bullets normalised).
@@ -2640,10 +2650,18 @@ export async function runAksAgent(
     if (answer) {
       // Self-review: if the response contains code-like content outside of
       // fenced code blocks, ask the agent to review and reformat its answer.
-      if (hasUnfencedCode(answer)) {
-        debugLog('[AKS Agent] Unfenced code detected — starting self-review');
+      // Bounded by MAX_SELF_REVIEW_ATTEMPTS to prevent infinite loops.
+      let currentAnswer = answer;
+      for (let attempt = 0; attempt < MAX_SELF_REVIEW_ATTEMPTS; attempt++) {
+        if (!hasUnfencedCode(currentAnswer)) {
+          debugLog('[AKS Agent] No unfenced code detected — skipping self-review');
+          break;
+        }
+        debugLog(
+          `[AKS Agent] Unfenced code detected — self-review attempt ${attempt + 1}/${MAX_SELF_REVIEW_ATTEMPTS}`
+        );
         try {
-          const reviewPrompt = buildSelfReviewPrompt(answer);
+          const reviewPrompt = buildSelfReviewPrompt(currentAnswer);
           const reviewResult = await session.ask(reviewPrompt);
           if (reviewResult && reviewResult.trim().length > 0) {
             const reviewAnswer = extractAIAnswer(reviewResult);
@@ -2651,29 +2669,32 @@ export async function runAksAgent(
             // If the agent confirms the response is fine, use the original
             if (trimmedReview.startsWith('LGTM')) {
               debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
+              break;
             } else if (
               reviewAnswer &&
-              reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
+              reviewAnswer.length > currentAnswer.length * MIN_REVIEW_LENGTH_RATIO
             ) {
               // Use the corrected version (sanity check: must be substantial)
               debugLog(
                 '[AKS Agent] Self-review: using corrected response, length:',
                 reviewAnswer.length
               );
-              return reviewAnswer;
+              currentAnswer = reviewAnswer;
             } else {
               debugLog(
                 '[AKS Agent] Self-review: corrected response too short — keeping original'
               );
+              break;
             }
+          } else {
+            break;
           }
         } catch (e) {
-          console.warn('[AKS Agent] Self-review failed, using original response:', e);
+          console.warn('[AKS Agent] Self-review failed, using current response:', e);
+          break;
         }
-      } else {
-        debugLog('[AKS Agent] No unfenced code detected — skipping self-review');
       }
-      return answer;
+      return currentAnswer;
     }
     // extractAIAnswer stripped everything — the agent ran but produced no
     // user-visible answer.  Return a generic message instead of raw noise.
