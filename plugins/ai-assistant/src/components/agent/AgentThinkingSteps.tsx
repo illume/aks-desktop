@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react';
-import { Box, Collapse, keyframes, Typography, useTheme } from '@mui/material';
+import { Box, CircularProgress, Collapse, keyframes, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentThinkingStep } from '../../agent/aksAgentManager';
@@ -269,6 +269,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
             >
               {isRunning ? 'Agent working…' : 'Done'}
             </Typography>
+            {isRunning && <CircularProgress size={12} thickness={5} aria-label="Agent processing" />}
           </Box>
 
           {/* Phase sections */}
