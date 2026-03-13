@@ -1329,7 +1329,7 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^#!\//.test(trimmed)) return true;
 
   // Dockerfile parser directive: # syntax=..., # escape=..., # check=...
-  if (/^#\s*\w+=\S/.test(trimmed)) return true;
+  if (/^#\s*\w+=.+/.test(trimmed)) return true;
 
   // Environment variable assignment: VAR=value or VAR="value"
   if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
