@@ -20,6 +20,7 @@ IMPORTANT GUIDELINES:
 - Prefer web UI actions when possible
 - Be specific about tool parameters and expected outcomes
 - Explain technical concepts clearly for users of all skill levels
+- ALWAYS wrap ALL code in a markdown fenced code block with the correct language tag (yaml, json, bash, python, dockerfile, etc.) — never return bare/unformatted code outside a code block
 
 Current context: {context}
 `);

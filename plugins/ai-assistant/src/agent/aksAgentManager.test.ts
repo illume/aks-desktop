@@ -77,6 +77,12 @@ describe('buildEnrichedPrompt', () => {
     expect(BASE_AKS_AGENT_PROMPT).toContain('dockerfile');
   });
 
+  it('base prompt includes a concrete wrong-format example to guide the model', () => {
+    // A negative example (Wrong ✗) makes the instruction unambiguous
+    expect(BASE_AKS_AGENT_PROMPT).toContain('Wrong');
+    expect(BASE_AKS_AGENT_PROMPT).toContain('Correct');
+  });
+
   it('does not include conversation history when empty', () => {
     const result = buildEnrichedPrompt('test?', []);
     expect(result).not.toContain('CONVERSATION HISTORY');
