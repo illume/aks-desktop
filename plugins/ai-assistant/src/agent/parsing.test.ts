@@ -6,6 +6,7 @@ const {
   normalizeBullets,
   looksLikeYaml,
   wrapBareYamlBlocks,
+  wrapBareCodeBlocks,
   cleanTerminalFormatting,
   collapseTerminalBlankLines,
   stripAgentNoise,
@@ -1236,6 +1237,92 @@ describe('wrapBareYamlBlocks', () => {
     const result = wrapBareYamlBlocks(input);
     const yamlFences = (result.match(/```yaml/g) || []).length;
     expect(yamlFences).toBe(2);
+  });
+});
+
+describe('wrapBareCodeBlocks', () => {
+  it('wraps a bare curl command in code fences', () => {
+    const input = 'Test your deployment:\n\ncurl http://localhost:8080';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\ncurl http://localhost:8080\n```');
+  });
+
+  it('wraps bare kubectl commands in a single code fence', () => {
+    const input = 'Run these commands:\n\nkubectl apply -f deploy.yaml\nkubectl get pods -n demo -w';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\nkubectl apply -f deploy.yaml\nkubectl get pods -n demo -w\n```');
+  });
+
+  it('wraps bare docker commands', () => {
+    const input = 'Build and push:\n\ndocker build -t myapp:1.0 .\ndocker push myapp:1.0';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\ndocker build -t myapp:1.0 .\ndocker push myapp:1.0\n```');
+  });
+
+  it('wraps bare helm commands', () => {
+    const input = 'Install the chart:\n\nhelm install myrelease ./mychart --namespace demo';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\nhelm install myrelease ./mychart --namespace demo\n```');
+  });
+
+  it('does not wrap prose text', () => {
+    const input = 'This is a paragraph about deploying apps.\nIt explains how to use kubectl.';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toBe(input);
+  });
+
+  it('does not double-wrap code already in fences', () => {
+    const input = '```\ncurl http://localhost:8080\n```';
+    const result = wrapBareCodeBlocks(input);
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(2);
+  });
+
+  it('does not wrap YAML lines (handled by wrapBareYamlBlocks)', () => {
+    const input = 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: test';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).not.toContain('```\napiVersion');
+  });
+
+  it('handles empty string', () => {
+    expect(wrapBareCodeBlocks('')).toBe('');
+  });
+
+  it('wraps multiple separate bare code blocks', () => {
+    const input = 'First step:\n\ncurl http://localhost/health\n\nSecond step:\n\nkubectl get pods';
+    const result = wrapBareCodeBlocks(input);
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(4); // 2 blocks × 2 fences each
+  });
+
+  it('wraps curl with flags', () => {
+    const input = 'Test the endpoint:\n\ncurl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\ncurl');
+    expect(result).toContain('http://localhost:8080/health\n```');
+  });
+
+  it('wraps az aks commands', () => {
+    const input = 'Get credentials:\n\naz aks get-credentials --resource-group myRG --name myCluster';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\naz aks get-credentials');
+  });
+
+  it('preserves markdown structure around wrapped code', () => {
+    const input = '## Step 1\n\nDeploy the app:\n\nkubectl apply -f app.yaml\n\n## Step 2\n\nCheck status:';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('## Step 1');
+    expect(result).toContain('```\nkubectl apply -f app.yaml\n```');
+    expect(result).toContain('## Step 2');
+  });
+
+  it('wraps bare curl after YAML code fence', () => {
+    const input = '```yaml\napiVersion: v1\nkind: Service\n```\n\nTest:\n\ncurl http://localhost:8080';
+    const result = wrapBareCodeBlocks(input);
+    expect(result).toContain('```\ncurl http://localhost:8080\n```');
+    // Should have yaml fence + curl fence = 4 total ``` markers
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(4);
   });
 });
 
@@ -4599,5 +4686,128 @@ describe('extractAIAnswer — Kubernetes kubectl and YAML patterns', () => {
     expect(result).toContain('kubectl create secret generic');
     expect(result).toContain('kubectl create configmap');
     expect(result).toContain('kubectl get secrets');
+  });
+});
+
+// ─── Bare code block wrapping in extractAIAnswer (curl, kubectl, etc.) ───────
+
+describe('extractAIAnswer — bare code line wrapping', () => {
+  it('wraps bare curl command in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Test the endpoint:',
+      '',
+      'curl http://localhost:8080/health',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```\ncurl http://localhost:8080/health\n```');
+  });
+
+  it('wraps bare curl with flags in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Check the service:',
+      '',
+      'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```\ncurl');
+  });
+
+  it('wraps bare kubectl commands in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Apply and check:',
+      '',
+      'kubectl apply -f app.yaml',
+      'kubectl get pods -n demo',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```\nkubectl apply -f app.yaml\nkubectl get pods -n demo\n```');
+  });
+
+  it('wraps bare docker build + push in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Build and push:',
+      '',
+      'docker build -t myapp:latest .',
+      'docker push myapp:latest',
+      '',
+      'Then deploy.',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```\ndocker build -t myapp:latest .\ndocker push myapp:latest\n```');
+  });
+
+  it('wraps bare helm install in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Install nginx ingress:',
+      '',
+      'helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx',
+      'helm install nginx ingress-nginx/ingress-nginx --namespace ingress --create-namespace',
+      '',
+      'Wait for the external IP.',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```\nhelm repo add');
+    expect(result).toContain('helm install nginx');
+  });
+
+  it('preserves YAML in yaml fence and wraps bare curl separately', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Apply:',
+      '',
+      '```yaml',
+      'apiVersion: v1',
+      'kind: Service',
+      'metadata:',
+      '  name: myapp',
+      '```',
+      '',
+      'Then test:',
+      '',
+      'curl http://localhost:8080',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```yaml\napiVersion: v1');
+    expect(result).toContain('```\ncurl http://localhost:8080\n```');
+  });
+
+  it('wraps bare az aks commands in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Get your kubeconfig:',
+      '',
+      'az aks get-credentials --resource-group myRG --name myCluster',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```\naz aks get-credentials');
+  });
+
+  it('does not wrap prose mentioning commands', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'You can use kubectl to check pod status. The curl command tests connectivity.',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    // Prose should NOT be wrapped in code fences
+    expect(result).not.toContain('```');
   });
 });

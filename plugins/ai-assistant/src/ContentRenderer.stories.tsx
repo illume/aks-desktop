@@ -1014,3 +1014,84 @@ export const RealWorldJavaDeployOptionABDark: StoryFn<typeof ContentRenderer> = 
     <ContentRenderer content={extractAIAnswer(rawJavaDeployOptionAB)} />
   </ThemeProvider>
 );
+
+// ─── Story: Kubernetes deployment with bare curl command ─────────────────────
+
+const rawK8sDeployWithCurl = [
+  'stty -echo',
+  '\x1b[?2004l',
+  '\x1b[?2004hroot@aks-agent-pod:/app# ',
+  '\x1b[?2004l\r',
+  '\x1b[?2004h> ',
+  '\x1b[?2004l\r',
+  '\x1b[1;96mAI:\x1b[0m ',
+  "Here's how to deploy an nginx web server and test it:",
+  '',
+  '```yaml',
+  'apiVersion: apps/v1',
+  'kind: Deployment',
+  'metadata:',
+  '  name: nginx-demo',
+  '  namespace: default',
+  'spec:',
+  '  replicas: 2',
+  '  selector:',
+  '    matchLabels:',
+  '      app: nginx-demo',
+  '  template:',
+  '    metadata:',
+  '      labels:',
+  '        app: nginx-demo',
+  '    spec:',
+  '      containers:',
+  '        - name: nginx',
+  '          image: nginx:1.25-alpine',
+  '          ports:',
+  '            - containerPort: 80',
+  '          resources:',
+  '            requests:',
+  '              cpu: 50m',
+  '              memory: 64Mi',
+  '            limits:',
+  '              cpu: 200m',
+  '              memory: 128Mi',
+  '---',
+  'apiVersion: v1',
+  'kind: Service',
+  'metadata:',
+  '  name: nginx-demo',
+  '  namespace: default',
+  'spec:',
+  '  selector:',
+  '    app: nginx-demo',
+  '  ports:',
+  '    - port: 80',
+  '      targetPort: 80',
+  '  type: ClusterIP',
+  '```',
+  '',
+  'Apply and verify:',
+  '',
+  'kubectl apply -f nginx-demo.yaml',
+  'kubectl get pods -l app=nginx-demo -w',
+  'kubectl port-forward svc/nginx-demo 8080:80',
+  '',
+  'Test the service:',
+  '',
+  'curl http://localhost:8080',
+  'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/healthz',
+  '',
+  'You should see the default nginx welcome page and a 200 status code.',
+  '\x1b[?2004hroot@aks-agent-pod:/app# ',
+].join('\r\n');
+
+export const RealWorldK8sDeployWithCurl: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer content={extractAIAnswer(rawK8sDeployWithCurl)} />
+);
+
+export const RealWorldK8sDeployWithCurlDark: StoryFn<typeof ContentRenderer> = () => (
+  <ThemeProvider theme={darkTheme}>
+    <CssBaseline />
+    <ContentRenderer content={extractAIAnswer(rawK8sDeployWithCurl)} />
+  </ThemeProvider>
+);

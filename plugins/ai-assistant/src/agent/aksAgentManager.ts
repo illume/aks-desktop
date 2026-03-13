@@ -1761,6 +1761,125 @@ function wrapBareYamlBlocks(text: string): string {
 }
 
 /**
+ * Detect contiguous blocks of bare shell/Docker commands (not already inside
+ * markdown code fences and not indented) and wrap each one in ``` fences so
+ * that ReactMarkdown renders them as code blocks.
+ *
+ * This handles the case where the AI response includes bare commands like
+ *   curl http://localhost:8080
+ *   kubectl apply -f deploy.yaml
+ * that are not indented (so normalizeTerminalMarkdown doesn't catch them)
+ * and are not YAML (so wrapBareYamlBlocks doesn't catch them).
+ *
+ * Detection starts when a non-blank, non-indented line matches
+ * looksLikeShellOrDockerCodeLine(). It collects consecutive code lines
+ * (allowing single blank lines between them) and wraps them in ``` fences.
+ */
+function wrapBareCodeBlocks(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let i = 0;
+  let inCodeFence = false;
+  let wrappedBlockCount = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Track existing code fences
+    if (/^```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // Detect start of a bare code block: non-blank, non-indented, looks like code
+    // Exclude lines that start with # (could be markdown headings) unless they
+    // match a Dockerfile directive or shell comment with URL/path
+    if (
+      trimmed !== '' &&
+      !/^\s+/.test(line) &&
+      looksLikeShellOrDockerCodeLine(trimmed) &&
+      !looksLikeYaml(trimmed)
+    ) {
+      const codeLines: string[] = [];
+      let j = i;
+
+      while (j < lines.length) {
+        const cl = lines[j];
+        const ct = cl.trim();
+
+        // Allow single blank lines within a code block
+        if (ct === '') {
+          // Peek ahead: if next non-blank line is also code, keep collecting
+          let peekIdx = j + 1;
+          while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
+          if (peekIdx < lines.length) {
+            const peekTrimmed = lines[peekIdx].trim();
+            if (
+              looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+              !looksLikeYaml(peekTrimmed) &&
+              !/^\s+/.test(lines[peekIdx])
+            ) {
+              codeLines.push(cl);
+              j++;
+              continue;
+            }
+          }
+          break;
+        }
+
+        // Stop if line is indented (belongs to different formatting)
+        if (/^\s+/.test(cl)) {
+          break;
+        }
+
+        // Stop if line doesn't look like code
+        if (!looksLikeShellOrDockerCodeLine(ct) || looksLikeYaml(ct)) {
+          break;
+        }
+
+        codeLines.push(cl);
+        j++;
+      }
+
+      // Trim trailing blank lines
+      while (codeLines.length > 0 && codeLines[codeLines.length - 1].trim() === '') {
+        codeLines.pop();
+      }
+
+      if (codeLines.length > 0) {
+        result.push('```');
+        result.push(...codeLines);
+        result.push('```');
+        wrappedBlockCount++;
+        i = j;
+        continue;
+      }
+    }
+
+    result.push(line);
+    i++;
+  }
+
+  if (wrappedBlockCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] wrapBareCodeBlocks: wrapped',
+      wrappedBlockCount,
+      'bare code blocks'
+    );
+  }
+
+  return result.join('\n');
+}
+
+/**
  * Clean up Rich terminal UI decorations and terminal line-padding:
  *  - Remove Rich panel border lines  (┏━━━┓ / ┗━━━┛)
  *  - Unwrap Rich panel content lines (┃  text  ┃  →  text)
@@ -2066,7 +2185,12 @@ function extractAIAnswer(rawOutput: string): string {
     '[AKS Agent Parse] extractAIAnswer: after normalizeTerminalMarkdown, length:',
     afterTerminalMarkdown.length
   );
-  const result = wrapBareYamlBlocks(afterTerminalMarkdown);
+  const afterYamlWrap = wrapBareYamlBlocks(afterTerminalMarkdown);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after wrapBareYamlBlocks, length:',
+    afterYamlWrap.length
+  );
+  const result = wrapBareCodeBlocks(afterYamlWrap);
   detailLog(
     '[AKS Agent Parse] extractAIAnswer: final result length:',
     result.length,
@@ -2870,6 +2994,7 @@ export const _testing = {
   normalizeBullets,
   looksLikeYaml,
   wrapBareYamlBlocks,
+  wrapBareCodeBlocks,
   cleanTerminalFormatting,
   collapseTerminalBlankLines,
   stripAgentNoise,
