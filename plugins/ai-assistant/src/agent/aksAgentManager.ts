@@ -325,14 +325,63 @@ function normalizeBullets(text: string): string {
 }
 
 function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
-  return (
+  // Dockerfile instructions (uppercase keywords)
+  if (
     /^(FROM|RUN|CMD|COPY|WORKDIR|EXPOSE|ENTRYPOINT|ENV|ARG|USER|LABEL|ADD|SHELL|VOLUME|STOPSIGNAL|HEALTHCHECK|ONBUILD)\b/.test(
       trimmed
-    ) ||
-    /^(docker|kubectl|helm|az|npm|pnpm|yarn|pip|python|uvicorn|gunicorn|flask|django-admin|poetry|curl|wget|git)\b/.test(
+    )
+  ) {
+    return true;
+  }
+
+  // Common CLI tools and package managers
+  if (
+    /^(docker|podman|nerdctl|kubectl|helm|az|gcloud|aws|npm|npx|pnpm|yarn|pip3?|python3?|uvicorn|gunicorn|flask|django-admin|poetry|curl|wget|git|make|cmake|go|cargo|java|javac|node|ruby|php|dotnet|terraform|ansible|vagrant|gradle|mvn)\b/.test(
       trimmed
     )
-  );
+  ) {
+    return true;
+  }
+
+  // System administration and package management
+  if (
+    /^(sudo|apt-get|apt|yum|dnf|brew|apk|pacman|snap|systemctl|service|journalctl)\b/.test(
+      trimmed
+    )
+  ) {
+    return true;
+  }
+
+  // Common Unix/shell commands (when followed by space or end-of-line for accuracy)
+  if (
+    /^(cd|mkdir|rm|rmdir|cp|mv|ln|chmod|chown|chgrp|cat|tee|echo|printf|grep|egrep|sed|awk|find|xargs|tar|gzip|gunzip|unzip|zip|ssh|scp|rsync|touch|sort|head|tail|wc|cut|tr|diff|patch|kill|export|source|bash|sh|zsh|nohup|test|sleep|wait|set|unset|eval|exec|alias)\b/.test(
+      trimmed
+    )
+  ) {
+    return true;
+  }
+
+  // Executable path: ./script.sh or /usr/bin/something
+  if (/^\.\/\w/.test(trimmed)) {
+    return true;
+  }
+
+  // Shell prompt: $ command
+  if (/^\$\s+\w/.test(trimmed)) {
+    return true;
+  }
+
+  // Shebang line: #!/bin/bash
+  if (/^#!\//.test(trimmed)) {
+    return true;
+  }
+
+  // Environment variable assignment: VAR=value or VAR="value"
+  if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -1688,4 +1737,6 @@ export const _testing = {
   extractTaskRow,
   friendlyToolLabel,
   stripCommandEcho,
+  looksLikeShellOrDockerCodeLine,
+  normalizeTerminalMarkdown,
 };
