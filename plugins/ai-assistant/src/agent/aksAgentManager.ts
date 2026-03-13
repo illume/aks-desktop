@@ -1588,7 +1588,7 @@ function normalizeTerminalMarkdown(text: string): string {
         blockLines.pop();
       }
 
-      if (codeLikeLineCount >= 2) {
+      if (codeLikeLineCount >= 1) {
         const nonBlank = blockLines.filter(l => l.trim() !== '');
         const minIndent = nonBlank.reduce((min, l) => {
           const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
@@ -1638,8 +1638,12 @@ function looksLikeYaml(trimmed: string): boolean {
   if (/^["'][^"']+["']:\s?/.test(trimmed)) return true;
   // list item:  - something
   if (/^-\s/.test(trimmed) || trimmed === '-') return true;
-  // flow mapping/sequence: { ... } or [ ... ]
+  // flow mapping/sequence opener: { ... } or [ ... ]
   if (/^[{\[]/.test(trimmed)) return true;
+  // flow mapping/sequence closer: } or ] (continuation from previous line)
+  if (/^[}\]]/.test(trimmed)) return true;
+  // Quoted scalar value (e.g. "http://..." on its own line after key:)
+  if (/^["'][^"']*["']$/.test(trimmed)) return true;
   // continuation value (indented scalar, e.g. multiline string)
   return false;
 }
@@ -1715,7 +1719,20 @@ function wrapBareYamlBlocks(text: string): string {
           yamlLines.push(yl);
           j++;
         } else {
-          break;
+          // Check if this line is a YAML value continuation:
+          // - Previous line ended with ':' (key with value on next line)
+          // - Previous line had unclosed braces/brackets (flow expression continues)
+          const prevYaml = yamlLines.length > 0 ? yamlLines[yamlLines.length - 1].trim() : '';
+          const prevEndsWithColon = /:\s*$/.test(prevYaml);
+          const prevUnclosed =
+            (prevYaml.split('{').length - prevYaml.split('}').length > 0) ||
+            (prevYaml.split('[').length - prevYaml.split(']').length > 0);
+          if (prevEndsWithColon || prevUnclosed) {
+            yamlLines.push(yl);
+            j++;
+          } else {
+            break;
+          }
         }
       }
 

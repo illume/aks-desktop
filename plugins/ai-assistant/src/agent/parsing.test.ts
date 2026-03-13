@@ -1033,10 +1033,17 @@ describe('normalizeTerminalMarkdown', () => {
     expect(result).toBe(input);
   });
 
-  it('does not wrap single indented line as code block', () => {
+  it('wraps single indented code line in code fence', () => {
     const input = 'Hello\n docker build -t myapp .\nDone.';
     const result = normalizeTerminalMarkdown(input);
-    expect(result).not.toContain('```');
+    expect(result).toContain('```\ndocker build -t myapp .\n```');
+    expect(result).toContain('Done.');
+  });
+
+  it('wraps single indented kubectl apply line in code fence', () => {
+    const input = 'Then:\n\n kubectl apply -f app.yaml';
+    const result = normalizeTerminalMarkdown(input);
+    expect(result).toContain('```\nkubectl apply -f app.yaml\n```');
   });
 
   it('does not treat prose lines as code', () => {
@@ -1237,6 +1244,73 @@ describe('wrapBareYamlBlocks', () => {
     const result = wrapBareYamlBlocks(input);
     const yamlFences = (result.match(/```yaml/g) || []).length;
     expect(yamlFences).toBe(2);
+  });
+
+  it('includes YAML value continuation when key ends with colon', () => {
+    const input = [
+      'apiVersion: v1',
+      'kind: ConfigMap',
+      'metadata:',
+      '  name: global-config',
+      '  namespace: apps',
+      'data:',
+      '  OTEL_EXPORTER_OTLP_ENDPOINT:',
+      '"http://otel-collector.observability.svc.cluster.local:4317"',
+      '---',
+      'apiVersion: v1',
+      'kind: Secret',
+    ].join('\n');
+
+    const result = wrapBareYamlBlocks(input);
+    // The quoted value should be INSIDE the yaml fence, not outside
+    expect(result).toContain('OTEL_EXPORTER_OTLP_ENDPOINT:');
+    expect(result).toContain('"http://otel-collector.observability.svc.cluster.local:4317"');
+    // Should be one continuous yaml block
+    const yamlFences = (result.match(/```yaml/g) || []).length;
+    expect(yamlFences).toBe(1);
+  });
+
+  it('includes YAML value continuation for unclosed flow braces', () => {
+    const input = [
+      'apiVersion: apps/v1',
+      'kind: StatefulSet',
+      'spec:',
+      '  containers:',
+      '    - name: postgres',
+      '      env:',
+      '        - name: POSTGRES_USER',
+      '          valueFrom: { secretKeyRef: { name: db-credentials, key:',
+      'POSTGRES_USER } }',
+      '        - name: POSTGRES_PASSWORD',
+      '          valueFrom: { secretKeyRef: { name: db-credentials, key:',
+      'POSTGRES_PASSWORD } }',
+    ].join('\n');
+
+    const result = wrapBareYamlBlocks(input);
+    // Continuations should be inside the fence
+    expect(result).toContain('POSTGRES_USER } }');
+    expect(result).toContain('POSTGRES_PASSWORD } }');
+    // Should be one yaml block
+    const yamlFences = (result.match(/```yaml/g) || []).length;
+    expect(yamlFences).toBe(1);
+  });
+
+  it('includes flow mapping closer } after flow opener', () => {
+    const input = [
+      'apiVersion: v1',
+      'kind: Pod',
+      'spec:',
+      '  containers:',
+      '    - name: test',
+      '      resources:',
+      '        requests: { cpu: "150m", memory: "256Mi" }',
+      '        limits: { cpu: "1", memory: "1Gi" }',
+    ].join('\n');
+
+    const result = wrapBareYamlBlocks(input);
+    expect(result).toContain('```yaml');
+    expect(result).toContain('{ cpu: "150m", memory: "256Mi" }');
+    expect(result).toContain('{ cpu: "1", memory: "1Gi" }');
   });
 });
 
@@ -4323,6 +4397,18 @@ describe('extractAIAnswer — real-world Java deploy with Option A/B and Rich pa
     expect(result).toContain('Use Spring Initializr');
     expect(result).toContain('Then:');
   });
+
+  it('wraps trailing kubectl apply -f in a code fence, not as emphasis', () => {
+    const result = extractAIAnswer(rawJavaDeployOptionAB);
+    // The trailing 'kubectl apply -f app.yaml' MUST be inside a code fence
+    const lastKubectl = result.lastIndexOf('kubectl apply -f app.yaml');
+    expect(lastKubectl).toBeGreaterThan(-1);
+    // Check that there's a ``` fence before it (and no unclosed fence between)
+    const before = result.slice(0, lastKubectl);
+    const fencesBefore = (before.match(/```/g) || []).length;
+    // Odd number of fences before = inside a fence (good)
+    expect(fencesBefore % 2).toBe(1);
+  });
 });
 
 // ─── Kubernetes-focused normalizeTerminalMarkdown tests ──────────────────────
@@ -4366,7 +4452,7 @@ describe('normalizeTerminalMarkdown — Kubernetes / kubectl scenarios', () => {
     // kubectl commands should be in a code fence
     expect(result).toContain('```\nkubectl apply');
     // "Option B:" should NOT be inside the code fence
-    expect(result).not.toMatch(/```[^`]*Option B[^`]*```/s);
+    expect(result).not.toMatch(/```[^`]*Option B[^`]*```/);
     expect(result).toContain('Option B: build your own app');
   });
 
@@ -4687,6 +4773,66 @@ describe('extractAIAnswer — Kubernetes kubectl and YAML patterns', () => {
     expect(result).toContain('kubectl create configmap');
     expect(result).toContain('kubectl get secrets');
   });
+
+  it('handles terminal-wrapped YAML values (key: on one line, value on next)', () => {
+    // Simulates Rich terminal formatting where long YAML values wrap to next line
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Below is a multi-document YAML example for a microservice setup.',
+      '',
+      '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mConfigMap                                                               \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mglobal-config                                                         \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mdata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                         \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mLOG_LEVEL\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40minfo\x1b[0m\x1b[93;40m"\x1b[0m\x1b[40m                                                           \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mOTEL_EXPORTER_OTLP_ENDPOINT\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m                                               \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40mhttp://otel-collector.observability.svc.cluster.local:4317\x1b[0m\x1b[93;40m"\x1b[0m\x1b[40m                  \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mSecret                                                                  \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mdb-credentials                                                        \x1b[0m\x1b[40m \x1b[0m',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    // The OTEL endpoint URL must be INSIDE the yaml fence, not outside
+    expect(result).toContain('OTEL_EXPORTER_OTLP_ENDPOINT:');
+    expect(result).toContain('"http://otel-collector.observability.svc.cluster.local:4317"');
+    // Both ConfigMap and Secret should be in a single yaml block
+    expect(result).toContain('kind: ConfigMap');
+    expect(result).toContain('kind: Secret');
+    const yamlFences = (result.match(/```yaml/g) || []).length;
+    expect(yamlFences).toBe(1);
+  });
+
+  it('handles terminal-wrapped YAML with unclosed flow braces', () => {
+    // Simulates Rich terminal wrapping a long flow expression across lines
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Here is the StatefulSet:',
+      '',
+      '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mapps/v1                                                           \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mStatefulSet                                                             \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[91;40mspec\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                         \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mcontainers\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                             \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m    \x1b[0m\x1b[40m-\x1b[0m\x1b[97;40m \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mpostgres                                                      \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m      \x1b[0m\x1b[91;40menv\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m        \x1b[0m\x1b[40m-\x1b[0m\x1b[97;40m \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mPOSTGRES_USER                                             \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40m          \x1b[0m\x1b[91;40mvalueFrom\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m{\x1b[0m\x1b[91;40m secretKeyRef\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m{\x1b[0m\x1b[91;40m name\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mdb-credentials\x1b[0m\x1b[40m,\x1b[0m\x1b[91;40m key\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m        \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40mPOSTGRES_USER\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m}\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m}                                                             \x1b[0m\x1b[40m \x1b[0m',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    // The continuation 'POSTGRES_USER } }' must be inside the yaml fence
+    expect(result).toContain('POSTGRES_USER } }');
+    expect(result).toContain('```yaml');
+    // Should be one yaml block
+    const yamlFences = (result.match(/```yaml/g) || []).length;
+    expect(yamlFences).toBe(1);
+  });
 });
 
 // ─── Bare code block wrapping in extractAIAnswer (curl, kubectl, etc.) ───────
@@ -4809,5 +4955,21 @@ describe('extractAIAnswer — bare code line wrapping', () => {
     const result = extractAIAnswer(raw);
     // Prose should NOT be wrapped in code fences
     expect(result).not.toContain('```');
+  });
+
+  it('wraps single indented kubectl line from terminal output in code fence', () => {
+    const raw = [
+      '\x1b[1;96mAI:\x1b[0m ',
+      'Then:',
+      '',
+      '\x1b[40m                                                                                \x1b[0m',
+      '\x1b[40m \x1b[0m\x1b[97;40mkubectl\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mapply\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40m-f\x1b[0m\x1b[97;40m \x1b[0m\x1b[97;40mapp.yaml\x1b[0m\x1b[40m                                                     \x1b[0m\x1b[40m \x1b[0m',
+      '\x1b[40m                                                                                \x1b[0m',
+      '',
+      '\x1b[?2004hroot@aks-agent:/app# ',
+    ].join('\r\n');
+    const result = extractAIAnswer(raw);
+    expect(result).toContain('```');
+    expect(result).toContain('kubectl apply -f app.yaml');
   });
 });
