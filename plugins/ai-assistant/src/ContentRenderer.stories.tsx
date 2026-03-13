@@ -7,20 +7,20 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { _testing } from './agent/aksAgentManager';
 import {
+  rawBareYamlService,
+  rawBestPractices,
+  rawCrashDiagnosis,
+  rawJavaDeployOptionAB,
+  rawJavaDeployTerminal,
+  rawK8sDeployWithCurl,
   rawMicroservicesPythonYaml,
+  rawMicroserviceYaml,
+  rawMultiResource,
+  rawPodStatus,
+  rawPythonDeploymentAdvice,
   rawPythonFlaskApp,
   rawRustAxumApp,
   rawRustK8sDeployment,
-  rawPodStatus,
-  rawCrashDiagnosis,
-  rawBestPractices,
-  rawMultiResource,
-  rawBareYamlService,
-  rawPythonDeploymentAdvice,
-  rawJavaDeployTerminal,
-  rawJavaDeployOptionAB,
-  rawK8sDeployWithCurl,
-  rawMicroserviceYaml,
 } from './agent/testFixtures';
 import ContentRenderer from './ContentRenderer';
 

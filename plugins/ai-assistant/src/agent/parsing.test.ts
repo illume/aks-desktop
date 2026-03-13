@@ -3,29 +3,29 @@ import YAML from 'yaml';
 import { parseKubernetesYAML } from '../utils/SampleYamlLibrary';
 import { _testing } from './aksAgentManager';
 import {
+  syntheticCSharpDotnetApp,
+  syntheticGoHttpServer,
+  syntheticHelmValuesYaml,
+  syntheticNodeExpressApp,
+  syntheticTerraformAksModule,
+} from './syntheticFixtures';
+import {
+  rawBareYamlService,
+  rawBestPractices,
+  rawCrashDiagnosis,
+  rawJavaDeployOptionAB,
+  rawJavaDeployTerminal,
+  rawK8sDeployWithCurl,
   rawMicroservicesPythonYaml,
+  rawMicroserviceYaml as rawMicroserviceYamlFixture,
+  rawMultiResource,
+  rawPodStatus,
+  rawPythonDeploymentAdvice,
   rawPythonFlaskApp,
   rawPythonImports,
   rawRustAxumApp,
   rawRustK8sDeployment,
-  rawPodStatus,
-  rawCrashDiagnosis,
-  rawBestPractices,
-  rawMultiResource,
-  rawBareYamlService,
-  rawPythonDeploymentAdvice,
-  rawJavaDeployTerminal,
-  rawJavaDeployOptionAB,
-  rawK8sDeployWithCurl,
-  rawMicroserviceYaml as rawMicroserviceYamlFixture,
 } from './testFixtures';
-import {
-  syntheticGoHttpServer,
-  syntheticNodeExpressApp,
-  syntheticHelmValuesYaml,
-  syntheticCSharpDotnetApp,
-  syntheticTerraformAksModule,
-} from './syntheticFixtures';
 
 const {
   stripAnsi,
@@ -6177,32 +6177,29 @@ describe('extractAIAnswer — syntheticGoHttpServer (synthetic fixture)', () => 
     result = extractAIAnswer(syntheticGoHttpServer);
   });
 
-  it('Go code in a code block contains "package main"', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('package main'))).toBe(true);
+  it('all Go code is inside code fences — no "if port ==" leaked as prose', () => {
+    const lines = result.split('\n');
+    let inFence = false;
+    const goLeaks = lines.filter(l => {
+      if (/^```/.test(l.trim())) {
+        inFence = !inFence;
+        return false;
+      }
+      return !inFence && /\bport\b.*:=|if\s+port\s*==|func\s+main\(\)|go\s+func\(\)/.test(l);
+    });
+    expect(goLeaks).toEqual([]);
   });
 
-  it('Go code contains "func main()"', () => {
+  it('Go code block contains "package main", "func main()", ":=", "go func()"', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('func main()'))).toBe(true);
+    const goBlock = blocks.find(b => b.includes('package main'));
+    expect(goBlock).toBeDefined();
+    expect(goBlock).toContain('func main()');
+    expect(goBlock).toContain(':=');
+    expect(goBlock).toContain('go func()');
   });
 
-  it('Go code contains ":=" short declaration', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes(':='))).toBe(true);
-  });
-
-  it('Go code contains "go func()"', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('go func()'))).toBe(true);
-  });
-
-  it('Dockerfile in a separate code block (FROM golang)', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('FROM golang'))).toBe(true);
-  });
-
-  it('Go code and Dockerfile are in DIFFERENT code blocks', () => {
+  it('Dockerfile in a SEPARATE code block from Go source', () => {
     const blocks = extractCodeBlocks(result);
     const goBlock = blocks.find(b => b.includes('package main'));
     const dockerBlock = blocks.find(b => b.includes('FROM golang'));
@@ -6224,31 +6221,22 @@ describe('extractAIAnswer — syntheticNodeExpressApp (synthetic fixture)', () =
     result = extractAIAnswer(syntheticNodeExpressApp);
   });
 
-  it('package.json content present in output', () => {
-    expect(result).toContain('"express"');
+  it('package.json content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('"express"'))).toBe(true);
   });
 
-  it('JS code present in output with require', () => {
-    expect(result).toContain("require('express')");
-  });
-
-  it('JS code contains app.get', () => {
-    expect(result).toContain('app.get');
-  });
-
-  it('JS code contains app.listen', () => {
-    expect(result).toContain('app.listen');
+  it('index.js code is inside a code fence (require, app.get, app.listen)', () => {
+    const blocks = extractCodeBlocks(result);
+    const jsBlock = blocks.find(b => b.includes("require('express')"));
+    expect(jsBlock).toBeDefined();
+    expect(jsBlock).toContain('app.get');
+    expect(jsBlock).toContain('app.listen');
   });
 
   it('Dockerfile in a code block (FROM node)', () => {
     const blocks = extractCodeBlocks(result);
     expect(blocks.some(b => b.includes('FROM node'))).toBe(true);
-  });
-
-  it('contains all three file sections', () => {
-    expect(result).toContain('"express"');
-    expect(result).toContain("require('express')");
-    expect(result).toContain('FROM node');
   });
 
   it('has no ANSI leaks', () => {
@@ -6264,21 +6252,14 @@ describe('extractAIAnswer — syntheticHelmValuesYaml (synthetic fixture)', () =
     result = extractAIAnswer(syntheticHelmValuesYaml);
   });
 
-  it('YAML content present in output', () => {
-    expect(result).toContain('controller:');
+  it('YAML content is inside a yaml fence', () => {
+    const yamlFences = (result.match(/```yaml/g) || []).length;
+    expect(yamlFences).toBeGreaterThanOrEqual(1);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('controller:') && b.includes('replicaCount:'))).toBe(true);
   });
 
-  it('contains "controller:" key', () => {
-    expect(result).toContain('controller:');
-  });
-
-  it('contains "replicaCount:" key', () => {
-    expect(result).toContain('replicaCount:');
-  });
-
-  it('helm install command is present but not inside a yaml block', () => {
-    expect(result).toContain('helm install');
-    // If there are yaml-fenced blocks, helm install should not be inside them
+  it('helm install command is NOT inside the yaml block', () => {
     const blocks = extractCodeBlocks(result);
     const yamlBlocksWithHelm = blocks.filter(
       b => b.includes('controller:') && b.includes('helm install')
@@ -6299,22 +6280,30 @@ describe('extractAIAnswer — syntheticCSharpDotnetApp (synthetic fixture)', () 
     result = extractAIAnswer(syntheticCSharpDotnetApp);
   });
 
-  it('C# code present in output with "using Microsoft"', () => {
-    expect(result).toContain('using Microsoft');
-  });
-
-  it('C# code contains "WebApplication.CreateBuilder"', () => {
-    expect(result).toContain('WebApplication.CreateBuilder');
-  });
-
-  it('Dockerfile in a code block (FROM mcr.microsoft.com)', () => {
+  it('C# code is inside a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('FROM mcr.microsoft.com'))).toBe(true);
+    const csBlock = blocks.find(b => b.includes('WebApplication.CreateBuilder'));
+    expect(csBlock).toBeDefined();
+    expect(csBlock).toContain('using Microsoft');
+  });
+
+  it('Dockerfile in a SEPARATE code block from C# source', () => {
+    const blocks = extractCodeBlocks(result);
+    const csBlock = blocks.find(b => b.includes('WebApplication.CreateBuilder'));
+    const dockerBlock = blocks.find(b => b.includes('FROM mcr.microsoft.com'));
+    expect(csBlock).toBeDefined();
+    expect(dockerBlock).toBeDefined();
+    expect(csBlock).not.toBe(dockerBlock);
   });
 
   it('dotnet/docker/kubectl commands in a code block', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('dotnet') || b.includes('docker') || b.includes('kubectl'))).toBe(true);
+    expect(
+      blocks.some(
+        b =>
+          b.includes('dotnet publish') || b.includes('docker build') || b.includes('kubectl apply')
+      )
+    ).toBe(true);
   });
 
   it('has no ANSI leaks', () => {

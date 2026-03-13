@@ -6,17 +6,13 @@
  * Terraform HCL).
  */
 
-function termLine(content: string, color = '97;40'): string {
-  const padded = content.padEnd(78);
-  return `\x1b[40m \x1b[0m\x1b[${color}m${padded}\x1b[0m\x1b[40m \x1b[0m`;
-}
-function commentLine(content: string): string {
-  return termLine(content, '37;40');
-}
+/** Helper: simulate a Rich code panel line with ANSI color codes. */
 function panelLine(content: string, keyColor = '97;40'): string {
   const padded = content.padEnd(78);
   return `\x1b[40m \x1b[0m\x1b[${keyColor}m${padded}\x1b[0m\x1b[40m \x1b[0m`;
 }
+
+/** Helper: blank panel line (just [40m background filling the whole width) */
 function panelBlank(): string {
   return '\x1b[40m' + ' '.repeat(80) + '\x1b[0m';
 }

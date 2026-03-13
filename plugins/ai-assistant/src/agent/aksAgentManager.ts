@@ -1477,6 +1477,15 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^(func|package)\s+\w+/.test(trimmed)) return true;
   if (/^(var|type)\s+\w+\s+\w+/.test(trimmed)) return true;
 
+  // Go control flow: if, for, switch, select, return, defer, go
+  // Require opening brace or parenthesis to avoid matching English prose.
+  if (/^(if|for|switch|select)\s+.+\{/.test(trimmed)) return true;
+  if (/^(defer|go)\s+(func\b|\w+\.\w+)/.test(trimmed)) return true;
+  if (/^return\s+\S/.test(trimmed) && /[;{}()\[\]]/.test(trimmed)) return true;
+
+  // Go/Rust short variable declaration: identifier := expr
+  if (/^\w+\s*:=\s*\S/.test(trimmed)) return true;
+
   return false;
 }
 
@@ -1673,7 +1682,8 @@ function normalizeTerminalMarkdown(text: string): string {
       /^\s{6,}\S/.test(line) &&
       prevTrimmed === '' &&
       nextTrimmed === '' &&
-      !looksLikeShellOrDockerCodeLine(trimmed)
+      !looksLikeShellOrDockerCodeLine(trimmed) &&
+      !isBoldFileHeading(trimmed)
     ) {
       trimmedHeadingCount++;
       result.push(trimmed);
@@ -1683,12 +1693,14 @@ function normalizeTerminalMarkdown(text: string): string {
 
     // Bold file headings (e.g. "Cargo.toml", "src/main.rs", "Dockerfile")
     // Rich terminal renders these as bold text outside code panels.
-    // After ANSI stripping they appear as bare filenames on their own line,
-    // followed by a blank line and then space-prefixed code content.
+    // After ANSI stripping they appear as bare filenames on their own line
+    // (possibly centered with leading whitespace), followed by a blank line
+    // and then space-prefixed code content.
     // Emit the heading, then collect subsequent space-prefixed lines as a
     // code block (the content may be TOML, Rust, Dockerfile, etc.).
-    if (!/^\s+/.test(line) && isBoldFileHeading(trimmed)) {
-      result.push(line);
+    if (isBoldFileHeading(trimmed)) {
+      // Emit the heading (trimmed if centered with whitespace)
+      result.push(trimmed);
       i++;
       // Skip blank lines after the heading
       while (i < lines.length && lines[i].trim() === '') {
@@ -2204,6 +2216,65 @@ function wrapBareYamlBlocks(text: string): string {
         result.push(line);
         i++;
       }
+    } else if (
+      // Detect start of a bare non-K8s YAML block: a key: value line at
+      // column 0 that isn't apiVersion but looks like YAML, followed by
+      // enough YAML-like lines to be confident it's structured YAML and
+      // not prose.  This catches Helm values.yaml, Ansible playbooks, etc.
+      !inCodeFence &&
+      trimmed !== '' &&
+      !/^\s+/.test(line) &&
+      /^[\w][\w.\/-]*:\s?/.test(trimmed) &&
+      !looksLikeShellOrDockerCodeLine(trimmed)
+    ) {
+      // Peek ahead to count consecutive YAML-like lines
+      let peek = i;
+      let yamlLineCount = 0;
+      while (peek < lines.length) {
+        const pt = lines[peek].trim();
+        if (pt === '') {
+          // Allow single blank lines
+          let nextNonBlank = peek + 1;
+          while (nextNonBlank < lines.length && lines[nextNonBlank].trim() === '') nextNonBlank++;
+          if (nextNonBlank - peek >= 2) break; // 2+ blanks = end
+          if (nextNonBlank < lines.length && looksLikeYaml(lines[nextNonBlank].trim())) {
+            peek++;
+            continue;
+          }
+          break;
+        }
+        if (!looksLikeYaml(pt)) break;
+        yamlLineCount++;
+        peek++;
+      }
+      // Require 3+ YAML-like lines to wrap as yaml (avoid false positives
+      // on single key: value lines that are prose descriptions).
+      const MIN_YAML_LINES = 3;
+      if (yamlLineCount >= MIN_YAML_LINES) {
+        const yamlLines: string[] = [];
+        let j = i;
+        while (j < peek) {
+          yamlLines.push(lines[j]);
+          j++;
+        }
+        // Trim trailing blank lines
+        while (yamlLines.length > 0 && yamlLines[yamlLines.length - 1].trim() === '') {
+          yamlLines.pop();
+        }
+        if (yamlLines.length > 0) {
+          result.push('```yaml');
+          result.push(...yamlLines);
+          result.push('```');
+          wrappedBlockCount++;
+          i = j;
+        } else {
+          result.push(line);
+          i++;
+        }
+      } else {
+        result.push(line);
+        i++;
+      }
     } else {
       result.push(line);
       i++;
@@ -2243,7 +2314,9 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
       /^#\[/.test(t) ||
       // Go
       /^(func|package)\s/.test(t) ||
-      /^(var|type)\s+\w+\s+\w+/.test(t)
+      /^(var|type)\s+\w+\s+\w+/.test(t) ||
+      /\w+\s*:=\s*\S/.test(t) ||
+      /^(if|for|switch|select)\s+.+\{/.test(t)
     );
   });
 }
