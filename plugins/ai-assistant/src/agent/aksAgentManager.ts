@@ -1672,12 +1672,14 @@ function joinYamlContinuation(yamlLines: string[], trimmedLine: string): boolean
   if (yamlLines.length === 0) return false;
   const prev = yamlLines[yamlLines.length - 1].trim();
   const prevEndsWithColon = /:\s*$/.test(prev);
-  const prevUnclosed =
-    prev.split('{').length - prev.split('}').length > 0 ||
-    prev.split('[').length - prev.split(']').length > 0;
-  const lineIsValue = /^["']/.test(trimmedLine) || /^[}\]]/.test(trimmedLine);
+  const openBraces = prev.split('{').length - prev.split('}').length;
+  const openBrackets = prev.split('[').length - prev.split(']').length;
+  const prevUnclosed = openBraces > 0 || openBrackets > 0;
+  const lineIsQuotedOrCloser = /^["']/.test(trimmedLine) || /^[}\]]/.test(trimmedLine);
+  // A bare word value like "Kustomization" after "kind:" — single token, no colon
+  const lineIsBareValue = /^\w[\w./-]*$/.test(trimmedLine) && !trimmedLine.includes(':');
 
-  if ((prevEndsWithColon && lineIsValue) || prevUnclosed) {
+  if ((prevEndsWithColon && (lineIsQuotedOrCloser || lineIsBareValue)) || (prevUnclosed && lineIsQuotedOrCloser)) {
     yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + trimmedLine;
     return true;
   }

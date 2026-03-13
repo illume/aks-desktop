@@ -1175,6 +1175,29 @@ describe('wrapBareYamlBlocks', () => {
     expect(wrapBareYamlBlocks('')).toBe('');
   });
 
+  it('joins bare value after kind: (terminal split kind: / Kustomization)', () => {
+    const input = 'apiVersion: kustomize.config.k8s.io/v1beta1\nkind:\nKustomization\nnamespace: shop\nresources:\n  - base.yaml';
+    const result = wrapBareYamlBlocks(input);
+    expect(result).toContain('kind: Kustomization');
+    expect(result).not.toMatch(/^Kustomization$/m);
+  });
+
+  it('does NOT consume entire YAML block when labels: has unclosed brace from terminal wrapping', () => {
+    const input = [
+      'apiVersion: apps/v1',
+      'kind: Deployment',
+      'metadata:',
+      '  name: payments',
+      '  namespace: shop',
+      '  labels: { app.kubernetes.io/name: payments, app.kubernetes.io/part-of: shop',
+      'spec:',
+      '  replicas: 2',
+    ].join('\n');
+    const result = wrapBareYamlBlocks(input);
+    // spec: should be on its own line, not joined onto the labels line
+    expect(result).toMatch(/^spec:/m);
+  });
+
   it('stops indented YAML block at less-indented prose like "Apply:"', () => {
     const input = [
       'Kubernetes YAML:',
