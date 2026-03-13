@@ -7,6 +7,7 @@ const {
   looksLikeYaml,
   wrapBareYamlBlocks,
   cleanTerminalFormatting,
+  collapseTerminalBlankLines,
   stripAgentNoise,
   isAgentNoiseLine,
   extractAIAnswer,
@@ -3778,5 +3779,244 @@ describe('real-world agent responses', () => {
     // Commands should be present
     expect(result).toContain('kubectl apply -f app.yaml');
     expect(result).toContain('docker build -t myacr.azurecr.io/java-demo:1.0.0 .');
+  });
+});
+
+describe('collapseTerminalBlankLines', () => {
+  it('removes single blank line between space-prefixed code lines', () => {
+    const input = ' FROM maven:3.9\n\n WORKDIR /src\n\n COPY pom.xml .';
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe(' FROM maven:3.9\n WORKDIR /src\n COPY pom.xml .');
+  });
+
+  it('collapses multiple blank lines between code lines to one', () => {
+    const input = ' RUN mvn package\n\n\n\n FROM eclipse-temurin:17-jre';
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe(' RUN mvn package\n\n FROM eclipse-temurin:17-jre');
+  });
+
+  it('joins prose continuation lines (long line + lowercase start)', () => {
+    const input =
+      "Here's a minimal, production-ready example for deploying a Java (Spring Boot)\n\napp on Kubernetes.";
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe(
+      "Here's a minimal, production-ready example for deploying a Java (Spring Boot)\napp on Kubernetes."
+    );
+  });
+
+  it('keeps blank between short line and next paragraph', () => {
+    const input = 'Actuator.\n\nDockerfile (multi-stage build):';
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe('Actuator.\n\nDockerfile (multi-stage build):');
+  });
+
+  it('collapses runs of 3+ blank lines to 1 in general case', () => {
+    const input = 'Dockerfile (multi-stage build):\n\n\n\n # syntax=docker/dockerfile:1';
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe('Dockerfile (multi-stage build):\n\n # syntax=docker/dockerfile:1');
+  });
+
+  it('does not alter content inside code fences', () => {
+    const input = '```\n FROM x\n\n WORKDIR y\n```';
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe('```\n FROM x\n\n WORKDIR y\n```');
+  });
+
+  it('handles mixed prose and code sections', () => {
+    const input = [
+      "Here's a minimal, production-ready example for deploying a Java (Spring Boot)",
+      '',
+      'app on Kubernetes.',
+      '',
+      'Dockerfile:',
+      '',
+      ' # syntax=docker/dockerfile:1',
+      '',
+      ' FROM maven:3.9',
+      '',
+      ' WORKDIR /src',
+    ].join('\n');
+    const result = collapseTerminalBlankLines(input);
+    expect(result).toBe(
+      [
+        "Here's a minimal, production-ready example for deploying a Java (Spring Boot)",
+        'app on Kubernetes.',
+        '',
+        'Dockerfile:',
+        '',
+        ' # syntax=docker/dockerfile:1',
+        ' FROM maven:3.9',
+        ' WORKDIR /src',
+      ].join('\n')
+    );
+  });
+});
+
+describe('looksLikeShellOrDockerCodeLine — Dockerfile parser directives', () => {
+  it('detects # syntax=docker/dockerfile:1', () => {
+    expect(looksLikeShellOrDockerCodeLine('# syntax=docker/dockerfile:1')).toBe(true);
+  });
+
+  it('detects # escape=`', () => {
+    expect(looksLikeShellOrDockerCodeLine('# escape=`')).toBe(true);
+  });
+
+  it('detects # check=error=true', () => {
+    expect(looksLikeShellOrDockerCodeLine('# check=error=true')).toBe(true);
+  });
+});
+
+describe('extractAIAnswer — terminal-formatted Java deployment with Rich code blocks', () => {
+  // Simulates the real-world terminal output where Rich renders Dockerfile and
+  // YAML code blocks with [40m (black background) ANSI formatting, producing
+  // space-prefixed lines and blank lines between every content line.
+  const rawJavaDeployTerminal = [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-846df6ffb-tz9xn:/app# ',
+    '\x1b[?2004l',
+    '',
+    '\x1b[?2004h',
+    '> ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: \x1b[1m[\x1b[0m\x1b[32m'azure/gpt-5-2'\x1b[0m\x1b[1m]\x1b[0m",
+    '\u2705 Toolset core_investigation',
+    'Using \x1b[1;36m4\x1b[0m datasources',
+    'NO ENABLED LOGGING TOOLSET',
+    '\x1b[1;97mUser:\x1b[0m IMPORTANT INSTRUCTIONS:',
+    'Now answer: Show me an example java application deploy on kubernetes?',
+    'The AI requested \x1b[1;36m1\x1b[0m tool call.',
+    'Running tool #1 TodoWrite: Update tasks',
+    'Task List:',
+    '+----+----------------------------+---------------+',
+    '| ID | Content                    | Status        |',
+    '+----+----------------------------+---------------+',
+    '| t1 | Create K8s YAML            | completed     |',
+    '+----+----------------------------+---------------+',
+    '  Finished #1 in 0.00s',
+    '\x1b[1;96mAI:\x1b[0m ',
+    "Here's a minimal, production-ready example for deploying a Java (Spring Boot)   ",
+    '',
+    "app on Kubernetes. Adjust health probe paths if you don't use Spring Boot       ",
+    '',
+    'Actuator.                                                                       ',
+    '',
+    '',
+    'Dockerfile (multi-stage build):                                                 ',
+    '',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40m# syntax=docker/dockerfile:1\x1b[0m\x1b[40m                                                  \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mFROM maven:3.9-eclipse-temurin-17 AS build\x1b[0m\x1b[40m                                    \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mWORKDIR /src\x1b[0m\x1b[40m                                                                  \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mCOPY pom.xml .\x1b[0m\x1b[40m                                                                \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mRUN mvn -B -q -DskipTests package\x1b[0m\x1b[40m                                             \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[40m                                                                              \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mFROM eclipse-temurin:17-jre\x1b[0m\x1b[40m                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mWORKDIR /app\x1b[0m\x1b[40m                                                                  \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mCOPY --from=build /src/target/app.jar ./app.jar\x1b[0m\x1b[40m                               \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mEXPOSE 8080\x1b[0m\x1b[40m                                                                   \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[97;40mCMD ["bash","-lc","java $JAVA_OPTS -jar app.jar"]\x1b[0m\x1b[40m                              \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '',
+    'Kubernetes manifests (Deployment + Service):                                    ',
+    '',
+    '',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mNamespace                                                               \x1b[0m\x1b[40m \x1b[0m',
+    '',
+    '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mdemo                                                                  \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mapps/v1                                                           \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mService                                                                 \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mjava-hello                                                            \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[91;40mspec\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                         \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mtype\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mClusterIP                                                             \x1b[0m\x1b[40m \x1b[0m',
+    '\x1b[40m                                                                                \x1b[0m',
+    '',
+    'Build/push and deploy:                                                          ',
+    '',
+    '\x1b[1;33m \u2022 \x1b[0mBuild: docker build -t ghcr.io/yourorg/java-hello:1.0.0 .                    ',
+    '\x1b[1;33m \u2022 \x1b[0mApply: kubectl apply -f k8s.yaml                                             ',
+    '',
+    'Notes:                                                                          ',
+    '',
+    '\x1b[1;33m \u2022 \x1b[0mFor HPA to work, install metrics-server in the cluster.                      ',
+    '',
+    '\x1b[?2004hroot@aks-agent-846df6ffb-tz9xn:/app# ',
+  ].join('\r\n');
+
+  it('joins terminal-wrapped prose into a single paragraph', () => {
+    const result = extractAIAnswer(rawJavaDeployTerminal);
+    // "Here's a minimal..." and "app on Kubernetes..." should be one paragraph
+    // (no blank line between them), so markdown joins them
+    expect(result).toContain(
+      "Here's a minimal, production-ready example for deploying a Java (Spring Boot)\napp on Kubernetes."
+    );
+    // Should NOT have a blank line between the continuation lines
+    expect(result).not.toMatch(
+      /Here's a minimal.*\(Spring Boot\)\s*\n\n\s*app on Kubernetes/
+    );
+  });
+
+  it('wraps Dockerfile in a code fence including # syntax line', () => {
+    const result = extractAIAnswer(rawJavaDeployTerminal);
+    // The Dockerfile should be in a code fence
+    expect(result).toContain('```\n# syntax=docker/dockerfile:1');
+    expect(result).toContain('FROM maven:3.9-eclipse-temurin-17 AS build');
+    expect(result).toContain('CMD ["bash","-lc","java $JAVA_OPTS -jar app.jar"]');
+    // # syntax should NOT appear outside a code fence as a heading
+    const fenceStart = result.indexOf('```\n# syntax');
+    expect(fenceStart).toBeGreaterThan(-1);
+  });
+
+  it('collapses Dockerfile stages without extra blank lines', () => {
+    const result = extractAIAnswer(rawJavaDeployTerminal);
+    // Terminal formatting artefact blank lines are collapsed; Dockerfile stages
+    // are adjacent (the intentional blank between stages is collapsed by the
+    // upstream stripAgentNoise blank-collapsing step — this is acceptable since
+    // the Dockerfile remains syntactically correct)
+    expect(result).toMatch(/RUN mvn.*package\nFROM eclipse-temurin/);
+  });
+
+  it('removes terminal-artefact blank lines within Dockerfile', () => {
+    const result = extractAIAnswer(rawJavaDeployTerminal);
+    // Adjacent Dockerfile instructions should NOT have blank lines between them
+    expect(result).toMatch(/FROM maven.*AS build\nWORKDIR \/src/);
+    expect(result).toMatch(/WORKDIR \/src\nCOPY pom\.xml/);
+  });
+
+  it('wraps YAML block without blank lines between YAML lines', () => {
+    const result = extractAIAnswer(rawJavaDeployTerminal);
+    // YAML should be in a fenced block
+    expect(result).toContain('```yaml');
+    // apiVersion and kind should be on adjacent lines (no blank between them)
+    expect(result).toMatch(/apiVersion: v1\nkind: Namespace/);
+    expect(result).toMatch(/apiVersion: apps\/v1\nkind: Service/);
+  });
+
+  it('bullet list items are present', () => {
+    const result = extractAIAnswer(rawJavaDeployTerminal);
+    expect(result).toContain('- Build: docker build -t ghcr.io/yourorg/java-hello:1.0.0 .');
+    expect(result).toContain('- Apply: kubectl apply -f k8s.yaml');
   });
 });

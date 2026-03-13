@@ -1328,6 +1328,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Shebang: #!/bin/bash, #!/usr/bin/env python3
   if (/^#!\//.test(trimmed)) return true;
 
+  // Dockerfile parser directive: # syntax=..., # escape=..., # check=...
+  if (/^#\s*\w+=\S/.test(trimmed)) return true;
+
   // Environment variable assignment: VAR=value or VAR="value"
   if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
 
@@ -1347,6 +1350,116 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/\\\s*$/.test(trimmed) && trimmed.length < 80) return true;
 
   return false;
+}
+
+/**
+ * Collapse blank lines that result from terminal-formatted output.
+ *
+ * Rich / terminal output pads every line to 80 chars and sends each line as a
+ * separate chunk followed by \r\n.  After ANSI stripping the chunks produce a
+ * blank line between every pair of content lines.  This function removes those
+ * artefact blank lines so that downstream transforms (normalizeTerminalMarkdown,
+ * wrapBareYamlBlocks) see clean, contiguous content.
+ *
+ * Heuristics:
+ *  - Between two space-prefixed lines (terminal code): a single blank line is
+ *    a terminal artefact → remove.  Two or more blanks indicate an intentional
+ *    blank line in the source code → collapse to one.
+ *  - Between two prose lines where the previous line is long (≥ 60 chars) and
+ *    the next starts with a lowercase letter: terminal line-wrapping artefact →
+ *    remove (markdown will join adjacent lines into one paragraph).
+ *  - Otherwise: collapse runs of multiple blank lines to one.
+ */
+function collapseTerminalBlankLines(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inCodeFence = false;
+  let collapsedCount = 0;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Track code fences — never alter content inside existing fences
+    if (/^\s*```/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (inCodeFence) {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // Non-blank line → push as-is
+    if (trimmed !== '') {
+      result.push(line);
+      i++;
+      continue;
+    }
+
+    // ── Blank line: count the full run ──
+    let blankCount = 0;
+    let j = i;
+    while (j < lines.length && lines[j].trim() === '') {
+      blankCount++;
+      j++;
+    }
+
+    // Find the previous non-blank line (already in result)
+    let prevLine = '';
+    for (let p = result.length - 1; p >= 0; p--) {
+      if (result[p].trim() !== '') {
+        prevLine = result[p];
+        break;
+      }
+    }
+    // Find the next non-blank line (still in input)
+    const nextLine = j < lines.length ? lines[j] : '';
+
+    const prevIsTermCode = prevLine.startsWith(' ') && prevLine.trim() !== '';
+    const nextIsTermCode = nextLine.startsWith(' ') && nextLine.trim() !== '';
+
+    if (prevIsTermCode && nextIsTermCode) {
+      // Both sides are terminal-formatted code lines
+      if (blankCount <= 1) {
+        // Single blank = terminal chunk artefact → drop entirely
+        collapsedCount++;
+      } else {
+        // Multiple blanks = intentional blank in source code → keep one
+        result.push('');
+        collapsedCount++;
+      }
+    } else if (
+      !prevIsTermCode &&
+      !nextIsTermCode &&
+      prevLine.trimEnd().length >= 60 &&
+      /^[a-z]/.test(nextLine.trim())
+    ) {
+      // Prose continuation: long line wrapped at terminal width, next line
+      // continues with a lowercase letter → join (remove blank)
+      collapsedCount++;
+    } else {
+      // Default: keep at most one blank line
+      result.push('');
+      if (blankCount > 1) collapsedCount++;
+    }
+
+    i = j; // skip past all blanks in this run
+  }
+
+  if (collapsedCount > 0) {
+    verboseLog(
+      '[AKS Agent Parse] collapseTerminalBlankLines: collapsed',
+      collapsedCount,
+      'blank line groups'
+    );
+  }
+
+  return result.join('\n');
 }
 
 /**
@@ -1897,7 +2010,13 @@ function extractAIAnswer(rawOutput: string): string {
     afterTerminal.length
   );
 
-  const afterBullets = normalizeBullets(afterTerminal);
+  const afterCollapse = collapseTerminalBlankLines(afterTerminal);
+  detailLog(
+    '[AKS Agent Parse] extractAIAnswer: after collapseTerminalBlankLines, length:',
+    afterCollapse.length
+  );
+
+  const afterBullets = normalizeBullets(afterCollapse);
   const afterTerminalMarkdown = normalizeTerminalMarkdown(afterBullets);
   detailLog(
     '[AKS Agent Parse] extractAIAnswer: after normalizeTerminalMarkdown, length:',
@@ -2708,6 +2827,7 @@ export const _testing = {
   looksLikeYaml,
   wrapBareYamlBlocks,
   cleanTerminalFormatting,
+  collapseTerminalBlankLines,
   stripAgentNoise,
   isAgentNoiseLine,
   extractAIAnswer,
