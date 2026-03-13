@@ -1712,8 +1712,8 @@ function normalizeTerminalMarkdown(text: string): string {
             // longer space-prefixed (left the terminal code area) or
             // two consecutive blank lines were found.
             if (startedByFileHeader) {
-              const consecutiveBlanks = peekIdx - j;
-              if (consecutiveBlanks >= 2 || !/^\s+\S/.test(peekLine)) {
+              const blankLineCount = peekIdx - j;
+              if (blankLineCount >= 2 || !/^\s+\S/.test(peekLine)) {
                 trimTrailingBlanks();
                 break;
               }
