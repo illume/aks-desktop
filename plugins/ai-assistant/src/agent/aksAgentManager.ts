@@ -1662,6 +1662,28 @@ function looksLikeYaml(trimmed: string): boolean {
  * single blank lines) and stops at two consecutive blanks or a line that
  * is clearly not YAML.
  */
+
+/**
+ * Join a YAML continuation value onto the previous line in `yamlLines`.
+ * Returns true if the line was joined, false otherwise.
+ * Handles: key: on one line + "value" on next; unclosed { or [ flow expressions.
+ */
+function joinYamlContinuation(yamlLines: string[], trimmedLine: string): boolean {
+  if (yamlLines.length === 0) return false;
+  const prev = yamlLines[yamlLines.length - 1].trim();
+  const prevEndsWithColon = /:\s*$/.test(prev);
+  const prevUnclosed =
+    prev.split('{').length - prev.split('}').length > 0 ||
+    prev.split('[').length - prev.split(']').length > 0;
+  const lineIsValue = /^["']/.test(trimmedLine) || /^[}\]]/.test(trimmedLine);
+
+  if ((prevEndsWithColon && lineIsValue) || prevUnclosed) {
+    yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + trimmedLine;
+    return true;
+  }
+  return false;
+}
+
 function wrapBareYamlBlocks(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];
@@ -1709,14 +1731,16 @@ function wrapBareYamlBlocks(text: string): string {
       }
       // Remove the prefix lines from result (they'll go inside the fence)
       if (prefixLines.length > 0) {
-        // Also remove any trailing blank lines between prefix and previous content
-        while (result.length > 0 && (result[result.length - 1].trim() === '' || prefixLines.includes(result[result.length - 1]))) {
-          const popped = result.pop()!;
-          if (!prefixLines.includes(popped)) {
-            // It was a blank line — keep one blank before the fence for readability
-            result.push('');
-            break;
-          }
+        // First remove the prefix lines themselves
+        for (let p = 0; p < prefixLines.length; p++) {
+          result.pop();
+        }
+        // Then remove trailing blank lines, keeping one for readability
+        while (result.length > 0 && result[result.length - 1].trim() === '') {
+          result.pop();
+        }
+        if (result.length > 0) {
+          result.push('');
         }
       }
 
@@ -1753,14 +1777,8 @@ function wrapBareYamlBlocks(text: string): string {
         if (j === i || looksLikeYaml(yt)) {
           // Check if this is a YAML value that should be joined to the
           // previous key line (terminal line wrapping split key: value)
-          const prevYaml2 = yamlLines.length > 0 ? yamlLines[yamlLines.length - 1].trim() : '';
-          if (
-            yamlLines.length > 0 &&
-            /:\s*$/.test(prevYaml2) &&
-            (/^["']/.test(yt) || /^[}\]]/.test(yt))
-          ) {
-            // Join value to previous key line: "key:" + " " + "value"
-            yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + yt;
+          if (joinYamlContinuation(yamlLines, yt)) {
+            // Joined to previous line
           } else {
             yamlLines.push(yl);
           }
@@ -1769,14 +1787,7 @@ function wrapBareYamlBlocks(text: string): string {
           // Check if this line is a YAML value continuation:
           // - Previous line ended with ':' (key with value on next line)
           // - Previous line had unclosed braces/brackets (flow expression continues)
-          const prevYaml = yamlLines.length > 0 ? yamlLines[yamlLines.length - 1].trim() : '';
-          const prevEndsWithColon = /:\s*$/.test(prevYaml);
-          const prevUnclosed =
-            (prevYaml.split('{').length - prevYaml.split('}').length > 0) ||
-            (prevYaml.split('[').length - prevYaml.split(']').length > 0);
-          if (prevEndsWithColon || prevUnclosed) {
-            // Join continuation to previous line for valid YAML
-            yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + yt;
+          if (joinYamlContinuation(yamlLines, yt)) {
             j++;
           } else {
             break;

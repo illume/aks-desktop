@@ -5059,7 +5059,8 @@ describe('extractAIAnswer — real-world microservice YAML with Rich terminal fo
     let inFence = false;
     for (const line of result.split('\n')) {
       if (line.trim().startsWith('```')) inFence = !inFence;
-      if (!inFence && /^#{1,3}\s/.test(line.trim()) && line.includes('Namespaces')) {
+      // CommonMark allows up to 3 spaces before # for headings
+      if (!inFence && /^\s{0,3}#\s/.test(line) && line.includes('Namespaces')) {
         throw new Error(`"# Namespaces" outside fence would render as heading: ${line}`);
       }
     }
