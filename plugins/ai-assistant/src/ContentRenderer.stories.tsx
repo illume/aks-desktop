@@ -439,6 +439,64 @@ metadata:
   </ThemeProvider>
 );
 
+/** YAML code blocks rendered as interactive Monaco editors via YamlDisplay.
+ *  Passing onYamlDetected enables the editor rendering path. */
+const noopYamlDetected = (_yaml: string, _resourceType: string) => {};
+
+export const YamlEditorDisplay: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={`Here is a Deployment manifest:
+
+\`\`\`yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  namespace: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+    spec:
+      containers:
+        - name: api-server
+          image: myregistry/api-server:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+\`\`\`
+
+And the corresponding Service:
+
+\`\`\`yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-server
+  namespace: production
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: api-server
+\`\`\``}
+  />
+);
+
 // ── Real-world agent response stories (raw exec output → extractAIAnswer → render) ──
 // These stories feed raw terminal output (matching real dev console captures) through
 // the extractAIAnswer parsing pipeline, then render the result. All identifiers are
@@ -1155,12 +1213,12 @@ const rawMicroserviceYaml = [
 ].join('\r\n');
 
 export const RealWorldMicroserviceYaml: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer content={extractAIAnswer(rawMicroserviceYaml)} />
+  <ContentRenderer content={extractAIAnswer(rawMicroserviceYaml)} onYamlDetected={noopYamlDetected} />
 );
 
 export const RealWorldMicroserviceYamlDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer content={extractAIAnswer(rawMicroserviceYaml)} />
+    <ContentRenderer content={extractAIAnswer(rawMicroserviceYaml)} onYamlDetected={noopYamlDetected} />
   </ThemeProvider>
 );

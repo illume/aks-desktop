@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
+import YAML from 'yaml';
 import { _testing } from './aksAgentManager';
+import { parseKubernetesYAML } from '../utils/SampleYamlLibrary';
 
 const {
   stripAnsi,
@@ -4971,5 +4973,162 @@ describe('extractAIAnswer — bare code line wrapping', () => {
     const result = extractAIAnswer(raw);
     expect(result).toContain('```');
     expect(result).toContain('kubectl apply -f app.yaml');
+  });
+});
+
+// ── Real-world microservice YAML with Rich terminal formatting ──
+
+const rawMicroserviceYaml = [
+  'stty -echo',
+  '\x1b[?2004l',
+  '\x1b[?2004hroot@aks-agent-649f94dbb9-whtf8:/app# ',
+  '\x1b[?2004l\r',
+  '\x1b[?2004h> ',
+  '\x1b[?2004l\r',
+  '\x1b[1;96mAI:\x1b[0m ',
+  'Below is a single (large) multi-document YAML example for a "complicated"       ',
+  'microservice setup: multiple namespaces, shared config, secrets, several        ',
+  'microservices, HPAs, PDBs, NetworkPolicies, an Ingress, a CronJob, and a Job.   ',
+  '',
+  '\x1b[40m                                                                                \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[37;40m# --------------------------------------------------------\x1b[0m\x1b[40m                    \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[37;40m# Namespaces\x1b[0m\x1b[40m                                                                  \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[37;40m# --------------------------------------------------------\x1b[0m\x1b[40m                    \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mNamespace                                                               \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mplatform                                                              \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mNamespace                                                               \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mapps                                                                  \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[40m                                                                              \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[37;40m# --------------------------------------------------------\x1b[0m\x1b[40m                    \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[37;40m# Shared config/secrets\x1b[0m\x1b[40m                                                       \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[37;40m# --------------------------------------------------------\x1b[0m\x1b[40m                    \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mConfigMap                                                               \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mglobal-config                                                         \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mnamespace\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mapps                                                             \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mdata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                         \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mLOG_LEVEL\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40minfo\x1b[0m\x1b[93;40m"\x1b[0m\x1b[40m                                                           \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mOTEL_EXPORTER_OTLP_ENDPOINT\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40m                                               \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40mhttp://otel-collector.observability.svc.cluster.local:4317\x1b[0m\x1b[93;40m"\x1b[0m\x1b[40m                  \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m---\x1b[0m\x1b[40m                                                                           \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mapiVersion\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mv1                                                                \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mkind\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mSecret                                                                  \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mmetadata\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                     \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mname\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mdb-credentials                                                        \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mtype\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[40mOpaque                                                                  \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[91;40mstringData\x1b[0m\x1b[97;40m:\x1b[0m\x1b[40m                                                                   \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mPOSTGRES_USER\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40mappuser\x1b[0m\x1b[93;40m"\x1b[0m\x1b[40m                                                     \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m \x1b[0m\x1b[97;40m  \x1b[0m\x1b[91;40mPOSTGRES_PASSWORD\x1b[0m\x1b[97;40m:\x1b[0m\x1b[97;40m \x1b[0m\x1b[93;40m"\x1b[0m\x1b[93;40mreplace-me\x1b[0m\x1b[93;40m"\x1b[0m\x1b[40m                                             \x1b[0m\x1b[40m \x1b[0m',
+  '\x1b[40m                                                                                \x1b[0m',
+  '',
+  'If you want it even more "realistic complicated", tell me what stack you want   ',
+  "included (Istio/Linkerd, Kafka, etc.) and I'll tailor the example.              ",
+  '',
+  '\x1b[?2004hroot@aks-agent-649f94dbb9-whtf8:/app# ',
+].join('\r\n');
+
+describe('extractAIAnswer — real-world microservice YAML with Rich terminal formatting', () => {
+  let result: string;
+  let yamlContent: string;
+  let docs: YAML.Document.Parsed[];
+
+  beforeAll(() => {
+    result = extractAIAnswer(rawMicroserviceYaml);
+    const yamlMatch = result.match(/```yaml\n([\s\S]*?)```/);
+    yamlContent = yamlMatch ? yamlMatch[1] : '';
+    docs = YAML.parseAllDocuments(yamlContent);
+  });
+
+  it('produces exactly one yaml-fenced block', () => {
+    expect((result.match(/```yaml/g) || []).length).toBe(1);
+  });
+
+  it('includes YAML section comments inside the fence', () => {
+    expect(yamlContent).toContain('# Namespaces');
+    expect(yamlContent).toContain('# Shared config/secrets');
+  });
+
+  it('does NOT render # Namespaces as a markdown heading', () => {
+    let inFence = false;
+    for (const line of result.split('\n')) {
+      if (line.trim().startsWith('```')) inFence = !inFence;
+      if (!inFence && /^#{1,3}\s/.test(line.trim()) && line.includes('Namespaces')) {
+        throw new Error(`"# Namespaces" outside fence would render as heading: ${line}`);
+      }
+    }
+  });
+
+  it('all YAML documents parse without errors', () => {
+    const errors = docs.flatMap(d => d.errors);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('contains exactly 4 YAML documents', () => {
+    expect(docs.length).toBe(4);
+  });
+
+  it('document 1 is Namespace "platform"', () => {
+    const doc = docs[0].toJSON();
+    expect(doc.apiVersion).toBe('v1');
+    expect(doc.kind).toBe('Namespace');
+    expect(doc.metadata.name).toBe('platform');
+  });
+
+  it('document 2 is Namespace "apps"', () => {
+    const doc = docs[1].toJSON();
+    expect(doc.apiVersion).toBe('v1');
+    expect(doc.kind).toBe('Namespace');
+    expect(doc.metadata.name).toBe('apps');
+  });
+
+  it('document 3 is ConfigMap "global-config" in namespace "apps"', () => {
+    const doc = docs[2].toJSON();
+    expect(doc.apiVersion).toBe('v1');
+    expect(doc.kind).toBe('ConfigMap');
+    expect(doc.metadata.name).toBe('global-config');
+    expect(doc.metadata.namespace).toBe('apps');
+  });
+
+  it('ConfigMap has correct data keys including terminal-wrapped OTEL value', () => {
+    const data = docs[2].toJSON().data;
+    expect(data.LOG_LEVEL).toBe('info');
+    expect(data.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+      'http://otel-collector.observability.svc.cluster.local:4317'
+    );
+  });
+
+  it('terminal-wrapped OTEL value is joined onto the key line', () => {
+    expect(yamlContent).toContain(
+      'OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4317"'
+    );
+  });
+
+  it('document 4 is Secret "db-credentials" with correct stringData', () => {
+    const doc = docs[3].toJSON();
+    expect(doc.apiVersion).toBe('v1');
+    expect(doc.kind).toBe('Secret');
+    expect(doc.metadata.name).toBe('db-credentials');
+    expect(doc.type).toBe('Opaque');
+    expect(doc.stringData.POSTGRES_USER).toBe('appuser');
+    expect(doc.stringData.POSTGRES_PASSWORD).toBe('replace-me');
+  });
+
+  it('parseKubernetesYAML recognises multi-document YAML as valid K8s', () => {
+    const parsed = parseKubernetesYAML(yamlContent);
+    expect(parsed.isValid).toBe(true);
+    expect(parsed.resourceType).toBe('Namespace');
+    expect(parsed.name).toBe('platform');
+  });
+
+  it('prose paragraph appears outside the yaml fence', () => {
+    const afterFence = result.split('```').pop() || '';
+    expect(afterFence).toContain('If you want it even more');
   });
 });

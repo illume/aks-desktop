@@ -1334,8 +1334,10 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^#\s*\w+=.+/.test(trimmed)) return true;
 
   // Shell comment containing a URL (e.g. "# then open http://localhost:8080")
-  // or a path/flag — these appear inside code blocks as documentation comments
-  if (/^#\s/.test(trimmed) && /https?:\/\/|localhost|\/\w/.test(trimmed)) return true;
+  // or an absolute path — these appear inside code blocks as documentation comments.
+  // The path check requires the slash to be preceded by whitespace or start-of-string
+  // so that prose like "config/secrets" doesn't false-positive.
+  if (/^#\s/.test(trimmed) && /https?:\/\/|localhost|(?:^|\s)\/\w/.test(trimmed)) return true;
 
   // Environment variable assignment: VAR=value or VAR="value"
   if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
@@ -1687,7 +1689,38 @@ function wrapBareYamlBlocks(text: string): string {
     // Detect start of a bare YAML block: apiVersion: (with optional value)
     if (/^\s*apiVersion:\s*/.test(line)) {
       verboseLog('[AKS Agent Parse] wrapBareYamlBlocks: detected bare apiVersion: at line', i, ':', line.trim());
-      const yamlLines: string[] = [];
+
+      // Look back: include preceding YAML comment lines (# ...) and
+      // document separators (---) that belong to this YAML block.
+      // This handles the common pattern of section headers before apiVersion.
+      const prefixLines: string[] = [];
+      let backIdx = result.length - 1;
+      // Skip trailing blank lines
+      while (backIdx >= 0 && result[backIdx].trim() === '') backIdx--;
+      // Collect YAML comments / separators going backwards
+      while (backIdx >= 0) {
+        const bt = result[backIdx].trim();
+        if (bt.startsWith('#') || bt === '---') {
+          prefixLines.unshift(result[backIdx]);
+          backIdx--;
+        } else {
+          break;
+        }
+      }
+      // Remove the prefix lines from result (they'll go inside the fence)
+      if (prefixLines.length > 0) {
+        // Also remove any trailing blank lines between prefix and previous content
+        while (result.length > 0 && (result[result.length - 1].trim() === '' || prefixLines.includes(result[result.length - 1]))) {
+          const popped = result.pop()!;
+          if (!prefixLines.includes(popped)) {
+            // It was a blank line — keep one blank before the fence for readability
+            result.push('');
+            break;
+          }
+        }
+      }
+
+      const yamlLines: string[] = [...prefixLines];
       let j = i;
       let consecutiveBlanks = 0;
 
@@ -1718,7 +1751,19 @@ function wrapBareYamlBlocks(text: string): string {
         }
 
         if (j === i || looksLikeYaml(yt)) {
-          yamlLines.push(yl);
+          // Check if this is a YAML value that should be joined to the
+          // previous key line (terminal line wrapping split key: value)
+          const prevYaml2 = yamlLines.length > 0 ? yamlLines[yamlLines.length - 1].trim() : '';
+          if (
+            yamlLines.length > 0 &&
+            /:\s*$/.test(prevYaml2) &&
+            (/^["']/.test(yt) || /^[}\]]/.test(yt))
+          ) {
+            // Join value to previous key line: "key:" + " " + "value"
+            yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + yt;
+          } else {
+            yamlLines.push(yl);
+          }
           j++;
         } else {
           // Check if this line is a YAML value continuation:
@@ -1730,7 +1775,8 @@ function wrapBareYamlBlocks(text: string): string {
             (prevYaml.split('{').length - prevYaml.split('}').length > 0) ||
             (prevYaml.split('[').length - prevYaml.split(']').length > 0);
           if (prevEndsWithColon || prevUnclosed) {
-            yamlLines.push(yl);
+            // Join continuation to previous line for valid YAML
+            yamlLines[yamlLines.length - 1] = yamlLines[yamlLines.length - 1].trimEnd() + ' ' + yt;
             j++;
           } else {
             break;

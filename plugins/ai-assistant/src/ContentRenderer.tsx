@@ -368,8 +368,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           }
         }
 
-        // Check if it's just one line of code
-        if (typeof children === 'string' && !children.trim().includes('\n')) {
+        // Check if it's just one line of inline code (not a fenced block)
+        if (props.inline && typeof children === 'string' && !children.trim().includes('\n')) {
           // Display inline
           return <em>{children}</em>;
         }
