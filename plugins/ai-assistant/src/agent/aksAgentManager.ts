@@ -25,6 +25,33 @@ export const BASE_AKS_AGENT_PROMPT = `IMPORTANT INSTRUCTIONS:
 - The conversation history below shows all previously asked questions and your answers. Keep that context in mind and answer accordingly — do not repeat information already provided unless the user explicitly asks for it.
 `;
 
+/**
+ * Prompt sent back to the agent after its initial response to verify
+ * formatting and correctness.  The placeholder `{RESPONSE}` is replaced
+ * with the extracted answer.
+ */
+export const SELF_REVIEW_PROMPT = `Review your previous response shown below for formatting and correctness issues.
+
+---BEGIN RESPONSE---
+{RESPONSE}
+---END RESPONSE---
+
+Check:
+1. ALL code (YAML, JSON, bash/shell, Python, Dockerfile, HCL, Go, etc.) MUST be wrapped inside fenced markdown code blocks with the correct language tag (e.g. \`\`\`yaml, \`\`\`bash, \`\`\`python).
+2. No code appears as plain text outside of code blocks.
+3. The code inside the blocks is syntactically correct and complete.
+4. Markdown formatting is clean (headings, lists, etc.).
+
+If the response is already well-formatted, respond with EXACTLY: LGTM
+If there are ANY issues, respond with the COMPLETE corrected response only — no extra commentary or explanation.`;
+
+/**
+ * Build the self-review prompt by injecting the original answer.
+ */
+export function buildSelfReviewPrompt(answer: string): string {
+  return SELF_REVIEW_PROMPT.replace('{RESPONSE}', answer);
+}
+
 /** Represents a single exchange (question + answer) from the conversation history. */
 export interface ConversationEntry {
   role: 'user' | 'assistant';
@@ -2540,6 +2567,13 @@ class ThinkingStepTracker {
 }
 
 /**
+ * Minimum ratio of corrected-response length to original-response length.
+ * If the agent's corrected answer is shorter than this fraction of the
+ * original, it is likely truncated or an error — fall back to the original.
+ */
+const MIN_REVIEW_LENGTH_RATIO = 0.3;
+
+/**
  * Runs a question against the AKS agent pod by exec-ing directly into it
  * via the Kubernetes exec API (WebSocket) through Headlamp's proxy.
  * Returns only the final AI answer (clean, no ANSI codes, bullets normalised).
@@ -2575,6 +2609,45 @@ export async function runAksAgent(
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
+      // Self-review: always ask the agent to review its response once for
+      // formatting and correctness.  A single pass — no loop.
+      debugLog('[AKS Agent] Starting self-review, original answer length:', answer.length, 'answer:', answer);
+      try {
+        const reviewPrompt = buildSelfReviewPrompt(answer);
+        const reviewResult = await session.ask(reviewPrompt);
+        if (reviewResult && reviewResult.trim().length > 0) {
+          debugLog('[AKS Agent] Self-review: raw reviewResult length:', reviewResult.length, 'reviewResult:', reviewResult);
+          const reviewAnswer = extractAIAnswer(reviewResult);
+          const trimmedReview = reviewAnswer.trim();
+          debugLog('[AKS Agent] Self-review: extracted reviewAnswer length:', reviewAnswer.length, 'reviewAnswer:', reviewAnswer);
+          // If the agent confirms the response is fine, use the original
+          if (trimmedReview.startsWith('LGTM')) {
+            debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
+            return answer;
+          } else if (
+            reviewAnswer &&
+            reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
+          ) {
+            // Use the corrected version (sanity check: must be substantial)
+            debugLog(
+              '[AKS Agent] Self-review: using corrected response, length:',
+              reviewAnswer.length,
+              'corrected response:',
+              reviewAnswer
+            );
+            return reviewAnswer;
+          } else {
+            debugLog(
+              '[AKS Agent] Self-review: corrected response too short — keeping original.',
+              'original length:', answer.length,
+              'review length:', reviewAnswer.length,
+              'reviewAnswer:', reviewAnswer
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('[AKS Agent] Self-review failed, using original response:', e);
+      }
       return answer;
     }
     // extractAIAnswer stripped everything — the agent ran but produced no
