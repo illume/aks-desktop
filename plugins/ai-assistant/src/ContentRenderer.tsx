@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { Link as RouterLink, useHistory } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import YAML from 'yaml';
-import { debugLog } from './agent/debugLog';
+import { debugLog, detailLog, verboseLog } from './agent/debugLog';
 import { LogsButton, YamlDisplay } from './components';
 import { getHeadlampLink } from './utils/promptLinkHelper';
 import { parseKubernetesYAML } from './utils/SampleYamlLibrary';
@@ -23,7 +23,7 @@ const parseJsonContent = (content: string): ParseResult<any> => {
     const parsed = JSON.parse(content);
     return { success: true, data: parsed };
   } catch (error) {
-    debugLog(
+    detailLog(
       'Content is not valid JSON:',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -181,7 +181,7 @@ const convertJsonToYaml = (content: string): string => {
       });
     }
   } catch (error) {
-    debugLog(
+    detailLog(
       'Content is not valid JSON, cannot convert to YAML:',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -200,7 +200,7 @@ const isJsonKubernetesResource = (content: string): boolean => {
     const parsed = JSON.parse(trimmed);
     return !!(parsed && typeof parsed === 'object' && parsed.apiVersion && parsed.kind);
   } catch (error) {
-    debugLog(
+    detailLog(
       'Content is not valid JSON when checking for Kubernetes resource:',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -327,7 +327,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           typeof children === 'string' &&
           (className === 'language-json' || isJsonKubernetesResource(children));
 
-        debugLog(
+        detailLog(
           '[ContentRenderer] CodeComponent: className:',
           className,
           'inline:',
@@ -475,7 +475,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
         // Split content by YAML document separators or detect YAML blocks
         const yamlSeparatorRegex = /^---+$/gm;
         const parts = content.split(yamlSeparatorRegex);
-        debugLog(
+        detailLog(
           '[ContentRenderer] processUnformattedYaml: split into',
           parts.length,
           'parts by --- separators'
@@ -487,7 +487,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
 
           // Check if this part is a JSON Kubernetes resource
           if (isJsonKubernetesResource(trimmedPart)) {
-            debugLog('[ContentRenderer] processUnformattedYaml: part', index, 'is JSON K8s resource');
+            verboseLog('[ContentRenderer] processUnformattedYaml: part', index, 'is JSON K8s resource');
             const yamlContent = convertJsonToYaml(trimmedPart);
             const parsed = parseKubernetesYAML(yamlContent);
             if (parsed.isValid) {
@@ -512,7 +512,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           if (isYamlPart) {
             // Try to parse as Kubernetes YAML
             const parsed = parseKubernetesYAML(trimmedPart);
-            debugLog(
+            verboseLog(
               '[ContentRenderer] processUnformattedYaml: part',
               index,
               'is YAML, valid:',
@@ -531,7 +531,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
               );
             } else {
               // Not valid YAML, display as code
-              debugLog('[ContentRenderer] processUnformattedYaml: part', index, 'invalid YAML, rendering as code block');
+              verboseLog('[ContentRenderer] processUnformattedYaml: part', index, 'invalid YAML, rendering as code block');
               sections.push(
                 <Box
                   component="pre"
@@ -552,7 +552,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
             }
           } else {
             // Regular text content - use ReactMarkdown with simplified components
-            debugLog('[ContentRenderer] processUnformattedYaml: part', index, 'is regular text, rendering as markdown');
+            verboseLog('[ContentRenderer] processUnformattedYaml: part', index, 'is regular text, rendering as markdown');
             sections.push(
               <ReactMarkdown
                 key={`text-${index}-${sectionIndex++}`}
@@ -575,7 +575,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
           }
         });
 
-        debugLog('[ContentRenderer] processUnformattedYaml: rendered', sections.length, 'sections');
+        detailLog('[ContentRenderer] processUnformattedYaml: rendered', sections.length, 'sections');
         return <Box>{sections}</Box>;
       },
       [onYamlDetected, LinkComponent, CodeComponent]

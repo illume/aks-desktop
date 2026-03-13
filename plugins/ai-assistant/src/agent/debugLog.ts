@@ -1,75 +1,64 @@
 /**
- * Debug logger for AKS agent response parsing.
+ * Levelled debug logger for AKS agent response parsing and data flow.
  *
- * - **On by default** in development (`npm start` / `import.meta.env.DEV`).
- * - **Off** in production builds.
- * - **Off** during tests (`import.meta.env.MODE === 'test'`).
+ * Flip `DEBUG` below to control output:
  *
- * Helpers:
- * - `debugLog(tag, ...args)` — emits a `console.debug` line.
- * - `warnLog(tag, ...args)` — emits a `console.warn` line.
- * - `dumpForTestCase(tag, raw, parsed)` — logs both values as JSON strings
- *   so you can copy-paste them straight into a new test case.
+ *   const DEBUG = false;  // silent (default)
+ *   const DEBUG = 1;      // lifecycle: session events, connection failures, content-type detection
+ *   const DEBUG = 2;      // + detail: per-transform summaries, data chunks, thinking-step updates
+ *   const DEBUG = 3;      // + verbose: per-line noise drops, full raw/parsed dumps, every step
+ *
+ * Always silent in production builds and tests regardless of the value.
  */
 
-let _enabled: boolean | null = null;
+const DEBUG: number | boolean = false;
 
-function isEnabled(): boolean {
-  if (_enabled !== null) return _enabled;
-
+function level(): number {
+  // Always silent in tests and production
   try {
-    // import.meta.env is set by Vite / Vitest
-    if (import.meta.env.MODE === 'test') {
-      _enabled = false;
-      return false;
-    }
-    // On in dev, off in production
-    _enabled = !!import.meta.env.DEV;
-    return _enabled;
+    if (import.meta.env.MODE === 'test') return 0;
+    if (!import.meta.env.DEV) return 0;
   } catch {
-    // Not in a Vite context — default off
-    _enabled = false;
-    return false;
+    return 0;
   }
+
+  if (DEBUG === false || DEBUG === 0) return 0;
+  if (DEBUG === true) return 1;
+  return DEBUG;
 }
 
-/** Emit a console.debug line.  Active in dev mode, silent in tests and production. */
+/** Level 1 — high-level lifecycle events. */
 export function debugLog(tag: string, ...args: unknown[]): void {
-  if (!isEnabled()) return;
+  if (level() < 1) return;
   console.debug(tag, ...args);
 }
 
-/** Emit a console.warn line.  Active in dev mode, silent in tests and production. */
+/** Level 2 — intermediate per-transform summaries. */
+export function detailLog(tag: string, ...args: unknown[]): void {
+  if (level() < 2) return;
+  console.debug(tag, ...args);
+}
+
+/** Level 3 — full verbose per-line / per-step output. */
+export function verboseLog(tag: string, ...args: unknown[]): void {
+  if (level() < 3) return;
+  console.debug(tag, ...args);
+}
+
+/** Level 1 — warnings. */
 export function warnLog(tag: string, ...args: unknown[]): void {
-  if (!isEnabled()) return;
+  if (level() < 1) return;
   console.warn(tag, ...args);
 }
 
 /**
- * Log a raw→parsed pair as JSON so you can copy-paste it into a test.
- *
- * Example output:
- * ```
- * [AKS Agent TestCase] extractAIAnswer
- *   input:  "AI: Hello\nroot@host:#"
- *   output: "Hello"
- * ```
- *
- * Silent during tests.
+ * Level 3 — log a raw→parsed pair as JSON for copy-pasting into tests.
  */
 export function dumpForTestCase(tag: string, raw: string, parsed: string): void {
-  if (!isEnabled()) return;
+  if (level() < 3) return;
   console.debug(
     `[AKS Agent TestCase] ${tag}\n  input:  ${JSON.stringify(raw)}\n  output: ${JSON.stringify(
       parsed
     )}`
   );
 }
-
-// Allow tests to override enabled state
-export const _testing = {
-  /** Force enable/disable, or pass null to reset to auto-detect. */
-  setEnabled(value: boolean | null): void {
-    _enabled = value;
-  },
-};
