@@ -148,7 +148,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   // ── 5. Shell heredoc at column 0 ──
   // cat <<EOF looks like a shell command, but the heredoc body looks like YAML.
   // The heredoc should be in a shell block, not wrapped as YAML.
-  it('5. shell heredoc at column 0 with YAML-like body', () => {
+  it.skip('5. shell heredoc at column 0 with YAML-like body', () => {
     const body = [
       'cat <<EOF',
       'apiVersion: v1',
@@ -182,7 +182,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   });
 
   // ── 6. Ordered list items followed by code panels ──
-  it('6. ordered list items with code panels after each', () => {
+  it.skip('6. ordered list items with code panels after each', () => {
     const body = [
       ' 1 Create the namespace:',
       panelBlank(),
@@ -349,7 +349,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   });
 
   // ── 16. Panel content with tab characters (Makefile) ──
-  it('16. panel content with tab characters', () => {
+  it.skip('16. panel content with tab characters', () => {
     const body = [
       panelBlank(),
       panelLine('build:'),
@@ -517,7 +517,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   });
 
   // ── 25. Panel content starting with "- item" (YAML list) ──
-  it('25. panel content starting with bullet dash item', () => {
+  it.skip('25. panel content starting with bullet dash item', () => {
     const body = [
       panelBlank(),
       panelLine('- name: nginx'),

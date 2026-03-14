@@ -1347,7 +1347,8 @@ function isFileHeaderComment(trimmed: string): boolean {
  */
 function isBoldFileHeading(trimmed: string): boolean {
   // filename.ext  or  path/to/file.ext  (standalone on a line, no other words)
-  if (/^([\w.-]+\/)*[\w.-]+\.\w+$/.test(trimmed)) {
+  // Also matches dot-prefixed files like .env, .gitignore, .dockerignore
+  if (/^([\w.-]+\/)*[\w.-]*\.\w+$/.test(trimmed)) {
     return true;
   }
   // Well-known extensionless filenames
@@ -2300,10 +2301,18 @@ function wrapBareYamlBlocks(text: string): string {
             // Peek ahead: if the next non-blank line looks like YAML,
             // this line may be a terminal line-wrap fragment — include it
             // to avoid breaking the YAML block.
+            // However, if there's a blank line between this line and the
+            // next YAML, this is a prose paragraph separator — NOT a terminal
+            // wrap — so stop the YAML block here.
             let peekIdx = j + 1;
+            const hasBlankBefore = peekIdx < lines.length && lines[peekIdx].trim() === '';
             while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
             const peekTrimmed = peekIdx < lines.length ? lines[peekIdx].trim() : '';
-            if (peekTrimmed !== '' && looksLikeYaml(peekTrimmed)) {
+            if (
+              peekTrimmed !== '' &&
+              looksLikeYaml(peekTrimmed) &&
+              !hasBlankBefore
+            ) {
               yamlLines.push(yl);
               j++;
             } else {
@@ -2369,6 +2378,14 @@ function wrapBareYamlBlocks(text: string): string {
           break;
         }
         if (!looksLikeYaml(pt)) break;
+        // Reject prose sentences that start with "Word: long sentence" — the
+        // PROSE_WORD_THRESHOLD check on the initial line must also apply to
+        // continuation lines within the peek loop.
+        if (
+          /^[\w][\w.\/-]*:\s+/.test(pt) &&
+          (pt.match(/:\s+(.*)/)?.[1]?.split(/\s+/).length ?? 0) >= PROSE_WORD_THRESHOLD
+        )
+          break;
         yamlLineCount++;
         peek++;
       }
@@ -2544,7 +2561,15 @@ function wrapBareCodeBlocks(text: string): string {
         }
 
         // Stop if line doesn't look like code
+        // Exception: a lone closing brace `}` also matches looksLikeYaml
+        // (YAML flow mapping closer), but in structured code context
+        // (Rust/Go/C) it's a block closer and should stay in the code block.
         if (!looksLikeShellOrDockerCodeLine(ct) || looksLikeYaml(ct)) {
+          if (/^\}\s*;?\s*$/.test(ct) && hasStructuredCodeContext(codeLines)) {
+            codeLines.push(cl);
+            j++;
+            continue;
+          }
           break;
         }
 
