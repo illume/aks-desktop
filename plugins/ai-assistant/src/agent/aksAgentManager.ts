@@ -312,7 +312,8 @@ function stripAnsi(text: string): string {
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
     .replace(/\s?\[\d{1,3}(;\d{1,3})*$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m")
-    .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, ''); // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
+    .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, '') // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
+    .replace(/^0m\s*$/gm, ''); // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
 }
 
 /**
@@ -1486,6 +1487,18 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Go/Rust short variable declaration: identifier := expr
   if (/^\w+\s*:=\s*\S/.test(trimmed)) return true;
 
+  // ── Tier 6: TOML / INI config patterns ──
+
+  // TOML section headers: [package], [dependencies], [workspace.dependencies], etc.
+  if (/^\[[\w.-]+\]/.test(trimmed)) return true;
+  // TOML key = value: name = "foo", version = "1.0", key = { ... }
+  if (/^[\w.-]+\s*=\s*["'{[\d]/.test(trimmed)) return true;
+
+  // ── Tier 7: XML/HTML patterns ──
+
+  // XML opening/closing tags: <project ...>, </dependencies>, <?xml ...>
+  if (/^<\/?[\w?]/.test(trimmed)) return true;
+
   return false;
 }
 
@@ -1728,17 +1741,36 @@ function normalizeTerminalMarkdown(text: string): string {
             // Break at centered headings (deeply indented non-code content,
             // e.g. "                 2) Containerize it ..." section headings).
             // Code panel content typically has 1-8 spaces indent; centered
-            // headings have 6+ and don't match code patterns.
+            // headings have 6+ and look like prose.  Only break when the line
+            // has multiple words and no code-like characters — deeply indented
+            // code (Rust assert_eq!, XML tags, nested blocks) must not break.
             const peekIndent = peekLine.match(/^(\s*)/)?.[1].length ?? 0;
-            if (peekIndent > 6 && !looksLikeShellOrDockerCodeLine(peekTrimmed)) break;
+            const peekWords = peekTrimmed.split(/\s+/).length;
+            if (
+              peekIndent > 6 &&
+              peekWords >= PROSE_WORD_THRESHOLD &&
+              !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+              !looksLikeYaml(peekTrimmed) &&
+              !/[{};=<>[\]]/.test(peekTrimmed)
+            )
+              break;
             blockLines.push(bl);
             j++;
             continue;
           }
           if (!/^\s+\S/.test(bl)) break;
           // Also break at centered headings appearing directly (no blank line)
+          // but only when it actually looks like prose (many words, no code chars)
           const lineIndent = bl.match(/^(\s*)/)?.[1].length ?? 0;
-          if (lineIndent > 6 && !looksLikeShellOrDockerCodeLine(bt)) break;
+          const lineWords = bt.split(/\s+/).length;
+          if (
+            lineIndent > 6 &&
+            lineWords >= PROSE_WORD_THRESHOLD &&
+            !looksLikeShellOrDockerCodeLine(bt) &&
+            !looksLikeYaml(bt) &&
+            !/[{};=<>[\]]/.test(bt)
+          )
+            break;
           blockLines.push(bl);
           j++;
         }
@@ -1921,9 +1953,9 @@ function normalizeTerminalMarkdown(text: string): string {
         }
         const prevIsYaml = prevContentTrimmed !== '' && looksLikeYaml(prevContentTrimmed);
         const nextIsYaml = nextContentTrimmed !== '' && looksLikeYaml(nextContentTrimmed);
-        // Previous line ends with | or > → YAML literal/folded block scalar;
-        // all indented lines that follow are scalar content (may be Python, etc.)
-        const prevIsLiteralBlockIndicator = /[|>]\s*$/.test(prevContentTrimmed);
+        // Previous line ends with |, |-, |+, >-, |2, etc. → YAML literal/folded
+        // block scalar; all indented lines that follow are scalar content.
+        const prevIsLiteralBlockIndicator = /[|>][-+]?\d?\s*$/.test(prevContentTrimmed);
         const isFragmentInsideYaml =
           (codeLikeLineCount <= 2 && prevIsYaml && nextIsYaml) || prevIsLiteralBlockIndicator;
 

@@ -424,7 +424,7 @@ export const rawRustAxumApp = [
   '\x1b[?2004hroot@aks-agent-649f94dbb9-whtf8:/app# ',
 ].join('\r\n');
 
-// ─── Fixture 4: Rust K8s deployment with bold section headings & large YAML ──
+// ─── Fixture 5: Rust K8s deployment with bold section headings & large YAML ──
 
 /**
  * Reproduces a real-world scenario where:

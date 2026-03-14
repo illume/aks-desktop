@@ -5,18 +5,28 @@ import { _testing } from './aksAgentManager';
 import {
   syntheticAnsi256ColorOutput,
   syntheticBashHeredoc,
+  syntheticCargoNewProject,
+  syntheticCargoTomlAnsiSplit,
+  syntheticCargoTomlFeatures,
+  syntheticCargoTomlWorkspace,
   syntheticCSharpDotnetApp,
   syntheticDeepNestedYaml,
   syntheticGoHttpServer,
+  syntheticGoModule,
   syntheticHelmValuesYaml,
+  syntheticJavaSpringBoot,
   syntheticMakefileWithTargets,
   syntheticMixedFencedAndBare,
   syntheticMultiLanguageComparison,
   syntheticNodeExpressApp,
   syntheticNumberedStepsWithCode,
+  syntheticPythonDjango,
   syntheticPythonMultilineStrings,
   syntheticRubyRailsApp,
+  syntheticRustFullDeploy,
+  syntheticRustWithTests,
   syntheticTerraformAksModule,
+  syntheticTypeScriptApp,
   syntheticYamlWithAnchors,
 } from './syntheticFixtures';
 import {
@@ -5340,9 +5350,7 @@ describe('looksLikeShellOrDockerCodeLine — Python patterns', () => {
   });
 
   it('does not false-positive English use of "use"', () => {
-    // "use" in English prose doesn't start with "use " followed by a word
-    // but our pattern requires "use \w+" which could match prose.
-    // That's acceptable since it will be in an ambiguous context.
+    // Rust `use` requires `::` or `;` to avoid matching English prose.
     // The word "Let" capitalized at sentence start won't match "let" (lowercase).
     expect(looksLikeShellOrDockerCodeLine('Let me explain the concept.')).toBe(false);
     // "use" in English prose without :: or ; does NOT match (tightened pattern)
@@ -5391,12 +5399,15 @@ describe('stripAnsi — orphaned ANSI code continuations', () => {
     expect(stripAnsi('200m')).toBe('200m');
     expect(stripAnsi('200m cpu-limit')).toBe('200m cpu-limit');
     expect(stripAnsi('500m memory')).toBe('500m memory');
-    // Single-part codes like 0m, 25m, 40m, 50m are preserved (could be millicores or K8s quantities)
-    expect(stripAnsi('0m')).toBe('0m');
+    // Single-part codes like 25m, 40m, 50m are preserved (K8s millicores)
+    // Bare "0m" alone on a line is stripped (ANSI reset artifact from split "[4\n0m")
     expect(stripAnsi('0m cpu-idle')).toBe('0m cpu-idle');
+    expect(stripAnsi('0m')).toBe(''); // bare "0m" alone = ANSI reset artifact
     expect(stripAnsi('25m')).toBe('25m');
     expect(stripAnsi('40m some text')).toBe('40m some text');
     expect(stripAnsi('50m cpu-request')).toBe('50m cpu-request');
+    // Multi-line: bare "0m" lines are stripped but "0m" in table data is preserved
+    expect(stripAnsi('name  cpu\napp1  0m\napp2  25m')).toBe('name  cpu\napp1  0m\napp2  25m');
   });
 });
 
@@ -6680,5 +6691,342 @@ describe('extractAIAnswer — syntheticMultiLanguageComparison (synthetic fixtur
 
   it('has no ANSI leaks', () => {
     assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCargoTomlWorkspace ─────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCargoTomlWorkspace (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCargoTomlWorkspace);
+  });
+
+  it('Cargo.toml workspace content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[workspace]'))).toBe(true);
+  });
+
+  it('api/Cargo.toml content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('serde.workspace = true'))).toBe(true);
+  });
+
+  it('Rust source is inside a code fence with use axum', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('use axum::'))).toBe(true);
+  });
+
+  it('workspace Cargo.toml is in SEPARATE block from api/Cargo.toml', () => {
+    const blocks = extractCodeBlocks(result);
+    const wsBlock = blocks.find(b => b.includes('[workspace]'));
+    const apiBlock = blocks.find(b => b.includes('serde.workspace'));
+    expect(wsBlock).toBeDefined();
+    expect(apiBlock).toBeDefined();
+    expect(wsBlock).not.toBe(apiBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCargoNewProject ────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCargoNewProject (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCargoNewProject);
+  });
+
+  it('cargo new commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo new'))).toBe(true);
+  });
+
+  it('[dependencies] TOML content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[dependencies]') && b.includes('actix-web'))).toBe(true);
+  });
+
+  it('Rust source with actix-web is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('use actix_web'))).toBe(true);
+  });
+
+  it('shell commands and Rust source are in SEPARATE blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const shellBlock = blocks.find(b => b.includes('cargo new'));
+    const rustBlock = blocks.find(b => b.includes('use actix_web'));
+    expect(shellBlock).toBeDefined();
+    expect(rustBlock).toBeDefined();
+    expect(shellBlock).not.toBe(rustBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCargoTomlFeatures ──────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCargoTomlFeatures (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCargoTomlFeatures);
+  });
+
+  it('Cargo.toml with [features] is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[features]') && b.includes('[dependencies]'))).toBe(true);
+  });
+
+  it('build.rs content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo:rerun-if-changed'))).toBe(true);
+  });
+
+  it('cargo build command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo build --release'))).toBe(true);
+  });
+
+  it('Cargo.toml and build.rs are in SEPARATE blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const cargoBlock = blocks.find(b => b.includes('[features]'));
+    const buildBlock = blocks.find(b => b.includes('cargo:rerun-if-changed'));
+    expect(cargoBlock).toBeDefined();
+    expect(buildBlock).toBeDefined();
+    expect(cargoBlock).not.toBe(buildBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticJavaSpringBoot ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticJavaSpringBoot (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticJavaSpringBoot);
+  });
+
+  it('pom.xml content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('<project') && b.includes('spring-boot'))).toBe(true);
+  });
+
+  it('Java source is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('@SpringBootApplication'))).toBe(true);
+  });
+
+  it('pom.xml and Java source are in SEPARATE blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const pomBlock = blocks.find(b => b.includes('<project'));
+    const javaBlock = blocks.find(b => b.includes('@SpringBootApplication'));
+    expect(pomBlock).toBeDefined();
+    expect(javaBlock).toBeDefined();
+    expect(pomBlock).not.toBe(javaBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticRustWithTests ──────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticRustWithTests (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticRustWithTests);
+  });
+
+  it('Cargo.toml is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[package]') && b.includes('calculator'))).toBe(true);
+  });
+
+  it('Rust lib with #[cfg(test)] is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('#[cfg(test)]') && b.includes('assert_eq!'))).toBe(true);
+  });
+
+  it('cargo test command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo test'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticGoModule ───────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticGoModule (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticGoModule);
+  });
+
+  it('go.mod content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('module github.com'))).toBe(true);
+  });
+
+  it('main.go with gorilla/mux is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('mux.NewRouter'))).toBe(true);
+  });
+
+  it('handlers.go with switch is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('switch r.Method'))).toBe(true);
+  });
+
+  it('go.mod and main.go are in SEPARATE blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const modBlock = blocks.find(b => b.includes('module github.com'));
+    const mainBlock = blocks.find(b => b.includes('mux.NewRouter'));
+    expect(modBlock).toBeDefined();
+    expect(mainBlock).toBeDefined();
+    expect(modBlock).not.toBe(mainBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticTypeScriptApp ──────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticTypeScriptApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticTypeScriptApp);
+  });
+
+  it('package.json content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('"fastify"'))).toBe(true);
+  });
+
+  it('tsconfig.json is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('"compilerOptions"'))).toBe(true);
+  });
+
+  it('TypeScript source is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes("import Fastify from 'fastify'"))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticRustFullDeploy ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticRustFullDeploy (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticRustFullDeploy);
+  });
+
+  it('Cargo.toml content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[package]') && b.includes('web-svc'))).toBe(true);
+  });
+
+  it('Rust source with axum is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('use axum::'))).toBe(true);
+  });
+
+  it('Dockerfile is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('FROM rust:1.76'))).toBe(true);
+  });
+
+  it('kubectl commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl apply'))).toBe(true);
+  });
+
+  it('Cargo.toml, Rust source, and Dockerfile are in SEPARATE blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const cargoBlock = blocks.find(b => b.includes('[package]') && b.includes('web-svc'));
+    const rustBlock = blocks.find(b => b.includes('use axum::'));
+    const dockerBlock = blocks.find(b => b.includes('FROM rust:1.76'));
+    expect(cargoBlock).toBeDefined();
+    expect(rustBlock).toBeDefined();
+    expect(dockerBlock).toBeDefined();
+    expect(cargoBlock).not.toBe(rustBlock);
+    expect(cargoBlock).not.toBe(dockerBlock);
+    expect(rustBlock).not.toBe(dockerBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticPythonDjango ───────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticPythonDjango (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticPythonDjango);
+  });
+
+  it('requirements.txt is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('django>='))).toBe(true);
+  });
+
+  it('Django views.py is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('from django.http') && b.includes('def health_check'))).toBe(
+      true
+    );
+  });
+
+  it('Dockerfile is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('FROM python:3.12'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCargoTomlAnsiSplit ─────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCargoTomlAnsiSplit (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCargoTomlAnsiSplit);
+  });
+
+  it('Cargo.toml TOML content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[package]') && b.includes('reqwest'))).toBe(true);
+  });
+
+  it('no orphan ANSI fragments like "[4" or "0m" leaked outside fences', () => {
+    assertNoAnsiLeaks(result);
+    // Specifically check the split SGR pattern
+    expect(result).not.toMatch(/\[4\s*$/m);
+  });
+
+  it('cargo build/run commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo build'))).toBe(true);
   });
 });
