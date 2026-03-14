@@ -1417,6 +1417,13 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Line continuation: ends with backslash (short lines only to avoid prose)
   if (/\\\s*$/.test(trimmed) && trimmed.length < 80) return true;
 
+  // Bash for/while loops: "for x in ...; do", "while ...; do", "done"
+  if (/^for\s+\w+\s+in\s/.test(trimmed)) return true;
+  if (/^while\s+.+;\s*do/.test(trimmed)) return true;
+  if (/^done\s*$/.test(trimmed)) return true;
+  // Bash echo with variable: "echo ..." containing $var or quotes
+  if (/^echo\s+.*\$/.test(trimmed)) return true;
+
   // ── Tier 4: Python-specific patterns ──
 
   // Python import: from X import Y  or  from X.Y import Z
