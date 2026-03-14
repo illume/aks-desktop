@@ -3,11 +3,21 @@ import YAML from 'yaml';
 import { parseKubernetesYAML } from '../utils/SampleYamlLibrary';
 import { _testing } from './aksAgentManager';
 import {
+  syntheticAnsi256ColorOutput,
+  syntheticBashHeredoc,
   syntheticCSharpDotnetApp,
+  syntheticDeepNestedYaml,
   syntheticGoHttpServer,
   syntheticHelmValuesYaml,
+  syntheticMakefileWithTargets,
+  syntheticMixedFencedAndBare,
+  syntheticMultiLanguageComparison,
   syntheticNodeExpressApp,
+  syntheticNumberedStepsWithCode,
+  syntheticPythonMultilineStrings,
+  syntheticRubyRailsApp,
   syntheticTerraformAksModule,
+  syntheticYamlWithAnchors,
 } from './syntheticFixtures';
 import {
   rawBareYamlService,
@@ -6332,6 +6342,340 @@ describe('extractAIAnswer — syntheticTerraformAksModule (synthetic fixture)', 
   it('bash block has terraform commands', () => {
     const blocks = extractCodeBlocks(result);
     expect(blocks.some(b => b.includes('terraform init'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticRubyRailsApp ───────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticRubyRailsApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticRubyRailsApp);
+  });
+
+  it('Ruby code (require, class, def, end) is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const rubyBlock = blocks.find(b => b.includes("require 'sinatra'") && b.includes('class App'));
+    expect(rubyBlock).toBeDefined();
+    expect(rubyBlock).toContain("get '/healthz' do");
+    expect(rubyBlock).toContain('end');
+  });
+
+  it('Gemfile content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const gemBlock = blocks.find(b => b.includes("gem 'sinatra'"));
+    expect(gemBlock).toBeDefined();
+    expect(gemBlock).toContain('rubygems.org');
+  });
+
+  it('Dockerfile content is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const dockerBlock = blocks.find(b => b.includes('FROM ruby:3.3-slim'));
+    expect(dockerBlock).toBeDefined();
+    expect(dockerBlock).toContain('bundle install');
+  });
+
+  it('three separate code blocks for app.rb, Gemfile, Dockerfile', () => {
+    const blocks = extractCodeBlocks(result);
+    const rubyBlock = blocks.find(b => b.includes("require 'sinatra'"));
+    const gemBlock = blocks.find(b => b.includes("gem 'sinatra'"));
+    const dockerBlock = blocks.find(b => b.includes('FROM ruby:3.3-slim'));
+    expect(rubyBlock).toBeDefined();
+    expect(gemBlock).toBeDefined();
+    expect(dockerBlock).toBeDefined();
+    expect(rubyBlock).not.toBe(gemBlock);
+    expect(rubyBlock).not.toBe(dockerBlock);
+    expect(gemBlock).not.toBe(dockerBlock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticPythonMultilineStrings ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticPythonMultilineStrings (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticPythonMultilineStrings);
+  });
+
+  it('Python code with triple-quotes and f-string is in a single fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const pyBlock = blocks.find(b => b.includes('"""') && b.includes('def get_db_url'));
+    expect(pyBlock).toBeDefined();
+    expect(pyBlock).toContain('f"postgresql://');
+  });
+
+  it('__file__ is preserved in the code block', () => {
+    const blocks = extractCodeBlocks(result);
+    const pyBlock = blocks.find(b => b.includes('__file__'));
+    expect(pyBlock).toBeDefined();
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticBashHeredoc ────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticBashHeredoc (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticBashHeredoc);
+  });
+
+  it('bash script with heredoc is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const bashBlock = blocks.find(b => b.includes('#!/bin/bash') && b.includes('<<EOF'));
+    expect(bashBlock).toBeDefined();
+    expect(bashBlock).toContain('kubectl apply');
+  });
+
+  it('EOF marker is inside the code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const bashBlock = blocks.find(b => b.includes('<<EOF'));
+    expect(bashBlock).toBeDefined();
+    expect(bashBlock).toMatch(/^\s*EOF$/m);
+  });
+
+  it('shell commands (chmod, ./setup.sh) are in a separate code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const runBlock = blocks.find(b => b.includes('chmod +x'));
+    expect(runBlock).toBeDefined();
+    expect(runBlock).toContain('./setup.sh');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticNumberedStepsWithCode ──────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticNumberedStepsWithCode (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticNumberedStepsWithCode);
+  });
+
+  it('kubectl create namespace is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl create namespace monitoring'))).toBe(true);
+  });
+
+  it('helm commands are inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('helm repo add') && b.includes('helm install'))).toBe(true);
+  });
+
+  it('kubectl get/port-forward commands are inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(
+      blocks.some(b => b.includes('kubectl get pods') && b.includes('kubectl port-forward'))
+    ).toBe(true);
+  });
+
+  it('numbered step headings are NOT inside code fences', () => {
+    const blocks = extractCodeBlocks(result);
+    const allCode = blocks.join('\n');
+    expect(allCode).not.toContain('1) Create the namespace');
+    expect(allCode).not.toContain('2) Install Prometheus');
+    expect(allCode).not.toContain('3) Verify it is running');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticMakefileWithTargets ────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticMakefileWithTargets (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticMakefileWithTargets);
+  });
+
+  it('Makefile content (.PHONY, targets) is inside a single code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const makeBlock = blocks.find(b => b.includes('.PHONY') && b.includes('build:'));
+    expect(makeBlock).toBeDefined();
+    expect(makeBlock).toContain('docker build');
+    expect(makeBlock).toContain('deploy:');
+    expect(makeBlock).toContain('clean:');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticMixedFencedAndBare ─────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticMixedFencedAndBare (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticMixedFencedAndBare);
+  });
+
+  it('bash fenced block is preserved with kubectl create secret', () => {
+    const blocks = extractCodeBlocks(result);
+    const bashBlock = blocks.find(b => b.includes('kubectl create secret'));
+    expect(bashBlock).toBeDefined();
+    expect(bashBlock).toContain('--from-literal=password');
+  });
+
+  it('bare YAML deployment is wrapped in a fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const yamlBlock = blocks.find(b => b.includes('apiVersion: apps/v1') && b.includes('web-app'));
+    expect(yamlBlock).toBeDefined();
+    expect(yamlBlock).toContain('replicas: 1');
+  });
+
+  it('bare kubectl get command is fenced', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl get pods -l app=web-app'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticYamlWithAnchors ────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticYamlWithAnchors (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticYamlWithAnchors);
+  });
+
+  it('YAML with anchors and aliases is in a single yaml fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const yamlBlock = blocks.find(b => b.includes('&defaults') && b.includes('*defaults'));
+    expect(yamlBlock).toBeDefined();
+    expect(yamlBlock).toContain('frontend:1.0');
+    expect(yamlBlock).toContain('backend:2.0');
+  });
+
+  it('<<: *defaults merge keys are preserved', () => {
+    const blocks = extractCodeBlocks(result);
+    const yamlBlock = blocks.find(b => b.includes('<<: *defaults'));
+    expect(yamlBlock).toBeDefined();
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticAnsi256ColorOutput ─────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticAnsi256ColorOutput (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticAnsi256ColorOutput);
+  });
+
+  it('256-color and RGB ANSI codes are fully stripped', () => {
+    assertNoAnsiLeaks(result);
+  });
+
+  it('deployment status content is preserved', () => {
+    expect(result).toContain('deployment/web-app');
+    expect(result).toContain('2/2 ready');
+    expect(result).toContain('CrashLoopBackOff');
+  });
+
+  it('service info is preserved', () => {
+    expect(result).toContain('service/web-app');
+    expect(result).toContain('ClusterIP 10.0.0.5');
+  });
+});
+
+// ─── syntheticDeepNestedYaml ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticDeepNestedYaml (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticDeepNestedYaml);
+  });
+
+  it('all YAML is in a single code fence (deep nesting not broken by heading detection)', () => {
+    const blocks = extractCodeBlocks(result);
+    const yamlBlock = blocks.find(
+      b => b.includes('apiVersion: apps/v1') && b.includes('initialDelaySeconds')
+    );
+    expect(yamlBlock).toBeDefined();
+    expect(yamlBlock).toContain('volumeMounts:');
+    expect(yamlBlock).toContain('livenessProbe:');
+  });
+
+  it('deeply indented lines are inside the fence', () => {
+    const blocks = extractCodeBlocks(result);
+    const yamlBlock = blocks.find(b => b.includes('SPRING_CONFIG_LOCATION'));
+    expect(yamlBlock).toBeDefined();
+    expect(yamlBlock).toContain('/actuator/health/liveness');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticMultiLanguageComparison ────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticMultiLanguageComparison (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticMultiLanguageComparison);
+  });
+
+  it('has a ```python fenced block', () => {
+    expect(result).toContain('```python');
+    const blocks = extractCodeBlocks(result);
+    const pyBlock = blocks.find(b => b.includes('from flask import Flask'));
+    expect(pyBlock).toBeDefined();
+  });
+
+  it('has a ```go fenced block', () => {
+    expect(result).toContain('```go');
+    const blocks = extractCodeBlocks(result);
+    const goBlock = blocks.find(b => b.includes('package main') && b.includes('net/http'));
+    expect(goBlock).toBeDefined();
+  });
+
+  it('has a ```rust fenced block', () => {
+    expect(result).toContain('```rust');
+    const blocks = extractCodeBlocks(result);
+    const rustBlock = blocks.find(b => b.includes('use axum::'));
+    expect(rustBlock).toBeDefined();
+  });
+
+  it('three separate language fences', () => {
+    const blocks = extractCodeBlocks(result);
+    const pyBlock = blocks.find(b => b.includes('Flask'));
+    const goBlock = blocks.find(b => b.includes('net/http'));
+    const rustBlock = blocks.find(b => b.includes('axum'));
+    expect(pyBlock).toBeDefined();
+    expect(goBlock).toBeDefined();
+    expect(rustBlock).toBeDefined();
+    expect(pyBlock).not.toBe(goBlock);
+    expect(pyBlock).not.toBe(rustBlock);
+    expect(goBlock).not.toBe(rustBlock);
+  });
+
+  it('prose between code blocks is NOT inside fences', () => {
+    const blocks = extractCodeBlocks(result);
+    const allCode = blocks.join('\n');
+    expect(allCode).not.toContain('All three listen on port 8080');
   });
 
   it('has no ANSI leaks', () => {
