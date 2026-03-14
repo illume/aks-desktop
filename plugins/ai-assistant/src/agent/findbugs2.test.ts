@@ -148,13 +148,8 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   // ── 5. Shell heredoc at column 0 ──
   // cat <<EOF looks like a shell command, but the heredoc body looks like YAML.
   // The heredoc should be in a shell block, not wrapped as YAML.
-  it.skip('5. shell heredoc at column 0 with YAML-like body', () => {
-    const body = [
-      'cat <<EOF',
-      'apiVersion: v1',
-      'kind: Pod',
-      'EOF',
-    ];
+  it('5. shell heredoc at column 0 with YAML-like body', () => {
+    const body = ['cat <<EOF', 'apiVersion: v1', 'kind: Pod', 'EOF'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
     // The heredoc delimiter "cat <<EOF" should be recognized as shell
@@ -164,15 +159,11 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
     // If parser wraps the YAML body separately, "cat <<EOF" would be
     // outside all code blocks — that's the bug.
     const blocks = extractCodeBlocks(result);
-    const allBlockContent = blocks.join('\n');
     // EOF should appear somewhere in the output (not swallowed)
     expect(result).toContain('EOF');
     // The YAML body should not be wrapped in a ```yaml block separate
     // from the cat command — they should be together or the cat line
     // should at least be in a code block too.
-    // Bug: cat <<EOF is not detected as code, and the body gets wrapped
-    // as ```yaml separately, breaking the heredoc structure.
-    const catInCodeBlock = blocks.some(b => b.includes('cat <<EOF'));
     const yamlInSeparateBlock = blocks.some(
       b => b.includes('apiVersion:') && !b.includes('cat <<EOF')
     );
@@ -182,7 +173,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   });
 
   // ── 6. Ordered list items followed by code panels ──
-  it.skip('6. ordered list items with code panels after each', () => {
+  it('6. ordered list items with code panels after each', () => {
     const body = [
       ' 1 Create the namespace:',
       panelBlank(),
@@ -237,12 +228,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
 
   // ── 9. Bare non-K8s YAML with name: first line ──
   it('9. bare non-K8s YAML starting with name:', () => {
-    const body = [
-      'name: my-app',
-      'version: "1.0"',
-      'description: short',
-      'author: someone',
-    ];
+    const body = ['name: my-app', 'version: "1.0"', 'description: short', 'author: someone'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
     const blocks = extractCodeBlocks(result);
@@ -349,7 +335,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   });
 
   // ── 16. Panel content with tab characters (Makefile) ──
-  it.skip('16. panel content with tab characters', () => {
+  it('16. panel content with tab characters', () => {
     const body = [
       panelBlank(),
       panelLine('build:'),
@@ -416,11 +402,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   // wrapBareCodeBlocks stops at } because looksLikeYaml is true,
   // leaving the brace outside the code block.
   it('19. closing brace at column 0 after code block', () => {
-    const body = [
-      'fn main() {',
-      '    println!("Hello, world!");',
-      '}',
-    ];
+    const body = ['fn main() {', '    println!("Hello, world!");', '}'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
     const blocks = extractCodeBlocks(result);
@@ -517,7 +499,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   });
 
   // ── 25. Panel content starting with "- item" (YAML list) ──
-  it.skip('25. panel content starting with bullet dash item', () => {
+  it('25. panel content starting with bullet dash item', () => {
     const body = [
       panelBlank(),
       panelLine('- name: nginx'),
@@ -537,11 +519,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
 
   // ── 26. Bare code starting with "import " (Python) ──
   it('26. bare python import at column 0', () => {
-    const body = [
-      'import os',
-      'import sys',
-      'from pathlib import Path',
-    ];
+    const body = ['import os', 'import sys', 'from pathlib import Path'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
     const blocks = extractCodeBlocks(result);
@@ -567,11 +545,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
 
   // ── 28. File heading with spaces "My App/config.yaml" ──
   it('28. file heading with spaces in path', () => {
-    const body = [
-      'My App/config.yaml',
-      '',
-      'Edit the config file above.',
-    ];
+    const body = ['My App/config.yaml', '', 'Edit the config file above.'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
     // Space in path means it's not recognized as a file heading
@@ -585,11 +559,7 @@ describe('findbugs2: extractAIAnswer edge cases (round 2)', () => {
   // ── 29. Literal \x1b text in panel (not actual ANSI escape) ──
   it('29. literal backslash-x1b text in panel content', () => {
     // Double-escaped: in the JS string this is the literal characters \ x 1 b
-    const body = [
-      panelBlank(),
-      panelLine('Use \\x1b[31m for red text'),
-      panelBlank(),
-    ];
+    const body = [panelBlank(), panelLine('Use \\x1b[31m for red text'), panelBlank()];
     const result = extractAIAnswer(makeRaw(body));
     // The literal text \x1b should be preserved (it's not a real escape)
     expect(result).toContain('\\x1b');

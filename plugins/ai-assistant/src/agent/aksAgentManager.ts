@@ -1291,6 +1291,9 @@ function hasShellSyntax(trimmed: string): boolean {
   // Output redirection: > or >>
   if (/\s>{1,2}\s/.test(trimmed) || /2>&1/.test(trimmed)) return true;
 
+  // Heredoc operator: <<EOF, <<'EOF', <<"EOF", <<-EOF
+  if (/<<[-~]?\s*['"]?\w+['"]?\s*$/.test(trimmed)) return true;
+
   // Quoted arguments: "..." or '...'
   if (/\s["'][^"'\s]/.test(trimmed)) return true;
 
@@ -1618,6 +1621,8 @@ function collapseTerminalBlankLines(text: string): string {
           !looksLikeYaml(t)
         )
           return false;
+        // Ordered list items (" 1 Create...", " 2 Apply...") are prose, not code
+        if (/^\d+\s+\S/.test(t)) return false;
         return true; // default: treat as code for short lines
       }
       // Heavily indented — only treat as code if it looks like code/YAML
@@ -1703,14 +1708,44 @@ function normalizeTerminalMarkdown(text: string): string {
       continue;
     }
 
-    if (/^\s+\d+\s+\S/.test(line)) {
-      const converted = line.replace(/^\s+(\d+)\s+/, '$1. ');
+    if (/^\s*\d+\s+\S/.test(line) && /^\s*\d+\s+/.test(line)) {
+      const converted = line.replace(/^\s*(\d+)\s+/, '$1. ');
       if (converted !== line) {
         orderedListCount++;
         result.push(converted);
         i++;
         continue;
       }
+    }
+
+    // Detect Makefile targets at column 0: a bare "word:" followed by a
+    // tab-indented line.  Wrap the target and its recipes in a code block.
+    if (
+      /^[\w.-]+:\s*$/.test(trimmed) &&
+      !/^\s+/.test(line) &&
+      i + 1 < lines.length &&
+      /^\s*\t/.test(lines[i + 1])
+    ) {
+      const makefileLines: string[] = [line];
+      let mj = i + 1;
+      while (mj < lines.length) {
+        const ml = lines[mj];
+        const mt = ml.trim();
+        if (mt === '') break;
+        // Makefile recipe (tab-indented) or another target (word:)
+        if (/^\s*\t/.test(ml) || /^[\w.-]+:\s*$/.test(mt)) {
+          makefileLines.push(ml);
+          mj++;
+          continue;
+        }
+        break;
+      }
+      result.push('```');
+      for (const ml of makefileLines) result.push(ml);
+      result.push('```');
+      wrappedCodeBlockCount++;
+      i = mj;
+      continue;
     }
 
     const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
@@ -1840,9 +1875,7 @@ function normalizeTerminalMarkdown(text: string): string {
             lineIndent > 6 &&
             lineWords >= 2 &&
             !looksLikeShellOrDockerCodeLine(bt) &&
-            (/^[A-Z][\w]*:\s+\S/.test(bt) ||
-              /^\d+[.)]\s+\S/.test(bt) ||
-              /^Step\s+\d+/i.test(bt)) &&
+            (/^[A-Z][\w]*:\s+\S/.test(bt) || /^\d+[.)]\s+\S/.test(bt) || /^Step\s+\d+/i.test(bt)) &&
             lineWords <= 8;
           // Break at prose-like lines (many words, no code/YAML patterns).
           // These may appear at any indent level — Rich terminal bold headings
@@ -1879,9 +1912,17 @@ function normalizeTerminalMarkdown(text: string): string {
       continue;
     }
 
+    // Also start indented code blocks when panel content (1–4 space indent)
+    // looks like YAML data (key: value, - item, etc.).  Deeper indentation
+    // (centered headings at 6+ spaces) is excluded to avoid false positives.
+    // Ordered list items (e.g. " 1 Create...", " 2 Apply...") are excluded.
+    const lineIndentN = line.match(/^(\s*)/)?.[1].length ?? 0;
     if (
       /^\s+\S/.test(line) &&
-      (looksLikeShellOrDockerCodeLine(trimmed) || isFileHeaderComment(trimmed))
+      !/^\s*\d+\s+\S/.test(line) &&
+      (looksLikeShellOrDockerCodeLine(trimmed) ||
+        isFileHeaderComment(trimmed) ||
+        (lineIndentN <= 4 && looksLikeYaml(trimmed) && trimmed !== '---'))
     ) {
       // Don't wrap indented lines that are Python function/class/if bodies.
       // If the previous non-blank line is an unindented Python block opener
@@ -2178,7 +2219,18 @@ function wrapBareYamlBlocks(text: string): string {
     }
 
     // Detect start of a bare YAML block: apiVersion: (with optional value)
-    if (/^\s*apiVersion:\s*/.test(line)) {
+    // Skip if the previous non-blank line is a heredoc operator (cat <<EOF, etc.)
+    // — the YAML content is part of the heredoc body, not a standalone YAML block.
+    let prevNonBlankForHeredoc = '';
+    for (let p = i - 1; p >= 0; p--) {
+      if (lines[p].trim() !== '') {
+        prevNonBlankForHeredoc = lines[p].trim();
+        break;
+      }
+    }
+    const insideHeredoc = /<<\s*['"]?\w+['"]?\s*$/.test(prevNonBlankForHeredoc);
+
+    if (/^\s*apiVersion:\s*/.test(line) && !insideHeredoc) {
       verboseLog(
         '[AKS Agent Parse] wrapBareYamlBlocks: detected bare apiVersion: at line',
         i,
@@ -2308,11 +2360,7 @@ function wrapBareYamlBlocks(text: string): string {
             const hasBlankBefore = peekIdx < lines.length && lines[peekIdx].trim() === '';
             while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
             const peekTrimmed = peekIdx < lines.length ? lines[peekIdx].trim() : '';
-            if (
-              peekTrimmed !== '' &&
-              looksLikeYaml(peekTrimmed) &&
-              !hasBlankBefore
-            ) {
+            if (peekTrimmed !== '' && looksLikeYaml(peekTrimmed) && !hasBlankBefore) {
               yamlLines.push(yl);
               j++;
             } else {
@@ -2352,6 +2400,7 @@ function wrapBareYamlBlocks(text: string): string {
       // enough YAML-like lines to be confident it's structured YAML and
       // not prose.  This catches Helm values.yaml, Ansible playbooks, etc.
       !inCodeFence &&
+      !insideHeredoc &&
       trimmed !== '' &&
       !/^\s+/.test(line) &&
       /^[\w][\w.\/-]*:\s?/.test(trimmed) &&
@@ -2400,6 +2449,60 @@ function wrapBareYamlBlocks(text: string): string {
           j++;
         }
         // Trim trailing blank lines
+        while (yamlLines.length > 0 && yamlLines[yamlLines.length - 1].trim() === '') {
+          yamlLines.pop();
+        }
+        if (yamlLines.length > 0) {
+          result.push('```yaml');
+          result.push(...yamlLines);
+          result.push('```');
+          wrappedBlockCount++;
+          i = j;
+        } else {
+          result.push(line);
+          i++;
+        }
+      } else {
+        result.push(line);
+        i++;
+      }
+    } else if (
+      // Detect start of a bare YAML list block: "- key: value" or "- item"
+      // at column 0 outside a code fence, followed by enough YAML-like
+      // lines to be confident it's structured YAML and not prose.
+      !inCodeFence &&
+      trimmed !== '' &&
+      !/^\s+/.test(line) &&
+      /^-\s+/.test(trimmed) &&
+      !looksLikeShellOrDockerCodeLine(trimmed)
+    ) {
+      // Peek ahead to count consecutive YAML-like lines
+      let peek = i;
+      let yamlLineCount = 0;
+      while (peek < lines.length) {
+        const pt = lines[peek].trim();
+        if (pt === '') {
+          let nextNonBlank = peek + 1;
+          while (nextNonBlank < lines.length && lines[nextNonBlank].trim() === '') nextNonBlank++;
+          if (nextNonBlank - peek >= 2) break;
+          if (nextNonBlank < lines.length && looksLikeYaml(lines[nextNonBlank].trim())) {
+            peek++;
+            continue;
+          }
+          break;
+        }
+        if (!looksLikeYaml(pt)) break;
+        yamlLineCount++;
+        peek++;
+      }
+      const MIN_YAML_LINES = 3;
+      if (yamlLineCount >= MIN_YAML_LINES) {
+        const yamlLines: string[] = [];
+        let j = i;
+        while (j < peek) {
+          yamlLines.push(lines[j]);
+          j++;
+        }
         while (yamlLines.length > 0 && yamlLines[yamlLines.length - 1].trim() === '') {
           yamlLines.pop();
         }
@@ -2505,18 +2608,36 @@ function wrapBareCodeBlocks(text: string): string {
     // Detect start of a bare code block: non-blank, non-indented, looks like code
     // Exclude lines that start with # (could be markdown headings) unless they
     // match a Dockerfile directive or shell comment with URL/path
+    //
+    // Also detect Makefile targets: bare "word:" (no value after colon) followed
+    // by a tab-indented continuation line.  These look like YAML to looksLikeYaml
+    // but are actually code (Makefile recipes).
+    const isMakefileTarget =
+      /^[\w.-]+:\s*$/.test(trimmed) && i + 1 < lines.length && /^\t/.test(lines[i + 1]);
     if (
       trimmed !== '' &&
       !/^\s+/.test(line) &&
-      looksLikeShellOrDockerCodeLine(trimmed) &&
-      !looksLikeYaml(trimmed)
+      (isMakefileTarget || (looksLikeShellOrDockerCodeLine(trimmed) && !looksLikeYaml(trimmed)))
     ) {
       const codeLines: string[] = [];
       let j = i;
 
+      // Track heredoc delimiter: if the starting line contains <<WORD, collect
+      // everything (including YAML-looking content) until the delimiter is found.
+      const heredocMatch = trimmed.match(/<<[-~]?\s*['"]?(\w+)['"]?\s*$/);
+      const heredocDelimiter = heredocMatch?.[1] ?? null;
+
       while (j < lines.length) {
         const cl = lines[j];
         const ct = cl.trim();
+
+        // Inside a heredoc: collect everything until the closing delimiter.
+        if (heredocDelimiter) {
+          codeLines.push(cl);
+          j++;
+          if (ct === heredocDelimiter) break; // closing delimiter found
+          continue;
+        }
 
         // Allow single blank lines within a code block
         if (ct === '') {
@@ -2551,8 +2672,9 @@ function wrapBareCodeBlocks(text: string): string {
         // Stop if line is indented (belongs to different formatting)
         // UNLESS we are inside a Python code block — Python uses indentation
         // for function/class bodies (e.g. the body of `def index():`)
+        // Also allow tab-indented Makefile recipe lines.
         if (/^\s+/.test(cl)) {
-          if (hasStructuredCodeContext(codeLines)) {
+          if (hasStructuredCodeContext(codeLines) || (isMakefileTarget && /^\t/.test(cl))) {
             codeLines.push(cl);
             j++;
             continue;
@@ -2564,8 +2686,14 @@ function wrapBareCodeBlocks(text: string): string {
         // Exception: a lone closing brace `}` also matches looksLikeYaml
         // (YAML flow mapping closer), but in structured code context
         // (Rust/Go/C) it's a block closer and should stay in the code block.
+        // Exception: Makefile targets ("word:") in a Makefile block.
         if (!looksLikeShellOrDockerCodeLine(ct) || looksLikeYaml(ct)) {
           if (/^\}\s*;?\s*$/.test(ct) && hasStructuredCodeContext(codeLines)) {
+            codeLines.push(cl);
+            j++;
+            continue;
+          }
+          if (isMakefileTarget && /^[\w.-]+:\s*$/.test(ct)) {
             codeLines.push(cl);
             j++;
             continue;
@@ -2687,10 +2815,7 @@ function cleanTerminalFormatting(text: string): string {
     // Current line ends with a bare word (no colon) and is space-indented
     // Next line starts with optional space + colon (for key-only YAML like "metadata:")
     // or colon + space + value (e.g. ": 70" from "averageUtilization\n: 70")
-    if (
-      /^\s+[\w.-]+$/.test(cur) &&
-      (/^\s*:\s*\S/.test(next) || /^\s*:$/.test(next))
-    ) {
+    if (/^\s+[\w.-]+$/.test(cur) && (/^\s*:\s*\S/.test(next) || /^\s*:$/.test(next))) {
       result[idx] = cur + next.replace(/^\s*/, '');
       result.splice(idx + 1, 1);
       rejoinedCount++;

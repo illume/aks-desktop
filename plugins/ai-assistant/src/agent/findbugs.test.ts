@@ -356,12 +356,7 @@ describe('findbugs: extractAIAnswer edge cases', () => {
 
   // ── 15. Shell command with backtick substitution at column 0 ──
   it('15. shell backtick substitution at column 0', () => {
-    const body = [
-      'Run this command:',
-      '',
-      'PODS=`kubectl get pods -o name`',
-      'echo $PODS',
-    ];
+    const body = ['Run this command:', '', 'PODS=`kubectl get pods -o name`', 'echo $PODS'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
 
@@ -493,11 +488,7 @@ describe('findbugs: extractAIAnswer edge cases', () => {
 
   // ── 22. ANSI code split across line boundary ──
   it('22. ANSI code split across line boundary', () => {
-    const body = [
-      'The config is:\x1b[',
-      '97;40m This is the value\x1b[0m',
-      'End of output.',
-    ];
+    const body = ['The config is:\x1b[', '97;40m This is the value\x1b[0m', 'End of output.'];
     const result = extractAIAnswer(makeRaw(body));
     assertNoAnsiLeaks(result);
     expect(result).toContain('The config is');
