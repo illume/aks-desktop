@@ -1342,8 +1342,6 @@ function isFileHeaderComment(trimmed: string): boolean {
 function isBoldFileHeading(trimmed: string): boolean {
   // filename.ext  or  path/to/file.ext  (standalone on a line, no other words)
   if (/^([\w.-]+\/)*[\w.-]+\.\w+$/.test(trimmed)) {
-    // Exclude YAML file headings
-    if (/\.ya?ml$/i.test(trimmed)) return false;
     return true;
   }
   // Well-known extensionless filenames
@@ -1498,6 +1496,18 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // XML opening/closing tags: <project ...>, </dependencies>, <?xml ...>
   if (/^<\/?[\w?]/.test(trimmed)) return true;
+
+  // ── Tier 8: kubectl / K8s structured output ──
+
+  // kubectl describe output: "Key:   value" with 2+ spaces between
+  if (/^[\w]+:\s{2,}\S/.test(trimmed)) return true;
+  // kubectl table headers/rows: "NAME   STATUS   AGE" or dashed separators "----"
+  if (/^-{4,}/.test(trimmed)) return true;
+  // Log lines: "2026-03-12T10:23:45Z INFO ..."
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(trimmed)) return true;
+  // Tabular output: lines with 3+ column-aligned gaps (2+ spaces between words)
+  // e.g. "NAME   STATUS   AGE", "Type    Reason   Age   From     Message"
+  if ((trimmed.match(/\S\s{2,}\S/g) ?? []).length >= 2) return true;
 
   return false;
 }

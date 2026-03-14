@@ -3,6 +3,7 @@ import YAML from 'yaml';
 import { parseKubernetesYAML } from '../utils/SampleYamlLibrary';
 import { _testing } from './aksAgentManager';
 import {
+  syntheticAksClusterCreate,
   syntheticAnsi256ColorOutput,
   syntheticBashHeredoc,
   syntheticCargoNewProject,
@@ -13,8 +14,17 @@ import {
   syntheticDeepNestedYaml,
   syntheticGoHttpServer,
   syntheticGoModule,
+  syntheticHelmInstall,
   syntheticHelmValuesYaml,
   syntheticJavaSpringBoot,
+  syntheticK8sCronJobScript,
+  syntheticK8sHpaPdb,
+  syntheticK8sNetworkPolicy,
+  syntheticK8sRbacSetup,
+  syntheticK8sTroubleshooting,
+  syntheticKubectlDescribePod,
+  syntheticKubectlTopOutput,
+  syntheticKustomizeOverlay,
   syntheticMakefileWithTargets,
   syntheticMixedFencedAndBare,
   syntheticMultiLanguageComparison,
@@ -5802,9 +5812,10 @@ describe('isBoldFileHeading', () => {
     expect(isBoldFileHeading('Makefile')).toBe(true);
   });
 
-  it('excludes YAML file headings', () => {
-    expect(isBoldFileHeading('k8s.yaml')).toBe(false);
-    expect(isBoldFileHeading('deploy.yml')).toBe(false);
+  it('includes YAML file headings (values-override.yaml, k8s.yaml)', () => {
+    expect(isBoldFileHeading('k8s.yaml')).toBe(true);
+    expect(isBoldFileHeading('deploy.yml')).toBe(true);
+    expect(isBoldFileHeading('values-override.yaml')).toBe(true);
   });
 
   it('does not match prose or multi-word lines', () => {
@@ -7028,5 +7039,360 @@ describe('extractAIAnswer — syntheticCargoTomlAnsiSplit (synthetic fixture)', 
   it('cargo build/run commands are in a code fence', () => {
     const blocks = extractCodeBlocks(result);
     expect(blocks.some(b => b.includes('cargo build'))).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Kubernetes-focused synthetic fixtures
+// ===========================================================================
+
+// ─── syntheticKubectlTopOutput ───────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticKubectlTopOutput (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticKubectlTopOutput);
+  });
+
+  it('kubectl top command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl top pods'))).toBe(true);
+  });
+
+  it('preserves CPU millicore values (250m, 50m, 0m, 25m, 4000m)', () => {
+    expect(result).toContain('250m');
+    expect(result).toContain('50m');
+    expect(result).toContain('0m');
+    expect(result).toContain('25m');
+    expect(result).toContain('4000m');
+  });
+
+  it('pod table data is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('api-server') && b.includes('250m'))).toBe(true);
+  });
+
+  it('resource limits YAML is in a fenced yaml block', () => {
+    expect(result).toContain('```yaml');
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cpu: 100m') && b.includes('memory: 128Mi'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticHelmInstall ────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticHelmInstall (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticHelmInstall);
+  });
+
+  it('helm repo commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('helm repo add'))).toBe(true);
+  });
+
+  it('values-override.yaml YAML content is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('controller:') && b.includes('replicaCount'))).toBe(true);
+  });
+
+  it('helm install with backslash continuations is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('helm install'))).toBe(true);
+  });
+
+  it('cpu millicore values 100m and 500m preserved', () => {
+    expect(result).toContain('100m');
+    expect(result).toContain('500m');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sRbacSetup ──────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sRbacSetup (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sRbacSetup);
+  });
+
+  it('multi-document YAML with RBAC resources is in a fenced block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Role') && b.includes('kind: RoleBinding'))).toBe(
+      true
+    );
+  });
+
+  it('contains all four K8s resource types', () => {
+    expect(result).toContain('kind: Namespace');
+    expect(result).toContain('kind: ServiceAccount');
+    expect(result).toContain('kind: Role');
+    expect(result).toContain('kind: RoleBinding');
+  });
+
+  it('kubectl apply commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl apply'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticKubectlDescribePod ─────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticKubectlDescribePod (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticKubectlDescribePod);
+  });
+
+  it('describe output is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('Name:') && b.includes('Namespace:'))).toBe(true);
+  });
+
+  it('container resource values preserved (100m, 500m, 128Mi)', () => {
+    expect(result).toContain('100m');
+    expect(result).toContain('500m');
+    expect(result).toContain('128Mi');
+  });
+
+  it('Events section is inside a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('Events:') && b.includes('kubelet'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticAksClusterCreate ───────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticAksClusterCreate (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticAksClusterCreate);
+  });
+
+  it('az aks create command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('az aks create'))).toBe(true);
+  });
+
+  it('az aks get-credentials command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('az aks get-credentials'))).toBe(true);
+  });
+
+  it('autoscaler commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('--enable-cluster-autoscaler'))).toBe(true);
+  });
+
+  it('numbered headings are NOT inside code fences', () => {
+    const lines = result.split('\n');
+    let inFence = false;
+    const headingLeaks = lines.filter(l => {
+      if (/^```/.test(l.trim())) {
+        inFence = !inFence;
+        return false;
+      }
+      return inFence && /^\*\*\d+\./.test(l.trim());
+    });
+    expect(headingLeaks).toEqual([]);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticKustomizeOverlay ───────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticKustomizeOverlay (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticKustomizeOverlay);
+  });
+
+  it('base/kustomization.yaml content is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Kustomization') && b.includes('resources:'))).toBe(
+      true
+    );
+  });
+
+  it('base/deployment.yaml content is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Deployment') && b.includes('containerPort'))).toBe(
+      true
+    );
+  });
+
+  it('production overlay content is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(
+      blocks.some(b => b.includes('patchesStrategicMerge') && b.includes('namespace: production'))
+    ).toBe(true);
+  });
+
+  it('kubectl apply -k is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl apply -k'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sCronJobScript ───────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sCronJobScript (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sCronJobScript);
+  });
+
+  it('YAML with embedded bash script is in a fenced block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: ConfigMap') && b.includes('#!/bin/bash'))).toBe(true);
+  });
+
+  it('CronJob resource is in the same YAML block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: CronJob') && b.includes('schedule:'))).toBe(true);
+  });
+
+  it('kubectl commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl get cronjobs'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sTroubleshooting ─────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sTroubleshooting (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sTroubleshooting);
+  });
+
+  it('kubectl logs command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl logs'))).toBe(true);
+  });
+
+  it('log output with ERROR/FATAL is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('ERROR') && b.includes('Connection refused'))).toBe(true);
+  });
+
+  it('events table is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('Warning') && b.includes('Unhealthy'))).toBe(true);
+  });
+
+  it('diagnostic kubectl commands are in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl get endpoints'))).toBe(true);
+  });
+
+  it('Root Cause heading is NOT inside a code fence', () => {
+    const lines = result.split('\n');
+    let inFence = false;
+    const headingLeaks = lines.filter(l => {
+      if (/^```/.test(l.trim())) {
+        inFence = !inFence;
+        return false;
+      }
+      return inFence && /Root Cause/.test(l);
+    });
+    expect(headingLeaks).toEqual([]);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sNetworkPolicy ───────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sNetworkPolicy (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sNetworkPolicy);
+  });
+
+  it('NetworkPolicy and Ingress are in a fenced YAML block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: NetworkPolicy') && b.includes('kind: Ingress'))).toBe(
+      true
+    );
+  });
+
+  it('contains K8s annotations', () => {
+    expect(result).toContain('nginx.ingress.kubernetes.io/rewrite-target');
+    expect(result).toContain('cert-manager.io/cluster-issuer');
+  });
+
+  it('kubectl apply command is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl apply'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sHpaPdb ──────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sHpaPdb (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sHpaPdb);
+  });
+
+  it('HPA and PDB are in a fenced YAML block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(
+      blocks.some(
+        b => b.includes('kind: HorizontalPodAutoscaler') && b.includes('kind: PodDisruptionBudget')
+      )
+    ).toBe(true);
+  });
+
+  it('averageUtilization values are preserved', () => {
+    expect(result).toContain('averageUtilization: 70');
+    expect(result).toContain('averageUtilization: 80');
+  });
+
+  it('scaleDown behavior with stabilizationWindowSeconds is present', () => {
+    expect(result).toContain('stabilizationWindowSeconds: 300');
+  });
+
+  it('kubectl describe hpa is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl describe hpa'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
   });
 });
