@@ -108,6 +108,32 @@ const parseLogsButtonData = (content: string, logsButtonIndex: number): ParseRes
   }
 };
 
+/**
+ * Check if content looks like YAML structure (indented key-value pairs,
+ * list items) even without Kubernetes-specific keywords.
+ * Used to catch orphaned YAML parts from --- splitting.
+ */
+export const looksLikeYamlContent = (text: string): boolean => {
+  const lines = text.split('\n').filter(l => l.trim() !== '');
+  if (lines.length < 2) return false;
+
+  let yamlLikeLines = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // key: value pair  OR  key: (no value, e.g. metadata:, spec:)
+    if (/^\w[\w./-]*:\s/.test(trimmed) || /^\w[\w./-]*:\s*$/.test(trimmed)) yamlLikeLines++;
+    // list item: - something
+    else if (/^-\s/.test(trimmed)) yamlLikeLines++;
+    // indented key: value  OR  indented key: (no value)
+    else if (/^\s+\w[\w./-]*:(\s|$)/.test(line)) yamlLikeLines++;
+    // indented list item
+    else if (/^\s+-\s/.test(line)) yamlLikeLines++;
+  }
+
+  // If at least half the lines look like YAML, treat it as YAML
+  return yamlLikeLines / lines.length >= 0.5;
+};
+
 interface ContentRendererProps {
   content: string;
   onYamlDetected?: (yaml: string, resourceType: string) => void;
@@ -558,6 +584,32 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
                 </Box>
               );
             }
+          } else if (looksLikeYamlContent(trimmedPart)) {
+            // Part looks like YAML content (indented key-value pairs, list items)
+            // but doesn't have K8s keywords — render as code block to avoid
+            // markdown interpreting YAML syntax (e.g. __name__ as bold)
+            verboseLog(
+              '[ContentRenderer] processUnformattedYaml: part',
+              index,
+              'looks like YAML content without K8s keywords, rendering as code block'
+            );
+            sections.push(
+              <Box
+                component="pre"
+                key={`yaml-code-${index}-${sectionIndex++}`}
+                sx={{
+                  backgroundColor: codeBlockBg,
+                  color: codeBlockColor,
+                  padding: 2,
+                  borderRadius: 1,
+                  overflowX: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {trimmedPart}
+              </Box>
+            );
           } else {
             // Regular text content - use ReactMarkdown with simplified components
             verboseLog(
@@ -698,18 +750,56 @@ const ContentRenderer: React.FC<ContentRendererProps> = React.memo(
       }
 
       // First, let's detect if this content has unformatted YAML (not in code blocks)
-      // or JSON Kubernetes resources that need special handling
-      const hasUnformattedYaml =
+      // or JSON Kubernetes resources that need special handling.
+      // Check for apiVersion: outside code fences — even if some YAML is fenced,
+      // there may also be unfenced YAML that needs special handling.
+      const hasYamlKeywords =
         content.includes('apiVersion:') &&
         content.includes('kind:') &&
-        content.includes('metadata:') &&
-        !content.includes('```yaml') &&
-        !content.includes('```yml');
+        content.includes('metadata:');
 
-      const hasJsonKubernetesResource =
+      let hasUnformattedYaml = false;
+      if (hasYamlKeywords) {
+        if (!content.includes('```yaml') && !content.includes('```yml')) {
+          // No fenced YAML at all — all YAML is unfenced
+          hasUnformattedYaml = true;
+        } else {
+          // Some YAML is fenced — check if apiVersion: also appears outside fences
+          const lines = content.split('\n');
+          let inFence = false;
+          for (const line of lines) {
+            if (/^\s*```/.test(line)) {
+              inFence = !inFence;
+              continue;
+            }
+            if (!inFence && /apiVersion:\s*\S/.test(line)) {
+              hasUnformattedYaml = true;
+              break;
+            }
+          }
+        }
+      }
+
+      let hasJsonKubernetesResource = false;
+      if (
         content.includes('"apiVersion":') &&
         content.includes('"kind":') &&
-        content.includes('"metadata":');
+        content.includes('"metadata":')
+      ) {
+        // Check whether JSON K8s keywords appear outside fenced code blocks
+        const jsonLines = content.split('\n');
+        let inJsonFence = false;
+        for (const line of jsonLines) {
+          if (/^\s*```/.test(line)) {
+            inJsonFence = !inJsonFence;
+            continue;
+          }
+          if (!inJsonFence && /"apiVersion"\s*:/.test(line)) {
+            hasJsonKubernetesResource = true;
+            break;
+          }
+        }
+      }
 
       if (hasUnformattedYaml || hasJsonKubernetesResource) {
         debugLog(
