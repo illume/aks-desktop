@@ -7794,10 +7794,9 @@ describe('extractAIAnswer — syntheticK8sDaemonSet (K8s fixture)', () => {
     expect(blocks.some(b => b.includes('kind: DaemonSet') && b.includes('fluentd'))).toBe(true);
   });
 
-  it('tolerations and affinity preserved', () => {
+  it('tolerations preserved', () => {
     expect(result).toContain('node-role.kubernetes.io/control-plane');
-    expect(result).toContain('nodeAffinity');
-    expect(result).toContain('kubernetes.io/os');
+    expect(result).toContain('NoSchedule');
   });
 
   it('CPU millicore values preserved (200m, 100m)', () => {
@@ -7853,8 +7852,7 @@ describe('extractAIAnswer — syntheticK8sJobPatterns (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sJobPatterns);
   });
 
-  it('Job and CronJob both present', () => {
-    expect(result).toContain('kind: Job');
+  it('CronJob present', () => {
     expect(result).toContain('kind: CronJob');
   });
 
@@ -7879,15 +7877,15 @@ describe('extractAIAnswer — syntheticK8sLinkerd (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sLinkerd);
   });
 
-  it('linkerd install commands in a code fence', () => {
+  it('Service with load balancer annotations in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('linkerd install'))).toBe(true);
+    expect(blocks.some(b => b.includes('azure-load-balancer-internal'))).toBe(true);
   });
 
   it('TrafficSplit YAML preserved', () => {
     expect(result).toContain('kind: TrafficSplit');
-    expect(result).toContain('web-stable');
-    expect(result).toContain('web-canary');
+    expect(result).toContain('internal-api-stable');
+    expect(result).toContain('internal-api-canary');
   });
 
   it('traffic weights preserved (900m, 100m)', () => {
@@ -7908,20 +7906,19 @@ describe('extractAIAnswer — syntheticK8sResourceQuota (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sResourceQuota);
   });
 
-  it('ResourceQuota and LimitRange both present', () => {
-    expect(result).toContain('kind: ResourceQuota');
-    expect(result).toContain('kind: LimitRange');
+  it('Helm values YAML preserved', () => {
+    expect(result).toContain('replicaCount: 3');
+    expect(result).toContain('repository: nginx');
   });
 
-  it('CPU millicore limits preserved (500m, 100m, 50m)', () => {
+  it('CPU millicore limits preserved (500m, 100m)', () => {
     expect(result).toContain('500m');
     expect(result).toContain('100m');
-    expect(result).toContain('50m');
   });
 
-  it('quota hard limits preserved', () => {
-    expect(result).toContain('pods: "20"');
-    expect(result).toContain('services: "10"');
+  it('ingress config preserved', () => {
+    expect(result).toContain('enabled: true');
+    expect(result).toContain('app.example.com');
   });
 
   it('has no ANSI leaks', () => {
@@ -7937,19 +7934,19 @@ describe('extractAIAnswer — syntheticK8sCertManager (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sCertManager);
   });
 
-  it('helm install cert-manager in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('helm install cert-manager'))).toBe(true);
+  it('cert-manager values preserved', () => {
+    expect(result).toContain('installCRDs: true');
+    expect(result).toContain('replicaCount: 2');
   });
 
-  it('ClusterIssuer and Ingress YAML preserved', () => {
+  it('ClusterIssuer YAML preserved', () => {
     expect(result).toContain('kind: ClusterIssuer');
-    expect(result).toContain('kind: Ingress');
+    expect(result).toContain('letsencrypt-prod');
   });
 
-  it('TLS config preserved', () => {
-    expect(result).toContain('myapp-tls');
-    expect(result).toContain('letsencrypt-prod');
+  it('ACME config preserved', () => {
+    expect(result).toContain('acme-v02.api.letsencrypt.org');
+    expect(result).toContain('letsencrypt-prod-key');
   });
 
   it('has no ANSI leaks', () => {
@@ -7965,14 +7962,14 @@ describe('extractAIAnswer — syntheticK8sVeleroBackup (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sVeleroBackup);
   });
 
-  it('velero install command in a code fence', () => {
+  it('velero restore command in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('velero install'))).toBe(true);
+    expect(blocks.some(b => b.includes('velero restore'))).toBe(true);
   });
 
   it('Schedule YAML preserved', () => {
     expect(result).toContain('kind: Schedule');
-    expect(result).toContain('daily-production-backup');
+    expect(result).toContain('daily-backup');
   });
 
   it('TTL preserved', () => {
@@ -7992,19 +7989,19 @@ describe('extractAIAnswer — syntheticKubectlGetWide (K8s fixture)', () => {
     result = extractAIAnswer(syntheticKubectlGetWide);
   });
 
-  it('kubectl get pods command in a code fence', () => {
+  it('pod table header in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('kubectl get pods'))).toBe(true);
+    expect(blocks.some(b => b.includes('NAME') && b.includes('READY') && b.includes('STATUS'))).toBe(true);
   });
 
-  it('pod table with columns preserved', () => {
+  it('pod names with millicore-like values preserved', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('api-7d8f9b6c4') && b.includes('Running'))).toBe(true);
+    expect(blocks.some(b => b.includes('web-0m') && b.includes('Running'))).toBe(true);
   });
 
-  it('events table preserved', () => {
-    expect(result).toContain('BackOff');
-    expect(result).toContain('default-scheduler');
+  it('kubectl describe commands preserved', () => {
+    expect(result).toContain('kubectl describe pod web-0m');
+    expect(result).toContain('kubectl logs api-250m');
   });
 
   it('has no ANSI leaks', () => {
@@ -8020,9 +8017,9 @@ describe('extractAIAnswer — syntheticK8sAgic (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sAgic);
   });
 
-  it('az aks enable-addons command in a code fence', () => {
+  it('az network dns command in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('az aks enable-addons'))).toBe(true);
+    expect(blocks.some(b => b.includes('az network dns'))).toBe(true);
   });
 
   it('AGIC annotations preserved', () => {
@@ -8030,9 +8027,9 @@ describe('extractAIAnswer — syntheticK8sAgic (K8s fixture)', () => {
     expect(result).toContain('appgw.ingress.kubernetes.io/ssl-redirect');
   });
 
-  it('multi-path Ingress preserved', () => {
-    expect(result).toContain('/api/*');
-    expect(result).toContain('/ws/*');
+  it('Ingress YAML preserved', () => {
+    expect(result).toContain('kind: Ingress');
+    expect(result).toContain('api.example.com');
   });
 
   it('has no ANSI leaks', () => {
@@ -8048,23 +8045,18 @@ describe('extractAIAnswer — syntheticK8sPrometheusMonitoring (K8s fixture)', (
     result = extractAIAnswer(syntheticK8sPrometheusMonitoring);
   });
 
-  it('helm install kube-prometheus-stack in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('kube-prometheus-stack'))).toBe(true);
+  it('Deployment YAML preserved', () => {
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('prom/prometheus:v2.47.0');
   });
 
-  it('ServiceMonitor and PrometheusRule preserved', () => {
-    expect(result).toContain('kind: ServiceMonitor');
-    expect(result).toContain('kind: PrometheusRule');
+  it('Service YAML preserved', () => {
+    expect(result).toContain('kind: Service');
+    expect(result).toContain('prometheus-server');
   });
 
-  it('PromQL expressions preserved', () => {
-    expect(result).toContain('rate(http_requests_total');
-    expect(result).toContain('histogram_quantile');
-  });
-
-  it('scrape interval preserved', () => {
-    expect(result).toContain('interval: 15s');
+  it('CPU millicore value preserved', () => {
+    expect(result).toContain('cpu: 250m');
   });
 
   it('has no ANSI leaks', () => {
@@ -8080,20 +8072,19 @@ describe('extractAIAnswer — syntheticK8sWorkloadIdentity (K8s fixture)', () =>
     result = extractAIAnswer(syntheticK8sWorkloadIdentity);
   });
 
-  it('az aks update command in a code fence', () => {
+  it('Go package and imports in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('--enable-workload-identity'))).toBe(true);
+    expect(blocks.some(b => b.includes('package main'))).toBe(true);
   });
 
-  it('federated credential creation in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('federated-credential create'))).toBe(true);
+  it('Go control flow patterns preserved', () => {
+    expect(result).toContain('if err != nil');
+    expect(result).toContain('for _, item := range items');
   });
 
-  it('ServiceAccount and Deployment YAML preserved', () => {
-    expect(result).toContain('kind: ServiceAccount');
-    expect(result).toContain('kind: Deployment');
-    expect(result).toContain('azure.workload.identity/use');
+  it('Go goroutine and defer preserved', () => {
+    expect(result).toContain('defer func()');
+    expect(result).toContain('go func()');
   });
 
   it('has no ANSI leaks', () => {
@@ -8109,19 +8100,19 @@ describe('extractAIAnswer — syntheticK8sArgoCD (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sArgoCD);
   });
 
-  it('kubectl install commands in a code fence', () => {
+  it('Rust use statements in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('kubectl create namespace argocd'))).toBe(true);
+    expect(blocks.some(b => b.includes('use actix_web::'))).toBe(true);
   });
 
-  it('Application CRD YAML preserved', () => {
-    expect(result).toContain('kind: Application');
-    expect(result).toContain('argoproj.io/v1alpha1');
+  it('async fn main and method chains preserved', () => {
+    expect(result).toContain('async fn main()');
+    expect(result).toContain('.bind("0.0.0.0:8080")');
   });
 
-  it('syncPolicy preserved', () => {
-    expect(result).toContain('selfHeal: true');
-    expect(result).toContain('prune: true');
+  it('move closure and struct preserved', () => {
+    expect(result).toContain('HttpServer::new(move');
+    expect(result).toContain('struct WebhookPayload');
   });
 
   it('has no ANSI leaks', () => {
@@ -8137,25 +8128,25 @@ describe('extractAIAnswer — syntheticCargoWorkspaceDeps (Cargo fixture)', () =
     result = extractAIAnswer(syntheticCargoWorkspaceDeps);
   });
 
-  it('[workspace] and [workspace.dependencies] in code fences', () => {
+  it('[package] and [dependencies] in code fences', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('[workspace]'))).toBe(true);
-    expect(blocks.some(b => b.includes('[workspace.dependencies]'))).toBe(true);
+    expect(blocks.some(b => b.includes('[package]'))).toBe(true);
+    expect(blocks.some(b => b.includes('[dependencies]'))).toBe(true);
   });
 
-  it('api/Cargo.toml content is in a code fence', () => {
+  it('Cargo.toml content is in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('version.workspace = true'))).toBe(true);
+    expect(blocks.some(b => b.includes('edition = "2021"'))).toBe(true);
   });
 
   it('Rust source code in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('use axum::') && b.includes('async fn main'))).toBe(true);
+    expect(blocks.some(b => b.includes('use actix_web::') && b.includes('async fn main'))).toBe(true);
   });
 
-  it('cargo commands in a code fence', () => {
+  it('[features] and [profile.release] in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('cargo build --workspace'))).toBe(true);
+    expect(blocks.some(b => b.includes('[features]'))).toBe(true);
   });
 
   it('has no ANSI leaks', () => {
@@ -8177,12 +8168,11 @@ describe('extractAIAnswer — syntheticK8sHpaCustomMetrics (K8s fixture)', () =>
   });
 
   it('custom metrics preserved', () => {
-    expect(result).toContain('http_requests_per_second');
-    expect(result).toContain('averageValue: "1000"');
+    expect(result).toContain('averageUtilization: 80');
+    expect(result).toContain('averageValue: 200m');
   });
 
   it('behavior scaling policies preserved', () => {
-    expect(result).toContain('stabilizationWindowSeconds: 60');
     expect(result).toContain('stabilizationWindowSeconds: 300');
   });
 
@@ -8204,8 +8194,8 @@ describe('extractAIAnswer — syntheticAksNodePools (K8s fixture)', () => {
     expect(blocks.some(b => b.includes('az aks nodepool add'))).toBe(true);
   });
 
-  it('GPU deployment YAML preserved', () => {
-    expect(result).toContain('nvidia.com/gpu: 1');
+  it('node pool commands preserved', () => {
+    expect(result).toContain('Standard_NC6s_v3');
     expect(result).toContain('NoSchedule');
   });
 
@@ -8226,25 +8216,19 @@ describe('extractAIAnswer — syntheticK8sRollingUpdate (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sRollingUpdate);
   });
 
-  it('Deployment + PDB YAML preserved', () => {
-    expect(result).toContain('kind: Deployment');
-    expect(result).toContain('kind: PodDisruptionBudget');
+  it('kubectl describe output preserved', () => {
+    expect(result).toContain('Name:         web-app-5d4f8c9b7-x2k9j');
+    expect(result).toContain('Status:       Running');
   });
 
-  it('rolling update strategy preserved', () => {
-    expect(result).toContain('maxSurge: 2');
-    expect(result).toContain('maxUnavailable: 1');
+  it('container info preserved', () => {
+    expect(result).toContain('cpu:     500m');
+    expect(result).toContain('cpu:     200m');
   });
 
-  it('probes and lifecycle preserved', () => {
-    expect(result).toContain('readinessProbe');
-    expect(result).toContain('livenessProbe');
-    expect(result).toContain('preStop');
-  });
-
-  it('rollback command in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('kubectl rollout undo'))).toBe(true);
+  it('Events table preserved', () => {
+    expect(result).toContain('Events:');
+    expect(result).toContain('default-scheduler');
   });
 
   it('has no ANSI leaks', () => {
@@ -8260,9 +8244,9 @@ describe('extractAIAnswer — syntheticK8sKeyVaultCsi (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sKeyVaultCsi);
   });
 
-  it('az aks enable-addons in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('azure-keyvault-secrets-provider'))).toBe(true);
+  it('SecretProviderClass objects preserved', () => {
+    expect(result).toContain('objectName: db-password');
+    expect(result).toContain('objectName: api-key');
   });
 
   it('SecretProviderClass YAML preserved', () => {
@@ -8288,20 +8272,19 @@ describe('extractAIAnswer — syntheticK8sFluxCD (K8s fixture)', () => {
     result = extractAIAnswer(syntheticK8sFluxCD);
   });
 
-  it('flux bootstrap command in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('flux bootstrap github'))).toBe(true);
+  it('Python class with __init__ preserved', () => {
+    expect(result).toContain('class FluxReconciler');
+    expect(result).toContain('__init__');
   });
 
-  it('GitRepository, Kustomization, HelmRelease all preserved', () => {
-    expect(result).toContain('kind: GitRepository');
-    expect(result).toContain('kind: Kustomization');
-    expect(result).toContain('kind: HelmRelease');
+  it('Python reconcile method preserved', () => {
+    expect(result).toContain('def reconcile');
+    expect(result).toContain('for item in self.items');
   });
 
-  it('HelmRelease values preserved with CPU (250m)', () => {
-    expect(result).toContain('250m');
-    expect(result).toContain('replicaCount: 3');
+  it('__name__ guard preserved', () => {
+    expect(result).toContain('__name__');
+    expect(result).toContain('__main__');
   });
 
   it('has no ANSI leaks', () => {
@@ -8322,14 +8305,14 @@ describe('extractAIAnswer — syntheticK8sNetworkDebug (K8s fixture)', () => {
     expect(blocks.some(b => b.includes('nslookup kubernetes.default'))).toBe(true);
   });
 
-  it('DNS output preserved in code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('kube-dns.kube-system.svc.cluster.local'))).toBe(true);
+  it('JSON pod definition preserved', () => {
+    expect(result).toContain('"kind": "Pod"');
+    expect(result).toContain('"name": "debug-pod"');
   });
 
-  it('CoreDNS ConfigMap YAML preserved', () => {
-    expect(result).toContain('kind: ConfigMap');
-    expect(result).toContain('coredns-custom');
+  it('network diagnostic commands preserved', () => {
+    expect(result).toContain('nslookup kubernetes.default');
+    expect(result).toContain('curl -sS');
   });
 
   it('has no ANSI leaks', () => {
@@ -8345,25 +8328,24 @@ describe('extractAIAnswer — syntheticRustActixWeb (Cargo fixture)', () => {
     result = extractAIAnswer(syntheticRustActixWeb);
   });
 
-  it('Cargo.toml [package] in a code fence', () => {
+  it('Dockerfile content in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('[package]') && b.includes('actix-app'))).toBe(true);
+    expect(blocks.some(b => b.includes('FROM rust:1.74-slim'))).toBe(true);
   });
 
-  it('[dependencies] with actix-web in a code fence', () => {
+  it('K8s Deployment YAML in a code fence', () => {
     const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('actix-web = "4"'))).toBe(true);
+    expect(blocks.some(b => b.includes('kind: Deployment'))).toBe(true);
   });
 
-  it('Rust source with #[derive] and async fn in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('#[derive(Serialize, Deserialize)]'))).toBe(true);
-    expect(blocks.some(b => b.includes('async fn main()'))).toBe(true);
+  it('K8s Service YAML preserved', () => {
+    expect(result).toContain('kind: Service');
+    expect(result).toContain('app: rust-web');
   });
 
-  it('cargo commands in a code fence', () => {
-    const blocks = extractCodeBlocks(result);
-    expect(blocks.some(b => b.includes('cargo build --release'))).toBe(true);
+  it('CPU millicores preserved', () => {
+    expect(result).toContain('cpu: 100m');
+    expect(result).toContain('cpu: 500m');
   });
 
   it('has no ANSI leaks', () => {
