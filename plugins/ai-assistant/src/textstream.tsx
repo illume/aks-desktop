@@ -51,6 +51,7 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const loadingIndicatorRef = useRef<HTMLDivElement>(null);
   // State to track if user has scrolled up
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   // Track the last user message count for detecting new user messages
@@ -174,6 +175,70 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
     }
   }, [history]);
 
+  // Smart scroll when "Agent working..." loading indicator appears.
+  // Shows the user's question with the loading indicator visible below it,
+  // but only scrolls if the loading indicator is not already visible.
+  const scrollToShowLoadingIndicator = useCallback(() => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+
+    // Check if the loading indicator is already visible in the viewport
+    if (loadingIndicatorRef.current) {
+      const containerRect = container.getBoundingClientRect();
+      const loadingRect = loadingIndicatorRef.current.getBoundingClientRect();
+
+      // If the loading indicator top is within the visible area, don't scroll
+      if (loadingRect.top >= containerRect.top && loadingRect.top < containerRect.bottom) {
+        return;
+      }
+    }
+
+    // Find the last user message to show it alongside the loading indicator
+    let lastUserIdx = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === 'user') {
+        lastUserIdx = i;
+        break;
+      }
+    }
+
+    if (lastUserIdx >= 0) {
+      const userElement = container.querySelector(
+        `[data-message-index="${lastUserIdx}"]`
+      ) as HTMLElement | null;
+
+      if (userElement) {
+        const containerRect = container.getBoundingClientRect();
+        const userRect = userElement.getBoundingClientRect();
+        const viewportHeight = container.clientHeight;
+
+        if (userRect.height < viewportHeight * 0.3) {
+          // Short question: show the full question above the loading indicator
+          const userTop = userRect.top - containerRect.top + container.scrollTop;
+          container.scrollTo({
+            top: Math.max(0, userTop - 8),
+            behavior: 'smooth',
+          });
+        } else {
+          // Long question: show bottom portion of the question so user sees
+          // the tail of what they asked, plus the loading indicator below.
+          const userBottom =
+            userRect.top + userRect.height - containerRect.top + container.scrollTop;
+          const scrollTarget = userBottom - viewportHeight * 0.25;
+          container.scrollTo({
+            top: Math.max(0, scrollTarget),
+            behavior: 'smooth',
+          });
+        }
+        return;
+      }
+    }
+
+    // Fallback: scroll to bottom
+    scrollToBottom();
+  }, [history, scrollToBottom]);
+
   // Handle container scroll event
   const handleScroll = useCallback(() => {
     if (containerRef.current) {
@@ -222,11 +287,21 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   // Auto-scroll only when loading starts (not when it finishes)
   useEffect(() => {
     if (isLoading && wasNearBottomRef.current) {
-      // Scroll to bottom when loading starts to keep user message and
-      // loading indicator visible.
-      setTimeout(scrollToBottom, 100);
+      // Smart scroll to show user's question with loading indicator visible,
+      // but only if the loading indicator isn't already in the viewport.
+      setTimeout(scrollToShowLoadingIndicator, 100);
     }
-  }, [isLoading, scrollToBottom]);
+  }, [isLoading, scrollToShowLoadingIndicator]);
+
+  // Keep the loading indicator visible as new thinking steps appear
+  useEffect(() => {
+    if (isLoading && agentThinkingSteps && agentThinkingSteps.length > 0) {
+      // As new thinking steps are added the loading area may grow beyond the
+      // viewport.  Re-run the smart scroll so the indicator stays visible while
+      // still showing the user's question for context.
+      setTimeout(scrollToShowLoadingIndicator, 100);
+    }
+  }, [isLoading, agentThinkingSteps, scrollToShowLoadingIndicator]);
 
   useEffect(() => {
     // Collect tool responses
@@ -370,15 +445,18 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
 
         {history.map((prompt, index) => renderMessage(prompt, index))}
 
-        {isLoading &&
-          (agentThinkingSteps && agentThinkingSteps.length > 0 ? (
-            <AgentThinkingSteps steps={agentThinkingSteps} isRunning={isLoading} />
-          ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
-              <CircularProgress size={24} sx={{ mr: 1 }} />
-              <Typography>Processing your request...</Typography>
-            </Box>
-          ))}
+        {isLoading && (
+          <div ref={loadingIndicatorRef}>
+            {agentThinkingSteps && agentThinkingSteps.length > 0 ? (
+              <AgentThinkingSteps steps={agentThinkingSteps} isRunning={isLoading} />
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
+                <CircularProgress size={24} sx={{ mr: 1 }} />
+                <Typography>Processing your request...</Typography>
+              </Box>
+            )}
+          </div>
+        )}
 
         {/* This is an invisible element that we'll scroll to */}
         <div ref={messagesEndRef} />
