@@ -3151,7 +3151,7 @@ export const syntheticK8sVeleroBackup = [
   panelLine('set -euo pipefail'),
   panelLine(''),
   panelLine('BACKUP_NAME=$(velero backup get -o json | jq -r \\'),
-  panelLine('  \'.items | sort_by(.metadata.creationTimestamp) | last | .metadata.name\')'),
+  panelLine("  '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.name')"),
   panelLine(''),
   panelLine('echo "Restoring from backup: $BACKUP_NAME"'),
   panelLine('velero restore create --from-backup "$BACKUP_NAME" \\'),
@@ -3192,12 +3192,24 @@ export const syntheticKubectlGetWide = [
   '',
   panelBlank(),
   panelLine('NAME                    READY   STATUS    RESTARTS   AGE   IP           NODE'),
-  panelLine('web-0m                  1/1     Running   0          3d    10.244.0.5   aks-pool1-12345'),
-  panelLine('api-250m                2/2     Running   1          2d    10.244.0.6   aks-pool1-12345'),
-  panelLine('worker-batch-7b9f4     1/1     Running   0          12h   10.244.1.3   aks-pool2-67890'),
-  panelLine('cache-redis-0           1/1     Running   0          5d    10.244.1.4   aks-pool2-67890'),
-  panelLine('ingress-nginx-ct9l2    1/1     Running   2          7d    10.244.2.8   aks-pool3-24680'),
-  panelLine('monitor-prom-0          3/3     Running   0          1d    10.244.2.9   aks-pool3-24680'),
+  panelLine(
+    'web-0m                  1/1     Running   0          3d    10.244.0.5   aks-pool1-12345'
+  ),
+  panelLine(
+    'api-250m                2/2     Running   1          2d    10.244.0.6   aks-pool1-12345'
+  ),
+  panelLine(
+    'worker-batch-7b9f4     1/1     Running   0          12h   10.244.1.3   aks-pool2-67890'
+  ),
+  panelLine(
+    'cache-redis-0           1/1     Running   0          5d    10.244.1.4   aks-pool2-67890'
+  ),
+  panelLine(
+    'ingress-nginx-ct9l2    1/1     Running   2          7d    10.244.2.8   aks-pool3-24680'
+  ),
+  panelLine(
+    'monitor-prom-0          3/3     Running   0          1d    10.244.2.9   aks-pool3-24680'
+  ),
   panelBlank(),
   '',
   'To get more detail on a specific pod:',
@@ -3254,7 +3266,9 @@ export const syntheticK8sAgic = [
   panelLine('  --resource-group myRG \\'),
   panelLine('  --zone-name example.com \\'),
   panelLine('  --record-set-name api \\'),
-  panelLine('  --ipv4-address $(kubectl get ingress agic-ingress -o jsonpath="{.status.loadBalancer.ingress[0].ip}")'),
+  panelLine(
+    '  --ipv4-address $(kubectl get ingress agic-ingress -o jsonpath="{.status.loadBalancer.ingress[0].ip}")'
+  ),
   panelBlank(),
   '',
   'Verify the AGIC ingress is operational now:',
@@ -3663,7 +3677,9 @@ export const syntheticK8sRollingUpdate = [
   panelLine('Events:'),
   panelLine('  Type    Reason     Age   From               Message'),
   panelLine('  ----    ------     ----  ----               -------'),
-  panelLine('  Normal  Scheduled  2m    default-scheduler  Successfully assigned production/web-app'),
+  panelLine(
+    '  Normal  Scheduled  2m    default-scheduler  Successfully assigned production/web-app'
+  ),
   panelLine('  Normal  Pulled     90s   kubelet            Container image pulled'),
   panelLine('  Normal  Created    89s   kubelet            Created container web-app'),
   panelLine('  Normal  Started    88s   kubelet            Started container web-app'),
@@ -3884,7 +3900,9 @@ export const syntheticRustActixWeb = [
   panelLine('RUN touch src/main.rs && cargo build --release'),
   panelLine(''),
   panelLine('FROM debian:bookworm-slim'),
-  panelLine('RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*'),
+  panelLine(
+    'RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*'
+  ),
   panelLine('COPY --from=builder /app/target/release/myapp /usr/local/bin/'),
   panelLine('EXPOSE 8080'),
   panelLine('CMD ["myapp"]'),
