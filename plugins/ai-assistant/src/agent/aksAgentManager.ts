@@ -1463,11 +1463,14 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Python import: import X  or  import X.Y  or  import X, Y
   if (/^import\s+\w+/.test(trimmed)) return true;
 
-  // Python function definition: def func_name(
-  if (/^def\s+\w+\s*\(/.test(trimmed)) return true;
+  // Python function definition: def func_name(  or  async def func_name(
+  if (/^(async\s+)?def\s+\w+\s*\(/.test(trimmed)) return true;
 
-  // Python class definition: class Name:  or  class Name(Base):
-  if (/^class\s+[A-Z]\w*[\s(:]/.test(trimmed)) return true;
+  // Python/Ruby/Java class definition: class Name:  or  class Name(Base):  or  class Name
+  if (/^(public\s+)?class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed)) return true;
+
+  // Ruby def: def method_name  or  def method_name(args)
+  if (/^def\s+\w+(\.\w+)?(\(|$|\s*$)/.test(trimmed)) return true;
 
   // Python decorator: @app.route(...)  or  @staticmethod
   if (/^@\w+/.test(trimmed)) return true;
@@ -2774,7 +2777,7 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
     const t = l.trim();
     return (
       // Python
-      /^(from|import|def|class)\s/.test(t) ||
+      /^(from|import|def|class|async\s+def)\s/.test(t) ||
       /^@\w/.test(t) ||
       /__\w+__/.test(t) ||
       // Rust
