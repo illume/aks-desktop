@@ -7,6 +7,7 @@ import {
   syntheticAksNodePools,
   syntheticAnsi256ColorOutput,
   syntheticBashHeredoc,
+  syntheticBoldHeadingSplit,
   syntheticCargoAddWorkflow,
   syntheticCargoBuildProfiles,
   syntheticCargoInlineTables,
@@ -58,6 +59,7 @@ import {
   syntheticMultiLanguageComparison,
   syntheticNodeExpressApp,
   syntheticNumberedStepsWithCode,
+  syntheticProseNotYaml,
   syntheticPythonDjango,
   syntheticPythonMultilineStrings,
   syntheticRubyRailsApp,
@@ -8497,6 +8499,80 @@ describe('extractAIAnswer — syntheticRustActixWeb (Cargo fixture)', () => {
   it('K8s Service YAML preserved', () => {
     expect(result).toContain('kind: Service');
     expect(result).toContain('app: rust-web');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticBoldHeadingSplit ─────────────────────────────────────────────
+// Fixture 66: Bold file heading properly splits code blocks.
+// Cargo.toml and src/main.rs should be in separate code blocks.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticBoldHeadingSplit', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticBoldHeadingSplit);
+  });
+
+  it('Cargo.toml and src/main.rs in SEPARATE code blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const tomlBlock = blocks.find(b => b.includes('[package]'));
+    const rustBlock = blocks.find(b => b.includes('use axum'));
+    expect(tomlBlock).toBeDefined();
+    expect(rustBlock).toBeDefined();
+    expect(tomlBlock).not.toContain('use axum');
+    expect(rustBlock).not.toContain('[package]');
+  });
+
+  it('TOML content preserved', () => {
+    expect(result).toContain('[package]');
+    expect(result).toContain('axum = "0.7"');
+  });
+
+  it('Rust code preserved', () => {
+    expect(result).toContain('use axum::{routing::get, Router}');
+    expect(result).toContain('async fn main()');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticProseNotYaml ────────────────────────────────────────────────
+// Fixture 67: Prose with colon + bullet list NOT miscategorized as YAML.
+// "Example: Node.js ..." is prose, not YAML.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticProseNotYaml', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticProseNotYaml);
+  });
+
+  it('"Example: Node.js..." should be prose, not YAML code', () => {
+    const blocks = extractCodeBlocks(result);
+    const exampleInCode = blocks.some(b => b.includes('Example:') && b.includes('Node.js'));
+    expect(exampleInCode).toBe(false);
+  });
+
+  it('bullet items should be prose, not code', () => {
+    const blocks = extractCodeBlocks(result);
+    const healthzInCode = blocks.some(b => b.includes('/healthz'));
+    expect(healthzInCode).toBe(false);
+  });
+
+  it('Dockerfile FROM should be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('FROM node:20-alpine'))).toBe(true);
+  });
+
+  it('docker build/push should be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('docker build'))).toBe(true);
   });
 
   it('has no ANSI leaks', () => {

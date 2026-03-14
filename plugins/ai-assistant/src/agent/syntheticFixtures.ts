@@ -3955,3 +3955,85 @@ export const syntheticRustActixWeb = [
   '',
   '\x1b[?2004hroot@aks-agent-rw01:/app# ',
 ].join('\n');
+
+// ---------------------------------------------------------------------------
+// Fixture 66 — Bold file heading splitting: Cargo.toml → src/main.rs
+// Tests that a second bold file heading inside the same panel run properly
+// splits the code block, instead of merging both files into one block.
+// ---------------------------------------------------------------------------
+export const syntheticBoldHeadingSplit = [
+  'stty -echo',
+  '\x1b[?2004l',
+  '\x1b[?2004hroot@aks-agent:/app# ',
+  '\x1b[?2004l',
+  '',
+  "Loaded models: ['azure/gpt-4']",
+  '\x1b[1;96mAI:\x1b[0m ',
+  '',
+  '  \x1b[1mCargo.toml\x1b[0m',
+  '',
+  panelBlank(),
+  panelLine('[package]'),
+  panelLine('name = "rust-k8s-example"'),
+  panelLine('version = "0.1.0"'),
+  panelLine('[dependencies]'),
+  panelLine('axum = "0.7"'),
+  panelBlank(),
+  '',
+  '  \x1b[1msrc/main.rs\x1b[0m',
+  '',
+  panelBlank(),
+  panelLine('use axum::{routing::get, Router};'),
+  panelLine('async fn root() -> &\'static str { "hello" }'),
+  panelLine('#[tokio::main]'),
+  panelLine('async fn main() {'),
+  panelLine('    let app = Router::new().route("/", get(root));'),
+  panelLine('    axum::serve(listener, app).await.unwrap();'),
+  panelLine('}'),
+  panelBlank(),
+  '',
+  '\x1b[?2004hroot@aks-agent:/app# ',
+].join('\n');
+
+// ---------------------------------------------------------------------------
+// Fixture 67 — Prose with colon + bullet list NOT miscategorized as YAML
+// "Example: Node.js (JavaScript) HTTP app ..." is prose, not a YAML key.
+// The " - GET /healthz → 200" bullet items are prose, not YAML list items.
+// ---------------------------------------------------------------------------
+export const syntheticProseNotYaml = [
+  'stty -echo',
+  '\x1b[?2004l',
+  '\x1b[?2004hroot@aks-agent:/app# ',
+  '\x1b[?2004l',
+  '',
+  "Loaded models: ['azure/gpt-4']",
+  '\x1b[1;96mAI:\x1b[0m ',
+  '',
+  'Example: Node.js (JavaScript) HTTP app listening on 0.0.0.0:8080 with:',
+  '',
+  ' - GET /healthz \u2192 200',
+  ' - GET /readyz \u2192 200',
+  '',
+  'Containerize (Dockerfile)',
+  '',
+  panelBlank(),
+  panelLine('FROM node:20-alpine'),
+  panelLine('WORKDIR /app'),
+  panelLine('ENV NODE_ENV=production'),
+  panelLine('COPY package*.json ./'),
+  panelLine('RUN npm ci --omit=dev'),
+  panelLine('COPY . .'),
+  panelLine('EXPOSE 8080'),
+  panelLine('USER node'),
+  panelLine('CMD ["node", "server.js"]'),
+  panelBlank(),
+  '',
+  'Build + push:',
+  '',
+  panelBlank(),
+  panelLine('docker build -t <registry>/myapp:1.0.0 .'),
+  panelLine('docker push <registry>/myapp:1.0.0'),
+  panelBlank(),
+  '',
+  '\x1b[?2004hroot@aks-agent:/app# ',
+].join('\n');

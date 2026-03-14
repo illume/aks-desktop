@@ -1776,6 +1776,8 @@ function normalizeTerminalMarkdown(text: string): string {
             continue;
           }
           if (!/^\s+\S/.test(bl)) break;
+          // Break at next bold file heading (e.g. " src/main.rs" after Cargo.toml panel)
+          if (isBoldFileHeading(bt)) break;
           // Also break at centered headings appearing directly (no blank line)
           // but only when it actually looks like prose (many words, no code chars)
           const lineIndent = bl.match(/^(\s*)/)?.[1].length ?? 0;
@@ -2274,7 +2276,11 @@ function wrapBareYamlBlocks(text: string): string {
       trimmed !== '' &&
       !/^\s+/.test(line) &&
       /^[\w][\w.\/-]*:\s?/.test(trimmed) &&
-      !looksLikeShellOrDockerCodeLine(trimmed)
+      !looksLikeShellOrDockerCodeLine(trimmed) &&
+      // Reject prose sentences that happen to start with "Word: ..." — real YAML
+      // values are short (key: value), not long English sentences.  Count the
+      // words after the colon; if there are many, it's prose, not YAML.
+      (trimmed.match(/:\s+(.*)/)?.[1]?.split(/\s+/).length ?? 0) < PROSE_WORD_THRESHOLD
     ) {
       // Peek ahead to count consecutive YAML-like lines
       let peek = i;
