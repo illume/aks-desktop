@@ -156,103 +156,103 @@ describe('findbugs3: extractAIAnswer edge cases (round 3)', () => {
 
   // ── 6. CSS-like code in panel (not shell, not YAML) ──
   it('6. CSS code in panel should be wrapped', () => {
-  const body = [
-    panelBlank(),
-    panelLine('body {'),
-    panelLine('  margin: 0;'),
-    panelLine('  padding: 0;'),
-    panelLine('}'),
-    panelBlank(),
-  ];
-  const result = extractAIAnswer(makeRaw(body));
-  assertNoAnsiLeaks(result);
-  const blocks = extractCodeBlocks(result);
-  expect(blocks.length).toBeGreaterThanOrEqual(1);
-  expect(blocks.join('\n')).toContain('body {');
+    const body = [
+      panelBlank(),
+      panelLine('body {'),
+      panelLine('  margin: 0;'),
+      panelLine('  padding: 0;'),
+      panelLine('}'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    expect(blocks.join('\n')).toContain('body {');
   });
 
   // ── 7. SQL query in panel ──
   it('7. SQL query in panel should be wrapped', () => {
-  const body = [
-    panelBlank(),
-    panelLine('SELECT name, age'),
-    panelLine('FROM users'),
-    panelLine('WHERE age > 18'),
-    panelLine('ORDER BY name;'),
-    panelBlank(),
-  ];
-  const result = extractAIAnswer(makeRaw(body));
-  assertNoAnsiLeaks(result);
-  const blocks = extractCodeBlocks(result);
-  expect(blocks.length).toBeGreaterThanOrEqual(1);
-  expect(blocks.join('\n')).toContain('SELECT name');
+    const body = [
+      panelBlank(),
+      panelLine('SELECT name, age'),
+      panelLine('FROM users'),
+      panelLine('WHERE age > 18'),
+      panelLine('ORDER BY name;'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    expect(blocks.join('\n')).toContain('SELECT name');
   });
 
   // ── 8. Prose between two code panels ──
   it('8. prose between two code panels stays as prose', () => {
-  const body = [
-    panelBlank(),
-    panelLine('kubectl get pods'),
-    panelBlank(),
-    'Then check the logs with this command:',
-    panelBlank(),
-    panelLine('kubectl logs pod-name'),
-    panelBlank(),
-  ];
-  const result = extractAIAnswer(makeRaw(body));
-  assertNoAnsiLeaks(result);
-  // Prose should NOT be in a code block
-  const blocks = extractCodeBlocks(result);
-  const allContent = blocks.join('\n');
-  expect(allContent).not.toContain('Then check');
-  // Both commands should be in code blocks
-  expect(allContent).toContain('kubectl get pods');
-  expect(allContent).toContain('kubectl logs pod-name');
+    const body = [
+      panelBlank(),
+      panelLine('kubectl get pods'),
+      panelBlank(),
+      'Then check the logs with this command:',
+      panelBlank(),
+      panelLine('kubectl logs pod-name'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    // Prose should NOT be in a code block
+    const blocks = extractCodeBlocks(result);
+    const allContent = blocks.join('\n');
+    expect(allContent).not.toContain('Then check');
+    // Both commands should be in code blocks
+    expect(allContent).toContain('kubectl get pods');
+    expect(allContent).toContain('kubectl logs pod-name');
   });
 
   // ── 9. JSON array output from kubectl ──
   it('9. bare JSON array output wrapped in code block', () => {
-  const body = [
-    '[',
-    '  {',
-    '    "name": "pod-1",',
-    '    "status": "Running"',
-    '  },',
-    '  {',
-    '    "name": "pod-2",',
-    '    "status": "Pending"',
-    '  }',
-    ']',
-  ];
-  const result = extractAIAnswer(makeRaw(body));
-  assertNoAnsiLeaks(result);
-  const blocks = extractCodeBlocks(result);
-  expect(blocks.length).toBeGreaterThanOrEqual(1);
-  expect(blocks.join('\n')).toContain('"name": "pod-1"');
+    const body = [
+      '[',
+      '  {',
+      '    "name": "pod-1",',
+      '    "status": "Running"',
+      '  },',
+      '  {',
+      '    "name": "pod-2",',
+      '    "status": "Pending"',
+      '  }',
+      ']',
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    expect(blocks.join('\n')).toContain('"name": "pod-1"');
   });
 
   // ── 10. Mixed heredoc types in one response ──
   it('10. multiple heredocs in one response', () => {
-  const body = [
-    'cat > namespace.yaml <<EOF',
-    'apiVersion: v1',
-    'kind: Namespace',
-    'metadata:',
-    '  name: test',
-    'EOF',
-    '',
-    'cat > deployment.yaml <<EOF',
-    'apiVersion: apps/v1',
-    'kind: Deployment',
-    'metadata:',
-    '  name: web',
-    'EOF',
-  ];
-  const result = extractAIAnswer(makeRaw(body));
-  assertNoAnsiLeaks(result);
-  // Neither YAML body should be in a separate yaml block
-  const blocks = extractCodeBlocks(result);
-  const yamlOnly = blocks.filter(b => b.includes('apiVersion:') && !b.includes('cat >'));
-  expect(yamlOnly.length).toBe(0);
+    const body = [
+      'cat > namespace.yaml <<EOF',
+      'apiVersion: v1',
+      'kind: Namespace',
+      'metadata:',
+      '  name: test',
+      'EOF',
+      '',
+      'cat > deployment.yaml <<EOF',
+      'apiVersion: apps/v1',
+      'kind: Deployment',
+      'metadata:',
+      '  name: web',
+      'EOF',
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    // Neither YAML body should be in a separate yaml block
+    const blocks = extractCodeBlocks(result);
+    const yamlOnly = blocks.filter(b => b.includes('apiVersion:') && !b.includes('cat >'));
+    expect(yamlOnly.length).toBe(0);
   });
 });

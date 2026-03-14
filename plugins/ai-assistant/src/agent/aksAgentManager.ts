@@ -1493,6 +1493,18 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Rust attribute: #[derive(...)], #[tokio::main]
   if (/^#\[[\w:]+/.test(trimmed)) return true;
 
+  // C/C++ preprocessor: #include, #define, #ifdef, #ifndef, #endif, #pragma
+  if (/^#\s*(include|define|ifdef|ifndef|endif|pragma|undef|if|else|elif)\b/.test(trimmed))
+    return true;
+
+  // Rust match arm: "pattern => expr" (e.g. "200 => println!(...)")
+  if (/^\s*\S+\s*=>\s*\S/.test(trimmed)) return true;
+
+  // Shell case statement: "case ... in", "pattern)", ";;"
+  if (/^case\s+.+\s+in/.test(trimmed)) return true;
+  if (/^esac\s*$/.test(trimmed)) return true;
+  if (/^;;\s*$/.test(trimmed)) return true;
+
   // Method chain continuation: .route("/", ...), .await, .unwrap()
   // Require the dot to be followed by a typical method name pattern (word + paren
   // or .await / .unwrap style) — excludes prose like ". However, the API..."
@@ -1526,6 +1538,11 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^\[[\w.-]+\]/.test(trimmed)) return true;
   // TOML key = value: name = "foo", version = "1.0", key = { ... }
   if (/^[\w.-]+\s*=\s*["'{[\d]/.test(trimmed)) return true;
+
+  // ── Tier 6b: Terraform HCL patterns ──
+
+  // HCL resource/data/variable/output/provider/module/locals blocks
+  if (/^(resource|data|variable|output|provider|module|locals)\s+["{\w]/.test(trimmed)) return true;
 
   // ── Tier 7: XML/HTML patterns ──
 
@@ -1754,7 +1771,7 @@ function normalizeTerminalMarkdown(text: string): string {
       continue;
     }
 
-    if (/^\s*\d+\s+\S/.test(line) && /^\s*\d+\s+/.test(line)) {
+    if (/^\s*\d+\s+\S/.test(line) && /^\s*\d+\s+/.test(line) && !/=>/.test(line)) {
       const converted = line.replace(/^\s*(\d+)\s+/, '$1. ');
       if (converted !== line) {
         orderedListCount++;
@@ -1805,9 +1822,8 @@ function normalizeTerminalMarkdown(text: string): string {
       const nextIndent = nextLine.match(/^(\s*)/)?.[1].length ?? 0;
       if (
         nextIndent > 0 &&
-        nextIndent <= 2 &&
-        looksLikeShellOrDockerCodeLine(nextTrimmed) &&
-        !looksLikeYaml(nextTrimmed)
+        nextIndent <= 6 &&
+        (looksLikeShellOrDockerCodeLine(nextTrimmed) || (nextIndent <= 6 && nextTrimmed !== ''))
       ) {
         const panelLines: string[] = [line];
         let pj = i + 1;
@@ -1815,24 +1831,41 @@ function normalizeTerminalMarkdown(text: string): string {
           const pl = lines[pj];
           const pt = pl.trim();
           const indent = pl.match(/^(\s*)/)?.[1].length ?? 0;
+          if (pt === '') {
+            // Allow single blank lines inside the panel block
+            if (pj + 1 < lines.length && lines[pj + 1].trim() !== '') {
+              panelLines.push(pl);
+              pj++;
+              continue;
+            }
+            break;
+          }
           if (
             indent > 0 &&
-            indent <= 2 &&
-            looksLikeShellOrDockerCodeLine(pt) &&
-            !looksLikeYaml(pt)
+            indent <= 6 &&
+            (looksLikeShellOrDockerCodeLine(pt) || looksLikeYaml(pt) || /^\s/.test(pl))
           ) {
+            panelLines.push(pl);
+            pj++;
+            continue;
+          }
+          // Also keep closing braces/brackets
+          if (/^\s*[}\]]\s*;?\s*$/.test(pl)) {
             panelLines.push(pl);
             pj++;
             continue;
           }
           break;
         }
-        result.push('```');
-        for (const pl of panelLines) result.push(pl);
-        result.push('```');
-        wrappedCodeBlockCount++;
-        i = pj;
-        continue;
+        // Only wrap if we collected more than just the first line
+        if (panelLines.length > 1) {
+          result.push('```');
+          for (const pl of panelLines) result.push(pl);
+          result.push('```');
+          wrappedCodeBlockCount++;
+          i = pj;
+          continue;
+        }
       }
     }
 
@@ -2226,7 +2259,12 @@ function normalizeTerminalMarkdown(text: string): string {
  * list item, comment, flow-mapping shorthand, etc.).
  */
 function looksLikeYaml(trimmed: string): boolean {
-  if (trimmed === '' || trimmed.startsWith('#')) return true;
+  if (
+    trimmed === '' ||
+    (trimmed.startsWith('#') &&
+      !/^#\s*(include|define|ifdef|ifndef|endif|pragma|undef|if|else|elif)\b/.test(trimmed))
+  )
+    return true;
   // YAML document separator (exactly ---) and document end marker (exactly ...)
   if (trimmed === '---' || trimmed === '...') return true;
   // YAML merge key: <<: *defaults
@@ -2725,11 +2763,22 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
       /^let\s/.test(t) ||
       /^(pub(\s*\(\s*crate\s*\))?\s+)?(struct|enum|impl|trait|mod)\s/.test(t) ||
       /^#\[/.test(t) ||
+      /^match\s+\S/.test(t) ||
       // Go
       /^(func|package)\s/.test(t) ||
       /^(var|type)\s+\w+\s+\w+/.test(t) ||
       /\w+\s*:=\s*\S/.test(t) ||
-      /^(if|for|switch|select)\s+.+\{/.test(t)
+      /^(if|for|switch|select)\s+.+\{/.test(t) ||
+      // C/C++
+      /^#\s*(include|define|ifdef|ifndef)\b/.test(t) ||
+      /^(int|void|char|float|double|long|unsigned|signed|static|extern|const)\s/.test(t) ||
+      // TypeScript/JavaScript
+      /^(interface|class|const|let|var|function|export|async)\s/.test(t) ||
+      // Terraform HCL
+      /^(resource|data|variable|output|provider|module|locals)\s/.test(t) ||
+      // Shell case/esac
+      /^case\s+.+\s+in/.test(t) ||
+      /^esac\s*$/.test(t)
     );
   });
 }
