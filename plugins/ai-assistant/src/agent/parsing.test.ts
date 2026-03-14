@@ -6,6 +6,7 @@ import {
   syntheticAksClusterCreate,
   syntheticAksNodePools,
   syntheticAnsi256ColorOutput,
+  syntheticAnsiSplitYamlKey,
   syntheticBashHeredoc,
   syntheticBoldHeadingSplit,
   syntheticCargoAddWorkflow,
@@ -16,8 +17,11 @@ import {
   syntheticCargoTomlFeatures,
   syntheticCargoTomlWorkspace,
   syntheticCargoWorkspaceDeps,
+  syntheticCenteredColonTitle,
+  syntheticCenteredStepHeading,
   syntheticCSharpDotnetApp,
   syntheticDeepNestedYaml,
+  syntheticFortranDockerfile,
   syntheticGoHttpServer,
   syntheticGoModule,
   syntheticHelmInstall,
@@ -56,9 +60,11 @@ import {
   syntheticKustomizeOverlay,
   syntheticMakefileWithTargets,
   syntheticMixedFencedAndBare,
+  syntheticMultiLangK8sDeploy,
   syntheticMultiLanguageComparison,
   syntheticNodeExpressApp,
   syntheticNumberedStepsWithCode,
+  syntheticProseHeadingAfterDockerfile,
   syntheticProseNotYaml,
   syntheticPythonDjango,
   syntheticPythonMultilineStrings,
@@ -8573,6 +8579,215 @@ describe('extractAIAnswer — syntheticProseNotYaml', () => {
   it('docker build/push should be in code block', () => {
     const blocks = extractCodeBlocks(result);
     expect(blocks.some(b => b.includes('docker build'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCenteredColonTitle ─────────────────────────────────────────────
+// Fixture 68: "Optional: Ingress" centered heading not absorbed into YAML block
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCenteredColonTitle', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCenteredColonTitle);
+  });
+
+  it('"Optional: Ingress" should NOT be in a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('Optional: Ingress') || b.includes('Optional:'))).toBe(
+      false
+    );
+  });
+
+  it('parenthetical note should be prose', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('Requires an Ingress controller'))).toBe(false);
+  });
+
+  it('Ingress YAML should be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Ingress'))).toBe(true);
+  });
+
+  it('Service YAML should be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Service'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticAnsiSplitYamlKey ──────────────────────────────────────────────
+// Fixture 69: ANSI escape split in YAML key — no "metadata[" or "0m:" orphans
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticAnsiSplitYamlKey', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticAnsiSplitYamlKey);
+  });
+
+  it('should NOT have "metadata[" orphan bracket', () => {
+    expect(result).not.toContain('metadata[');
+  });
+
+  it('should NOT have bare "0m:" orphan ANSI reset', () => {
+    const lines = result.split('\n');
+    expect(lines.some(l => l.trim().startsWith('0m:'))).toBe(false);
+  });
+
+  it('YAML should contain metadata: key', () => {
+    expect(result).toContain('metadata:');
+  });
+
+  it('Deployment YAML should be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Deployment'))).toBe(true);
+  });
+
+  it('Service YAML should be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: Service'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticProseHeadingAfterDockerfile ────────────────────────────────────
+// Fixture 70: "Build + push (example with Docker Hub):" is prose, not code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticProseHeadingAfterDockerfile', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticProseHeadingAfterDockerfile);
+  });
+
+  it('prose heading should NOT be inside Dockerfile code block', () => {
+    const blocks = extractCodeBlocks(result);
+    const dockBlock = blocks.find(b => b.includes('FROM node'));
+    expect(dockBlock).toBeTruthy();
+    expect(dockBlock).not.toContain('Build + push');
+  });
+
+  it('Dockerfile content in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('FROM node:20-alpine'))).toBe(true);
+  });
+
+  it('docker build/push in separate code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('docker build'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCenteredStepHeading ───────────────────────────────────────────
+// Fixture 71: "2) Containerize it" breaks preceding Cargo.toml code block
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCenteredStepHeading', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCenteredStepHeading);
+  });
+
+  it('Cargo.toml and Dockerfile in separate code blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const toml = blocks.find(b => b.includes('[package]'));
+    const dock = blocks.find(b => b.includes('FROM rust'));
+    expect(toml).toBeTruthy();
+    expect(dock).toBeTruthy();
+    expect(toml).not.toBe(dock);
+  });
+
+  it('step heading "2) Containerize it" should NOT be in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('Containerize it'))).toBe(false);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticFortranDockerfile ─────────────────────────────────────────────
+// Fixture 72: Fortran + Dockerfile multi-file with gfortran commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticFortranDockerfile', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticFortranDockerfile);
+  });
+
+  it('Fortran and Dockerfile in separate code blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const fort = blocks.find(b => b.includes('PROGRAM HELLO'));
+    const dock = blocks.find(b => b.includes('FROM gcc'));
+    expect(fort).toBeTruthy();
+    expect(dock).toBeTruthy();
+    expect(fort).not.toBe(dock);
+  });
+
+  it('gfortran commands in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('gfortran'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticMultiLangK8sDeploy ────────────────────────────────────────────
+// Fixture 73: COBOL + PHP + C + Dockerfile multi-language deployment
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticMultiLangK8sDeploy', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticMultiLangK8sDeploy);
+  });
+
+  it('COBOL in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('IDENTIFICATION DIVISION'))).toBe(true);
+  });
+
+  it('PHP in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('<?php') || b.includes('echo "Hello from PHP"'))).toBe(true);
+  });
+
+  it('C code in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('#include <stdio.h>'))).toBe(true);
+  });
+
+  it('Dockerfile in code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('FROM gcc:12'))).toBe(true);
+  });
+
+  it('COBOL and Dockerfile in separate code blocks', () => {
+    const blocks = extractCodeBlocks(result);
+    const cob = blocks.find(b => b.includes('IDENTIFICATION'));
+    const dock = blocks.find(b => b.includes('FROM gcc'));
+    expect(cob).toBeTruthy();
+    expect(dock).toBeTruthy();
+    expect(cob).not.toBe(dock);
   });
 
   it('has no ANSI leaks', () => {

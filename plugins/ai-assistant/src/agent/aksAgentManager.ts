@@ -681,6 +681,8 @@ const KNOWN_CODE_COMMANDS: ReadonlySet<string> = new Set([
   'configure',
   'gcc',
   'g++',
+  'gfortran',
+  'cobc',
   'cc',
   'c++',
   'clang',
@@ -703,6 +705,9 @@ const KNOWN_CODE_COMMANDS: ReadonlySet<string> = new Set([
   'xmake',
   'vcpkg',
   'conan',
+  'zig',
+  'nim',
+  'nimble',
 
   // ── Version managers ──
   'nvm',
@@ -1768,18 +1773,30 @@ function normalizeTerminalMarkdown(text: string): string {
             // clearly headings, not YAML data.
             const peekIndent = peekLine.match(/^(\s*)/)?.[1].length ?? 0;
             const peekWords = peekTrimmed.split(/\s+/).length;
+            // Detect centered titles: "Optional: Ingress", "1) Deploy to K8s",
+            // "Step 2: Configure", "3. Deploy to Kubernetes"
             const isCenteredTitle =
               peekIndent > 6 &&
               peekWords >= 2 &&
-              /^[A-Z][\w]*:\s+[A-Z]/.test(peekTrimmed) &&
-              peekWords <= 4;
+              !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+              (/^[A-Z][\w]*:\s+[A-Z]/.test(peekTrimmed) ||
+                /^\d+[.)]\s+\S/.test(peekTrimmed) ||
+                /^Step\s+\d+/i.test(peekTrimmed)) &&
+              peekWords <= 8;
             if (
-              peekIndent > 6 &&
-              (isCenteredTitle ||
-                (peekWords >= PROSE_WORD_THRESHOLD &&
-                  !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
-                  !looksLikeYaml(peekTrimmed) &&
-                  !/[{};=<>[\]]/.test(peekTrimmed)))
+              isCenteredTitle ||
+              (peekIndent > 6 &&
+                peekWords >= PROSE_WORD_THRESHOLD &&
+                !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+                !looksLikeYaml(peekTrimmed) &&
+                !/[{};=<>[\]]/.test(peekTrimmed)) ||
+              // Also break at prose-like headings at any indent level
+              // (e.g. "  Build + push (example with Docker Hub):" at 2-space indent)
+              (peekWords >= PROSE_WORD_THRESHOLD &&
+                !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+                !looksLikeYaml(peekTrimmed) &&
+                !/[{};=<>[\].$`"'\\|@#!]/.test(peekTrimmed) &&
+                !/--\w/.test(peekTrimmed))
             )
               break;
             blockLines.push(bl);
@@ -1797,17 +1814,23 @@ function normalizeTerminalMarkdown(text: string): string {
           const isDirectCenteredTitle =
             lineIndent > 6 &&
             lineWords >= 2 &&
-            /^[A-Z][\w]*:\s+[A-Z]/.test(bt) &&
-            lineWords <= 4;
-          if (
-            lineIndent > 6 &&
-            (isDirectCenteredTitle ||
-              (lineWords >= PROSE_WORD_THRESHOLD &&
-                !looksLikeShellOrDockerCodeLine(bt) &&
-                !looksLikeYaml(bt) &&
-                !/[{};=<>[\]]/.test(bt)))
-          )
-            break;
+            !looksLikeShellOrDockerCodeLine(bt) &&
+            (/^[A-Z][\w]*:\s+[A-Z]/.test(bt) ||
+              /^\d+[.)]\s+\S/.test(bt) ||
+              /^Step\s+\d+/i.test(bt)) &&
+            lineWords <= 8;
+          // Break at prose-like lines (many words, no code/YAML patterns).
+          // These may appear at any indent level — Rich terminal bold headings
+          // like "Build + push (example with Docker Hub):" have just 2 spaces.
+          // Exclude lines with code-like chars (flags, operators, braces, dots)
+          // to avoid breaking multiline strings and Makefile targets.
+          const isProseHeading =
+            lineWords >= PROSE_WORD_THRESHOLD &&
+            !looksLikeShellOrDockerCodeLine(bt) &&
+            !looksLikeYaml(bt) &&
+            !/[{};=<>[\].$`"'\\|@#!]/.test(bt) &&
+            !/--\w/.test(bt);
+          if (isDirectCenteredTitle || isProseHeading) break;
           blockLines.push(bl);
           j++;
         }
