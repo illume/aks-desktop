@@ -4,6 +4,7 @@ import { parseKubernetesYAML } from '../utils/SampleYamlLibrary';
 import { _testing } from './aksAgentManager';
 import {
   syntheticAksClusterCreate,
+  syntheticAksNodePools,
   syntheticAnsi256ColorOutput,
   syntheticBashHeredoc,
   syntheticCargoAddWorkflow,
@@ -13,6 +14,7 @@ import {
   syntheticCargoTomlAnsiSplit,
   syntheticCargoTomlFeatures,
   syntheticCargoTomlWorkspace,
+  syntheticCargoWorkspaceDeps,
   syntheticCSharpDotnetApp,
   syntheticDeepNestedYaml,
   syntheticGoHttpServer,
@@ -20,18 +22,35 @@ import {
   syntheticHelmInstall,
   syntheticHelmValuesYaml,
   syntheticJavaSpringBoot,
+  syntheticK8sAgic,
+  syntheticK8sArgoCD,
+  syntheticK8sCertManager,
   syntheticK8sConfigMapFromFile,
   syntheticK8sCronJobScript,
+  syntheticK8sDaemonSet,
+  syntheticK8sFluxCD,
+  syntheticK8sHpaCustomMetrics,
   syntheticK8sHpaPdb,
   syntheticK8sInitContainers,
   syntheticK8sIstioRouting,
+  syntheticK8sJobPatterns,
+  syntheticK8sKeyVaultCsi,
+  syntheticK8sLinkerd,
   syntheticK8sMultiCluster,
+  syntheticK8sNetworkDebug,
   syntheticK8sNetworkPolicy,
+  syntheticK8sPodSecurity,
+  syntheticK8sPrometheusMonitoring,
   syntheticK8sRbacSetup,
+  syntheticK8sResourceQuota,
+  syntheticK8sRollingUpdate,
   syntheticK8sSecretsWorkflow,
   syntheticK8sStatefulSet,
   syntheticK8sTroubleshooting,
+  syntheticK8sVeleroBackup,
+  syntheticK8sWorkloadIdentity,
   syntheticKubectlDescribePod,
+  syntheticKubectlGetWide,
   syntheticKubectlTopOutput,
   syntheticKustomizeOverlay,
   syntheticMakefileWithTargets,
@@ -42,6 +61,7 @@ import {
   syntheticPythonDjango,
   syntheticPythonMultilineStrings,
   syntheticRubyRailsApp,
+  syntheticRustActixWeb,
   syntheticRustFullDeploy,
   syntheticRustLibBinSplit,
   syntheticRustWithTests,
@@ -7753,6 +7773,597 @@ describe('extractAIAnswer — syntheticK8sMultiCluster (K8s fixture)', () => {
   it('for loop deploying to clusters is in a code fence', () => {
     const blocks = extractCodeBlocks(result);
     expect(blocks.some(b => b.includes('for ctx in'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sDaemonSet ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sDaemonSet (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sDaemonSet);
+  });
+
+  it('DaemonSet YAML is preserved in a fenced block', () => {
+    expect(result).toContain('```yaml');
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kind: DaemonSet') && b.includes('fluentd'))).toBe(true);
+  });
+
+  it('tolerations and affinity preserved', () => {
+    expect(result).toContain('node-role.kubernetes.io/control-plane');
+    expect(result).toContain('nodeAffinity');
+    expect(result).toContain('kubernetes.io/os');
+  });
+
+  it('CPU millicore values preserved (200m, 100m)', () => {
+    expect(result).toContain('200m');
+    expect(result).toContain('100m');
+  });
+
+  it('kubectl commands in code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl apply -f daemonset.yaml'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sPodSecurity ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sPodSecurity (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sPodSecurity);
+  });
+
+  it('namespace label command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('pod-security.kubernetes.io/enforce=restricted'))).toBe(
+      true
+    );
+  });
+
+  it('securityContext YAML preserved', () => {
+    expect(result).toContain('runAsNonRoot: true');
+    expect(result).toContain('allowPrivilegeEscalation: false');
+    expect(result).toContain('readOnlyRootFilesystem: true');
+  });
+
+  it('seccompProfile preserved', () => {
+    expect(result).toContain('RuntimeDefault');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sJobPatterns ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sJobPatterns (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sJobPatterns);
+  });
+
+  it('Job and CronJob both present', () => {
+    expect(result).toContain('kind: Job');
+    expect(result).toContain('kind: CronJob');
+  });
+
+  it('cron schedule preserved', () => {
+    expect(result).toContain('0 2 * * *');
+  });
+
+  it('literal block scalar with pg_dump preserved', () => {
+    expect(result).toContain('pg_dump');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sLinkerd ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sLinkerd (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sLinkerd);
+  });
+
+  it('linkerd install commands in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('linkerd install'))).toBe(true);
+  });
+
+  it('TrafficSplit YAML preserved', () => {
+    expect(result).toContain('kind: TrafficSplit');
+    expect(result).toContain('web-stable');
+    expect(result).toContain('web-canary');
+  });
+
+  it('traffic weights preserved (900m, 100m)', () => {
+    expect(result).toContain('900m');
+    expect(result).toContain('100m');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sResourceQuota ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sResourceQuota (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sResourceQuota);
+  });
+
+  it('ResourceQuota and LimitRange both present', () => {
+    expect(result).toContain('kind: ResourceQuota');
+    expect(result).toContain('kind: LimitRange');
+  });
+
+  it('CPU millicore limits preserved (500m, 100m, 50m)', () => {
+    expect(result).toContain('500m');
+    expect(result).toContain('100m');
+    expect(result).toContain('50m');
+  });
+
+  it('quota hard limits preserved', () => {
+    expect(result).toContain('pods: "20"');
+    expect(result).toContain('services: "10"');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sCertManager ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sCertManager (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sCertManager);
+  });
+
+  it('helm install cert-manager in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('helm install cert-manager'))).toBe(true);
+  });
+
+  it('ClusterIssuer and Ingress YAML preserved', () => {
+    expect(result).toContain('kind: ClusterIssuer');
+    expect(result).toContain('kind: Ingress');
+  });
+
+  it('TLS config preserved', () => {
+    expect(result).toContain('myapp-tls');
+    expect(result).toContain('letsencrypt-prod');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sVeleroBackup ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sVeleroBackup (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sVeleroBackup);
+  });
+
+  it('velero install command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('velero install'))).toBe(true);
+  });
+
+  it('Schedule YAML preserved', () => {
+    expect(result).toContain('kind: Schedule');
+    expect(result).toContain('daily-production-backup');
+  });
+
+  it('TTL preserved', () => {
+    expect(result).toContain('720h0m0s');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticKubectlGetWide ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticKubectlGetWide (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticKubectlGetWide);
+  });
+
+  it('kubectl get pods command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl get pods'))).toBe(true);
+  });
+
+  it('pod table with columns preserved', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('api-7d8f9b6c4') && b.includes('Running'))).toBe(true);
+  });
+
+  it('events table preserved', () => {
+    expect(result).toContain('BackOff');
+    expect(result).toContain('default-scheduler');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sAgic ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sAgic (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sAgic);
+  });
+
+  it('az aks enable-addons command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('az aks enable-addons'))).toBe(true);
+  });
+
+  it('AGIC annotations preserved', () => {
+    expect(result).toContain('azure/application-gateway');
+    expect(result).toContain('appgw.ingress.kubernetes.io/ssl-redirect');
+  });
+
+  it('multi-path Ingress preserved', () => {
+    expect(result).toContain('/api/*');
+    expect(result).toContain('/ws/*');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sPrometheusMonitoring ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sPrometheusMonitoring (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sPrometheusMonitoring);
+  });
+
+  it('helm install kube-prometheus-stack in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kube-prometheus-stack'))).toBe(true);
+  });
+
+  it('ServiceMonitor and PrometheusRule preserved', () => {
+    expect(result).toContain('kind: ServiceMonitor');
+    expect(result).toContain('kind: PrometheusRule');
+  });
+
+  it('PromQL expressions preserved', () => {
+    expect(result).toContain('rate(http_requests_total');
+    expect(result).toContain('histogram_quantile');
+  });
+
+  it('scrape interval preserved', () => {
+    expect(result).toContain('interval: 15s');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sWorkloadIdentity ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sWorkloadIdentity (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sWorkloadIdentity);
+  });
+
+  it('az aks update command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('--enable-workload-identity'))).toBe(true);
+  });
+
+  it('federated credential creation in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('federated-credential create'))).toBe(true);
+  });
+
+  it('ServiceAccount and Deployment YAML preserved', () => {
+    expect(result).toContain('kind: ServiceAccount');
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('azure.workload.identity/use');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sArgoCD ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sArgoCD (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sArgoCD);
+  });
+
+  it('kubectl install commands in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl create namespace argocd'))).toBe(true);
+  });
+
+  it('Application CRD YAML preserved', () => {
+    expect(result).toContain('kind: Application');
+    expect(result).toContain('argoproj.io/v1alpha1');
+  });
+
+  it('syncPolicy preserved', () => {
+    expect(result).toContain('selfHeal: true');
+    expect(result).toContain('prune: true');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticCargoWorkspaceDeps ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticCargoWorkspaceDeps (Cargo fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticCargoWorkspaceDeps);
+  });
+
+  it('[workspace] and [workspace.dependencies] in code fences', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[workspace]'))).toBe(true);
+    expect(blocks.some(b => b.includes('[workspace.dependencies]'))).toBe(true);
+  });
+
+  it('api/Cargo.toml content is in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('version.workspace = true'))).toBe(true);
+  });
+
+  it('Rust source code in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('use axum::') && b.includes('async fn main'))).toBe(true);
+  });
+
+  it('cargo commands in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo build --workspace'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sHpaCustomMetrics ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sHpaCustomMetrics (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sHpaCustomMetrics);
+  });
+
+  it('HPA v2 YAML preserved', () => {
+    expect(result).toContain('kind: HorizontalPodAutoscaler');
+    expect(result).toContain('autoscaling/v2');
+  });
+
+  it('custom metrics preserved', () => {
+    expect(result).toContain('http_requests_per_second');
+    expect(result).toContain('averageValue: "1000"');
+  });
+
+  it('behavior scaling policies preserved', () => {
+    expect(result).toContain('stabilizationWindowSeconds: 60');
+    expect(result).toContain('stabilizationWindowSeconds: 300');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticAksNodePools ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticAksNodePools (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticAksNodePools);
+  });
+
+  it('az aks nodepool add command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('az aks nodepool add'))).toBe(true);
+  });
+
+  it('GPU deployment YAML preserved', () => {
+    expect(result).toContain('nvidia.com/gpu: 1');
+    expect(result).toContain('NoSchedule');
+  });
+
+  it('node taint key=value preserved', () => {
+    expect(result).toContain('sku=gpu:NoSchedule');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sRollingUpdate ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sRollingUpdate (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sRollingUpdate);
+  });
+
+  it('Deployment + PDB YAML preserved', () => {
+    expect(result).toContain('kind: Deployment');
+    expect(result).toContain('kind: PodDisruptionBudget');
+  });
+
+  it('rolling update strategy preserved', () => {
+    expect(result).toContain('maxSurge: 2');
+    expect(result).toContain('maxUnavailable: 1');
+  });
+
+  it('probes and lifecycle preserved', () => {
+    expect(result).toContain('readinessProbe');
+    expect(result).toContain('livenessProbe');
+    expect(result).toContain('preStop');
+  });
+
+  it('rollback command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kubectl rollout undo'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sKeyVaultCsi ─────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sKeyVaultCsi (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sKeyVaultCsi);
+  });
+
+  it('az aks enable-addons in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('azure-keyvault-secrets-provider'))).toBe(true);
+  });
+
+  it('SecretProviderClass YAML preserved', () => {
+    expect(result).toContain('kind: SecretProviderClass');
+    expect(result).toContain('secrets-store.csi.x-k8s.io');
+  });
+
+  it('nested literal block objects preserved', () => {
+    expect(result).toContain('objectName: db-password');
+    expect(result).toContain('objectName: api-key');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sFluxCD ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sFluxCD (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sFluxCD);
+  });
+
+  it('flux bootstrap command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('flux bootstrap github'))).toBe(true);
+  });
+
+  it('GitRepository, Kustomization, HelmRelease all preserved', () => {
+    expect(result).toContain('kind: GitRepository');
+    expect(result).toContain('kind: Kustomization');
+    expect(result).toContain('kind: HelmRelease');
+  });
+
+  it('HelmRelease values preserved with CPU (250m)', () => {
+    expect(result).toContain('250m');
+    expect(result).toContain('replicaCount: 3');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticK8sNetworkDebug ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticK8sNetworkDebug (K8s fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticK8sNetworkDebug);
+  });
+
+  it('DNS test command in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('nslookup kubernetes.default'))).toBe(true);
+  });
+
+  it('DNS output preserved in code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('kube-dns.kube-system.svc.cluster.local'))).toBe(true);
+  });
+
+  it('CoreDNS ConfigMap YAML preserved', () => {
+    expect(result).toContain('kind: ConfigMap');
+    expect(result).toContain('coredns-custom');
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticRustActixWeb ─────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticRustActixWeb (Cargo fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticRustActixWeb);
+  });
+
+  it('Cargo.toml [package] in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('[package]') && b.includes('actix-app'))).toBe(true);
+  });
+
+  it('[dependencies] with actix-web in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('actix-web = "4"'))).toBe(true);
+  });
+
+  it('Rust source with #[derive] and async fn in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('#[derive(Serialize, Deserialize)]'))).toBe(true);
+    expect(blocks.some(b => b.includes('async fn main()'))).toBe(true);
+  });
+
+  it('cargo commands in a code fence', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('cargo build --release'))).toBe(true);
   });
 
   it('has no ANSI leaks', () => {
