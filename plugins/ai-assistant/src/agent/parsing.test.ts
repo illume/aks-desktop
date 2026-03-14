@@ -76,6 +76,16 @@ import {
   syntheticTerraformAksModule,
   syntheticTypeScriptApp,
   syntheticYamlWithAnchors,
+  syntheticKotlinApp,
+  syntheticScalaApp,
+  syntheticPerlScript,
+  syntheticLuaModule,
+  syntheticHaskellApp,
+  syntheticSwiftApp,
+  syntheticElixirModule,
+  syntheticClojureApp,
+  syntheticRAnalysis,
+  syntheticSqlSchema,
 } from './syntheticFixtures';
 import {
   rawBareYamlService,
@@ -8788,6 +8798,206 @@ describe('extractAIAnswer — syntheticMultiLangK8sDeploy', () => {
     expect(cob).toBeTruthy();
     expect(dock).toBeTruthy();
     expect(cob).not.toBe(dock);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticKotlinApp ─────────────────────────────────────────────────────
+// Fixture 74: Kotlin — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticKotlinApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticKotlinApp);
+  });
+
+  it('Kotlin code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('fun main(args: Array<String>)'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticScalaApp ──────────────────────────────────────────────────────
+// Fixture 75: Scala — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticScalaApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticScalaApp);
+  });
+
+  it('Scala code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('object Main'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticPerlScript ────────────────────────────────────────────────────
+// Fixture 76: Perl — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticPerlScript (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticPerlScript);
+  });
+
+  it('Perl code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('#!/usr/bin/perl'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticLuaModule ─────────────────────────────────────────────────────
+// Fixture 77: Lua — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticLuaModule (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticLuaModule);
+  });
+
+  it('Lua code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('local M = {}'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticHaskellApp ────────────────────────────────────────────────────
+// Fixture 78: Haskell — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticHaskellApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticHaskellApp);
+  });
+
+  it('Haskell code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('module Main where'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticSwiftApp ──────────────────────────────────────────────────────
+// Fixture 79: Swift — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticSwiftApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticSwiftApp);
+  });
+
+  it('Swift code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('import Foundation'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticElixirModule ──────────────────────────────────────────────────
+// Fixture 80: Elixir — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticElixirModule (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticElixirModule);
+  });
+
+  it('Elixir code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('defmodule App do'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticClojureApp ────────────────────────────────────────────────────
+// Fixture 81: Clojure — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticClojureApp (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticClojureApp);
+  });
+
+  it('Clojure code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('(ns myapp.core)'))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticRAnalysis ─────────────────────────────────────────────────────
+// Fixture 82: R — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticRAnalysis (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticRAnalysis);
+  });
+
+  it('R code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('data.frame('))).toBe(true);
+  });
+
+  it('has no ANSI leaks', () => {
+    assertNoAnsiLeaks(result);
+  });
+});
+
+// ─── syntheticSqlSchema ─────────────────────────────────────────────────────
+// Fixture 83: SQL — bold file heading with panel code
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('extractAIAnswer — syntheticSqlSchema (synthetic fixture)', () => {
+  let result: string;
+  beforeAll(() => {
+    result = extractAIAnswer(syntheticSqlSchema);
+  });
+
+  it('SQL code should be inside a code block', () => {
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.some(b => b.includes('CREATE TABLE users'))).toBe(true);
   });
 
   it('has no ANSI leaks', () => {

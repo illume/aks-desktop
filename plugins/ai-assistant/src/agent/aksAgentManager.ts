@@ -1747,10 +1747,20 @@ function normalizeTerminalMarkdown(text: string): string {
       if (i < lines.length && /^\s+\S/.test(lines[i])) {
         const blockLines: string[] = [];
         let j = i;
+        // Track YAML literal/folded block scalars (| or >) so that their
+        // indented content is never mistaken for prose headings.
+        let inLiteralBlock = false;
+        let literalBlockIndent = 0;
         while (j < lines.length) {
           const bl = lines[j];
           const bt = bl.trim();
           if (bt === '') {
+            // Blank lines inside literal blocks are part of the scalar
+            if (inLiteralBlock) {
+              blockLines.push(bl);
+              j++;
+              continue;
+            }
             // Allow single blank lines within the block
             let peekIdx = j + 1;
             while (peekIdx < lines.length && lines[peekIdx].trim() === '') peekIdx++;
@@ -1806,6 +1816,20 @@ function normalizeTerminalMarkdown(text: string): string {
           if (!/^\s+\S/.test(bl)) break;
           // Break at next bold file heading (e.g. " src/main.rs" after Cargo.toml panel)
           if (isBoldFileHeading(bt)) break;
+
+          // Inside a YAML literal/folded block scalar: include all lines
+          // that are indented deeper than the indicator line.
+          if (inLiteralBlock) {
+            const curIndent = bl.match(/^(\s*)/)?.[1].length ?? 0;
+            if (curIndent > literalBlockIndent) {
+              blockLines.push(bl);
+              j++;
+              continue;
+            }
+            // Indentation dropped — exit literal block
+            inLiteralBlock = false;
+          }
+
           // Also break at centered headings appearing directly (no blank line)
           // but only when it actually looks like prose (many words, no code chars)
           // or a short title heading like "Optional: Ingress"
@@ -1832,6 +1856,11 @@ function normalizeTerminalMarkdown(text: string): string {
             !/--\w/.test(bt);
           if (isDirectCenteredTitle || isProseHeading) break;
           blockLines.push(bl);
+          // Track start of YAML literal/folded block scalar (e.g. "key: |")
+          if (/[|>][-+]?\d?\s*$/.test(bt)) {
+            inLiteralBlock = true;
+            literalBlockIndent = lineIndent;
+          }
           j++;
         }
         // Trim trailing blank lines

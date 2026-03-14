@@ -72,7 +72,7 @@ function assertNoAnsiLeaks(text: string): void {
 // ---------------------------------------------------------------------------
 // 8. YAML literal/folded block scalars (10 tests)
 // ---------------------------------------------------------------------------
-describe.skip('8 – YAML literal/folded block scalars preserved', () => {
+describe('8 – YAML literal/folded block scalars preserved', () => {
   const indicators = ['|', '|-', '|+', '>', '>-', '>+', '|2', '>2', '|-2', '>+2'];
 
   indicators.forEach((ind, i) => {
