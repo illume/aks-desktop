@@ -1211,6 +1211,15 @@ const AMBIGUOUS_CODE_COMMANDS: ReadonlySet<string> = new Set([
   'tac',
   'look',
 
+  // Editors
+  'vi',
+  'vim',
+  'nano',
+  'emacs',
+  'ed',
+  'less',
+  'more',
+
   // Process / control
   'kill',
   'wait',
@@ -1305,6 +1314,15 @@ function hasShellSyntax(trimmed: string): boolean {
 
   // Backtick command substitution
   if (/`[^`]+`/.test(trimmed)) return true;
+
+  // File arguments: word.ext where ext is a known code/config file extension
+  // (e.g. "touch app.yaml", "vim config.json", "cat main.py")
+  if (
+    /\s[\w./-]+\.(ya?ml|json|toml|py|rs|go|js|ts|sh|bash|conf|cfg|ini|txt|log|md|html|css|xml|sql|env|lock|mod|sum)\b/.test(
+      trimmed
+    )
+  )
+    return true;
 
   return false;
 }
