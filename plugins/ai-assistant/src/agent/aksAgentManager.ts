@@ -1472,6 +1472,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Ruby def: def method_name  or  def method_name(args)
   if (/^def\s+\w+(\.\w+)?(\(|$|\s*$)/.test(trimmed)) return true;
 
+  // Elixir: defmodule, defp, defmacro
+  if (/^(defmodule|defp?|defmacro)\s+\w/.test(trimmed)) return true;
+
   // Python decorator: @app.route(...)  or  @staticmethod
   if (/^@\w+/.test(trimmed)) return true;
 
@@ -2252,6 +2255,46 @@ function normalizeTerminalMarkdown(text: string): string {
           // Inside YAML context — don't wrap, but advance past all collected
           // block lines to prevent re-processing individual lines.
           result.push(...blockLines);
+          i = j;
+          continue;
+        }
+      }
+      // Pure YAML block (no code-like lines) from Rich panel content —
+      // dedent so that wrapBareYamlBlocks can detect and fence it with
+      // ```yaml.  Only activate for blocks with 3+ YAML lines and a
+      // strong non-K8s YAML indicator to avoid false positives on prose.
+      // K8s YAML (with apiVersion:) is already handled by wrapBareYamlBlocks
+      // and should NOT be dedented here to avoid changing its behavior.
+      if (codeLikeLineCount === 0 && blockLines.length >= 3) {
+        const yamlCount = blockLines.filter(
+          l => l.trim() !== '' && looksLikeYaml(l.trim())
+        ).length;
+        const hasK8sYaml = blockLines.some(l => /^\s*apiVersion:\s/.test(l));
+        const hasStrongNonK8sYaml =
+          !hasK8sYaml &&
+          blockLines.some(l => {
+            const t = l.trim();
+            return /^(version|services|on):\s?/.test(t);
+          }) &&
+          // Also check the starting line itself — if it's 'name:' it
+          // could be K8s metadata.  Only treat as strong YAML when the
+          // block contains Docker Compose / GitHub Actions indicators.
+          blockLines.some(l => {
+            const t = l.trim();
+            return (
+              /^(version|services|on|jobs|steps|runs-on):\s?/.test(t) ||
+              /^(build|image|ports|environment|depends_on):\s?/.test(t)
+            );
+          });
+        if (yamlCount >= 3 && hasStrongNonK8sYaml) {
+          const nonBlank = blockLines.filter(l => l.trim() !== '');
+          const minIndent = nonBlank.reduce((min, l) => {
+            const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
+            return Math.min(min, indent);
+          }, Infinity);
+          const shift = minIndent === Infinity ? 0 : minIndent;
+          const dedented = blockLines.map(l => (l.trim() === '' ? '' : l.slice(shift)));
+          result.push(...dedented);
           i = j;
           continue;
         }
