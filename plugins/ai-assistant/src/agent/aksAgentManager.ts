@@ -1779,7 +1779,7 @@ function normalizeTerminalMarkdown(text: string): string {
               peekIndent > 6 &&
               peekWords >= 2 &&
               !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
-              (/^[A-Z][\w]*:\s+[A-Z]/.test(peekTrimmed) ||
+              (/^[A-Z][\w]*:\s+\S/.test(peekTrimmed) ||
                 /^\d+[.)]\s+\S/.test(peekTrimmed) ||
                 /^Step\s+\d+/i.test(peekTrimmed)) &&
               peekWords <= 8;
@@ -1815,7 +1815,7 @@ function normalizeTerminalMarkdown(text: string): string {
             lineIndent > 6 &&
             lineWords >= 2 &&
             !looksLikeShellOrDockerCodeLine(bt) &&
-            (/^[A-Z][\w]*:\s+[A-Z]/.test(bt) ||
+            (/^[A-Z][\w]*:\s+\S/.test(bt) ||
               /^\d+[.)]\s+\S/.test(bt) ||
               /^Step\s+\d+/i.test(bt)) &&
             lineWords <= 8;
@@ -2631,8 +2631,9 @@ function cleanTerminalFormatting(text: string): string {
     const cur = result[idx];
     const next = result[idx + 1];
     // Current line ends with a bare word (no colon) and is space-indented
-    // Next line starts with optional space + colon + space + value (or just colon for YAML key-only)
-    if (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s*/.test(next)) {
+    // Next line starts with optional space + colon (for key-only YAML like "metadata:")
+    // or colon + space + value (e.g. ": 70" from "averageUtilization\n: 70")
+    if (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s*\S/.test(next) || /^\s+[\w.-]+$/.test(cur) && /^\s*:$/.test(next)) {
       result[idx] = cur + next.replace(/^\s*/, '');
       result.splice(idx + 1, 1);
       rejoinedCount++;
