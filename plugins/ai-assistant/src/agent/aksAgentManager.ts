@@ -1532,6 +1532,30 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // XML opening/closing tags: <project ...>, </dependencies>, <?xml ...>
   if (/^<\/?[\w?]/.test(trimmed)) return true;
 
+  // ── Tier 7b: SQL patterns ──
+
+  // SQL keywords at line start (case-insensitive): SELECT, INSERT, UPDATE,
+  // DELETE, ALTER, DROP, WHERE, etc.  CREATE, FROM, JOIN, SET, VALUES are
+  // handled separately below because they overlap with English prose/filenames.
+  if (
+    /^(SELECT|INSERT|UPDATE|DELETE|ALTER|DROP|WHERE|LEFT|RIGHT|INNER|OUTER|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|LIMIT|OFFSET|INTO|GRANT|REVOKE|BEGIN|COMMIT|ROLLBACK)\b/i.test(
+      trimmed
+    )
+  )
+    return true;
+  // SQL CREATE: require specific SQL object type after it
+  if (
+    /^CREATE\s+(TABLE|INDEX|DATABASE|VIEW|SCHEMA|FUNCTION|PROCEDURE|TRIGGER|TYPE|ROLE|USER|SEQUENCE|EXTENSION)\b/i.test(
+      trimmed
+    )
+  )
+    return true;
+  // SQL FROM: require it to NOT be followed by English article
+  if (/^FROM\s+\w/i.test(trimmed) && !/^FROM\s+(the|a|an)\b/i.test(trimmed)) return true;
+  // SQL JOIN: require a specific join pattern like "JOIN table ON column"
+  // Exclude English prose like "join the two tables on ID"
+  if (/^(INNER|LEFT|RIGHT|FULL|CROSS)\s+JOIN\b/i.test(trimmed)) return true;
+
   // ── Tier 8: kubectl / K8s structured output ──
 
   // kubectl describe output: "Key:   value" with 2+ spaces between
@@ -1543,6 +1567,10 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Tabular output: lines with 3+ column-aligned gaps (2+ spaces between words)
   // e.g. "NAME   STATUS   AGE", "Type    Reason   Age   From     Message"
   if ((trimmed.match(/\S\s{2,}\S/g) ?? []).length >= 2) return true;
+
+  // Short lines ending with { — CSS selectors, function declarations, etc.
+  // Require the line to be short (≤ 40 chars) to avoid matching prose.
+  if (/\{\s*$/.test(trimmed) && trimmed.length <= 40) return true;
 
   return false;
 }
@@ -2527,6 +2555,55 @@ function wrapBareYamlBlocks(text: string): string {
         if (yamlLines.length > 0) {
           result.push('```yaml');
           result.push(...yamlLines);
+          result.push('```');
+          wrappedBlockCount++;
+          i = j;
+        } else {
+          result.push(line);
+          i++;
+        }
+      } else {
+        result.push(line);
+        i++;
+      }
+    } else if (
+      // Detect start of a bare JSON block: [ or { at column 0 outside a code
+      // fence, followed by enough JSON-like lines (matching looksLikeYaml) to
+      // be confident it's structured data.
+      !inCodeFence &&
+      !insideHeredoc &&
+      !/^\s+/.test(line) &&
+      /^[{\[]/.test(trimmed)
+    ) {
+      let peek = i;
+      let jsonLineCount = 0;
+      let braceDepth = 0;
+      while (peek < lines.length) {
+        const pt = lines[peek].trim();
+        if (pt === '') break;
+        // Track brace/bracket depth
+        for (const ch of pt) {
+          if (ch === '{' || ch === '[') braceDepth++;
+          if (ch === '}' || ch === ']') braceDepth--;
+        }
+        jsonLineCount++;
+        peek++;
+        // Stop when all braces/brackets are closed
+        if (braceDepth <= 0) break;
+      }
+      if (jsonLineCount >= 3) {
+        const jsonLines: string[] = [];
+        let j = i;
+        while (j < peek) {
+          jsonLines.push(lines[j]);
+          j++;
+        }
+        while (jsonLines.length > 0 && jsonLines[jsonLines.length - 1].trim() === '') {
+          jsonLines.pop();
+        }
+        if (jsonLines.length > 0) {
+          result.push('```json');
+          result.push(...jsonLines);
           result.push('```');
           wrappedBlockCount++;
           i = j;
