@@ -1466,8 +1466,18 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Python function definition: def func_name(  or  async def func_name(
   if (/^(async\s+)?def\s+\w+\s*\(/.test(trimmed)) return true;
 
-  // Python/Ruby/Java class definition: class Name:  or  class Name(Base):  or  class Name
-  if (/^(public\s+)?class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed)) return true;
+  // Python/Ruby/Java/Scala/Kotlin class definition
+  if (
+    /^(public\s+|abstract\s+|data\s+|case\s+|sealed\s+)*class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed)
+  )
+    return true;
+  // Scala object: object Name { ... }
+  if (/^object\s+[A-Z]\w*([\s{]|$)/.test(trimmed)) return true;
+  // Kotlin/Scala suspend/fun: suspend fun ..., fun ...(
+  if (/^(suspend\s+)?fun\s+\w+/.test(trimmed)) return true;
+  // Java/C# access modifiers: public/private/protected followed by type declarations
+  // Require the line to contain () or ; or { to avoid matching prose
+  if (/^(public|private|protected)\s+/.test(trimmed) && /[(){;]/.test(trimmed)) return true;
 
   // Ruby def: def method_name  or  def method_name(args)
   if (/^def\s+\w+(\.\w+)?(\(|$|\s*$)/.test(trimmed)) return true;
@@ -1563,6 +1573,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // TOML section headers: [package], [dependencies], [workspace.dependencies], etc.
   if (/^\[[\w.-]+\]/.test(trimmed)) return true;
   // TOML key = value: name = "foo", version = "1.0", key = { ... }
+
+  // Python requirements.txt: package==version, package>=version, package~=version
+  if (/^[\w][\w.-]*[=~!><]=+\d/.test(trimmed)) return true;
   if (/^[\w.-]+\s*=\s*["'{[\d]/.test(trimmed)) return true;
 
   // ── Tier 6b: Terraform HCL patterns ──
@@ -2266,9 +2279,7 @@ function normalizeTerminalMarkdown(text: string): string {
       // K8s YAML (with apiVersion:) is already handled by wrapBareYamlBlocks
       // and should NOT be dedented here to avoid changing its behavior.
       if (codeLikeLineCount === 0 && blockLines.length >= 3) {
-        const yamlCount = blockLines.filter(
-          l => l.trim() !== '' && looksLikeYaml(l.trim())
-        ).length;
+        const yamlCount = blockLines.filter(l => l.trim() !== '' && looksLikeYaml(l.trim())).length;
         const hasK8sYaml = blockLines.some(l => /^\s*apiVersion:\s/.test(l));
         const hasStrongNonK8sYaml =
           !hasK8sYaml &&
@@ -2846,7 +2857,11 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
       /^case\s+.+\s+in/.test(t) ||
       /^esac\s*$/.test(t) ||
       // Shell if/elif...then
-      /^(if|elif)\s+.+;\s*then/.test(t)
+      /^(if|elif)\s+.+;\s*then/.test(t) ||
+      // Java/Kotlin/Scala
+      /^(public|private|protected|abstract|static|final|suspend)\s/.test(t) ||
+      /^(case\s+)?class\s+[A-Z]/.test(t) ||
+      /^object\s+[A-Z]/.test(t)
     );
   });
 }

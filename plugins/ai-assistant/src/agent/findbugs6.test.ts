@@ -361,7 +361,7 @@ describe('findbugs6: extractAIAnswer edge cases (round 6)', () => {
     const body = [
       'Scale the deployment:',
       '',
-      panelLine("kubectl patch deployment myapp -p '{\"spec\":{\"replicas\":5}}'"),
+      panelLine('kubectl patch deployment myapp -p \'{"spec":{"replicas":5}}\''),
       panelLine('kubectl rollout status deployment/myapp'),
       panelLine('kubectl get pods -l app=myapp -o wide'),
       panelBlank(),
