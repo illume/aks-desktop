@@ -1468,7 +1468,7 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // Python/Ruby/Java/Scala/Kotlin class definition
   if (
-    /^(public\s+|abstract\s+|data\s+|case\s+|sealed\s+)*class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed)
+    /^((?:public|abstract|data|case|sealed)\s+)*class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed)
   )
     return true;
   // Scala object: object Name { ... }
@@ -1575,7 +1575,7 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // TOML key = value: name = "foo", version = "1.0", key = { ... }
 
   // Python requirements.txt: package==version, package>=version, package~=version
-  if (/^[\w][\w.-]*[=~!><]=+\d/.test(trimmed)) return true;
+  if (/^\w[\w.-]*[=~!><]{1,2}\d/.test(trimmed)) return true;
   if (/^[\w.-]+\s*=\s*["'{[\d]/.test(trimmed)) return true;
 
   // ── Tier 6b: Terraform HCL patterns ──
@@ -2279,7 +2279,10 @@ function normalizeTerminalMarkdown(text: string): string {
       // K8s YAML (with apiVersion:) is already handled by wrapBareYamlBlocks
       // and should NOT be dedented here to avoid changing its behavior.
       if (codeLikeLineCount === 0 && blockLines.length >= 3) {
-        const yamlCount = blockLines.filter(l => l.trim() !== '' && looksLikeYaml(l.trim())).length;
+        const yamlCount = blockLines.filter(l => {
+          const t = l.trim();
+          return t !== '' && looksLikeYaml(t);
+        }).length;
         const hasK8sYaml = blockLines.some(l => /^\s*apiVersion:\s/.test(l));
         const hasStrongNonK8sYaml =
           !hasK8sYaml &&
