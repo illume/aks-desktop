@@ -1301,7 +1301,7 @@ function hasShellSyntax(trimmed: string): boolean {
   if (/\s>{1,2}\s/.test(trimmed) || /2>&1/.test(trimmed)) return true;
 
   // Heredoc operator: <<EOF, <<'EOF', <<"EOF", <<-EOF
-  if (/<<[-~]?\s*['"]?\w+['"]?\s*$/.test(trimmed)) return true;
+  if (/<<-?\s*['"]?\w+['"]?\s*$/.test(trimmed)) return true;
 
   // Quoted arguments: "..." or '...'
   if (/\s["'][^"'\s]/.test(trimmed)) return true;
@@ -1764,22 +1764,18 @@ function normalizeTerminalMarkdown(text: string): string {
       }
     }
 
-    // Detect Makefile targets at column 0: a bare "word:" followed by a
-    // tab-indented line.  Wrap the target and its recipes in a code block.
-    if (
-      /^[\w.-]+:\s*$/.test(trimmed) &&
-      !/^\s+/.test(line) &&
-      i + 1 < lines.length &&
-      /^\s*\t/.test(lines[i + 1])
-    ) {
+    // Detect Makefile directives/targets at column 0: .PHONY lines, bare
+    // targets, and targets with dependencies. Wrap the target/directive lines
+    // and their tab-indented recipes in a code block.
+    if (!/^\s+/.test(line) && startsMakefileBlock(lines, i)) {
       const makefileLines: string[] = [line];
       let mj = i + 1;
       while (mj < lines.length) {
         const ml = lines[mj];
         const mt = ml.trim();
         if (mt === '') break;
-        // Makefile recipe (tab-indented) or another target (word:)
-        if (/^\s*\t/.test(ml) || /^[\w.-]+:\s*$/.test(mt)) {
+        // Makefile recipe (tab-indented) or another directive/target line.
+        if (/^\s*\t/.test(ml) || isMakefileDirective(mt) || looksLikeMakefileTarget(mt)) {
           makefileLines.push(ml);
           mj++;
           continue;
@@ -1792,6 +1788,52 @@ function normalizeTerminalMarkdown(text: string): string {
       wrappedCodeBlockCount++;
       i = mj;
       continue;
+    }
+
+    // Recover terminal panel blocks whose first content line lost its leading
+    // space because extractAIAnswer() trims the overall response. This shows up
+    // as: first line at column 0 that looks like code, followed by shallow
+    // (1–2 space) code lines from the same Rich panel.
+    if (
+      !/^\s+/.test(line) &&
+      looksLikeShellOrDockerCodeLine(trimmed) &&
+      !looksLikeYaml(trimmed) &&
+      i + 1 < lines.length
+    ) {
+      const nextLine = lines[i + 1];
+      const nextTrimmed = nextLine.trim();
+      const nextIndent = nextLine.match(/^(\s*)/)?.[1].length ?? 0;
+      if (
+        nextIndent > 0 &&
+        nextIndent <= 2 &&
+        looksLikeShellOrDockerCodeLine(nextTrimmed) &&
+        !looksLikeYaml(nextTrimmed)
+      ) {
+        const panelLines: string[] = [line];
+        let pj = i + 1;
+        while (pj < lines.length) {
+          const pl = lines[pj];
+          const pt = pl.trim();
+          const indent = pl.match(/^(\s*)/)?.[1].length ?? 0;
+          if (
+            indent > 0 &&
+            indent <= 2 &&
+            looksLikeShellOrDockerCodeLine(pt) &&
+            !looksLikeYaml(pt)
+          ) {
+            panelLines.push(pl);
+            pj++;
+            continue;
+          }
+          break;
+        }
+        result.push('```');
+        for (const pl of panelLines) result.push(pl);
+        result.push('```');
+        wrappedCodeBlockCount++;
+        i = pj;
+        continue;
+      }
     }
 
     const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
@@ -2187,6 +2229,8 @@ function looksLikeYaml(trimmed: string): boolean {
   if (trimmed === '' || trimmed.startsWith('#')) return true;
   // YAML document separator (exactly ---) and document end marker (exactly ...)
   if (trimmed === '---' || trimmed === '...') return true;
+  // YAML merge key: <<: *defaults
+  if (/^<<:\s?/.test(trimmed)) return true;
   // key: or key:  (with optional value)
   if (/^[\w][\w.\/-]*:\s?/.test(trimmed)) return true;
   // quoted key
@@ -2201,6 +2245,35 @@ function looksLikeYaml(trimmed: string): boolean {
   if (/^["'][^"']*["']$/.test(trimmed)) return true;
   // continuation value (indented scalar, e.g. multiline string)
   return false;
+}
+
+function isMakefileDirective(trimmed: string): boolean {
+  return /^\.(PHONY|SUFFIXES|DEFAULT_GOAL|PRECIOUS|INTERMEDIATE|SECONDARY|SECONDEXPANSION|DELETE_ON_ERROR|EXPORT_ALL_VARIABLES|NOTPARALLEL|ONESHELL|POSIX):/.test(
+    trimmed
+  );
+}
+
+function looksLikeMakefileTarget(trimmed: string): boolean {
+  return /^[\w./-]+:\s*(?:$|\S.*)$/.test(trimmed);
+}
+
+/**
+ * Check whether the current line starts a Makefile block. We only enter
+ * Makefile mode in real Makefile contexts:
+ *  - a dot-directive followed by a target line, or
+ *  - a target line followed by a tab-indented recipe line.
+ */
+function startsMakefileBlock(lines: string[], index: number): boolean {
+  const trimmed = lines[index].trim();
+  let nextIdx = index + 1;
+  while (nextIdx < lines.length && lines[nextIdx].trim() === '') nextIdx++;
+  if (nextIdx >= lines.length) return false;
+  const nextLine = lines[nextIdx];
+  const nextTrimmed = nextLine.trim();
+  return (
+    (isMakefileDirective(trimmed) && looksLikeMakefileTarget(nextTrimmed)) ||
+    (looksLikeMakefileTarget(trimmed) && /^\s*\t/.test(nextLine))
+  );
 }
 
 /**
@@ -2274,7 +2347,7 @@ function wrapBareYamlBlocks(text: string): string {
         break;
       }
     }
-    const insideHeredoc = /<<\s*['"]?\w+['"]?\s*$/.test(prevNonBlankForHeredoc);
+    const insideHeredoc = /<<-?\s*['"]?\w+['"]?\s*$/.test(prevNonBlankForHeredoc);
 
     if (/^\s*apiVersion:\s*/.test(line) && !insideHeredoc) {
       verboseLog(
@@ -2704,11 +2777,10 @@ function wrapBareCodeBlocks(text: string): string {
     // Exclude lines that start with # (could be markdown headings) unless they
     // match a Dockerfile directive or shell comment with URL/path
     //
-    // Also detect Makefile targets: bare "word:" (no value after colon) followed
-    // by a tab-indented continuation line.  These look like YAML to looksLikeYaml
-    // but are actually code (Makefile recipes).
-    const isMakefileTarget =
-      /^[\w.-]+:\s*$/.test(trimmed) && i + 1 < lines.length && /^\t/.test(lines[i + 1]);
+    // Also detect Makefile directives/targets at column 0: .PHONY lines, bare
+    // targets, and targets with dependencies. These can be followed by another
+    // Makefile line or by a tab-indented recipe.
+    const isMakefileTarget = startsMakefileBlock(lines, i);
     if (
       trimmed !== '' &&
       !/^\s+/.test(line) &&
@@ -2717,9 +2789,19 @@ function wrapBareCodeBlocks(text: string): string {
       const codeLines: string[] = [];
       let j = i;
 
+      const isShallowPanelCodeContinuation = (rawLine: string, rawTrimmed: string): boolean => {
+        const indent = rawLine.match(/^(\s*)/)?.[1].length ?? 0;
+        return (
+          indent > 0 &&
+          indent <= 2 &&
+          looksLikeShellOrDockerCodeLine(rawTrimmed) &&
+          !looksLikeYaml(rawTrimmed)
+        );
+      };
+
       // Track heredoc delimiter: if the starting line contains <<WORD, collect
       // everything (including YAML-looking content) until the delimiter is found.
-      const heredocMatch = trimmed.match(/<<[-~]?\s*['"]?(\w+)['"]?\s*$/);
+      const heredocMatch = trimmed.match(/<<-?\s*['"]?(\w+)['"]?\s*$/);
       const heredocDelimiter = heredocMatch?.[1] ?? null;
 
       while (j < lines.length) {
@@ -2754,7 +2836,9 @@ function wrapBareCodeBlocks(text: string): string {
             if (
               looksLikeShellOrDockerCodeLine(peekTrimmed) &&
               !looksLikeYaml(peekTrimmed) &&
-              (!peekIsIndented || hasCodeCtx)
+              (!peekIsIndented ||
+                hasCodeCtx ||
+                isShallowPanelCodeContinuation(lines[peekIdx], peekTrimmed))
             ) {
               codeLines.push(cl);
               j++;
@@ -2769,7 +2853,11 @@ function wrapBareCodeBlocks(text: string): string {
         // for function/class bodies (e.g. the body of `def index():`)
         // Also allow tab-indented Makefile recipe lines.
         if (/^\s+/.test(cl)) {
-          if (hasStructuredCodeContext(codeLines) || (isMakefileTarget && /^\t/.test(cl))) {
+          if (
+            hasStructuredCodeContext(codeLines) ||
+            (isMakefileTarget && /^\t/.test(cl)) ||
+            isShallowPanelCodeContinuation(cl, ct)
+          ) {
             codeLines.push(cl);
             j++;
             continue;
@@ -2788,7 +2876,7 @@ function wrapBareCodeBlocks(text: string): string {
             j++;
             continue;
           }
-          if (isMakefileTarget && /^[\w.-]+:\s*$/.test(ct)) {
+          if (isMakefileTarget && (isMakefileDirective(ct) || looksLikeMakefileTarget(ct))) {
             codeLines.push(cl);
             j++;
             continue;

@@ -169,10 +169,10 @@ describe('findbugs3: extractAIAnswer edge cases (round 3)', () => {
   const blocks = extractCodeBlocks(result);
   expect(blocks.length).toBeGreaterThanOrEqual(1);
   expect(blocks.join('\n')).toContain('body {');
-});
+  });
 
-// ── 7. SQL query in panel ──
-it('7. SQL query in panel should be wrapped', () => {
+  // ── 7. SQL query in panel ──
+  it('7. SQL query in panel should be wrapped', () => {
   const body = [
     panelBlank(),
     panelLine('SELECT name, age'),
@@ -186,10 +186,10 @@ it('7. SQL query in panel should be wrapped', () => {
   const blocks = extractCodeBlocks(result);
   expect(blocks.length).toBeGreaterThanOrEqual(1);
   expect(blocks.join('\n')).toContain('SELECT name');
-});
+  });
 
-// ── 8. Prose between two code panels ──
-it('8. prose between two code panels stays as prose', () => {
+  // ── 8. Prose between two code panels ──
+  it('8. prose between two code panels stays as prose', () => {
   const body = [
     panelBlank(),
     panelLine('kubectl get pods'),
@@ -208,10 +208,10 @@ it('8. prose between two code panels stays as prose', () => {
   // Both commands should be in code blocks
   expect(allContent).toContain('kubectl get pods');
   expect(allContent).toContain('kubectl logs pod-name');
-});
+  });
 
-// ── 9. JSON array output from kubectl ──
-it('9. bare JSON array output wrapped in code block', () => {
+  // ── 9. JSON array output from kubectl ──
+  it('9. bare JSON array output wrapped in code block', () => {
   const body = [
     '[',
     '  {',
@@ -229,10 +229,10 @@ it('9. bare JSON array output wrapped in code block', () => {
   const blocks = extractCodeBlocks(result);
   expect(blocks.length).toBeGreaterThanOrEqual(1);
   expect(blocks.join('\n')).toContain('"name": "pod-1"');
-});
+  });
 
-// ── 10. Mixed heredoc types in one response ──
-it('10. multiple heredocs in one response', () => {
+  // ── 10. Mixed heredoc types in one response ──
+  it('10. multiple heredocs in one response', () => {
   const body = [
     'cat > namespace.yaml <<EOF',
     'apiVersion: v1',
@@ -254,5 +254,5 @@ it('10. multiple heredocs in one response', () => {
   const blocks = extractCodeBlocks(result);
   const yamlOnly = blocks.filter(b => b.includes('apiVersion:') && !b.includes('cat >'));
   expect(yamlOnly.length).toBe(0);
-});
+  });
 });

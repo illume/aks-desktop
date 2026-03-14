@@ -3266,9 +3266,8 @@ describe('parser edge cases', () => {
       expect(looksLikeYaml('defaults: &defaults')).toBe(true);
     });
 
-    it('accepts YAML aliases (*)', () => {
-      // *defaults would start with *, which isn't a YAML key/list/flow
-      expect(looksLikeYaml('<<: *defaults')).toBe(false);
+    it('accepts YAML merge keys with aliases (*)', () => {
+      expect(looksLikeYaml('<<: *defaults')).toBe(true);
     });
 
     it('rejects bare prose without colons', () => {
