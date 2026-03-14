@@ -1771,7 +1771,7 @@ function normalizeTerminalMarkdown(text: string): string {
       continue;
     }
 
-    if (/^\s*\d+\s+\S/.test(line) && /^\s*\d+\s+/.test(line) && !/=>/.test(line)) {
+    if (/^\s*\d+\s+\S/.test(line) && !/=>/.test(line)) {
       const converted = line.replace(/^\s*(\d+)\s+/, '$1. ');
       if (converted !== line) {
         orderedListCount++;
@@ -1823,7 +1823,7 @@ function normalizeTerminalMarkdown(text: string): string {
       if (
         nextIndent > 0 &&
         nextIndent <= 6 &&
-        (looksLikeShellOrDockerCodeLine(nextTrimmed) || (nextIndent <= 6 && nextTrimmed !== ''))
+        (looksLikeShellOrDockerCodeLine(nextTrimmed) || nextTrimmed !== '')
       ) {
         const panelLines: string[] = [line];
         let pj = i + 1;
