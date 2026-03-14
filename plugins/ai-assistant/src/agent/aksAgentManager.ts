@@ -1445,10 +1445,13 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Line continuation: ends with backslash (short lines only to avoid prose)
   if (/\\\s*$/.test(trimmed) && trimmed.length < 80) return true;
 
-  // Bash for/while/done: "for x in ...; do", "while ...; do", "done"
+  // Bash for/while/until/done: "for x in ...; do", "while ...; do", "until ...; do", "done"
   if (/^for\s+\w+\s+in\s/.test(trimmed)) return true;
-  if (/^while\s+.+;\s*do/.test(trimmed)) return true;
+  if (/^(while|until)\s+.+;\s*do/.test(trimmed)) return true;
   if (/^done\s*$/.test(trimmed)) return true;
+  // Bash if/elif/else/fi: "if ...; then", "elif ...; then", "else", "fi"
+  if (/^(if|elif)\s+.+;\s*then/.test(trimmed)) return true;
+  if (/^(else|fi)\s*$/.test(trimmed)) return true;
   // Bash echo with variable expansion: "echo ..." containing $var
   if (/^echo\s+.*\$/.test(trimmed)) return true;
 
@@ -1519,9 +1522,23 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Lone closing brace (with optional semicolon): }  or };
   if (/^\}\s*;?\s*$/.test(trimmed)) return true;
 
+  // Function/method calls: identifier.method(...), identifier(...) ending with ; or )
+  // Covers console.log(), fmt.Println(), println!(), print(), etc.
+  // Require a dot-method or known call pattern to avoid matching prose.
+  if (/^\w+(\.\w+)+\(/.test(trimmed)) return true; // obj.method(...) chains
+  if (/^\w+!\(/.test(trimmed)) return true; // Rust macros: println!(...), vec![...]
+
+  // try/catch/finally: error handling in Java/C#/JS/TS
+  if (/^(try|catch|finally)\s*[\({]/.test(trimmed)) return true;
+  if (/^throw\s+new\s/.test(trimmed)) return true;
+
   // Go-specific: func, var, package, type keywords
   if (/^(func|package)\s+\w+/.test(trimmed)) return true;
   if (/^(var|type)\s+\w+\s+\w+/.test(trimmed)) return true;
+
+  // JS/TS variable declarations: const x = ..., let x = ..., var x = ...
+  // Require an assignment operator (=) to avoid matching prose.
+  if (/^(const|let)\s+\w+\s*=/.test(trimmed)) return true;
 
   // Go control flow: if, for, switch, select, return, defer, go
   // Require opening brace or parenthesis to avoid matching English prose.
@@ -1531,6 +1548,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // Go/Rust short variable declaration: identifier := expr
   if (/^\w+\s*:=\s*\S/.test(trimmed)) return true;
+
+  // Go channel send: identifier <- expr
+  if (/^\w+\s*<-\s*\S/.test(trimmed)) return true;
 
   // ── Tier 6: TOML / INI config patterns ──
 
@@ -2778,7 +2798,9 @@ function hasStructuredCodeContext(codeLines: string[]): boolean {
       /^(resource|data|variable|output|provider|module|locals)\s/.test(t) ||
       // Shell case/esac
       /^case\s+.+\s+in/.test(t) ||
-      /^esac\s*$/.test(t)
+      /^esac\s*$/.test(t) ||
+      // Shell if/elif...then
+      /^(if|elif)\s+.+;\s*then/.test(t)
     );
   });
 }
