@@ -153,10 +153,9 @@ describe('findbugs3: extractAIAnswer edge cases (round 3)', () => {
     );
     expect(yamlInSeparateBlock).toBe(false);
   });
-});
 
-// ── 6. CSS-like code in panel (not shell, not YAML) ──
-it('6. CSS code in panel should be wrapped', () => {
+  // ── 6. CSS-like code in panel (not shell, not YAML) ──
+  it('6. CSS code in panel should be wrapped', () => {
   const body = [
     panelBlank(),
     panelLine('body {'),
@@ -255,4 +254,5 @@ it('10. multiple heredocs in one response', () => {
   const blocks = extractCodeBlocks(result);
   const yamlOnly = blocks.filter(b => b.includes('apiVersion:') && !b.includes('cat >'));
   expect(yamlOnly.length).toBe(0);
+});
 });
