@@ -311,9 +311,10 @@ function stripAnsi(text: string): string {
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
     .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
-    .replace(/\s?\[\d{1,3}(;\d{1,3})*$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m")
+    .replace(/\s?\[(\d{1,3}(;\d{1,3})*)?$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m", or bare "[" from "\x1b[" at line end)
     .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, '') // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
-    .replace(/^0m\s*$/gm, ''); // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
+    .replace(/^0m\s*$/gm, '') // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
+    .replace(/^0m(?=:\s?)/gm, ''); // Orphan ANSI reset "0m" at start of YAML key/value line (e.g. "0m:" from split "\x1b[\n0m:" → "metadata:" after rejoining); safe because real "0m:" never starts a line in YAML
 }
 
 /**
@@ -1756,19 +1757,29 @@ function normalizeTerminalMarkdown(text: string): string {
             // Break at next file heading boundary
             if (isBoldFileHeading(peekTrimmed)) break;
             // Break at centered headings (deeply indented non-code content,
-            // e.g. "                 2) Containerize it ..." section headings).
+            // e.g. "                 2) Containerize it ..." section headings
+            // or "                           Optional: Ingress" title headings).
             // Code panel content typically has 1-8 spaces indent; centered
             // headings have 6+ and look like prose.  Only break when the line
             // has multiple words and no code-like characters — deeply indented
             // code (Rust assert_eq!, XML tags, nested blocks) must not break.
+            // Also break when the line looks like a section title with a colon
+            // (e.g. "Optional: Ingress") — these match looksLikeYaml but are
+            // clearly headings, not YAML data.
             const peekIndent = peekLine.match(/^(\s*)/)?.[1].length ?? 0;
             const peekWords = peekTrimmed.split(/\s+/).length;
+            const isCenteredTitle =
+              peekIndent > 6 &&
+              peekWords >= 2 &&
+              /^[A-Z][\w]*:\s+[A-Z]/.test(peekTrimmed) &&
+              peekWords <= 4;
             if (
               peekIndent > 6 &&
-              peekWords >= PROSE_WORD_THRESHOLD &&
-              !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
-              !looksLikeYaml(peekTrimmed) &&
-              !/[{};=<>[\]]/.test(peekTrimmed)
+              (isCenteredTitle ||
+                (peekWords >= PROSE_WORD_THRESHOLD &&
+                  !looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+                  !looksLikeYaml(peekTrimmed) &&
+                  !/[{};=<>[\]]/.test(peekTrimmed)))
             )
               break;
             blockLines.push(bl);
@@ -1780,14 +1791,21 @@ function normalizeTerminalMarkdown(text: string): string {
           if (isBoldFileHeading(bt)) break;
           // Also break at centered headings appearing directly (no blank line)
           // but only when it actually looks like prose (many words, no code chars)
+          // or a short title heading like "Optional: Ingress"
           const lineIndent = bl.match(/^(\s*)/)?.[1].length ?? 0;
           const lineWords = bt.split(/\s+/).length;
+          const isDirectCenteredTitle =
+            lineIndent > 6 &&
+            lineWords >= 2 &&
+            /^[A-Z][\w]*:\s+[A-Z]/.test(bt) &&
+            lineWords <= 4;
           if (
             lineIndent > 6 &&
-            lineWords >= PROSE_WORD_THRESHOLD &&
-            !looksLikeShellOrDockerCodeLine(bt) &&
-            !looksLikeYaml(bt) &&
-            !/[{};=<>[\]]/.test(bt)
+            (isDirectCenteredTitle ||
+              (lineWords >= PROSE_WORD_THRESHOLD &&
+                !looksLikeShellOrDockerCodeLine(bt) &&
+                !looksLikeYaml(bt) &&
+                !/[{};=<>[\]]/.test(bt)))
           )
             break;
           blockLines.push(bl);
@@ -2590,8 +2608,8 @@ function cleanTerminalFormatting(text: string): string {
     const cur = result[idx];
     const next = result[idx + 1];
     // Current line ends with a bare word (no colon) and is space-indented
-    // Next line starts with optional space + colon + space + value
-    if (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s+\S/.test(next)) {
+    // Next line starts with optional space + colon + space + value (or just colon for YAML key-only)
+    if (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s*/.test(next)) {
       result[idx] = cur + next.replace(/^\s*/, '');
       result.splice(idx + 1, 1);
       rejoinedCount++;
