@@ -1839,9 +1839,7 @@ function normalizeTerminalMarkdown(text: string): string {
             lineIndent > 6 &&
             lineWords >= 2 &&
             !looksLikeShellOrDockerCodeLine(bt) &&
-            (/^[A-Z][\w]*:\s+\S/.test(bt) ||
-              /^\d+[.)]\s+\S/.test(bt) ||
-              /^Step\s+\d+/i.test(bt)) &&
+            (/^[A-Z][\w]*:\s+\S/.test(bt) || /^\d+[.)]\s+\S/.test(bt) || /^Step\s+\d+/i.test(bt)) &&
             lineWords <= 8;
           // Break at prose-like lines (many words, no code/YAML patterns).
           // These may appear at any indent level — Rich terminal bold headings
@@ -2662,7 +2660,10 @@ function cleanTerminalFormatting(text: string): string {
     // Current line ends with a bare word (no colon) and is space-indented
     // Next line starts with optional space + colon (for key-only YAML like "metadata:")
     // or colon + space + value (e.g. ": 70" from "averageUtilization\n: 70")
-    if (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s*\S/.test(next) || /^\s+[\w.-]+$/.test(cur) && /^\s*:$/.test(next)) {
+    if (
+      (/^\s+[\w.-]+$/.test(cur) && /^\s*:\s*\S/.test(next)) ||
+      (/^\s+[\w.-]+$/.test(cur) && /^\s*:$/.test(next))
+    ) {
       result[idx] = cur + next.replace(/^\s*/, '');
       result.splice(idx + 1, 1);
       rejoinedCount++;

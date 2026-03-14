@@ -6,7 +6,6 @@
  * skipped pending a parser fix.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-
 import { _testing } from './aksAgentManager';
 
 const { extractAIAnswer } = _testing;
