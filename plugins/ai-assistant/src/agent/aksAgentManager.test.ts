@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_AKS_AGENT_PROMPT,
   buildEnrichedPrompt,
+  buildSelfReviewPrompt,
+  type ReviewStep,
+  reviewStep,
+  SELF_REVIEW_PROMPT,
   shellEscapeSingleQuote,
 } from './aksAgentManager';
 
@@ -108,5 +112,58 @@ describe('buildEnrichedPrompt', () => {
     const thirdIdx = result.indexOf('Third question');
     expect(firstIdx).toBeLessThan(secondIdx);
     expect(secondIdx).toBeLessThan(thirdIdx);
+  });
+});
+
+describe('buildSelfReviewPrompt', () => {
+  it('includes the original answer in the prompt', () => {
+    const answer = 'Here is a deployment:\napiVersion: apps/v1';
+    const prompt = buildSelfReviewPrompt(answer);
+    expect(prompt).toContain(answer);
+    expect(prompt).toContain('---BEGIN RESPONSE---');
+    expect(prompt).toContain('---END RESPONSE---');
+  });
+
+  it('includes formatting check instructions', () => {
+    const prompt = buildSelfReviewPrompt('some answer');
+    expect(prompt).toContain('fenced markdown code blocks');
+    expect(prompt).toContain('LGTM');
+    expect(prompt).toContain('COMPLETE corrected response');
+  });
+
+  it('matches the SELF_REVIEW_PROMPT template structure', () => {
+    const prompt = buildSelfReviewPrompt('test');
+    // The prompt should be the template with {RESPONSE} replaced
+    const expected = SELF_REVIEW_PROMPT.replace('{RESPONSE}', 'test');
+    expect(prompt).toBe(expected);
+  });
+});
+
+describe('SELF_REVIEW_PROMPT', () => {
+  it('contains the {RESPONSE} placeholder', () => {
+    expect(SELF_REVIEW_PROMPT).toContain('{RESPONSE}');
+  });
+
+  it('instructs LGTM for well-formatted responses', () => {
+    expect(SELF_REVIEW_PROMPT).toContain('LGTM');
+  });
+
+  it('asks for complete corrected response when issues found', () => {
+    expect(SELF_REVIEW_PROMPT).toContain('COMPLETE corrected response');
+  });
+
+  it('checks for code block formatting', () => {
+    expect(SELF_REVIEW_PROMPT).toContain('fenced markdown code blocks');
+  });
+});
+
+describe('reviewStep', () => {
+  it('is one of the allowed ReviewStep values', () => {
+    const allowed: ReviewStep[] = ['off', 'model', 'agent'];
+    expect(allowed).toContain(reviewStep);
+  });
+
+  it('defaults to "agent"', () => {
+    expect(reviewStep).toBe('agent');
   });
 });

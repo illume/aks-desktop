@@ -47,6 +47,60 @@ config = yaml.safe_load(data)
 - The conversation history below shows all previously asked questions and your answers. Keep that context in mind and answer accordingly — do not repeat information already provided unless the user explicitly asks for it.
 `;
 
+/**
+ * Prompt sent back to the agent after its initial response to verify
+ * formatting and correctness.  The placeholder `{RESPONSE}` is replaced
+ * with the extracted answer.
+ */
+export const SELF_REVIEW_PROMPT = `Review your previous response shown below for formatting and correctness issues.
+
+---BEGIN RESPONSE---
+{RESPONSE}
+---END RESPONSE---
+
+Check:
+1. ALL code (YAML, JSON, bash/shell, Python, Dockerfile, HCL, Go, etc.) MUST be wrapped inside fenced markdown code blocks with the correct language tag (e.g. \`\`\`yaml, \`\`\`bash, \`\`\`python).
+2. No code appears as plain text outside of code blocks.
+3. The code inside the blocks is syntactically correct and complete.
+4. Markdown formatting is clean (headings, lists, etc.).
+
+If the response is already well-formatted, respond with EXACTLY: LGTM
+If there are ANY issues, respond with the COMPLETE corrected response only — no extra commentary or explanation.`;
+
+/**
+ * Build the self-review prompt by injecting the original answer.
+ */
+export function buildSelfReviewPrompt(answer: string): string {
+  return SELF_REVIEW_PROMPT.replace('{RESPONSE}', answer);
+}
+
+/**
+ * Controls whether and how the self-review step runs after each agent response.
+ *
+ * - `"off"`   — no self-review; use the raw extracted answer directly.
+ * - `"model"` — send the review prompt to the configured LLM model (fast,
+ *   needs a `modelReviewFn` callback passed to `runAksAgent`).
+ * - `"agent"` — send the review prompt back through the agent pod session
+ *   (reuses the existing exec connection).
+ */
+export type ReviewStep = 'off' | 'model' | 'agent';
+
+/**
+ * Current self-review mode.  Change this value to toggle the behaviour:
+ *
+ *   "off"   – skip the review entirely
+ *   "model" – use the configured chat model for the review
+ *   "agent" – use the agent pod session for the review (default)
+ */
+export const reviewStep: ReviewStep = 'agent';
+
+/**
+ * Optional callback signature for model-based self-review.
+ * Accepts a prompt string and returns the model's response text.
+ * Passed into `runAksAgent` when `reviewStep === "model"`.
+ */
+export type ModelReviewFn = (prompt: string) => Promise<string>;
+
 /** Represents a single exchange (question + answer) from the conversation history. */
 export interface ConversationEntry {
   role: 'user' | 'assistant';
@@ -2562,6 +2616,13 @@ class ThinkingStepTracker {
 }
 
 /**
+ * Minimum ratio of corrected-response length to original-response length.
+ * If the agent's corrected answer is shorter than this fraction of the
+ * original, it is likely truncated or an error — fall back to the original.
+ */
+const MIN_REVIEW_LENGTH_RATIO = 0.3;
+
+/**
  * Runs a question against the AKS agent pod by exec-ing directly into it
  * via the Kubernetes exec API (WebSocket) through Headlamp's proxy.
  * Returns only the final AI answer (clean, no ANSI codes, bullets normalised).
@@ -2573,13 +2634,17 @@ class ThinkingStepTracker {
  *
  * @param onProgress — optional callback invoked with an updated array of
  *   thinking steps every time a new step is detected in the agent stream.
+ * @param modelReviewFn — optional callback for model-based self-review.
+ *   Required when `reviewStep === "model"`.  Receives the review prompt
+ *   and should return the model's response text.
  */
 export async function runAksAgent(
   question: string,
   podInfo: AksAgentPodInfo,
   clusterName: string,
   onProgress?: AgentProgressCallback,
-  conversationHistory: ConversationEntry[] = []
+  conversationHistory: ConversationEntry[] = [],
+  modelReviewFn?: ModelReviewFn
 ): Promise<string> {
   console.log(
     `[AKS Agent] Exec into pod ${podInfo.podName} in namespace ${podInfo.namespace}, cluster ${clusterName}`
@@ -2597,6 +2662,90 @@ export async function runAksAgent(
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
+      // ── Self-review ──────────────────────────────────────────────────
+      // Controlled by the exported `reviewStep` constant:
+      //   "off"   → skip review, return raw answer
+      //   "agent" → send review prompt via the agent pod session
+      //   "model" → send review prompt via the configured LLM model
+      if (reviewStep === 'off') {
+        debugLog('[AKS Agent] Self-review: skipped (reviewStep = "off")');
+        return answer;
+      }
+
+      debugLog(
+        `[AKS Agent] Starting self-review (mode: ${reviewStep}),`,
+        'original answer length:', answer.length,
+        'answer:', answer
+      );
+
+      try {
+        const reviewPromptText = buildSelfReviewPrompt(answer);
+        let reviewAnswer: string;
+
+        if (reviewStep === 'model') {
+          // ── Model-based review ──
+          if (!modelReviewFn) {
+            console.warn(
+              '[AKS Agent] Self-review: reviewStep is "model" but no modelReviewFn provided — skipping review.'
+            );
+            return answer;
+          }
+          const modelResponse = await modelReviewFn(reviewPromptText);
+          debugLog(
+            '[AKS Agent] Self-review (model): raw response length:',
+            modelResponse.length,
+            'response:', modelResponse
+          );
+          reviewAnswer = modelResponse.trim();
+        } else {
+          // ── Agent-based review (default) ──
+          const reviewResult = await session.ask(reviewPromptText);
+          if (!reviewResult || reviewResult.trim().length === 0) {
+            debugLog('[AKS Agent] Self-review (agent): empty result — keeping original');
+            return answer;
+          }
+          debugLog(
+            '[AKS Agent] Self-review (agent): raw reviewResult length:',
+            reviewResult.length,
+            'reviewResult:', reviewResult
+          );
+          reviewAnswer = extractAIAnswer(reviewResult);
+        }
+
+        const trimmedReview = reviewAnswer.trim();
+        debugLog(
+          '[AKS Agent] Self-review: extracted reviewAnswer length:',
+          reviewAnswer.length,
+          'reviewAnswer:', reviewAnswer
+        );
+
+        // If the reviewer confirms the response is fine, use the original
+        if (trimmedReview.startsWith('LGTM')) {
+          debugLog('[AKS Agent] Self-review: reviewer confirmed response is well-formatted');
+          return answer;
+        } else if (
+          reviewAnswer &&
+          reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
+        ) {
+          // Use the corrected version (sanity check: must be substantial)
+          debugLog(
+            '[AKS Agent] Self-review: using corrected response, length:',
+            reviewAnswer.length,
+            'corrected response:',
+            reviewAnswer
+          );
+          return reviewAnswer;
+        } else {
+          debugLog(
+            '[AKS Agent] Self-review: corrected response too short — keeping original.',
+            'original length:', answer.length,
+            'review length:', reviewAnswer.length,
+            'reviewAnswer:', reviewAnswer
+          );
+        }
+      } catch (e) {
+        console.warn('[AKS Agent] Self-review failed, using original response:', e);
+      }
       return answer;
     }
     // extractAIAnswer stripped everything — the agent ran but produced no
