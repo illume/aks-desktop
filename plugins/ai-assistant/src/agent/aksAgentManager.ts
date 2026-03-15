@@ -1827,6 +1827,13 @@ function collapseTerminalBlankLines(text: string): string {
           return false;
         // Ordered list items (" 1 Create...", " 2 Apply...") are prose, not code
         if (/^\d+\s+\S/.test(t)) return false;
+        // Multi-word prose headings ending with colon (e.g. "Also confirm:",
+        // "Build + push:") are prose, not code.  Single-word YAML keys like
+        // "spec:" match /^[\w][\w.\/-]*:/ and are caught earlier.
+        // Exclude lines with code-like characters (parens, brackets, etc.)
+        // which are Python type hints, function signatures, etc.
+        if (/:\s*$/.test(t) && !/^[\w][\w.\/-]*:/.test(t) && !/[(){}\[\]=<>|\\;]/.test(t))
+          return false;
         return true; // default: treat as code for short lines
       }
       // Heavily indented — only treat as code if it looks like code/YAML
@@ -1982,6 +1989,19 @@ function normalizeTerminalMarkdown(text: string): string {
               pj++;
               continue;
             }
+            break;
+          }
+          // Break at prose headings ending with colon that don't match YAML
+          // key patterns (e.g. "Also confirm:", "Build + push:").  These are
+          // clearly not code/YAML panel content.  Exclude lines with code-like
+          // characters (parens, brackets, arrows) which are Python type hints,
+          // function signatures, etc.
+          if (
+            /:\s*$/.test(pt) &&
+            !/^[\w][\w.\/-]*:/.test(pt) &&
+            !looksLikeShellOrDockerCodeLine(pt) &&
+            !/[(){}\[\]=<>|\\;]/.test(pt)
+          ) {
             break;
           }
           if (
@@ -2515,6 +2535,22 @@ function normalizeTerminalMarkdown(text: string): string {
           !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
           !looksLikeYaml(blockTrimmed) &&
           !/[{[\]]\s*$/.test(blockTrimmed)
+        ) {
+          break;
+        }
+
+        // Also break at short prose headings ending with colon that don't
+        // match YAML key patterns (e.g. "Also confirm:", "Build + push:").
+        // These are too short for the PROSE_WORD_THRESHOLD check above but
+        // are clearly prose headings, not code or YAML data.  Exclude lines
+        // with code-like characters (parens, brackets, arrows) which are
+        // Python type hints, function signatures, etc.
+        if (
+          !startedByFileHeader &&
+          /:\s*$/.test(blockTrimmed) &&
+          !/^[\w][\w.\/-]*:/.test(blockTrimmed) &&
+          !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
+          !/[(){}\[\]=<>|\\;]/.test(blockTrimmed)
         ) {
           break;
         }
