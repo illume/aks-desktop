@@ -8,8 +8,6 @@
  *
  * Used by tests and (optionally) Storybook stories.
  */
-import { expect } from 'vitest';
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -60,10 +58,17 @@ function extractCodeBlocks(result: string): string[] {
   return blocks;
 }
 
-/** Assert that no ANSI escape sequences leaked into the output. Requires vitest. */
+/**
+ * Assert that no ANSI escape sequences leaked into the output.
+ * Throws an Error (no vitest dependency) so it works in any context.
+ */
 function assertNoAnsiLeaks(result: string): void {
-  expect(result).not.toMatch(/\x1b/);
-  expect(result).not.toMatch(/\[\d+m/);
+  if (/\x1b/.test(result)) {
+    throw new Error('ANSI escape (\\x1b) found in result');
+  }
+  if (/\x1b\[\d+m/.test(result)) {
+    throw new Error('ANSI color code (ESC[Nm) found in result');
+  }
 }
 
 export { panelLine, panelBlank, makeRaw, extractCodeBlocks, assertNoAnsiLeaks };
@@ -445,7 +450,7 @@ export const fb2_shellHeredoc = makeRaw([
   'EOF',
 ]);
 
-/** Ordered list items with code panels after each */
+/** Ordered list items with code panels after each (space-prefixed numbers match original terminal output) */
 export const fb2_orderedListPanels = makeRaw([
   ' 1 Create the namespace:',
   panelBlank(),
@@ -495,7 +500,7 @@ export const fb2_nonK8sYamlSeparator = makeRaw([
   'port: 9090',
 ]);
 
-/** Panel content with nested ANSI reset mid-line */
+/** Panel content with nested ANSI reset mid-line — manually built (not via panelLine) to embed \x1b[0m inside content */
 export const fb2_nestedAnsiReset = makeRaw([
   panelBlank(),
   `\x1b[40m \x1b[0m\x1b[97;40m${'echo \x1b[0m"hello world"'.padEnd(78)}\x1b[0m\x1b[40m \x1b[0m`,
@@ -598,7 +603,7 @@ export const fb2_readmeMdContent = makeRaw([
   panelLine('This is a readme.'),
 ]);
 
-/** ANSI bold inside panel content */
+/** ANSI bold inside panel content — manually built (not via panelLine) to embed \x1b[1m bold inside content */
 export const fb2_ansiBoldPanel = makeRaw([
   panelBlank(),
   `\x1b[40m \x1b[0m\x1b[97;40m${'\x1b[1mImportant\x1b[0m: Run this command'.padEnd(78)}\x1b[0m\x1b[40m \x1b[0m`,
