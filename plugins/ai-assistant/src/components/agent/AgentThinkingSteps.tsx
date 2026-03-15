@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Box, CircularProgress, Collapse, keyframes, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,24 +28,6 @@ interface PhaseMeta {
   doneLabel: string;
 }
 
-const PHASE_META: Record<Phase, PhaseMeta> = {
-  init: {
-    icon: 'mdi:cog-outline',
-    activeLabel: 'Initializing',
-    doneLabel: 'Initialized',
-  },
-  planning: {
-    icon: 'mdi:clipboard-list-outline',
-    activeLabel: 'Tasks',
-    doneLabel: 'All tasks complete',
-  },
-  executing: {
-    icon: 'mdi:play-circle-outline',
-    activeLabel: 'Executing',
-    doneLabel: 'Execution complete',
-  },
-};
-
 const PHASE_ORDER: Phase[] = ['init', 'planning', 'executing'];
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -59,9 +42,28 @@ interface AgentThinkingStepsProps {
 const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
   ({ steps, isRunning = true }) => {
     const theme = useTheme();
+    const { t } = useTranslation();
     const successColor = theme.palette.success.main;
     const [collapsedPhases, setCollapsedPhases] = useState<Set<Phase>>(new Set());
     const prevPhaseCountRef = useRef<Record<Phase, number>>({ init: 0, planning: 0, executing: 0 });
+
+    const PHASE_META: Record<Phase, PhaseMeta> = {
+      init: {
+        icon: 'mdi:cog-outline',
+        activeLabel: t('Initializing'),
+        doneLabel: t('Initialized'),
+      },
+      planning: {
+        icon: 'mdi:clipboard-list-outline',
+        activeLabel: t('Tasks'),
+        doneLabel: t('All tasks complete'),
+      },
+      executing: {
+        icon: 'mdi:play-circle-outline',
+        activeLabel: t('Executing'),
+        doneLabel: t('Execution complete'),
+      },
+    };
     const endRef = useRef<HTMLDivElement>(null);
     const scrollParentRef = useRef<HTMLElement | null>(null);
 
@@ -314,10 +316,10 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
               variant="caption"
               sx={{ fontWeight: 700, letterSpacing: 0.3, fontSize: '0.75rem' }}
             >
-              {isRunning ? 'Agent working…' : 'Done'}
+              {isRunning ? t('Agent working…') : t('Done')}
             </Typography>
             {isRunning && (
-              <CircularProgress size={12} thickness={5} aria-label="Agent processing" />
+              <CircularProgress size={12} thickness={5} aria-label={t('Agent processing')} />
             )}
           </Box>
 

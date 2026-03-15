@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { ActionButton } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import {
   Box,
@@ -61,6 +62,7 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
   onAgentClusterChange,
   isCheckingClusters,
 }) => {
+  const { t } = useTranslation();
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -136,7 +138,7 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
         onKeyDown={handleKeyDown}
         variant="outlined"
         value={promptVal}
-        label={isTestMode ? 'Type user message (Test Mode)' : 'Ask AI'}
+        label={isTestMode ? t('Type user message (Test Mode)') : t('Ask AI')}
         multiline
         fullWidth
         minRows={2}
@@ -151,12 +153,18 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
 
       <Grid container justifyContent="space-between" alignItems="center">
         <Grid item sx={{ display: 'flex', alignItems: 'center' }}>
-          <ActionButton description="Clear History" onClick={onClearHistory} icon="mdi:broom" />
+          <ActionButton
+            description={t('Clear History')}
+            onClick={onClearHistory}
+            icon="mdi:broom"
+          />
           <Tooltip
-            title="AI responses may be inaccurate or incomplete. Always review and verify suggestions before applying them, especially in production environments."
+            title={t(
+              'AI responses may be inaccurate or incomplete. Always review and verify suggestions before applying them, especially in production environments.'
+            )}
             arrow
           >
-            <IconButton size="small" aria-label="AI disclaimer">
+            <IconButton size="small" aria-label={t('AI disclaimer')}>
               <Icon icon="mdi:alert-circle-outline" width="18px" height="18px" />
             </IconButton>
           </Tooltip>
@@ -212,7 +220,7 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
                               variant="caption"
                               sx={{ ml: 1, color: 'primary.main' }}
                             >
-                              (Default)
+                              {t('(Default)')}
                             </Typography>
                           )}
                       </MenuItem>
@@ -233,7 +241,7 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
               onClick={onStop}
               size="small"
             >
-              Stop
+              {t('Stop')}
             </Button>
           ) : (
             <Button
@@ -243,7 +251,7 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
               size="small"
               disabled={loading || !promptVal}
             >
-              Send
+              {t('Send')}
             </Button>
           )}
         </Grid>

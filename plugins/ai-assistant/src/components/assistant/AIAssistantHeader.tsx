@@ -1,3 +1,4 @@
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { ActionButton } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { Box, Chip, Typography } from '@mui/material';
 import React from 'react';
@@ -16,6 +17,7 @@ export default function AIAssistantHeader({
   onClose,
 }: AIAssistantHeaderProps) {
   const history = useHistory();
+  const { t } = useTranslation();
 
   return (
     <Box
@@ -30,10 +32,10 @@ export default function AIAssistantHeader({
     >
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <Typography variant="h6">
-          AI Assistant (preview)
+          {t('AI Assistant (preview)')}
           {isTestMode && (
             <Chip
-              label="TEST MODE"
+              label={t('TEST MODE')}
               color="warning"
               size="small"
               sx={{ ml: 1, fontSize: '0.7rem' }}
@@ -43,7 +45,7 @@ export default function AIAssistantHeader({
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <ActionButton
-          description="Settings"
+          description={t('Settings')}
           onClick={() => {
             history.push(getSettingsURL());
           }}
@@ -52,7 +54,7 @@ export default function AIAssistantHeader({
             disabled: disableSettingsButton,
           }}
         />
-        <ActionButton description="Close" onClick={onClose} icon="mdi:close" />
+        <ActionButton description={t('Close')} onClick={onClose} icon="mdi:close" />
       </Box>
     </Box>
   );

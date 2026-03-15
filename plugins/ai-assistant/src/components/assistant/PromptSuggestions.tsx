@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Box, Chip, Typography } from '@mui/material';
 import React from 'react';
 
@@ -19,6 +20,7 @@ export const PromptSuggestions: React.FC<PromptSuggestionsProps> = ({
   onPromptSend,
   onErrorClear,
 }) => {
+  const { t } = useTranslation();
   if (loading) {
     return null;
   }
@@ -28,7 +30,7 @@ export const PromptSuggestions: React.FC<PromptSuggestionsProps> = ({
       {/* Show error message when there was a content filter error */}
       {apiError && apiError.includes('content filter') && (
         <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1 }}>
-          Try one of these safe Kubernetes questions instead:
+          {t('Try one of these safe Kubernetes questions instead:')}
         </Typography>
       )}
 

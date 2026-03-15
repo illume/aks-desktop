@@ -1,3 +1,4 @@
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Link } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { Alert, Box, Button } from '@mui/material';
 import React from 'react';
@@ -25,6 +26,7 @@ export default function AIChatContent({
   onYamlAction,
   agentThinkingSteps,
 }: AIChatContentProps) {
+  const { t } = useTranslation();
   return (
     <Box
       sx={{
@@ -44,7 +46,7 @@ export default function AIChatContent({
                   name: '@headlamp-k8s/ai-assistant',
                 }}
               >
-                Settings
+                {t('Settings')}
               </Link>
             </Button>
           }

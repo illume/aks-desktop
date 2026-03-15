@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Box, CircularProgress, Fab, Typography } from '@mui/material';
 import { useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -45,6 +46,7 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   const [resourceType, setResourceType] = useState('');
   const [isDelete, setIsDelete] = useState(false);
   const theme = useTheme();
+  const { t } = useTranslation();
   // Track if content filter errors were detected
   const [contentFilterErrors, setContentFilterErrors] = useState<boolean>(false);
   // Refs for controlling auto-scrolling
@@ -376,7 +378,7 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
               <CircularProgress size={24} sx={{ mr: 1 }} />
-              <Typography>Processing your request...</Typography>
+              <Typography>{t('Processing your request...')}</Typography>
             </Box>
           ))}
 

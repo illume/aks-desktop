@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import {
   Box,
   CircularProgress,
@@ -31,6 +32,7 @@ export const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
   onAgentClusterChange,
   isCheckingClusters,
 }) => {
+  const { t } = useTranslation();
   const handleTabChange = (_: React.SyntheticEvent, newValue: ChatMode) => {
     onModeChange(newValue);
   };
@@ -48,13 +50,13 @@ export const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
       >
         <Tab
           value="chat"
-          label="Chat"
+          label={t('Chat')}
           icon={<Icon icon="mdi:chat-outline" width="14px" />}
           iconPosition="start"
         />
         <Tab
           value="agent"
-          label="Agent Mode"
+          label={t('Agent Mode')}
           icon={<Icon icon="mdi:robot-outline" width="14px" />}
           iconPosition="start"
         />
@@ -76,12 +78,12 @@ export const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
             <Icon icon="mdi:kubernetes" width="16px" />
             <Typography variant="caption" fontWeight="bold">
-              AKS Agent
+              {t('AKS Agent')}
             </Typography>
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-            on
+            {t('on')}
           </Typography>
 
           {/* Cluster selector */}
@@ -89,15 +91,19 @@ export const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <CircularProgress size={12} />
               <Typography variant="caption" color="text.secondary">
-                Checking clusters...
+                {t('Checking clusters...')}
               </Typography>
             </Box>
           ) : aksAgentClusters.length === 0 ? (
-            <Tooltip title="No clusters with AKS agent installed were found. Make sure the AKS agent is deployed on at least one connected cluster.">
+            <Tooltip
+              title={t(
+                'No clusters with AKS agent installed were found. Make sure the AKS agent is deployed on at least one connected cluster.'
+              )}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Icon icon="mdi:alert-circle-outline" width="14px" style={{ color: 'orange' }} />
                 <Typography variant="caption" color="text.secondary">
-                  No clusters with AKS agent found
+                  {t('No clusters with AKS agent found')}
                 </Typography>
               </Box>
             </Tooltip>

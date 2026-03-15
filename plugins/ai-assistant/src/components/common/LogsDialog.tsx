@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Dialog } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import Editor from '@monaco-editor/react';
 import { Box, Button, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
@@ -13,6 +14,7 @@ interface LogsDialogProps {
 }
 
 const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, resourceName }) => {
+  const { t } = useTranslation();
   const copyToClipboard = async () => {
     try {
       const formattedLogs = getFormattedLogs();
@@ -61,7 +63,7 @@ const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, res
 
   // Format logs for better readability
   const getFormattedLogs = () => {
-    if (!logs) return 'No logs available';
+    if (!logs) return t('No logs available');
 
     const language = getLogLanguage();
 
@@ -153,10 +155,10 @@ const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, res
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
-            {title} - Editor View
+            {title} - {t('Editor View')}
             {getLogLanguage() === 'json' && (
               <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
-                (Auto-formatted)
+                {t('(Auto-formatted)')}
               </Typography>
             )}
           </Typography>
@@ -167,7 +169,7 @@ const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, res
               onClick={copyToClipboard}
               variant="outlined"
             >
-              Copy
+              {t('Copy')}
             </Button>
             <Button
               size="small"
@@ -175,7 +177,7 @@ const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, res
               onClick={downloadLogs}
               variant="outlined"
             >
-              Download
+              {t('Download')}
             </Button>
           </Box>
         </Box>
@@ -231,7 +233,7 @@ const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, res
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} variant="contained">
-          Close
+          {t('Close')}
         </Button>
       </DialogActions>
     </Dialog>

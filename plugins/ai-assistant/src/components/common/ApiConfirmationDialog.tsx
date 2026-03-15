@@ -1,3 +1,4 @@
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { ConfirmDialog, EditorDialog } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { Box, Typography } from '@mui/material';
 import React from 'react';
@@ -31,6 +32,7 @@ export default function ApiConfirmationDialog({
   body,
   onConfirm,
 }: ApiConfirmationDialogProps) {
+  const { t } = useTranslation();
   const [editedBody, setEditedBody] = React.useState('');
   const [resourceInfo, setResourceInfo] = React.useState<{
     kind: string;
@@ -150,18 +152,18 @@ export default function ApiConfirmationDialog({
   const getTitle = () => {
     const base =
       method.toUpperCase() === 'DELETE'
-        ? 'Delete'
+        ? t('Delete')
         : method.toUpperCase() === 'POST'
-        ? 'Create'
+        ? t('Create')
         : method.toUpperCase() === 'GET'
-        ? 'Fetch'
-        : 'Update';
+        ? t('Fetch')
+        : t('Update');
 
     if (resourceInfo) {
       return `${base} ${resourceInfo.kind}: ${resourceInfo.name}`;
     }
 
-    return `${base} Resource`;
+    return `${base} ${t('Resource')}`;
   };
 
   if (!url || !method) {
@@ -177,15 +179,25 @@ export default function ApiConfirmationDialog({
           onClose();
         }}
         onConfirm={handleDeleteConfirm}
-        title={`Delete ${resourceInfo?.kind || 'Resource'}`}
+        title={`${t('Delete')} ${resourceInfo?.kind || t('Resource')}`}
         description={
           <Box>
             <Typography variant="body1" sx={{ mb: 2 }}>
               {resourceInfo
-                ? `Are you sure you want to delete the ${resourceInfo.kind} "${resourceInfo.name}"${
-                    resourceInfo.namespace ? ` in namespace "${resourceInfo.namespace}"` : ''
-                  }?`
-                : 'Are you sure you want to delete this resource?'}
+                ? resourceInfo.namespace
+                  ? t(
+                      'Are you sure you want to delete the {{kind}} "{{name}}" in namespace "{{namespace}}"?',
+                      {
+                        kind: resourceInfo.kind,
+                        name: resourceInfo.name,
+                        namespace: resourceInfo.namespace,
+                      }
+                    )
+                  : t('Are you sure you want to delete the {{kind}} "{{name}}"?', {
+                      kind: resourceInfo.kind,
+                      name: resourceInfo.name,
+                    })
+                : t('Are you sure you want to delete this resource?')}
             </Typography>
             {resourceInfo && (
               <Box
@@ -196,27 +208,27 @@ export default function ApiConfirmationDialog({
                 }}
               >
                 <Typography variant="subtitle2" component="div" sx={{ mb: 1 }}>
-                  Resource details:
+                  {t('Resource details:')}
                 </Typography>
                 <Typography variant="body2" component="div" sx={{ ml: 2 }}>
-                  <strong>Type:</strong> {resourceInfo.kind}
+                  <strong>{t('Type:')} </strong> {resourceInfo.kind}
                 </Typography>
                 <Typography variant="body2" component="div" sx={{ ml: 2 }}>
-                  <strong>Name:</strong> {resourceInfo.name}
+                  <strong>{t('Name:')} </strong> {resourceInfo.name}
                 </Typography>
                 {resourceInfo.namespace && (
                   <Typography variant="body2" component="div" sx={{ ml: 2 }}>
-                    <strong>Namespace:</strong> {resourceInfo.namespace}
+                    <strong>{t('Namespace:')} </strong> {resourceInfo.namespace}
                   </Typography>
                 )}
               </Box>
             )}
             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-              This action cannot be undone.
+              {t('This action cannot be undone.')}
             </Typography>
           </Box>
         }
-        confirmLabel={`Yes, Delete ${resourceInfo?.kind || 'Resource'}`}
+        confirmLabel={`${t('Yes, Delete')} ${resourceInfo?.kind || t('Resource')}`}
       />
     );
   }
@@ -232,24 +244,25 @@ export default function ApiConfirmationDialog({
           onClose();
         }}
         onConfirm={handleUpdateConfirm}
-        title={`Apply Patch to ${
-          resourceInfo ? `${resourceInfo.kind}: ${resourceInfo.name}` : 'Resource'
+        title={`${t('Apply Patch to')} ${
+          resourceInfo ? `${resourceInfo.kind}: ${resourceInfo.name}` : t('Resource')
         }`}
         description={
           <Box>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              The following patch will be applied to the resource:
+              {t('The following patch will be applied to the resource:')}
             </Typography>
             <Box sx={{ p: 2, border: '1px solid #ccc', borderRadius: 1 }}>
               <pre>{editedBody}</pre>
             </Box>
             <Typography variant="body2" sx={{ mt: 2 }}>
-              Are you sure you want to apply this patch? The system will merge this patch with the
-              current resource and update it.
+              {t(
+                'Are you sure you want to apply this patch? The system will merge this patch with the current resource and update it.'
+              )}
             </Typography>
           </Box>
         }
-        confirmLabel="Yes, Apply Patch"
+        confirmLabel={t('Yes, Apply Patch')}
       />
     );
   }
@@ -267,7 +280,7 @@ export default function ApiConfirmationDialog({
       open={openEditorDialog}
       onClose={() => setOpenEditorDialog(false)}
       setOpen={setOpenEditorDialog}
-      saveLabel="Apply"
+      saveLabel={t('Apply')}
       onSave={handleSave}
       title={getTitle()}
     />
