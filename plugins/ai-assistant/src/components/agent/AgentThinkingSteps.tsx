@@ -65,12 +65,6 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     const rootRef = useRef<HTMLDivElement>(null);
     const scrollParentRef = useRef<HTMLElement | null>(null);
 
-    // Query prefers-reduced-motion once at mount (static for component lifetime)
-    const prefersReducedMotion = useMemo(
-      () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      []
-    );
-
     // Group steps by phase
     const grouped = useMemo(() => {
       const map: Record<Phase, AgentThinkingStep[]> = { init: [], planning: [], executing: [] };
@@ -103,9 +97,9 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
       };
     }, [grouped]);
 
-    // Scroll into view when new steps appear, but only if the component is
-    // already near the viewport. This avoids yanking the scroll position when
-    // the user has intentionally scrolled away to read older messages.
+    // Scroll into view when new steps appear, but only if the user is near
+    // the bottom of the scroll container (matches TextStreamContainer's pattern).
+    // This avoids yanking the viewport when the user has scrolled away.
     useEffect(() => {
       const el = rootRef.current;
       if (steps.length === 0 || !el) return;
@@ -119,19 +113,22 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
         scrollParentRef.current = sp;
       }
       const scrollParent = scrollParentRef.current;
-      if (!scrollParent) return;
 
-      // Only auto-scroll if the component is within one viewport-height of the
-      // visible area (i.e. the user hasn't scrolled far away).
-      const spRect = scrollParent.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const margin = spRect.height;
-      const isNearViewport =
-        elRect.bottom >= spRect.top - margin && elRect.top <= spRect.bottom + margin;
-      if (!isNearViewport) return;
+      // Only auto-scroll if user is near the bottom of the scroll container
+      if (scrollParent) {
+        const distanceFromBottom =
+          scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
+        if (distanceFromBottom > scrollParent.clientHeight) return;
+      }
 
-      el.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-    }, [steps.length, prefersReducedMotion]);
+      // Respect prefers-reduced-motion for accessibility (with SSR guard)
+      const reducedMotion =
+        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+          ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          : false;
+
+      el.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+    }, [steps.length]);
 
     if (steps.length === 0) return null;
 
