@@ -2031,6 +2031,12 @@ function normalizeTerminalMarkdown(text: string): string {
           if (isProseHeadingEndingWithColon(pt)) {
             break;
           }
+          // Break at numbered step headers (e.g. "2) Containerize (multi-stage
+          // Dockerfile)").  These are section headings, not code, even when
+          // indented after a code block.
+          if (/^\d+[.)]\s+\S/.test(pt) && !looksLikeShellOrDockerCodeLine(pt)) {
+            break;
+          }
           if (
             indent > 0 &&
             indent <= 6 &&

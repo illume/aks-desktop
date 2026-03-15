@@ -335,4 +335,50 @@ describe('findbugs15 — filename-hint code detection', () => {
     );
     expect(rustBlock).toBeDefined();
   });
+
+  it('#11 indented numbered step header after Go code is NOT a code block', () => {
+    // When a Go code block is followed by "    2) Containerize (multi-stage
+    // Dockerfile, static binary, nonroot)", the numbered step header should NOT
+    // be captured as part of the code block or wrapped in its own code fences.
+    const body = [
+      boldLine('1. Minimal Go HTTP server'),
+      panelBlank(),
+      panelLine(' package main'),
+      panelLine(' import ('),
+      panelLine('     "fmt"'),
+      panelLine('     "log"'),
+      panelLine('     "net/http"'),
+      panelLine('     "os"'),
+      panelLine(' )'),
+      panelLine(' func main() {'),
+      panelLine('     mux := http.NewServeMux()'),
+      panelLine('     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {'),
+      panelLine('         fmt.Fprintln(w, "hello from go")'),
+      panelLine('     })'),
+      panelLine('     port := os.Getenv("PORT")'),
+      panelLine('     if port == "" {'),
+      panelLine('         port = "8080"'),
+      panelLine('     }'),
+      panelLine('     addr := "0.0.0.0:" + port'),
+      panelLine('     log.Printf("listening on %s\\n", addr)'),
+      panelLine('     log.Fatal(http.ListenAndServe(addr, mux))'),
+      panelLine(' }'),
+      panelBlank(),
+      panelLine('    2) Containerize (multi-stage Dockerfile, static binary, nonroot)'),
+      panelBlank(),
+      panelLine('Create a Dockerfile:'),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+
+    // The Go code should be in a code block
+    const blocks = extractCodeBlocks(result);
+    const goBlock = blocks.find(b => b.includes('package main') && b.includes('func main()'));
+    expect(goBlock).toBeDefined();
+
+    // The numbered step header should NOT be in a code block
+    const stepBlock = blocks.find(b => b.includes('2) Containerize'));
+    expect(stepBlock).toBeUndefined();
+    expect(result).toContain('2) Containerize');
+  });
 });
