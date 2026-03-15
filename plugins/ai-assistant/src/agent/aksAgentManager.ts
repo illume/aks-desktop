@@ -1646,6 +1646,45 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // e.g. "NAME   STATUS   AGE", "Type    Reason   Age   From     Message"
   if ((trimmed.match(/\S\s{2,}\S/g) ?? []).length >= 2) return true;
 
+  // PromQL functions: sum(rate(...{...}[5m])) etc.
+  if (/\b(rate|sum|histogram_quantile|avg|count|avg_over_time|increase)\(/.test(trimmed) &&
+    (/[{[\]]/.test(trimmed)))
+    return true;
+  // Prometheus metric format: metric_name{labels} value
+  if (/^[a-z_][a-z0-9_]*\{[^}]+\}\s+\S/.test(trimmed)) return true;
+
+  // K8s event messages: verbs from kubectl describe events
+  if (/^(Pulling|Pulled|Created|Started|Killing|Stopped|Attached|Detached|Scheduled|FailedScheduling)\s+(image\s+"[^"]*"|container\s+\S|volume\s+"[^"]*")/.test(trimmed))
+    return true;
+  if (/^(Successfully\s+assigned|Container\s+image\s+")/.test(trimmed)) return true;
+
+  // Probe failures
+  if (/^(Readiness|Liveness|Startup)\s+probe\s+failed:/.test(trimmed)) return true;
+
+  // Scheduling messages
+  if (/^\d+\/\d+\s+nodes\s+are\s+available:/.test(trimmed)) return true;
+  if (/^Insufficient\s+(cpu|memory)\b/.test(trimmed)) return true;
+  if (/^node\(s\)\s+(had|did\s+not\s+match)\b/.test(trimmed)) return true;
+
+  // CRI-O log prefix
+  if (/^(stdout|stderr)\s+F\s+/.test(trimmed)) return true;
+
+  // K8s operation failures
+  if (/^(MountVolume\.|AttachVolume\.|Failed\s+to\s+pull\s+image|Error\s+response\s+from\s+daemon)/.test(trimmed))
+    return true;
+  if (/^Unable\s+to\s+attach\s+or\s+mount\s+volumes/.test(trimmed)) return true;
+
+  // Container lifecycle
+  if (/^Back-off\s+restarting/.test(trimmed)) return true;
+  if (/^Container\s+\S+.*\b(definition\s+changed|failed\s+liveness\s+probe)/.test(trimmed)) return true;
+  if (/^Killing\s+container\s+with/.test(trimmed)) return true;
+
+  // Dotted key=value pairs
+  if (/^[a-z][\w]*\.[a-z][\w]*=\S/.test(trimmed)) return true;
+
+  // Normal BackOff event lines
+  if (/^Normal\s+\w+\s+\d/.test(trimmed)) return true;
+
   // Short lines ending with { — CSS selectors, function declarations, etc.
   // Require the line to be short (≤ 40 chars) to avoid matching prose.
   if (/\{\s*$/.test(trimmed) && trimmed.length <= 40) return true;
@@ -2039,7 +2078,20 @@ function normalizeTerminalMarkdown(text: string): string {
         trimmed
       ) ||
         /^[IWEF]\d{4}\s+\d{2}:\d{2}:\d{2}/.test(trimmed) ||
-        /^(level|ts|time|msg)=\S/.test(trimmed)) &&
+        /^(level|ts|time|msg)=\S/.test(trimmed) ||
+        /\b(rate|sum|histogram_quantile|avg|count)\(/.test(trimmed) ||
+        /^[a-z_][a-z0-9_]*\{[^}]+\}\s+\S/.test(trimmed) ||
+        /^(Pulling|Pulled|Created|Started|Killing|Stopped|Attached|Detached|Scheduled|FailedScheduling)\s/.test(trimmed) ||
+        /^(Successfully\s+assigned|Container\s+image\s+")/.test(trimmed) ||
+        /^(Readiness|Liveness|Startup)\s+probe\s+failed:/.test(trimmed) ||
+        /^\d+\/\d+\s+nodes\s+are\s+available:/.test(trimmed) ||
+        /^(Insufficient\s+(cpu|memory)|node\(s\)\s+(had|did\s+not\s+match))/.test(trimmed) ||
+        /^(stdout|stderr)\s+F\s+/.test(trimmed) ||
+        /^(MountVolume\.|AttachVolume\.|Failed\s+to\s+pull|Error\s+response\s+from|Unable\s+to\s+attach)/.test(trimmed) ||
+        /^(Back-off\s+restarting|Killing\s+container\s+with)/.test(trimmed) ||
+        /^Container\s+\S+.*\b(definition\s+changed|failed\s+liveness\s+probe)/.test(trimmed) ||
+        /^[a-z][\w]*\.[a-z][\w]*=\S/.test(trimmed) ||
+        /^Normal\s+\w+\s+\d/.test(trimmed)) &&
       i + 1 < lines.length
     ) {
       const codePanelLines: string[] = [line];
@@ -2350,6 +2402,7 @@ function normalizeTerminalMarkdown(text: string): string {
       const blockLines: string[] = [];
       let j = i;
       let codeLikeLineCount = 0;
+      let braceDepth = 0;
       const baseIndent = line.match(/^(\s*)/)?.[1].length ?? 0;
       // Track whether this block was started by a file header comment
       // (e.g. "# Cargo.toml"): if so, we collect ALL space-prefixed lines
@@ -2420,6 +2473,13 @@ function normalizeTerminalMarkdown(text: string): string {
           break;
         }
 
+        // Track brace/bracket depth for nested JSON/config blocks
+        // (must be computed before prose and deep-indent checks)
+        for (const ch of blockTrimmed) {
+          if (ch === '{' || ch === '[') braceDepth++;
+          if (ch === '}' || ch === ']') braceDepth--;
+        }
+
         // Stop at prose lines: if the trimmed content is long (5+ words),
         // doesn't look like code/YAML, and isn't a continuation of the
         // previous code, it's likely a wrapped bold heading or description
@@ -2429,7 +2489,8 @@ function normalizeTerminalMarkdown(text: string): string {
           !startedByFileHeader &&
           blockWords >= PROSE_WORD_THRESHOLD &&
           !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
-          !looksLikeYaml(blockTrimmed)
+          !looksLikeYaml(blockTrimmed) &&
+          !/[{[\]]\s*$/.test(blockTrimmed)
         ) {
           break;
         }
@@ -2454,6 +2515,8 @@ function normalizeTerminalMarkdown(text: string): string {
           !startedByFileHeader &&
           lineIndent > baseIndent + 4 &&
           !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
+          !looksLikeYaml(blockTrimmed) &&
+          braceDepth <= 0 &&
           !hasStructuredCodeContext(blockLines)
         ) {
           break;
