@@ -351,6 +351,36 @@ const PROSE_WORD_THRESHOLD = 5;
 const CODE_LIKE_CHARS_RE = /[(){}\[\]=<>|\\;]/;
 
 /**
+ * Regex matching a capitalized single-word heading ending with colon,
+ * e.g. "Assumptions:", "Prerequisites:", "Requirements:".
+ * Used by the indented-block collector and panel recovery handler to
+ * break at prose headings that looksLikeYaml would otherwise absorb.
+ */
+const CAPITALIZED_HEADING_RE = /^[A-Z]\w+:\s*$/;
+
+/**
+ * Regex matching common code-keyword starts that indicate the collected
+ * block contains actual programming code (not kubectl/YAML output).
+ * Used by the capitalized prose heading break to distinguish "Assumptions:"
+ * after Go/Python code from "Events:" in kubectl describe output.
+ */
+const CODE_KEYWORD_START_RE =
+  /^(func |def |class |import |from |package |export |const |let |var |return |type )/;
+
+/**
+ * Check whether any line in a block contains code patterns (function
+ * definitions, imports, or brace/paren characters).  Used to detect
+ * that a capitalized heading like "Assumptions:" follows actual code
+ * and should break the block.
+ */
+function blockContainsCode(blockLines: string[]): boolean {
+  return blockLines.some(pl => {
+    const plt = pl.trim();
+    return CODE_KEYWORD_START_RE.test(plt) || /[{}()]/.test(plt);
+  });
+}
+
+/**
  * Detect prose headings ending with colon that should NOT be treated as code
  * or YAML keys.  Matches lines like "Also confirm:", "Build + push:" but
  * excludes YAML keys ("spec:"), code lines, and lines with code-like characters
@@ -2037,15 +2067,9 @@ function normalizeTerminalMarkdown(text: string): string {
           // This distinguishes prose section headings from kubectl output labels
           // like "Events:", "Status:" which follow other structured output.
           if (
-            /^[A-Z]\w+:\s*$/.test(pt) &&
+            CAPITALIZED_HEADING_RE.test(pt) &&
             !looksLikeShellOrDockerCodeLine(pt) &&
-            panelLines.some(pl => {
-              const plt = pl.trim();
-              return (
-                /^(func |def |class |import |from |package |export |const |let |var |return |type )/.test(plt) ||
-                /[{}()]/.test(plt)
-              );
-            })
+            blockContainsCode(panelLines)
           ) {
             break;
           }
@@ -2491,7 +2515,7 @@ function normalizeTerminalMarkdown(text: string): string {
       // This prevents "Assumptions:" from merging with subsequent Dockerfile
       // or shell code into a single code block.
       if (
-        /^[A-Z]\w+:\s*$/.test(trimmed) &&
+        CAPITALIZED_HEADING_RE.test(trimmed) &&
         !looksLikeShellOrDockerCodeLine(trimmed)
       ) {
         let peekNext = i + 1;
@@ -2584,7 +2608,7 @@ function normalizeTerminalMarkdown(text: string): string {
               // key.  Without this check, "Assumptions:" followed by a blank
               // line and Dockerfile content merges into one code block.
               blockLines.length === 1 &&
-              /^[A-Z]\w+:\s*$/.test(blockLines[0].trim()) &&
+              CAPITALIZED_HEADING_RE.test(blockLines[0].trim()) &&
               looksLikeShellOrDockerCodeLine(peekTrimmed) &&
               !looksLikeYaml(peekTrimmed)
             ) {
@@ -2644,16 +2668,9 @@ function normalizeTerminalMarkdown(text: string): string {
         // into the code block (e.g. Go code + "Assumptions:" + Dockerfile).
         if (
           !startedByFileHeader &&
-          /^[A-Z]\w+:\s*$/.test(blockTrimmed) &&
+          CAPITALIZED_HEADING_RE.test(blockTrimmed) &&
           !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
-          blockLines.some(pl => {
-            const plt = pl.trim();
-            return (
-              /^(func |def |class |import |from |package |export |const |let |var |return |type )/.test(
-                plt
-              ) || /[{}()]/.test(plt)
-            );
-          })
+          blockContainsCode(blockLines)
         ) {
           break;
         }
