@@ -97,41 +97,46 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
       };
     }, [grouped]);
 
-    // Scroll the bottom of the component into view when new steps appear,
-    // but only if the user is near the bottom of the scroll container
-    // (matches TextStreamContainer's "near bottom" pattern).
-    // Uses a delay to let MUI Collapse animations finish before measuring.
+    // Scroll the scroll container when new steps appear so the growing
+    // "Agent working…" box stays visible. Uses direct scrollTo on the
+    // scroll parent instead of scrollIntoView, which can target the wrong
+    // container when MUI Collapse wrappers have overflow:hidden.
     useEffect(() => {
       const el = endRef.current;
       if (steps.length === 0 || !el) return;
 
-      // Cache the nearest scrollable ancestor
+      // Cache the nearest scroll container (overflow-y: auto/scroll).
+      // Skips MUI Collapse wrappers which use overflow:hidden.
       if (!scrollParentRef.current) {
         let sp: HTMLElement | null = el.parentElement;
-        while (sp && sp.scrollHeight <= sp.clientHeight) {
+        while (sp) {
+          const overflowY = getComputedStyle(sp).overflowY;
+          if (overflowY === 'auto' || overflowY === 'scroll') break;
           sp = sp.parentElement;
         }
         scrollParentRef.current = sp;
       }
 
-      // Delay scroll to let MUI Collapse animations settle (300ms outer + buffer)
+      // Delay to let MUI Collapse animations settle before measuring
       const timer = setTimeout(() => {
         const scrollParent = scrollParentRef.current;
+        if (!scrollParent) return;
 
-        // Only auto-scroll if user is near the bottom of the scroll container
-        if (scrollParent) {
-          const distanceFromBottom =
-            scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
-          if (distanceFromBottom > scrollParent.clientHeight) return;
-        }
+        // Only auto-scroll if user is near the bottom (matches TextStreamContainer pattern)
+        const distanceFromBottom =
+          scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
+        if (distanceFromBottom > scrollParent.clientHeight) return;
 
-        // Respect prefers-reduced-motion for accessibility (with SSR guard)
+        // Respect prefers-reduced-motion (with SSR guard)
         const reducedMotion =
           typeof window !== 'undefined' && typeof window.matchMedia === 'function'
             ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
             : false;
 
-        el.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+        scrollParent.scrollTo({
+          top: scrollParent.scrollHeight - scrollParent.clientHeight,
+          behavior: reducedMotion ? 'auto' : 'smooth',
+        });
       }, 350);
 
       return () => clearTimeout(timer);
