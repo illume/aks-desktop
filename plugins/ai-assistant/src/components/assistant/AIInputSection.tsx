@@ -4,10 +4,12 @@ import {
   Box,
   Button,
   Grid,
+  IconButton,
   ListSubheader,
   MenuItem,
   Select,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import React from 'react';
@@ -150,6 +152,14 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
       <Grid container justifyContent="space-between" alignItems="center">
         <Grid item sx={{ display: 'flex', alignItems: 'center' }}>
           <ActionButton description="Clear History" onClick={onClearHistory} icon="mdi:broom" />
+          <Tooltip
+            title="AI responses may be inaccurate or incomplete. Always review and verify suggestions before applying them, especially in production environments."
+            arrow
+          >
+            <IconButton size="small" aria-label="AI disclaimer">
+              <Icon icon="mdi:information-outline" width="18px" height="18px" />
+            </IconButton>
+          </Tooltip>
 
           {/* Provider Selection Dropdown */}
           {availableConfigs.length > 0 && !isTestMode && (

@@ -30,7 +30,7 @@ export default function AIAssistantHeader({
     >
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <Typography variant="h6">
-          AI Assistant (alpha)
+          AI Assistant (preview)
           {isTestMode && (
             <Chip
               label="TEST MODE"
