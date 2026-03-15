@@ -305,20 +305,22 @@ export async function getClusterResourceGroup(
 
 /** Strip ANSI/VT100 escape sequences and carriage returns from terminal output. */
 function stripAnsi(text: string): string {
-  return text
-    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '') // CSI sequences (colors, cursor, bracketed paste)
-    .replace(/\x1b[()][AB012]/g, '') // Character set selection
-    .replace(/\r/g, '') // Carriage returns
-    .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
-    // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping).
-    // Require at least one digit before 'm' so text like [main], [master]
-    // is not corrupted.  Negative lookahead prevents stripping Prometheus-style
-    // durations like [5m] or [30m] (followed by ], ), }, or word char).
-    .replace(/\[\d[\d;]*m(?![)\]}\w])/g, '')
-    .replace(/\s?\[(\d{1,3}(;\d{1,3})*)?$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m", or bare "[" from "\x1b[" at line end)
-    .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, '') // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
-    .replace(/^0m\s*$/gm, '') // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
-    .replace(/^0m(?=:\s?)/gm, ''); // Orphan ANSI reset "0m" at start of YAML key/value line (e.g. "0m:" from split "\x1b[\n0m:" → "metadata:" after rejoining); safe because real "0m:" never starts a line in YAML
+  return (
+    text
+      .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '') // CSI sequences (colors, cursor, bracketed paste)
+      .replace(/\x1b[()][AB012]/g, '') // Character set selection
+      .replace(/\r/g, '') // Carriage returns
+      .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
+      // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping).
+      // Require at least one digit before 'm' so text like [main], [master]
+      // is not corrupted.  Negative lookahead prevents stripping Prometheus-style
+      // durations like [5m] or [30m] (followed by ], ), }, or word char).
+      .replace(/\[\d[\d;]*m(?![)\]}\w])/g, '')
+      .replace(/\s?\[(\d{1,3}(;\d{1,3})*)?$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m", or bare "[" from "\x1b[" at line end)
+      .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, '') // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
+      .replace(/^0m\s*$/gm, '') // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
+      .replace(/^0m(?=:\s?)/gm, '')
+  ); // Orphan ANSI reset "0m" at start of YAML key/value line (e.g. "0m:" from split "\x1b[\n0m:" → "metadata:" after rejoining); safe because real "0m:" never starts a line in YAML
 }
 
 /**
@@ -1635,6 +1637,11 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^-{4,}/.test(trimmed)) return true;
   // Log lines: "2026-03-12T10:23:45Z INFO ..."
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(trimmed)) return true;
+  // K8s klog format: "I0115 10:30:00.000000 1 file.go:N] message"
+  // Used by controller-manager, kubelet, kube-apiserver
+  if (/^[IWEF]\d{4}\s+\d{2}:\d{2}:\d{2}\.\d+/.test(trimmed)) return true;
+  // Structured logging (logfmt): "level=info msg=\"...\" key=value"
+  if (/^(level|ts|time|msg)=\S/.test(trimmed)) return true;
   // Tabular output: lines with 3+ column-aligned gaps (2+ spaces between words)
   // e.g. "NAME   STATUS   AGE", "Type    Reason   Age   From     Message"
   if ((trimmed.match(/\S\s{2,}\S/g) ?? []).length >= 2) return true;
@@ -1648,7 +1655,11 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // kubectl resource action output: "resource.group/name verb" or "resource/name verb"
   // e.g. "deployment.apps/my-app scaled", "service/my-svc created",
   //      "namespace/monitoring created", "configmap/my-config unchanged"
-  if (/^[\w.-]+\/[\w.-]+\s+(created|configured|unchanged|deleted|scaled|patched|annotated|labeled|exposed|applied|pruned|edited|replaced)\s*$/.test(trimmed))
+  if (
+    /^[\w.-]+\/[\w.-]+\s+(created|configured|unchanged|deleted|scaled|patched|annotated|labeled|exposed|applied|pruned|edited|replaced)\s*$/.test(
+      trimmed
+    )
+  )
     return true;
 
   // Docker build step output: "Step 1/10 : FROM ..."
@@ -1965,11 +1976,7 @@ function normalizeTerminalMarkdown(text: string): string {
     // collect the prompt and all following 1-space-indented lines as command output.
     // This handles helm status, kubectl rollout, Docker build output, etc.
     const prevLineBlankForPrompt = i === 0 || lines[i - 1].trim() === '';
-    if (
-      prevLineBlankForPrompt &&
-      /^ \$\s+\w/.test(line) &&
-      i + 1 < lines.length
-    ) {
+    if (prevLineBlankForPrompt && /^ \$\s+\w/.test(line) && i + 1 < lines.length) {
       const promptPanelLines: string[] = [line];
       let ppj = i + 1;
       while (ppj < lines.length) {
@@ -1978,7 +1985,11 @@ function normalizeTerminalMarkdown(text: string): string {
         const ppIndent = ppl.match(/^(\s*)/)?.[1].length ?? 0;
         if (ppt === '') {
           // Allow single blank lines
-          if (ppj + 1 < lines.length && /^\s/.test(lines[ppj + 1]) && lines[ppj + 1].trim() !== '') {
+          if (
+            ppj + 1 < lines.length &&
+            /^\s/.test(lines[ppj + 1]) &&
+            lines[ppj + 1].trim() !== ''
+          ) {
             promptPanelLines.push(ppl);
             ppj++;
             continue;
@@ -2007,6 +2018,62 @@ function normalizeTerminalMarkdown(text: string): string {
         result.push('```');
         wrappedCodeBlockCount++;
         i = ppj;
+        continue;
+      }
+    }
+
+    // ── Panel code recovery: 1-2 space indented code from Rich panels ──
+    // When Rich panel content at 1-2 space indent contains K8s output patterns
+    // (resource/action output, klog, logfmt) that aren't detected by other paths,
+    // collect and wrap in fences.  Only trigger after a blank line.
+    // Use a narrow set of patterns to avoid interfering with the bold-file-heading
+    // and indented-block collector paths that handle general code.
+    const prevLineBlankForCode = i === 0 || lines[i - 1].trim() === '';
+    if (
+      prevLineBlankForCode &&
+      /^ {1,2}\S/.test(line) &&
+      looksLikeShellOrDockerCodeLine(trimmed) &&
+      !looksLikeYaml(trimmed) &&
+      // Only trigger for K8s output patterns that other paths miss
+      (/^[\w.-]+\/[\w.-]+\s+(created|configured|unchanged|deleted|scaled|patched|annotated|labeled|exposed)\s*$/.test(
+        trimmed
+      ) ||
+        /^[IWEF]\d{4}\s+\d{2}:\d{2}:\d{2}/.test(trimmed) ||
+        /^(level|ts|time|msg)=\S/.test(trimmed)) &&
+      i + 1 < lines.length
+    ) {
+      const codePanelLines: string[] = [line];
+      let cpj = i + 1;
+      while (cpj < lines.length) {
+        const cpl = lines[cpj];
+        const cpt = cpl.trim();
+        const cpIndent = cpl.match(/^(\s*)/)?.[1].length ?? 0;
+        if (cpt === '') break;
+        if (
+          cpIndent > 0 &&
+          cpIndent <= 6 &&
+          (looksLikeShellOrDockerCodeLine(cpt) || looksLikeYaml(cpt))
+        ) {
+          codePanelLines.push(cpl);
+          cpj++;
+          continue;
+        }
+        break;
+      }
+      if (codePanelLines.length >= 2) {
+        const nonBlank = codePanelLines.filter(l => l.trim() !== '');
+        const minIndent = nonBlank.reduce(
+          (min, l) => Math.min(min, l.match(/^(\s*)/)?.[1].length ?? 0),
+          Infinity
+        );
+        const shift = minIndent === Infinity ? 0 : minIndent;
+        result.push('```');
+        for (const cpl of codePanelLines) {
+          result.push(cpl.trim() === '' ? '' : cpl.slice(shift));
+        }
+        result.push('```');
+        wrappedCodeBlockCount++;
+        i = cpj;
         continue;
       }
     }
@@ -2547,7 +2614,11 @@ function looksLikeYaml(trimmed: string): boolean {
   if (/^-\s/.test(trimmed) || trimmed === '-') return true;
   // flow mapping/sequence opener: { ... } or [ ... ]
   // Exclude Helm/Go template expressions: {{- if }}, {{ include }}
-  if (/^[{\[]/.test(trimmed) && !/^\{\{-?\s*(if|else|end|range|with|define|template|block|include)\b/.test(trimmed)) return true;
+  if (
+    /^[{\[]/.test(trimmed) &&
+    !/^\{\{-?\s*(if|else|end|range|with|define|template|block|include)\b/.test(trimmed)
+  )
+    return true;
   // flow mapping/sequence closer: } or ] (continuation from previous line)
   if (/^[}\]]/.test(trimmed)) return true;
   // Quoted scalar value (e.g. "http://..." on its own line after key:)
@@ -3175,26 +3246,6 @@ function wrapBareCodeBlocks(text: string): string {
               codeLines.push(cl);
               j++;
               continue;
-            }
-            // For shell prompt blocks ($ command), allow blank-then-continue
-            // if the next line is part of command output (indented or not),
-            // as long as it isn't a new prose section or file heading.
-            if (
-              startsWithPrompt &&
-              peekTrimmed !== '' &&
-              !isBoldFileHeading(peekTrimmed) &&
-              !/^[A-Z][\w]*:\s+\S/.test(peekTrimmed)
-            ) {
-              // Only cross blank lines if the next line still looks code-ish
-              // or YAML-ish (command output), not if it's pure prose (5+ words
-              // with no code characters).
-              const words = peekTrimmed.split(/\s+/);
-              const hasCodeChars = /[{}()[\]$=<>|;:\/\\@#`"'*&^%!~]/.test(peekTrimmed);
-              if (words.length < 8 || hasCodeChars) {
-                codeLines.push(cl);
-                j++;
-                continue;
-              }
             }
           }
           break;

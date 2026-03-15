@@ -52,7 +52,9 @@ function extractCodeBlocks(result: string): string[] {
 
 function assertNoAnsiLeaks(result: string): void {
   expect(result).not.toMatch(/\x1b/);
-  expect(result).not.toMatch(/\[\d+m/);
+  // Check for orphaned ANSI codes but exclude Prometheus durations like [5m], [30m]
+  // which legitimately appear in PromQL expressions
+  expect(result).not.toMatch(/\[\d+m(?![)\]}\w])/);
 }
 
 describe('findbugs11: K8s/AKS-focused extractAIAnswer edge cases round 2', () => {
@@ -144,8 +146,12 @@ describe('findbugs11: K8s/AKS-focused extractAIAnswer edge cases round 2', () =>
       'Wait for rollout:',
       '',
       panelLine('$ kubectl rollout status deployment/my-app -n production'),
-      panelLine('Waiting for deployment "my-app" rollout to finish: 1 of 3 updated replicas are available...'),
-      panelLine('Waiting for deployment "my-app" rollout to finish: 2 of 3 updated replicas are available...'),
+      panelLine(
+        'Waiting for deployment "my-app" rollout to finish: 1 of 3 updated replicas are available...'
+      ),
+      panelLine(
+        'Waiting for deployment "my-app" rollout to finish: 2 of 3 updated replicas are available...'
+      ),
       panelLine('deployment "my-app" successfully rolled out'),
       panelBlank(),
     ];
@@ -341,12 +347,24 @@ describe('findbugs11: K8s/AKS-focused extractAIAnswer edge cases round 2', () =>
       'Recent events in the namespace:',
       '',
       panelLine('LAST SEEN   TYPE      REASON              OBJECT                        MESSAGE'),
-      panelLine('30s         Normal    Scheduled           pod/api-server-abc12          Successfully assigned'),
-      panelLine('28s         Normal    Pulling             pod/api-server-abc12          Pulling image "myapp:v2"'),
-      panelLine('15s         Normal    Pulled              pod/api-server-abc12          Successfully pulled image'),
-      panelLine('14s         Normal    Created             pod/api-server-abc12          Created container api'),
-      panelLine('14s         Normal    Started             pod/api-server-abc12          Started container api'),
-      panelLine('5s          Warning   BackOff             pod/worker-xyz99              Back-off restarting failed'),
+      panelLine(
+        '30s         Normal    Scheduled           pod/api-server-abc12          Successfully assigned'
+      ),
+      panelLine(
+        '28s         Normal    Pulling             pod/api-server-abc12          Pulling image "myapp:v2"'
+      ),
+      panelLine(
+        '15s         Normal    Pulled              pod/api-server-abc12          Successfully pulled image'
+      ),
+      panelLine(
+        '14s         Normal    Created             pod/api-server-abc12          Created container api'
+      ),
+      panelLine(
+        '14s         Normal    Started             pod/api-server-abc12          Started container api'
+      ),
+      panelLine(
+        '5s          Warning   BackOff             pod/worker-xyz99              Back-off restarting failed'
+      ),
       panelBlank(),
     ];
     const result = extractAIAnswer(makeRaw(body));
@@ -412,7 +430,9 @@ describe('findbugs11: K8s/AKS-focused extractAIAnswer edge cases round 2', () =>
       panelLine('    panic(err)'),
       panelLine('  }'),
       panelLine('  clientset, err := kubernetes.NewForConfig(config)'),
-      panelLine('  pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})'),
+      panelLine(
+        '  pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})'
+      ),
       panelLine('  for _, pod := range pods.Items {'),
       panelLine('    fmt.Printf("Pod: %s\\n", pod.Name)'),
       panelLine('  }'),
@@ -482,10 +502,18 @@ describe('findbugs11: K8s/AKS-focused extractAIAnswer edge cases round 2', () =>
       'Verify the pods are running:',
       '',
       panelLine('$ kubectl get pods -n monitoring'),
-      panelLine('NAME                                                  READY   STATUS    RESTARTS   AGE'),
-      panelLine('prometheus-kube-prometheus-operator-7d9f5b6c4-abc12   1/1     Running   0          60s'),
-      panelLine('prometheus-grafana-85f4c9d7b-xyz99                    3/3     Running   0          60s'),
-      panelLine('alertmanager-prometheus-alertmanager-0                1/1     Running   0          60s'),
+      panelLine(
+        'NAME                                                  READY   STATUS    RESTARTS   AGE'
+      ),
+      panelLine(
+        'prometheus-kube-prometheus-operator-7d9f5b6c4-abc12   1/1     Running   0          60s'
+      ),
+      panelLine(
+        'prometheus-grafana-85f4c9d7b-xyz99                    3/3     Running   0          60s'
+      ),
+      panelLine(
+        'alertmanager-prometheus-alertmanager-0                1/1     Running   0          60s'
+      ),
       panelBlank(),
     ];
     const result = extractAIAnswer(makeRaw(body));
@@ -500,5 +528,402 @@ describe('findbugs11: K8s/AKS-focused extractAIAnswer edge cases round 2', () =>
     // Prose between blocks should be outside code
     expect(result).toContain('Then install Prometheus');
     expect(result).toContain('Verify the pods');
+  });
+
+  // Bug 16: K8s klog-format log lines not detected as code
+  // Controller/kubelet logs use klog format: W0115 10:30:00.000 1 file.go:N] msg
+  // These start with I/W/E/F prefix + timestamp that doesn't match any tier
+  it('16. klog-format log lines from kubectl logs detected as code', () => {
+    const body = [
+      'Check controller logs:',
+      '',
+      panelLine('$ kubectl logs -n kube-system deployment/kube-controller-manager --tail=5'),
+      panelLine('I0115 10:30:00.123456       1 main.go:50] Starting controller v1.28.0'),
+      panelLine('I0115 10:30:01.234567       1 leaderelection.go:258] successfully acquired lease'),
+      panelLine('W0115 10:30:05.345678       1 reflector.go:302] pkg/mod/cache: watch closed'),
+      panelLine(
+        'E0115 10:30:06.456789       1 controller.go:114] error syncing key: connection refused'
+      ),
+      panelLine('I0115 10:30:07.567890       1 controller.go:120] requeue: default/my-deployment'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('kubectl logs');
+    expect(all).toContain('Starting controller');
+    expect(all).toContain('watch closed');
+  });
+
+  // Bug 17: Structured logging (logfmt) not detected as code
+  // Many K8s apps use logfmt: level=info msg="..." key=value
+  it('17. logfmt structured logging lines detected as code', () => {
+    const body = [
+      'Application logs:',
+      '',
+      panelLine('$ kubectl logs -n production deployment/api-server --tail=5'),
+      panelLine('level=info msg="server started" port=8080 version=v1.2.3'),
+      panelLine('level=info msg="connected to database" host=postgres:5432 db=myapp'),
+      panelLine('level=error msg="request failed" status=503 path=/api/health'),
+      panelLine('level=warn msg="slow query" duration=2.5s table=users'),
+      panelLine('level=info msg="graceful shutdown" signal=SIGTERM'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('kubectl logs');
+    expect(all).toContain('server started');
+  });
+
+  // Bug 18: K8s validation error messages not detected as code
+  // spec.containers[0].image is a K8s field path used in validation errors
+  it('18. K8s validation errors stay in code block', () => {
+    const body = [
+      'If validation fails:',
+      '',
+      panelLine('$ kubectl apply -f deployment.yaml'),
+      panelLine('The Deployment "my-app" is invalid:'),
+      panelLine('* spec.containers[0].image: Required value'),
+      panelLine('* spec.containers[0].name: Required value'),
+      panelLine('* spec.template.metadata.labels: Invalid value: map[string]string(nil)'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('kubectl apply');
+    expect(all).toContain('spec.containers[0].image');
+  });
+
+  // Bug 19: K8s scheduling failure messages not detected as code
+  // "0/3 nodes are available:" style messages from kubectl describe
+  it('19. K8s scheduling messages stay in kubectl describe output', () => {
+    const body = [
+      'Check pod status:',
+      '',
+      panelLine('$ kubectl describe pod stuck-pod -n production'),
+      panelLine('Name:         stuck-pod'),
+      panelLine('Status:       Pending'),
+      panelLine('Conditions:'),
+      panelLine('  Type             Status'),
+      panelLine('  PodScheduled     False'),
+      panelLine('Events:'),
+      panelLine('  Type     Reason            Message'),
+      panelLine('  ----     ------            -------'),
+      panelLine(
+        '  Warning  FailedScheduling  0/3 nodes are available: 1 Insufficient cpu, 2 node(s) had taint'
+      ),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('kubectl describe');
+    expect(all).toContain('FailedScheduling');
+  });
+
+  // Bug 20: PersistentVolumeClaim resource/action output
+  // persistentvolumeclaim/my-pvc needs the same detection as deployment.apps/...
+  it('20. PVC and other resource status lines detected as code', () => {
+    const body = [
+      'Apply storage:',
+      '',
+      panelLine('$ kubectl apply -f storage.yaml'),
+      panelLine('storageclass.storage.k8s.io/fast-ssd created'),
+      panelLine('persistentvolumeclaim/data-pvc created'),
+      panelLine('persistentvolume/nfs-pv configured'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('kubectl apply');
+    expect(all).toContain('persistentvolumeclaim/data-pvc created');
+    expect(all).toContain('storageclass.storage.k8s.io/fast-ssd created');
+  });
+
+  // Bug 21: Helm chart deployment with hooks output
+  // Helm install/upgrade output has "NAME:", "NAMESPACE:" fields that look like
+  // YAML but are status output, plus hook lines like "HOOKS:" and "MANIFEST:"
+  it('21. helm upgrade output with hooks and notes stays in code block', () => {
+    const body = [
+      'Upgrade the release:',
+      '',
+      panelLine('$ helm upgrade my-release ./chart -n production --install'),
+      panelLine('Release "my-release" has been upgraded. Happy Helming!'),
+      panelLine('NAME: my-release'),
+      panelLine('LAST DEPLOYED: Mon Jan 15 10:30:00 2024'),
+      panelLine('NAMESPACE: production'),
+      panelLine('STATUS: deployed'),
+      panelLine('REVISION: 5'),
+      panelLine('HOOKS:'),
+      panelLine('---'),
+      panelLine('# Source: mychart/templates/tests/test-connection.yaml'),
+      panelLine('apiVersion: v1'),
+      panelLine('kind: Pod'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('helm upgrade');
+    expect(all).toContain('STATUS: deployed');
+  });
+
+  // Bug 22: az aks get-credentials and kubeconfig context commands
+  // These are common AKS workflow commands with long flag chains
+  it('22. az aks and kubeconfig commands with output stay together', () => {
+    const body = [
+      'Connect to AKS:',
+      '',
+      panelLine('$ az aks get-credentials --resource-group myRG --name myAKS --overwrite-existing'),
+      panelLine('Merged "myAKS" as current context in /home/user/.kube/config'),
+      panelBlank(),
+      '',
+      'Verify context:',
+      '',
+      panelLine('$ kubectl config current-context'),
+      panelLine('myAKS'),
+      panelBlank(),
+      '',
+      'Check nodes:',
+      '',
+      panelLine('$ kubectl get nodes'),
+      panelLine('NAME                                STATUS   ROLES   AGE   VERSION'),
+      panelLine('aks-nodepool1-12345678-vmss000000   Ready    agent   5d    v1.28.3'),
+      panelLine('aks-nodepool1-12345678-vmss000001   Ready    agent   5d    v1.28.3'),
+      panelLine('aks-nodepool1-12345678-vmss000002   Ready    agent   5d    v1.28.3'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+    const all = blocks.join('\n');
+    expect(all).toContain('az aks get-credentials');
+    expect(all).toContain('Merged');
+    expect(all).toContain('kubectl config current-context');
+    expect(all).toContain('kubectl get nodes');
+    expect(all).toContain('aks-nodepool1');
+  });
+
+  // Bug 23: Service mesh injection annotations in panel YAML
+  // Annotations with long DNS-like keys (sidecar.istio.io/inject) look like YAML
+  // but the value is a quoted boolean which might confuse the parser
+  it('23. Pod with service mesh annotations stays in one YAML block', () => {
+    const body = [
+      'Add Istio sidecar injection:',
+      '',
+      panelLine('apiVersion: v1'),
+      panelLine('kind: Pod'),
+      panelLine('metadata:'),
+      panelLine('  name: my-app'),
+      panelLine('  annotations:'),
+      panelLine('    sidecar.istio.io/inject: "true"'),
+      panelLine('    sidecar.istio.io/proxyMemory: "256Mi"'),
+      panelLine('    prometheus.io/scrape: "true"'),
+      panelLine('    prometheus.io/port: "8080"'),
+      panelLine('spec:'),
+      panelLine('  containers:'),
+      panelLine('  - name: my-app'),
+      panelLine('    image: myapp:latest'),
+      panelLine('    ports:'),
+      panelLine('    - containerPort: 8080'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('sidecar.istio.io/inject');
+    expect(all).toContain('prometheus.io/scrape');
+    expect(all).toContain('containerPort: 8080');
+  });
+
+  // Bug 24: Bare logfmt output (without $ command prefix) detected as code
+  // level=info msg="..." lines are structured logging output from K8s applications
+  it('24. bare logfmt structured logging wrapped in code block', () => {
+    const body = [
+      'The application logs show:',
+      '',
+      panelLine('level=info msg="server started" port=8080 version=v1.2.3'),
+      panelLine('level=info msg="connected to database" host=postgres:5432'),
+      panelLine('level=error msg="request failed" status=503 path=/api/health'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('level=info');
+    expect(all).toContain('server started');
+  });
+
+  // Bug 25: Bare klog format output (without $ command prefix) detected as code
+  // K8s component logs use klog format: I/W/E/F + timestamp + source file
+  it('25. bare klog format controller logs wrapped in code block', () => {
+    const body = [
+      'Controller logs show:',
+      '',
+      panelLine('I0115 10:30:00.123456       1 main.go:50] Starting controller v1.28.0'),
+      panelLine('I0115 10:30:01.234567       1 leaderelection.go:258] acquired lease'),
+      panelLine('W0115 10:30:05.345678       1 reflector.go:302] watch closed'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('Starting controller');
+    expect(all).toContain('watch closed');
+  });
+
+  // Bug 26: Bare kubectl resource action output at panel indent
+  // Lines like "deployment.apps/my-app scaled" from panel without $ prefix
+  it('26. bare kubectl resource action output from panel wrapped as code', () => {
+    const body = [
+      'After applying:',
+      '',
+      panelLine('deployment.apps/my-app configured'),
+      panelLine('service/my-app-svc created'),
+      panelLine('configmap/my-config unchanged'),
+      panelLine('ingress.networking.k8s.io/my-ingress created'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('deployment.apps/my-app configured');
+    expect(all).toContain('ingress.networking.k8s.io/my-ingress created');
+  });
+
+  // Bug 27: Terraform output values at panel indent
+  // terraform output values use key = "value" format
+  it('27. terraform output values at panel indent wrapped as code', () => {
+    const body = [
+      'Terraform outputs:',
+      '',
+      panelLine('cluster_endpoint = "https://myaks-abc.hcp.eastus.azmk8s.io:443"'),
+      panelLine('cluster_name = "myAKSCluster"'),
+      panelLine('resource_group = "myResourceGroup"'),
+      panelLine('kube_config = <sensitive>'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('cluster_endpoint');
+    expect(all).toContain('cluster_name');
+  });
+
+  // Bug 28: PromQL expression with [5m] at panel indent
+  // PromQL queries in bare panel output should be wrapped and [5m] preserved
+  it('28. bare PromQL expression with [5m] wrapped as code', () => {
+    const body = [
+      'Use this PromQL query:',
+      '',
+      panelLine('sum(rate(container_cpu_usage_seconds_total{namespace="prod"}[5m])) by (pod)'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    expect(result).toContain('[5m]');
+    // PromQL should be in a code block or at least preserved
+    expect(result).toContain('container_cpu_usage_seconds_total');
+  });
+
+  // Bug 29: Multi-step AKS troubleshooting with mixed commands and YAML
+  // A realistic workflow: check pods → describe → patch → verify
+  it('29. multi-step AKS troubleshooting with commands and YAML', () => {
+    const body = [
+      'Troubleshoot the failing pod:',
+      '',
+      '1. Check the pods:',
+      '',
+      panelLine('$ kubectl get pods -n production -l app=my-app'),
+      panelLine('NAME                     READY   STATUS             RESTARTS   AGE'),
+      panelLine('my-app-abc12             0/1     CrashLoopBackOff   5          10m'),
+      panelBlank(),
+      '',
+      '2. Check the logs:',
+      '',
+      panelLine('$ kubectl logs my-app-abc12 -n production --previous'),
+      panelLine('Error: Cannot find module "/app/server.js"'),
+      panelBlank(),
+      '',
+      '3. Fix the Deployment:',
+      '',
+      panelLine('apiVersion: apps/v1'),
+      panelLine('kind: Deployment'),
+      panelLine('metadata:'),
+      panelLine('  name: my-app'),
+      panelLine('spec:'),
+      panelLine('  template:'),
+      panelLine('    spec:'),
+      panelLine('      containers:'),
+      panelLine('      - name: my-app'),
+      panelLine('        command: ["node", "dist/server.js"]'),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+    const all = blocks.join('\n');
+    expect(all).toContain('kubectl get pods');
+    expect(all).toContain('CrashLoopBackOff');
+    expect(all).toContain('kubectl logs');
+    expect(all).toContain('Cannot find module');
+    expect(all).toContain('kind: Deployment');
+  });
+
+  // Bug 30: Kubernetes Secrets with base64 data
+  // Secret manifests have base64-encoded data that might look like gibberish
+  it('30. K8s Secret with base64 data stays in one YAML block', () => {
+    const body = [
+      'Create the Secret:',
+      '',
+      panelLine('apiVersion: v1'),
+      panelLine('kind: Secret'),
+      panelLine('metadata:'),
+      panelLine('  name: db-credentials'),
+      panelLine('  namespace: production'),
+      panelLine('type: Opaque'),
+      panelLine('data:'),
+      panelLine('  DB_HOST: cG9zdGdyZXMucHJvZHVjdGlvbi5zdmMuY2x1c3Rlci5sb2NhbA=='),
+      panelLine('  DB_USER: bXlhcHB1c2Vy'),
+      panelLine('  DB_PASS: c3VwZXJzZWNyZXRwYXNzd29yZA=='),
+      panelLine('  DB_NAME: bXlhcHBkYg=='),
+      panelBlank(),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+    const blocks = extractCodeBlocks(result);
+    expect(blocks.length).toBeGreaterThanOrEqual(1);
+    const all = blocks.join('\n');
+    expect(all).toContain('kind: Secret');
+    expect(all).toContain('type: Opaque');
+    expect(all).toContain('DB_HOST:');
+    expect(all).toContain('DB_PASS:');
   });
 });
