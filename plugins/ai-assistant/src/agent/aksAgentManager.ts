@@ -3108,7 +3108,34 @@ function wrapBareYamlBlocks(text: string): string {
         while (yamlLines.length > 0 && yamlLines[yamlLines.length - 1].trim() === '') {
           yamlLines.pop();
         }
-        if (yamlLines.length > 0) {
+        // Distinguish YAML lists from prose bullet lists:
+        // For list items (lines starting with "- "), check if the content
+        // after "- " contains YAML structure (key: value, nested YAML).
+        // Prose bullets like "- Out of memory (OOMKilled)" or
+        // "- **Node status**: all 6 nodes" should not be wrapped as YAML.
+        let structuredYamlItems = 0;
+        let totalListItems = 0;
+        for (const yl of yamlLines) {
+          const yt = yl.trim();
+          if (/^-\s+/.test(yt)) {
+            totalListItems++;
+            const afterDash = yt.replace(/^-\s+/, '');
+            // Check if content after "- " has YAML key-value structure
+            // e.g., "name: nginx", "containerPort: 80", "key: MY_VAR"
+            // but NOT "Out of memory (OOMKilled)" or "**Node status**: all 6"
+            if (
+              /^[\w][\w.\/-]*:\s/.test(afterDash) || // key: value
+              /^-\s/.test(afterDash) || // nested list
+              /^[{\[]/.test(afterDash) // flow mapping/sequence
+            ) {
+              structuredYamlItems++;
+            }
+          }
+        }
+        // If most list items are prose (no YAML key-value structure),
+        // treat as markdown bullets, not YAML
+        const isProseBulletList = totalListItems > 0 && structuredYamlItems < totalListItems / 2;
+        if (yamlLines.length > 0 && !isProseBulletList) {
           result.push('```yaml');
           result.push(...yamlLines);
           result.push('```');
