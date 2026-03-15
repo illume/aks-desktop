@@ -90,34 +90,14 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
     const container = containerRef.current;
 
     // If the newest message is from the user (e.g. loading state, before assistant
-    // response arrives), scroll to show the user question with the loading indicator
-    // visible below — don't jump back to a previous assistant message.
+    // response arrives), scroll to bottom so the user message and loading indicator
+    // stay visible — don't jump back to a previous assistant message.
     const lastMessage = history[history.length - 1];
     if (lastMessage.role === 'user') {
-      const lastIdx = history.length - 1;
-      const userEl = container.querySelector(
-        `[data-message-index="${lastIdx}"]`
-      ) as HTMLElement | null;
-
-      if (userEl) {
-        const containerRect = container.getBoundingClientRect();
-        const userRect = userEl.getBoundingClientRect();
-        const userTop = userRect.top - containerRect.top + container.scrollTop;
-
-        if (userRect.height < container.clientHeight * 0.3) {
-          // Short question: show in full with loading indicator below
-          container.scrollTo({ top: Math.max(0, userTop - 8), behavior: 'smooth' });
-        } else {
-          // Long question: show bottom portion + loading indicator
-          const userBottom = userTop + userRect.height;
-          container.scrollTo({
-            top: Math.max(0, userBottom - container.clientHeight * 0.25),
-            behavior: 'smooth',
-          });
-        }
-      } else {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-      }
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
       return;
     }
 
@@ -242,11 +222,11 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   // Auto-scroll only when loading starts (not when it finishes)
   useEffect(() => {
     if (isLoading && wasNearBottomRef.current) {
-      // Reuse scrollToShowNewMessage — its user-message branch positions
-      // the question element so the loading indicator below it is visible.
-      setTimeout(scrollToShowNewMessage, 100);
+      // Scroll to bottom when loading starts to keep user message and
+      // loading indicator visible.
+      setTimeout(scrollToBottom, 100);
     }
-  }, [isLoading, scrollToShowNewMessage]);
+  }, [isLoading, scrollToBottom]);
 
   useEffect(() => {
     // Collect tool responses
