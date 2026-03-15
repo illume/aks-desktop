@@ -1977,10 +1977,27 @@ function normalizeTerminalMarkdown(text: string): string {
     // space because extractAIAnswer() trims the overall response. This shows up
     // as: first line at column 0 that looks like code, followed by shallow
     // (1–2 space) code lines from the same Rich panel.
+    //
+    // Skip when the previous non-blank line was also a column-0 code line —
+    // that means we're in the middle of a multi-line bare code block (e.g.
+    // a Python file with `def root():` after `@app.get("/")`).  The whole
+    // block is better handled as one unit by wrapBareCodeBlocks later.
+    const prevNonBlankLine = (() => {
+      for (let pi = i - 1; pi >= 0; pi--) {
+        if (lines[pi].trim() !== '') return lines[pi];
+      }
+      return '';
+    })();
+    const prevIsCol0Code =
+      prevNonBlankLine !== '' &&
+      !/^\s+/.test(prevNonBlankLine) &&
+      looksLikeShellOrDockerCodeLine(prevNonBlankLine.trim()) &&
+      !looksLikeYaml(prevNonBlankLine.trim());
     if (
       !/^\s+/.test(line) &&
       looksLikeShellOrDockerCodeLine(trimmed) &&
       !looksLikeYaml(trimmed) &&
+      !prevIsCol0Code &&
       i + 1 < lines.length
     ) {
       const nextLine = lines[i + 1];
@@ -3341,6 +3358,119 @@ function wrapBareCodeBlocks(text: string): string {
       result.push(line);
       i++;
       continue;
+    }
+
+    // ── Filename-hint block detection ──────────────────────────────────────
+    // When a bare filename heading (e.g. "main.py", "requirements.txt",
+    // "Dockerfile", "Cargo.toml:") appears alone on a line, peek ahead: if
+    // the next non-blank lines look like code, collect them all as a single
+    // fenced block.  This uses the filename as a hint — the parser is more
+    // permissive about what counts as code when it knows the language from
+    // the extension (e.g. .py ⇒ Python, .txt ⇒ requirements-style deps).
+    // Also accepts filenames with a trailing colon (e.g. "Cargo.toml:").
+    const fileHintName = trimmed.replace(/:$/, '');
+    if (
+      trimmed !== '' &&
+      !/^\s+/.test(line) &&
+      !inCodeFence &&
+      isBoldFileHeading(fileHintName)
+    ) {
+      // Peek ahead: skip blank lines, then check if content follows
+      let peekJ = i + 1;
+      while (peekJ < lines.length && lines[peekJ].trim() === '') peekJ++;
+      if (peekJ < lines.length) {
+        const firstContentTrimmed = lines[peekJ].trim();
+        // If the content is already fenced by a prior pipeline stage
+        // (normalizeTerminalMarkdown), skip — don't double-wrap.
+        if (/^```/.test(firstContentTrimmed)) {
+          result.push(line);
+          i++;
+          continue;
+        }
+        const firstContentIsCode =
+          looksLikeShellOrDockerCodeLine(firstContentTrimmed) ||
+          /^\s+\S/.test(lines[peekJ]) || // indented content after filename
+          /^\[[\w.-]+\]/.test(firstContentTrimmed); // TOML section [package]
+        // After a filename heading, even lines that don't individually look
+        // like code are likely file content.  Only skip when the first line
+        // is clearly prose (many words, no code chars).
+        const firstLineWords = firstContentTrimmed.split(/\s+/).length;
+        const firstIsProse =
+          firstLineWords >= PROSE_WORD_THRESHOLD &&
+          !looksLikeShellOrDockerCodeLine(firstContentTrimmed) &&
+          !CODE_LIKE_CHARS_RE.test(firstContentTrimmed);
+        if ((firstContentIsCode || !firstIsProse) && firstContentTrimmed !== '') {
+          // Emit the filename heading as prose
+          result.push(line);
+          i++;
+          // Emit blank lines between heading and code
+          while (i < lines.length && lines[i].trim() === '') {
+            result.push(lines[i]);
+            i++;
+          }
+          // Collect code lines into a single block
+          const codeLines: string[] = [];
+          let fj = i;
+          while (fj < lines.length) {
+            const fl = lines[fj];
+            const ft = fl.trim();
+            // Blank line: peek ahead — keep if followed by more code-like
+            // content, break if followed by a new file heading or prose
+            if (ft === '') {
+              let peekNext = fj + 1;
+              while (peekNext < lines.length && lines[peekNext].trim() === '') peekNext++;
+              const blankCount = peekNext - fj;
+              if (blankCount >= 2 || peekNext >= lines.length) break;
+              const nextTr = lines[peekNext].trim();
+              // Break at next file heading (with or without trailing colon)
+              if (
+                isBoldFileHeading(nextTr) ||
+                isBoldFileHeading(nextTr.replace(/:$/, ''))
+              )
+                break;
+              if (isFileHeaderComment(nextTr)) break;
+              // Continue if next line looks like code or is indented
+              if (
+                looksLikeShellOrDockerCodeLine(nextTr) ||
+                /^\s+\S/.test(lines[peekNext])
+              ) {
+                codeLines.push(fl);
+                fj++;
+                continue;
+              }
+              break;
+            }
+            // Stop at file-heading boundaries (with or without trailing colon)
+            if (isBoldFileHeading(ft) || isBoldFileHeading(ft.replace(/:$/, ''))) break;
+            // Stop at lines that are clearly prose (many words, no code chars)
+            const ftWords = ft.split(/\s+/).length;
+            if (
+              ftWords >= PROSE_WORD_THRESHOLD &&
+              !looksLikeShellOrDockerCodeLine(ft) &&
+              !looksLikeYaml(ft) &&
+              !CODE_LIKE_CHARS_RE.test(ft)
+            )
+              break;
+            // Include code lines and non-code lines that aren't clearly prose
+            // (short assignment lines like "app = FastAPI()" may not match
+            // looksLikeShellOrDockerCodeLine but belong to the code block)
+            codeLines.push(fl);
+            fj++;
+          }
+          // Trim trailing blanks
+          while (codeLines.length > 0 && codeLines[codeLines.length - 1].trim() === '')
+            codeLines.pop();
+          if (codeLines.length > 0) {
+            result.push('```');
+            result.push(...codeLines);
+            result.push('```');
+            wrappedBlockCount++;
+            i = fj;
+            continue;
+          }
+          continue;
+        }
+      }
     }
 
     // Detect start of a bare code block: non-blank, non-indented, looks like code
