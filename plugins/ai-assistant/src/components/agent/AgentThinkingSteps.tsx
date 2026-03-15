@@ -62,6 +62,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     const successColor = theme.palette.success.main;
     const [collapsedPhases, setCollapsedPhases] = useState<Set<Phase>>(new Set());
     const prevPhaseCountRef = useRef<Record<Phase, number>>({ init: 0, planning: 0, executing: 0 });
+    const rootRef = useRef<HTMLDivElement>(null);
 
     // Group steps by phase
     const grouped = useMemo(() => {
@@ -94,6 +95,13 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
         executing: grouped.executing.length,
       };
     }, [grouped]);
+
+    // Scroll into view when new steps appear, but only if not already visible
+    useEffect(() => {
+      if (steps.length > 0 && rootRef.current) {
+        rootRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, [steps.length]);
 
     if (steps.length === 0) return null;
 
@@ -235,6 +243,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     return (
       <Collapse in={steps.length > 0}>
         <Box
+          ref={rootRef}
           sx={{
             my: 1.5,
             mx: 0,
