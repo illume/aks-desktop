@@ -157,7 +157,7 @@ export const AIInputSection: React.FC<AIInputSectionProps> = ({
             arrow
           >
             <IconButton size="small" aria-label="AI disclaimer">
-              <Icon icon="mdi:information-outline" width="18px" height="18px" />
+              <Icon icon="mdi:alert-circle-outline" width="18px" height="18px" />
             </IconButton>
           </Tooltip>
 
