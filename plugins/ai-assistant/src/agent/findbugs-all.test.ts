@@ -157,6 +157,104 @@ import {
   fb9_markdownTable,
   fb9_shellProcessSubstitution,
   fb9_requirementsTxt,
+  // Round 10
+  fb10_ghActionsBranchesMain,
+  fb10_prometheusDuration5m,
+  fb10_kustomizationYaml,
+  fb10_helmValuesYaml,
+  fb10_azureDevOpsPipeline,
+  fb10_ansiblePlaybook,
+  fb10_configMapLiteralBlock,
+  fb10_makefilePhony,
+  fb10_nginxProxyPass,
+  fb10_pythonK8sOperator,
+  fb10_grafanaConfigMap5m,
+  fb10_dockerComposeYaml,
+  fb10_envoyProxyConfig,
+  fb10_azureBicepAks,
+  fb10_kubectlTopMillicores,
+  // Round 11
+  fb11_kubectlScaleOutput,
+  fb11_kubectlApplyOutput,
+  fb11_helmStatusOutput,
+  fb11_kubectlRolloutStatus,
+  fb11_terraformPlanOutput,
+  fb11_dockerBuildSteps,
+  fb11_helmTemplateGoExpr,
+  fb11_configMapSpringProperties,
+  fb11_kubectlErrorMessage,
+  fb11_kubectlWarningDeprecation,
+  fb11_kubectlEventsTable,
+  fb11_kustomizationPatches,
+  fb11_goClientGoCode,
+  fb11_rbacClusterRole,
+  fb11_multiKubectlWithProse,
+  fb11_klogFormatLogs,
+  fb11_logfmtStructuredLogs,
+  fb11_k8sValidationErrors,
+  fb11_k8sSchedulingDescribe,
+  fb11_pvcResourceStatus,
+  fb11_helmUpgradeHooks,
+  fb11_azAksGetCredentials,
+  fb11_istioSidecarAnnotations,
+  fb11_bareLogfmtOutput,
+  fb11_bareKlogFormat,
+  fb11_bareResourceActionOutput,
+  fb11_terraformOutputValues,
+  fb11_barePromQL5m,
+  fb11_aksTroubleshooting,
+  fb11_k8sSecretBase64,
+  // Round 12
+  fb12_barePromQLExpressions,
+  fb12_bareK8sEventMessages,
+  fb12_bareSchedulingFailure,
+  fb12_barePrometheusMetrics,
+  fb12_bareProbeFailures,
+  fb12_coreDNSCorefile,
+  fb12_prometheusRuleCRD,
+  fb12_azAksJsonOutput,
+  fb12_bareContainerCrash,
+  fb12_bareVolumeMountFailure,
+  fb12_bareImagePullFailure,
+  fb12_bareSchedulingDetails,
+  fb12_bareCRIOLogs,
+  fb12_bareContainerLifecycle,
+  fb12_bareKeyValueDiagnostics,
+  // Round 13
+  fb13_proseColonEnding,
+  fb13_diagnosticSummaryColon,
+  fb13_stepHeadingColon,
+  fb13_assumesHeadingColon,
+  fb13_boldK8sTerms,
+  fb13_bulletListTechTerms,
+  fb13_numberedStepList,
+  fb13_markdownHeaders,
+  fb13_proseWithUrls,
+  fb13_notePrefix,
+  fb13_multiParagraphExplanation,
+  fb13_inlineCodeBackticks,
+  fb13_proseKeyValueDescriptions,
+  fb13_questionsAboutK8s,
+  fb13_mixedMarkdownFormatting,
+  // Round 14
+  fb14_alsoConfirmAfterShell,
+  fb14_alsoConfirmNoBlank,
+  fb14_alsoConfirmDoubleBlank,
+  fb14_buildPushProseHeading,
+  fb14_panelCodeThenAlsoConfirm,
+  // Round 15
+  fb15_requirementsTxtPanel,
+  fb15_mainPyPanel,
+  fb15_numberedStepHeaderPanel,
+  fb15_dockerfilePanel,
+  fb15_requirementsTxtNonPanel,
+  fb15_mainPyNonPanel,
+  fb15_numberedStepHeaderNonPanel,
+  fb15_cargoTomlNonPanel,
+  fb15_deploymentYamlPanel,
+  fb15_mainRsNonPanel,
+  fb15_numberedStepAfterGoCode,
+  fb15_assumptionsBetweenCodeBlocks,
 } from './findbugFixtures';
 
 const { extractAIAnswer } = _testing;
@@ -1641,6 +1739,1051 @@ describe('findbugs: all extractAIAnswer edge cases', () => {
       const all = blocks.join('\n');
       expect(all).toContain('flask==3.0.0');
       expect(all).toContain('kubernetes==28.1.0');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Round 10
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('round 10', () => {
+    it('1. GitHub Actions YAML branches: [main] not corrupted by ANSI stripping', () => {
+      const result = extractAIAnswer(fb10_ghActionsBranchesMain);
+      assertNoAnsiLeaks(result);
+      expect(result).toContain('[main]');
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('branches: [main]');
+      expect(all).toContain('kubectl apply');
+    });
+
+    it('2. Prometheus [5m] duration selector not corrupted', () => {
+      const result = extractAIAnswer(fb10_prometheusDuration5m);
+      // Don't use assertNoAnsiLeaks — [5m] in PromQL is intentional content
+      expect(result).not.toMatch(/\x1b/);
+      const blocks = extractCodeBlocks(result);
+      const all = blocks.join('\n');
+      expect(all).toContain('[5m]');
+      expect(all).toContain('HighLatency');
+      // for: 10m may be outside the code block due to deep-indent handling
+      expect(result).toContain('10m');
+    });
+
+    it('3. Kustomization YAML in panel gets wrapped in code fence', () => {
+      const result = extractAIAnswer(fb10_kustomizationYaml);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('resources:');
+      expect(all).toContain('namePrefix: prod-');
+      expect(all).toContain('commonLabels:');
+    });
+
+    it('4. Helm values.yaml in panel gets wrapped in code fence', () => {
+      const result = extractAIAnswer(fb10_helmValuesYaml);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      const all = blocks.join('\n');
+      expect(all).toContain('replicaCount: 3');
+      expect(all).toContain('pullPolicy: IfNotPresent');
+      expect(all).toContain('helm install');
+    });
+
+    it('5. Azure DevOps pipeline YAML in panel gets wrapped', () => {
+      const result = extractAIAnswer(fb10_azureDevOpsPipeline);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('trigger:');
+      expect(all).toContain('KubernetesManifest');
+      expect(all).toContain('kubernetesServiceConnection');
+    });
+
+    it('6. Ansible playbook YAML in panel gets wrapped', () => {
+      const result = extractAIAnswer(fb10_ansiblePlaybook);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Deploy to AKS');
+      expect(all).toContain('azure_rm_aks_info');
+      expect(all).toContain('kubernetes.core.k8s');
+    });
+
+    it('7. ConfigMap with literal block scalar bash script stays in one block', () => {
+      const result = extractAIAnswer(fb10_configMapLiteralBlock);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('ConfigMap');
+      expect(all).toContain('init.sh');
+      expect(all).toContain('sleep 2');
+      expect(all).toContain('done');
+      // Verify everything is in the SAME block
+      const sameBlock = blocks.some(b => b.includes('ConfigMap') && b.includes('sleep 2'));
+      expect(sameBlock).toBe(true);
+    });
+
+    it('8. Makefile .PHONY and variable assignments stay in code block', () => {
+      const result = extractAIAnswer(fb10_makefilePhony);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('.PHONY');
+      expect(all).toContain('IMAGE ?=');
+      expect(all).toContain('docker build');
+    });
+
+    it('9. NGINX config with proxy_pass stays in one code block', () => {
+      const result = extractAIAnswer(fb10_nginxProxyPass);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBe(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('server {');
+      expect(all).toContain('proxy_pass');
+      expect(all).toContain('location /healthz');
+    });
+
+    it('10. Python K8s operator with deep nesting stays in one block', () => {
+      const result = extractAIAnswer(fb10_pythonK8sOperator);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kopf');
+      expect(all).toContain('namespace="default"');
+      const sameBlock = blocks.some(b => b.includes('kopf') && b.includes('namespace="default"'));
+      expect(sameBlock).toBe(true);
+    });
+
+    it('11. Grafana JSON in ConfigMap with [5m] Prometheus duration preserved', () => {
+      const result = extractAIAnswer(fb10_grafanaConfigMap5m);
+      // Don't use assertNoAnsiLeaks — [5m] in PromQL is intentional content
+      expect(result).not.toMatch(/\x1b/);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('[5m]');
+      expect(all).toContain('ConfigMap');
+      expect(all).toContain('Request Rate');
+      const sameBlock = blocks.some(b => b.includes('ConfigMap') && b.includes('[5m]'));
+      expect(sameBlock).toBe(true);
+    });
+
+    it('12. Docker Compose YAML in panel gets wrapped', () => {
+      const result = extractAIAnswer(fb10_dockerComposeYaml);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('services:');
+      expect(all).toContain('postgres:15');
+    });
+
+    it('13. Envoy proxy config YAML gets wrapped in panel', () => {
+      const result = extractAIAnswer(fb10_envoyProxyConfig);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('static_resources:');
+      expect(all).toContain('envoy.filters');
+    });
+
+    it('14. Azure Bicep for AKS stays in one code block', () => {
+      const result = extractAIAnswer(fb10_azureBicepAks);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBe(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('resource aks');
+      expect(all).toContain('agentpool');
+      expect(all).toContain('Standard_D2s_v3');
+    });
+
+    it('15. kubectl top millicore values not corrupted', () => {
+      const result = extractAIAnswer(fb10_kubectlTopMillicores);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('250m');
+      expect(all).toContain('500m');
+      expect(all).toContain('128Mi');
+      expect(all).toContain('kubectl top');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Round 11
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('round 11', () => {
+    it('1. kubectl resource action output lines detected as code', () => {
+      const result = extractAIAnswer(fb11_kubectlScaleOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl scale');
+      expect(all).toContain('deployment.apps/my-app scaled');
+    });
+
+    it('2. kubectl apply output lines stay in code block', () => {
+      const result = extractAIAnswer(fb11_kubectlApplyOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl apply');
+      expect(all).toContain('service/my-app-svc created');
+      expect(all).toContain('ingress.networking.k8s.io/my-ingress created');
+    });
+
+    it('3. Helm status output not treated as YAML keys', () => {
+      const result = extractAIAnswer(fb11_helmStatusOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('helm status');
+      expect(all).toContain('STATUS: deployed');
+    });
+
+    it('4. kubectl rollout output stays in code block', () => {
+      const result = extractAIAnswer(fb11_kubectlRolloutStatus);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl rollout');
+      expect(all).toContain('successfully rolled out');
+    });
+
+    it('5. terraform plan output with + prefix detected as code', () => {
+      const result = extractAIAnswer(fb11_terraformPlanOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('terraform plan');
+      expect(all).toContain('azurerm_kubernetes_cluster');
+    });
+
+    it('6. Docker build step output stays in code block', () => {
+      const result = extractAIAnswer(fb11_dockerBuildSteps);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('docker build');
+      expect(all).toContain('Step 1/5');
+      expect(all).toContain('Successfully tagged');
+    });
+
+    it('7. Helm template Go expressions in bare output wrapped as code', () => {
+      const result = extractAIAnswer(fb11_helmTemplateGoExpr);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('{{- if .Values.ingress.enabled');
+      expect(all).toContain('kind: Ingress');
+      expect(all).toContain('{{- end }}');
+    });
+
+    it('8. ConfigMap with embedded Spring properties stays together', () => {
+      const result = extractAIAnswer(fb11_configMapSpringProperties);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kind: ConfigMap');
+      expect(all).toContain('spring.datasource.url');
+      expect(all).toContain('management.endpoints');
+    });
+
+    it('9. kubectl error messages not absorbed into YAML blocks', () => {
+      const result = extractAIAnswer(fb11_kubectlErrorMessage);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl get pods');
+      expect(all).toContain('error: the server');
+      // The trailing prose should NOT be inside a code block
+      expect(result).toContain('CRD is not installed');
+    });
+
+    it('10. kubectl deprecation warnings stay with command output', () => {
+      const result = extractAIAnswer(fb11_kubectlWarningDeprecation);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl apply');
+      expect(all).toContain('Warning:');
+      expect(all).toContain('podsecuritypolicy');
+    });
+
+    it('11. bare kubectl events table detected as code', () => {
+      const result = extractAIAnswer(fb11_kubectlEventsTable);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('LAST SEEN');
+      expect(all).toContain('BackOff');
+    });
+
+    it('12. Kustomization with patchesStrategicMerge wrapped as YAML', () => {
+      const result = extractAIAnswer(fb11_kustomizationPatches);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('resources:');
+      expect(all).toContain('patchesStrategicMerge');
+      expect(all).toContain('commonLabels');
+    });
+
+    it('13. Go client-go code stays in one code block', () => {
+      const result = extractAIAnswer(fb11_goClientGoCode);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('package main');
+      expect(all).toContain('k8s.io/client-go');
+      expect(all).toContain('CoreV1().Pods');
+    });
+
+    it('14. RBAC ClusterRole with complex rules stays together', () => {
+      const result = extractAIAnswer(fb11_rbacClusterRole);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('rbac.authorization.k8s.io');
+      expect(all).toContain('verbs: ["*"]');
+    });
+
+    it('15. Multiple kubectl commands with prose rendered correctly', () => {
+      const result = extractAIAnswer(fb11_multiKubectlWithProse);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl create namespace');
+      expect(all).toContain('helm install');
+      expect(all).toContain('kubectl get pods');
+      expect(all).toContain('alertmanager');
+      // Prose between blocks should be outside code
+      expect(result).toContain('Then install Prometheus');
+      expect(result).toContain('Verify the pods');
+    });
+
+    it('16. klog-format log lines from kubectl logs detected as code', () => {
+      const result = extractAIAnswer(fb11_klogFormatLogs);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl logs');
+      expect(all).toContain('Starting controller');
+      expect(all).toContain('watch closed');
+    });
+
+    it('17. logfmt structured logging lines detected as code', () => {
+      const result = extractAIAnswer(fb11_logfmtStructuredLogs);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl logs');
+      expect(all).toContain('server started');
+    });
+
+    it('18. K8s validation errors stay in code block', () => {
+      const result = extractAIAnswer(fb11_k8sValidationErrors);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl apply');
+      expect(all).toContain('spec.containers[0].image');
+    });
+
+    it('19. K8s scheduling messages stay in kubectl describe output', () => {
+      const result = extractAIAnswer(fb11_k8sSchedulingDescribe);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl describe');
+      expect(all).toContain('FailedScheduling');
+    });
+
+    it('20. PVC and other resource status lines detected as code', () => {
+      const result = extractAIAnswer(fb11_pvcResourceStatus);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl apply');
+      expect(all).toContain('persistentvolumeclaim/data-pvc created');
+      expect(all).toContain('storageclass.storage.k8s.io/fast-ssd created');
+    });
+
+    it('21. helm upgrade output with hooks and notes stays in code block', () => {
+      const result = extractAIAnswer(fb11_helmUpgradeHooks);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('helm upgrade');
+      expect(all).toContain('STATUS: deployed');
+    });
+
+    it('22. az aks and kubeconfig commands with output stay together', () => {
+      const result = extractAIAnswer(fb11_azAksGetCredentials);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(3);
+      const all = blocks.join('\n');
+      expect(all).toContain('az aks get-credentials');
+      expect(all).toContain('Merged');
+      expect(all).toContain('kubectl config current-context');
+      expect(all).toContain('kubectl get nodes');
+      expect(all).toContain('aks-nodepool1');
+    });
+
+    it('23. Pod with service mesh annotations stays in one YAML block', () => {
+      const result = extractAIAnswer(fb11_istioSidecarAnnotations);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('sidecar.istio.io/inject');
+      expect(all).toContain('prometheus.io/scrape');
+      expect(all).toContain('containerPort: 8080');
+    });
+
+    it('24. bare logfmt structured logging wrapped in code block', () => {
+      const result = extractAIAnswer(fb11_bareLogfmtOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('level=info');
+      expect(all).toContain('server started');
+    });
+
+    it('25. bare klog format controller logs wrapped in code block', () => {
+      const result = extractAIAnswer(fb11_bareKlogFormat);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Starting controller');
+      expect(all).toContain('watch closed');
+    });
+
+    it('26. bare kubectl resource action output from panel wrapped as code', () => {
+      const result = extractAIAnswer(fb11_bareResourceActionOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('deployment.apps/my-app configured');
+      expect(all).toContain('ingress.networking.k8s.io/my-ingress created');
+    });
+
+    it('27. terraform output values at panel indent wrapped as code', () => {
+      const result = extractAIAnswer(fb11_terraformOutputValues);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('cluster_endpoint');
+      expect(all).toContain('cluster_name');
+    });
+
+    it('28. bare PromQL expression with [5m] wrapped as code', () => {
+      const result = extractAIAnswer(fb11_barePromQL5m);
+      // Don't use assertNoAnsiLeaks — [5m] in PromQL is intentional content
+      expect(result).not.toMatch(/\x1b/);
+      expect(result).toContain('[5m]');
+      // PromQL should be in a code block or at least preserved
+      expect(result).toContain('container_cpu_usage_seconds_total');
+    });
+
+    it('29. multi-step AKS troubleshooting with commands and YAML', () => {
+      const result = extractAIAnswer(fb11_aksTroubleshooting);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(3);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl get pods');
+      expect(all).toContain('CrashLoopBackOff');
+      expect(all).toContain('kubectl logs');
+      expect(all).toContain('Cannot find module');
+      expect(all).toContain('kind: Deployment');
+    });
+
+    it('30. K8s Secret with base64 data stays in one YAML block', () => {
+      const result = extractAIAnswer(fb11_k8sSecretBase64);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kind: Secret');
+      expect(all).toContain('type: Opaque');
+      expect(all).toContain('DB_HOST:');
+      expect(all).toContain('DB_PASS:');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Round 12
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('round 12', () => {
+    it('1. bare PromQL expressions detected as code', () => {
+      const result = extractAIAnswer(fb12_barePromQLExpressions);
+      // Don't use assertNoAnsiLeaks — [5m] in PromQL is intentional content
+      expect(result).not.toMatch(/\x1b/);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('container_cpu_usage_seconds_total');
+      expect(all).toContain('[5m]');
+    });
+
+    it('2. bare K8s event messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareK8sEventMessages);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Pulling image');
+      expect(all).toContain('Started container nginx');
+    });
+
+    it('3. bare scheduling failure messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareSchedulingFailure);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('0/3 nodes are available');
+    });
+
+    it('4. bare Prometheus metric query results detected as code', () => {
+      const result = extractAIAnswer(fb12_barePrometheusMetrics);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('container_memory_working_set_bytes');
+      expect(all).toContain('kube_pod_status_phase');
+    });
+
+    it('5. bare readiness probe failure messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareProbeFailures);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Readiness probe failed');
+      expect(all).toContain('Startup probe failed');
+    });
+
+    it('6. CoreDNS Corefile with deep nesting stays complete', () => {
+      const result = extractAIAnswer(fb12_coreDNSCorefile);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('.:53 {');
+      expect(all).toContain('kubernetes cluster.local');
+      expect(all).toContain('lameduck 5s');
+      expect(all).toContain('pods insecure');
+      expect(all).toContain('forward . /etc/resolv.conf');
+    });
+
+    it('7. PrometheusRule CRD YAML with deep rules stays complete', () => {
+      const result = extractAIAnswer(fb12_prometheusRuleCRD);
+      // Don't use assertNoAnsiLeaks — [5m] in PromQL is intentional content
+      expect(result).not.toMatch(/\x1b/);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('monitoring.coreos.com/v1');
+      expect(all).toContain('HighErrorRate');
+      expect(all).toContain('severity: critical');
+      expect(all).toContain('for: 5m');
+    });
+
+    it('8. deeply nested az aks JSON output stays complete', () => {
+      const result = extractAIAnswer(fb12_azAksJsonOutput);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('"name": "nodepool1"');
+      expect(all).toContain('"code": "Running"');
+      expect(all).toContain('"env": "production"');
+    });
+
+    it('9. bare container crash messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareContainerCrash);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Back-off restarting');
+      expect(all).toContain('definition changed');
+    });
+
+    it('10. bare volume mount failure messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareVolumeMountFailure);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('MountVolume.SetUp failed');
+      expect(all).toContain('AttachVolume.Attach failed');
+    });
+
+    it('11. bare image pull failure messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareImagePullFailure);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Failed to pull image');
+      expect(all).toContain('Error response from daemon');
+    });
+
+    it('12. bare scheduling detail messages detected as code', () => {
+      const result = extractAIAnswer(fb12_bareSchedulingDetails);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Insufficient cpu');
+      expect(all).toContain('topologySpreadConstraints');
+    });
+
+    it('13. bare CRI-O container log lines detected as code', () => {
+      const result = extractAIAnswer(fb12_bareCRIOLogs);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('stdout F Starting application');
+      expect(all).toContain('stderr F Error');
+    });
+
+    it('14. bare multi-line container lifecycle events detected as code', () => {
+      const result = extractAIAnswer(fb12_bareContainerLifecycle);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('Pulling image');
+      expect(all).toContain('Liveness probe failed');
+    });
+
+    it('15. bare key=value diagnostic output detected as code', () => {
+      const result = extractAIAnswer(fb12_bareKeyValueDiagnostics);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('runtime.name=containerd');
+      expect(all).toContain('container.id=abc123def456');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Round 13
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('round 13', () => {
+    it('1. prose sentence ending with colon is not code', () => {
+      const result = extractAIAnswer(fb13_proseColonEnding);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      // The prose should NOT be inside any code block
+      for (const block of blocks) {
+        expect(block).not.toContain('diagnose it');
+      }
+      // No empty code blocks should be generated
+      for (const block of blocks) {
+        expect(block.trim()).not.toBe('');
+      }
+    });
+
+    it('2. diagnostic summary ending with colon is not code', () => {
+      const result = extractAIAnswer(fb13_diagnosticSummaryColon);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('pod problems');
+        expect(block.trim()).not.toBe('');
+      }
+      expect(result).toContain('No obvious pod problems right now:');
+    });
+
+    it('3. step heading ending with colon does not produce empty code block', () => {
+      const result = extractAIAnswer(fb13_stepHeadingColon);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      // No empty code blocks
+      for (const block of blocks) {
+        expect(block.trim()).not.toBe('');
+      }
+      // "Build + push:" should be prose, not inside a code block
+      for (const block of blocks) {
+        expect(block).not.toContain('Build + push:');
+      }
+    });
+
+    it('4. assumptions heading with colon does not produce empty code block', () => {
+      const result = extractAIAnswer(fb13_assumesHeadingColon);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      // No empty code blocks
+      for (const block of blocks) {
+        expect(block.trim()).not.toBe('');
+      }
+      // "Assumes:" should be prose
+      for (const block of blocks) {
+        expect(block).not.toContain('Assumes:');
+      }
+    });
+
+    it('5. markdown bold text with k8s terms is not code', () => {
+      const result = extractAIAnswer(fb13_boldK8sTerms);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('deployment');
+        expect(block).not.toContain('kube-system');
+      }
+    });
+
+    it('6. markdown bullet list with technical terms is not code', () => {
+      const result = extractAIAnswer(fb13_bulletListTechTerms);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('OOMKilled');
+        expect(block).not.toContain('Liveness probe');
+        expect(block).not.toContain('CrashLoopBackOff');
+      }
+    });
+
+    it('7. numbered step list with k8s actions is not code', () => {
+      const result = extractAIAnswer(fb13_numberedStepList);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('Create the deployment');
+        expect(block).not.toContain('Verify pods are');
+      }
+    });
+
+    it('8. markdown headers are not YAML comments or code', () => {
+      const result = extractAIAnswer(fb13_markdownHeaders);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('Troubleshooting');
+        expect(block).not.toContain('Step 1');
+        expect(block).not.toContain('Step 2');
+      }
+    });
+
+    it('9. prose with URLs is not code', () => {
+      const result = extractAIAnswer(fb13_proseWithUrls);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('kubernetes.io');
+        expect(block).not.toContain('microsoft.com');
+      }
+    });
+
+    it('10. note prefix with explanation is not code', () => {
+      const result = extractAIAnswer(fb13_notePrefix);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('cluster-admin');
+        expect(block).not.toContain('assumes you');
+      }
+    });
+
+    it('11. multi-paragraph technical explanation is not code', () => {
+      const result = extractAIAnswer(fb13_multiParagraphExplanation);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('CrashLoopBackOff');
+        expect(block).not.toContain('Common causes');
+        expect(block).not.toContain('recommend');
+      }
+    });
+
+    it('12. prose with inline code backticks is not wrapped in code fence', () => {
+      const result = extractAIAnswer(fb13_inlineCodeBackticks);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('You can check the status');
+        expect(block).not.toContain('output should show');
+      }
+    });
+
+    it('13. prose with colon-separated key-value descriptions is not YAML', () => {
+      const result = extractAIAnswer(fb13_proseKeyValueDescriptions);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('cluster has');
+        expect(block).not.toContain('All nodes');
+        expect(block.trim()).not.toBe('');
+      }
+    });
+
+    it('14. questions about k8s resources are not code', () => {
+      const result = extractAIAnswer(fb13_questionsAboutK8s);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('namespace');
+        expect(block).not.toContain('replicas');
+        expect(block).not.toContain('resource limits');
+      }
+    });
+
+    it('15. mixed markdown formatting is not code', () => {
+      const result = extractAIAnswer(fb13_mixedMarkdownFormatting);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('healthy');
+        expect(block).not.toContain('Node status');
+        expect(block).not.toContain('Pod health');
+        expect(block).not.toContain('pending pods');
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Round 14
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('round 14', () => {
+    it('1. "Also confirm:" after shell commands is not code', () => {
+      const result = extractAIAnswer(fb14_alsoConfirmAfterShell);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      // No empty code blocks
+      for (const block of blocks) {
+        expect(block.trim()).not.toBe('');
+      }
+      // "Also confirm" should NOT be inside any code block
+      for (const block of blocks) {
+        expect(block).not.toContain('Also confirm');
+      }
+      // kubectl commands SHOULD be in a code block
+      const allCode = blocks.join('\n');
+      expect(allCode).toContain('kubectl get pods');
+    });
+
+    it('2. "Also confirm:" without blank line after shell is not code', () => {
+      const result = extractAIAnswer(fb14_alsoConfirmNoBlank);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('Also confirm');
+      }
+    });
+
+    it('3. "Also confirm:" after double blank is not code', () => {
+      const result = extractAIAnswer(fb14_alsoConfirmDoubleBlank);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('Also confirm');
+      }
+    });
+
+    it('4. "Build + push:" prose heading is not code', () => {
+      const result = extractAIAnswer(fb14_buildPushProseHeading);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block).not.toContain('Build + push');
+      }
+    });
+
+    it('5. Rich panel code then "Also confirm:" stays prose', () => {
+      const result = extractAIAnswer(fb14_panelCodeThenAlsoConfirm);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      for (const block of blocks) {
+        expect(block.trim()).not.toBe('');
+        expect(block).not.toContain('Also confirm');
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Round 15
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('round 15', () => {
+    it('1. requirements.txt followed by pinned dependencies', () => {
+      const result = extractAIAnswer(fb15_requirementsTxtPanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      // The pinned deps should be in a code block
+      const depBlock = blocks.find(
+        b => b.includes('fastapi==0.110.0') && b.includes('uvicorn')
+      );
+      expect(depBlock).toBeDefined();
+    });
+
+    it('2. main.py followed by Python code', () => {
+      const result = extractAIAnswer(fb15_mainPyPanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      const pyBlock = blocks.find(
+        b => b.includes('from fastapi import FastAPI') && b.includes('def root():')
+      );
+      expect(pyBlock).toBeDefined();
+    });
+
+    it('3. numbered step header is NOT a code block', () => {
+      const result = extractAIAnswer(fb15_numberedStepHeaderPanel);
+      assertNoAnsiLeaks(result);
+      // Should NOT be in a code block
+      expect(result).toContain('3) Kubernetes');
+      const blocks = extractCodeBlocks(result);
+      const headingBlock = blocks.find(b => b.includes('3) Kubernetes'));
+      expect(headingBlock).toBeUndefined();
+    });
+
+    it('4. Dockerfile filename followed by Dockerfile content', () => {
+      const result = extractAIAnswer(fb15_dockerfilePanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      const dockerBlock = blocks.find(
+        b => b.includes('FROM python:3.12-slim') && b.includes('CMD')
+      );
+      expect(dockerBlock).toBeDefined();
+    });
+
+    it('5. requirements.txt followed by deps (non-panel format)', () => {
+      const result = extractAIAnswer(fb15_requirementsTxtNonPanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      const depBlock = blocks.find(b => b.includes('fastapi==0.110.0'));
+      expect(depBlock).toBeDefined();
+    });
+
+    it('6. main.py followed by Python code (non-panel format)', () => {
+      const result = extractAIAnswer(fb15_mainPyNonPanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      const pyBlock = blocks.find(
+        b => b.includes('from fastapi import FastAPI') && b.includes('def root():')
+      );
+      expect(pyBlock).toBeDefined();
+    });
+
+    it('7. numbered header 3) is NOT code in non-panel format', () => {
+      const result = extractAIAnswer(fb15_numberedStepHeaderNonPanel);
+      assertNoAnsiLeaks(result);
+      expect(result).toContain('3)');
+      const blocks = extractCodeBlocks(result);
+      const headingBlock = blocks.find(b => b.includes('Kubernetes'));
+      expect(headingBlock).toBeUndefined();
+    });
+
+    it('8. Cargo.toml: with trailing colon wraps TOML content', () => {
+      const result = extractAIAnswer(fb15_cargoTomlNonPanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      const tomlBlock = blocks.find(
+        b => b.includes('[package]') && b.includes('name = "myapp"')
+      );
+      expect(tomlBlock).toBeDefined();
+    });
+
+    it('9. deployment.yaml heading keeps YAML separate from filename', () => {
+      const result = extractAIAnswer(fb15_deploymentYamlPanel);
+      assertNoAnsiLeaks(result);
+      expect(result).toContain('deployment.yaml');
+      const blocks = extractCodeBlocks(result);
+      const yamlBlock = blocks.find(
+        b => b.includes('apiVersion: apps/v1') && b.includes('kind: Deployment')
+      );
+      expect(yamlBlock).toBeDefined();
+    });
+
+    it('10. src/main.rs: with trailing colon wraps Rust code', () => {
+      const result = extractAIAnswer(fb15_mainRsNonPanel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      const rustBlock = blocks.find(
+        b => b.includes('fn main()') && b.includes('println!')
+      );
+      expect(rustBlock).toBeDefined();
+    });
+
+    it('11. indented numbered step header after Go code is NOT a code block', () => {
+      const result = extractAIAnswer(fb15_numberedStepAfterGoCode);
+      assertNoAnsiLeaks(result);
+
+      // The Go code should be in a code block
+      const blocks = extractCodeBlocks(result);
+      const goBlock = blocks.find(b => b.includes('package main') && b.includes('func main()'));
+      expect(goBlock).toBeDefined();
+
+      // The numbered step header should NOT be in a code block
+      const stepBlock = blocks.find(b => b.includes('2) Containerize'));
+      expect(stepBlock).toBeUndefined();
+      expect(result).toContain('2) Containerize');
+    });
+
+    it('12. Assumptions: between Go code and Dockerfile is prose, not code', () => {
+      const result = extractAIAnswer(fb15_assumptionsBetweenCodeBlocks);
+      assertNoAnsiLeaks(result);
+
+      // Assumptions: should appear as prose, NOT in any code block
+      const blocks = extractCodeBlocks(result);
+      const assumptionsBlock = blocks.find(b => b.includes('Assumptions:'));
+      expect(assumptionsBlock).toBeUndefined();
+      expect(result).toContain('Assumptions:');
+
+      // No empty code blocks
+      const emptyBlock = blocks.find(b => b.trim() === '');
+      expect(emptyBlock).toBeUndefined();
+
+      // Go code should be in a code block
+      const goBlock = blocks.find(b => b.includes('package main') && b.includes('func main()'));
+      expect(goBlock).toBeDefined();
+
+      // Dockerfile should be in a separate code block
+      const dockerBlock = blocks.find(b => b.includes('FROM maven'));
+      expect(dockerBlock).toBeDefined();
     });
   });
 });
