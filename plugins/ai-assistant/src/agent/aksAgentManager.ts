@@ -2475,10 +2475,9 @@ function normalizeTerminalMarkdown(text: string): string {
               trimTrailingBlanks();
               break;
             } else if (
-              // Break at YAML-to-code boundary: when the block so far is
-              // predominantly YAML (has apiVersion:) and the peek line is
-              // code but NOT YAML, this signals a transition from K8s manifest
-              // content to shell commands (e.g. kubectl apply after YAML).
+              // Break at YAML-to-code boundary: block has apiVersion: and
+              // peek line is code but NOT YAML — transition from K8s
+              // manifest to shell commands (e.g. kubectl apply after YAML).
               blockLines.some(l => /^\s*apiVersion:\s/.test(l)) &&
               !looksLikeYaml(peekTrimmed)
             ) {
@@ -2528,10 +2527,8 @@ function normalizeTerminalMarkdown(text: string): string {
         const lineIndent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
         if (indBlockInLiteral) {
           if (lineIndent > indBlockLiteralIndent) {
-            // Still inside literal block — keep going
-            // Don't count code-like lines inside literal block scalars
-            // because they're YAML scalar content (e.g. embedded scripts
-            // in ConfigMap data), not standalone code lines.
+            // Still inside literal block — don't count code-like lines
+            // (e.g. embedded ConfigMap scripts) as they're scalar content.
             blockLines.push(blockLine);
             j++;
             continue;
@@ -2594,15 +2591,10 @@ function normalizeTerminalMarkdown(text: string): string {
         // Previous line ends with |, |-, |+, >-, |2, etc. → YAML literal/folded
         // block scalar; all indented lines that follow are scalar content.
         const prevIsLiteralBlockIndicator = /[|>][-+]?\d?\s*$/.test(prevContentTrimmed);
-        // K8s YAML blocks containing apiVersion: at the block's base indent
-        // with only a few code-like fragments (typically YAML comments with
-        // paths like "/api/*") should be pushed as-is for wrapBareYamlBlocks
-        // to handle with ```yaml.  Only match apiVersion: at the base indent
-        // (±2 spaces) to avoid false positives on heredocs and Python strings
-        // that embed YAML at deeper indentation.  Also require the block to
-        // have been started by a YAML line (not a code line like "cat <<EOF"
-        // or "YAML_TEMPLATE = ...") to distinguish embedded YAML from
-        // standalone K8s manifests.
+        // K8s YAML blocks with apiVersion: at base indent (±2 spaces) and
+        // few code-like fragments should be pushed as-is for wrapBareYamlBlocks.
+        // Block must start with a YAML line (not code like "cat <<EOF") to
+        // distinguish standalone K8s manifests from embedded YAML.
         const firstBlockTrimmed = blockLines.length > 0 ? blockLines[0].trim() : '';
         const blockStartedByCode = looksLikeShellOrDockerCodeLine(firstBlockTrimmed);
         const hasK8sApiVersion =
