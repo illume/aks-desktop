@@ -453,12 +453,7 @@ export const fb2_yamlDocSeparator = makeRaw([
 ]);
 
 /** Shell heredoc at column 0 with YAML-like body */
-export const fb2_shellHeredoc = makeRaw([
-  'cat <<EOF',
-  'apiVersion: v1',
-  'kind: Pod',
-  'EOF',
-]);
+export const fb2_shellHeredoc = makeRaw(['cat <<EOF', 'apiVersion: v1', 'kind: Pod', 'EOF']);
 
 /** Ordered list items with code panels after each (space-prefixed numbers match original terminal output) */
 export const fb2_orderedListPanels = makeRaw([
@@ -485,11 +480,7 @@ export const fb2_unicodeFilename = makeRaw([
 ]);
 
 /** Panel content exactly 78 chars */
-export const fb2_exact78Chars = makeRaw([
-  panelBlank(),
-  panelLine('x'.repeat(78)),
-  panelBlank(),
-]);
+export const fb2_exact78Chars = makeRaw([panelBlank(), panelLine('x'.repeat(78)), panelBlank()]);
 
 /** Bare non-K8s YAML starting with name: */
 export const fb2_bareNonK8sYaml = makeRaw([
@@ -528,11 +519,7 @@ export const fb2_cargoLockToml = makeRaw([
 ]);
 
 /** Prose with period should not be file heading */
-export const fb2_proseNotHeading = makeRaw([
-  'Hello world.',
-  '',
-  'This is a paragraph.',
-]);
+export const fb2_proseNotHeading = makeRaw(['Hello world.', '', 'This is a paragraph.']);
 
 /** Markdown ## heading after code panel */
 export const fb2_markdownHeadingAfterCode = makeRaw([
@@ -586,11 +573,7 @@ export const fb2_headingBlankLinePanel = makeRaw([
 ]);
 
 /** Closing brace at column 0 after code block */
-export const fb2_closingBrace = makeRaw([
-  'fn main() {',
-  '    println!("Hello, world!");',
-  '}',
-]);
+export const fb2_closingBrace = makeRaw(['fn main() {', '    println!("Hello, world!");', '}']);
 
 /** Consecutive blank panel lines */
 export const fb2_consecutiveBlanks = makeRaw([
@@ -616,7 +599,9 @@ export const fb2_readmeMdContent = makeRaw([
 /** ANSI bold inside panel content — manually built (not via panelLine) to embed \x1b[1m bold inside content */
 export const fb2_ansiBoldPanel = makeRaw([
   panelBlank(),
-  `\x1b[40m \x1b[0m\x1b[97;40m${'\x1b[1mImportant\x1b[0m: Run this command'.padEnd(78)}\x1b[0m\x1b[40m \x1b[0m`,
+  `\x1b[40m \x1b[0m\x1b[97;40m${'\x1b[1mImportant\x1b[0m: Run this command'.padEnd(
+    78
+  )}\x1b[0m\x1b[40m \x1b[0m`,
   panelBlank(),
 ]);
 
@@ -651,11 +636,7 @@ export const fb2_panelDashList = makeRaw([
 ]);
 
 /** Bare python import at column 0 */
-export const fb2_pythonImport = makeRaw([
-  'import os',
-  'import sys',
-  'from pathlib import Path',
-]);
+export const fb2_pythonImport = makeRaw(['import os', 'import sys', 'from pathlib import Path']);
 
 /** Prose lines with word-colon pattern and many words */
 export const fb2_proseWordColon = makeRaw([
@@ -665,11 +646,7 @@ export const fb2_proseWordColon = makeRaw([
 ]);
 
 /** File heading with spaces in path */
-export const fb2_spacesInPath = makeRaw([
-  'My App/config.yaml',
-  '',
-  'Edit the config file above.',
-]);
+export const fb2_spacesInPath = makeRaw(['My App/config.yaml', '', 'Edit the config file above.']);
 
 /** Literal backslash-x1b text in panel content */
 export const fb2_literalEscapeText = makeRaw([
@@ -2842,9 +2819,7 @@ export const fb12_bareProbeFailures = makeRaw([
   '',
   panelLine('Readiness probe failed: Get "http://10.0.0.5:8080/healthz": connection refused'),
   panelLine('Liveness probe failed: HTTP probe failed with statuscode: 503'),
-  panelLine(
-    'Startup probe failed: Get "http://10.0.0.5:8080/ready": context deadline exceeded'
-  ),
+  panelLine('Startup probe failed: Get "http://10.0.0.5:8080/ready": context deadline exceeded'),
   panelBlank(),
 ]);
 
@@ -3370,14 +3345,7 @@ export const fb15_deploymentYamlPanel = makeRaw([
 
 /** src/main.rs: with trailing colon wraps Rust code (non-panel format) */
 export const fb15_mainRsNonPanel = (() => {
-  const body = [
-    'src/main.rs:',
-    '',
-    'fn main() {',
-    '    println!("Hello, world!");',
-    '}',
-    '',
-  ];
+  const body = ['src/main.rs:', '', 'fn main() {', '    println!("Hello, world!");', '}', ''];
   return [
     'stty -echo',
     '\x1b[?2004l',

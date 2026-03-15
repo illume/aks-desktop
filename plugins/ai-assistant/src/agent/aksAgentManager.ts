@@ -2514,10 +2514,7 @@ function normalizeTerminalMarkdown(text: string): string {
       // These are section headings, not YAML keys that should start a block.
       // This prevents "Assumptions:" from merging with subsequent Dockerfile
       // or shell code into a single code block.
-      if (
-        CAPITALIZED_HEADING_RE.test(trimmed) &&
-        !looksLikeShellOrDockerCodeLine(trimmed)
-      ) {
+      if (CAPITALIZED_HEADING_RE.test(trimmed) && !looksLikeShellOrDockerCodeLine(trimmed)) {
         let peekNext = i + 1;
         while (peekNext < lines.length && lines[peekNext].trim() === '') peekNext++;
         if (
@@ -3468,12 +3465,7 @@ function wrapBareCodeBlocks(text: string): string {
     // the extension (e.g. .py ⇒ Python, .txt ⇒ requirements-style deps).
     // Also accepts filenames with a trailing colon (e.g. "Cargo.toml:").
     const fileHintName = trimmed.replace(/:$/, '');
-    if (
-      trimmed !== '' &&
-      !/^\s+/.test(line) &&
-      !inCodeFence &&
-      isBoldFileHeading(fileHintName)
-    ) {
+    if (trimmed !== '' && !/^\s+/.test(line) && !inCodeFence && isBoldFileHeading(fileHintName)) {
       // Peek ahead: skip blank lines, then check if content follows
       let peekJ = i + 1;
       while (peekJ < lines.length && lines[peekJ].trim() === '') peekJ++;
@@ -3522,17 +3514,10 @@ function wrapBareCodeBlocks(text: string): string {
               if (blankCount >= 2 || peekNext >= lines.length) break;
               const nextTr = lines[peekNext].trim();
               // Break at next file heading (with or without trailing colon)
-              if (
-                isBoldFileHeading(nextTr) ||
-                isBoldFileHeading(nextTr.replace(/:$/, ''))
-              )
-                break;
+              if (isBoldFileHeading(nextTr) || isBoldFileHeading(nextTr.replace(/:$/, ''))) break;
               if (isFileHeaderComment(nextTr)) break;
               // Continue if next line looks like code or is indented
-              if (
-                looksLikeShellOrDockerCodeLine(nextTr) ||
-                /^\s+\S/.test(lines[peekNext])
-              ) {
+              if (looksLikeShellOrDockerCodeLine(nextTr) || /^\s+\S/.test(lines[peekNext])) {
                 codeLines.push(fl);
                 fj++;
                 continue;

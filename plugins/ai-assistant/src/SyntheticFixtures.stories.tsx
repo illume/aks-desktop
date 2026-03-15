@@ -60,24 +60,15 @@ export const Round01TwoFileHeadings: StoryFn<typeof ContentRenderer> = () => (
 );
 
 export const Round02ShellHeredoc: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    onYamlDetected={noopYamlDetected}
-    content={extractAIAnswer(fb2_shellHeredoc)}
-  />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb2_shellHeredoc)} />
 );
 
 export const Round03CssPanel: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    onYamlDetected={noopYamlDetected}
-    content={extractAIAnswer(fb3_cssPanel)}
-  />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb3_cssPanel)} />
 );
 
 export const Round04YamlMergeKey: StoryFn<typeof ContentRenderer> = () => (
-  <ContentRenderer
-    onYamlDetected={noopYamlDetected}
-    content={extractAIAnswer(fb4_yamlMergeKey)}
-  />
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb4_yamlMergeKey)} />
 );
 
 export const Round05CIncludeHeaders: StoryFn<typeof ContentRenderer> = () => (
@@ -182,10 +173,7 @@ export const Round02ShellHeredocDark: StoryFn<typeof ContentRenderer> = () => (
 export const Round03CssPanelDark: StoryFn<typeof ContentRenderer> = () => (
   <ThemeProvider theme={darkTheme}>
     <CssBaseline />
-    <ContentRenderer
-      onYamlDetected={noopYamlDetected}
-      content={extractAIAnswer(fb3_cssPanel)}
-    />
+    <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb3_cssPanel)} />
   </ThemeProvider>
 );
 
