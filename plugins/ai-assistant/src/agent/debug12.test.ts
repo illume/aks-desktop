@@ -31,8 +31,8 @@ function makeRaw(bodyLines: string[]): string {
   return [...prefix, ...bodyLines, ...suffix].join('\n');
 }
 
-function extractCodeBlocks(result: string): Array<{type: string, content: string}> {
-  const blocks: Array<{type: string, content: string}> = [];
+function extractCodeBlocks(result: string): Array<{ type: string; content: string }> {
+  const blocks: Array<{ type: string; content: string }> = [];
   let inBlock = false;
   let blockType = '';
   let current: string[] = [];
@@ -61,8 +61,12 @@ describe('debug12: Understanding why tests 5, 9, 10, 11, 12 pass', () => {
       'Etcd endpoint status:',
       '',
       panelLine('https://10.0.0.10:2379, 8e9e05c52164694d, 3.5.9, 25 MB, true, false, 12, 1547564'),
-      panelLine('https://10.0.0.11:2379, ade526d28b1f92f7, 3.5.9, 25 MB, false, false, 12, 1547564'),
-      panelLine('https://10.0.0.12:2379, d282ac2ce600c1ce, 3.5.9, 25 MB, false, false, 12, 1547564'),
+      panelLine(
+        'https://10.0.0.11:2379, ade526d28b1f92f7, 3.5.9, 25 MB, false, false, 12, 1547564'
+      ),
+      panelLine(
+        'https://10.0.0.12:2379, d282ac2ce600c1ce, 3.5.9, 25 MB, false, false, 12, 1547564'
+      ),
       panelBlank(),
     ];
     const result = extractAIAnswer(makeRaw(body));

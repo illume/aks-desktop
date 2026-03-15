@@ -145,7 +145,9 @@ describe('findbugs12: K8s/AKS-focused extractAIAnswer edge cases round 3', () =>
       '',
       panelLine('Readiness probe failed: Get "http://10.0.0.5:8080/healthz": connection refused'),
       panelLine('Liveness probe failed: HTTP probe failed with statuscode: 503'),
-      panelLine('Startup probe failed: Get "http://10.0.0.5:8080/ready": context deadline exceeded'),
+      panelLine(
+        'Startup probe failed: Get "http://10.0.0.5:8080/ready": context deadline exceeded'
+      ),
       panelBlank(),
     ];
     const result = extractAIAnswer(makeRaw(body));

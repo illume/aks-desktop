@@ -1647,14 +1647,20 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if ((trimmed.match(/\S\s{2,}\S/g) ?? []).length >= 2) return true;
 
   // PromQL functions: sum(rate(...{...}[5m])) etc.
-  if (/\b(rate|sum|histogram_quantile|avg|count|avg_over_time|increase)\(/.test(trimmed) &&
-    (/[{[\]]/.test(trimmed)))
+  if (
+    /\b(rate|sum|histogram_quantile|avg|count|avg_over_time|increase)\(/.test(trimmed) &&
+    /[{[\]]/.test(trimmed)
+  )
     return true;
   // Prometheus metric format: metric_name{labels} value
   if (/^[a-z_][a-z0-9_]*\{[^}]+\}\s+\S/.test(trimmed)) return true;
 
   // K8s event messages: verbs from kubectl describe events
-  if (/^(Pulling|Pulled|Created|Started|Killing|Stopped|Attached|Detached|Scheduled|FailedScheduling)\s+(image\s+"[^"]*"|container\s+\S|volume\s+"[^"]*")/.test(trimmed))
+  if (
+    /^(Pulling|Pulled|Created|Started|Killing|Stopped|Attached|Detached|Scheduled|FailedScheduling)\s+(image\s+"[^"]*"|container\s+\S|volume\s+"[^"]*")/.test(
+      trimmed
+    )
+  )
     return true;
   if (/^(Successfully\s+assigned|Container\s+image\s+")/.test(trimmed)) return true;
 
@@ -1670,13 +1676,18 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^(stdout|stderr)\s+F\s+/.test(trimmed)) return true;
 
   // K8s operation failures
-  if (/^(MountVolume\.|AttachVolume\.|Failed\s+to\s+pull\s+image|Error\s+response\s+from\s+daemon)/.test(trimmed))
+  if (
+    /^(MountVolume\.|AttachVolume\.|Failed\s+to\s+pull\s+image|Error\s+response\s+from\s+daemon)/.test(
+      trimmed
+    )
+  )
     return true;
   if (/^Unable\s+to\s+attach\s+or\s+mount\s+volumes/.test(trimmed)) return true;
 
   // Container lifecycle
   if (/^Back-off\s+restarting/.test(trimmed)) return true;
-  if (/^Container\s+\S+.*\b(definition\s+changed|failed\s+liveness\s+probe)/.test(trimmed)) return true;
+  if (/^Container\s+\S+.*\b(definition\s+changed|failed\s+liveness\s+probe)/.test(trimmed))
+    return true;
   if (/^Killing\s+container\s+with/.test(trimmed)) return true;
 
   // Dotted key=value pairs
@@ -2081,13 +2092,17 @@ function normalizeTerminalMarkdown(text: string): string {
         /^(level|ts|time|msg)=\S/.test(trimmed) ||
         /\b(rate|sum|histogram_quantile|avg|count)\(/.test(trimmed) ||
         /^[a-z_][a-z0-9_]*\{[^}]+\}\s+\S/.test(trimmed) ||
-        /^(Pulling|Pulled|Created|Started|Killing|Stopped|Attached|Detached|Scheduled|FailedScheduling)\s/.test(trimmed) ||
+        /^(Pulling|Pulled|Created|Started|Killing|Stopped|Attached|Detached|Scheduled|FailedScheduling)\s/.test(
+          trimmed
+        ) ||
         /^(Successfully\s+assigned|Container\s+image\s+")/.test(trimmed) ||
         /^(Readiness|Liveness|Startup)\s+probe\s+failed:/.test(trimmed) ||
         /^\d+\/\d+\s+nodes\s+are\s+available:/.test(trimmed) ||
         /^(Insufficient\s+(cpu|memory)|node\(s\)\s+(had|did\s+not\s+match))/.test(trimmed) ||
         /^(stdout|stderr)\s+F\s+/.test(trimmed) ||
-        /^(MountVolume\.|AttachVolume\.|Failed\s+to\s+pull|Error\s+response\s+from|Unable\s+to\s+attach)/.test(trimmed) ||
+        /^(MountVolume\.|AttachVolume\.|Failed\s+to\s+pull|Error\s+response\s+from|Unable\s+to\s+attach)/.test(
+          trimmed
+        ) ||
         /^(Back-off\s+restarting|Killing\s+container\s+with)/.test(trimmed) ||
         /^Container\s+\S+.*\b(definition\s+changed|failed\s+liveness\s+probe)/.test(trimmed) ||
         /^[a-z][\w]*\.[a-z][\w]*=\S/.test(trimmed) ||
@@ -2459,6 +2474,16 @@ function normalizeTerminalMarkdown(text: string): string {
               // Non-file-header blocks: break when peek line doesn't look like code.
               trimTrailingBlanks();
               break;
+            } else if (
+              // Break at YAML-to-code boundary: when the block so far is
+              // predominantly YAML (has apiVersion:) and the peek line is
+              // code but NOT YAML, this signals a transition from K8s manifest
+              // content to shell commands (e.g. kubectl apply after YAML).
+              blockLines.some(l => /^\s*apiVersion:\s/.test(l)) &&
+              !looksLikeYaml(peekTrimmed)
+            ) {
+              trimTrailingBlanks();
+              break;
             }
           } else if (startedByFileHeader) {
             trimTrailingBlanks();
@@ -2504,8 +2529,10 @@ function normalizeTerminalMarkdown(text: string): string {
         if (indBlockInLiteral) {
           if (lineIndent > indBlockLiteralIndent) {
             // Still inside literal block — keep going
+            // Don't count code-like lines inside literal block scalars
+            // because they're YAML scalar content (e.g. embedded scripts
+            // in ConfigMap data), not standalone code lines.
             blockLines.push(blockLine);
-            if (looksLikeShellOrDockerCodeLine(blockTrimmed)) codeLikeLineCount++;
             j++;
             continue;
           }
@@ -2567,8 +2594,29 @@ function normalizeTerminalMarkdown(text: string): string {
         // Previous line ends with |, |-, |+, >-, |2, etc. → YAML literal/folded
         // block scalar; all indented lines that follow are scalar content.
         const prevIsLiteralBlockIndicator = /[|>][-+]?\d?\s*$/.test(prevContentTrimmed);
+        // K8s YAML blocks containing apiVersion: at the block's base indent
+        // with only a few code-like fragments (typically YAML comments with
+        // paths like "/api/*") should be pushed as-is for wrapBareYamlBlocks
+        // to handle with ```yaml.  Only match apiVersion: at the base indent
+        // (±2 spaces) to avoid false positives on heredocs and Python strings
+        // that embed YAML at deeper indentation.  Also require the block to
+        // have been started by a YAML line (not a code line like "cat <<EOF"
+        // or "YAML_TEMPLATE = ...") to distinguish embedded YAML from
+        // standalone K8s manifests.
+        const firstBlockTrimmed = blockLines.length > 0 ? blockLines[0].trim() : '';
+        const blockStartedByCode = looksLikeShellOrDockerCodeLine(firstBlockTrimmed);
+        const hasK8sApiVersion =
+          !blockStartedByCode &&
+          blockLines.some(l => {
+            const indent = l.match(/^(\s*)/)?.[1].length ?? 0;
+            return /^\s*apiVersion:\s/.test(l) && indent <= baseIndent + 2;
+          });
+        const yamlLineCount = blockLines.filter(l => looksLikeYaml(l.trim())).length;
+        const isK8sYamlWithFragments = hasK8sApiVersion && yamlLineCount > codeLikeLineCount * 3;
         const isFragmentInsideYaml =
-          (codeLikeLineCount <= 2 && prevIsYaml && nextIsYaml) || prevIsLiteralBlockIndicator;
+          (codeLikeLineCount <= 2 && prevIsYaml && nextIsYaml) ||
+          prevIsLiteralBlockIndicator ||
+          isK8sYamlWithFragments;
 
         if (!isFragmentInsideYaml) {
           const nonBlank = blockLines.filter(l => l.trim() !== '');
