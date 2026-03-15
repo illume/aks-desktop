@@ -3133,8 +3133,11 @@ function wrapBareYamlBlocks(text: string): string {
           }
         }
         // If most list items are prose (no YAML key-value structure),
-        // treat as markdown bullets, not YAML
-        const isProseBulletList = totalListItems > 0 && structuredYamlItems < totalListItems / 2;
+        // treat as markdown bullets, not YAML.
+        // Threshold: fewer than half the items have YAML structure.
+        const YAML_LIST_STRUCTURE_RATIO = 0.5;
+        const isProseBulletList =
+          totalListItems > 0 && structuredYamlItems < totalListItems * YAML_LIST_STRUCTURE_RATIO;
         if (yamlLines.length > 0 && !isProseBulletList) {
           result.push('```yaml');
           result.push(...yamlLines);
