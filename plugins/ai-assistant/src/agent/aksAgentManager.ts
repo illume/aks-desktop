@@ -2031,6 +2031,24 @@ function normalizeTerminalMarkdown(text: string): string {
           if (isProseHeadingEndingWithColon(pt)) {
             break;
           }
+          // Break at capitalized single-word headings (e.g. "Assumptions:",
+          // "Prerequisites:", "Requirements:") when the previously collected
+          // content contains code (function definitions, imports, braces).
+          // This distinguishes prose section headings from kubectl output labels
+          // like "Events:", "Status:" which follow other structured output.
+          if (
+            /^[A-Z]\w+:\s*$/.test(pt) &&
+            !looksLikeShellOrDockerCodeLine(pt) &&
+            panelLines.some(pl => {
+              const plt = pl.trim();
+              return (
+                /^(func |def |class |import |from |package |export |const |let |var |return |type )/.test(plt) ||
+                /[{}()]/.test(plt)
+              );
+            })
+          ) {
+            break;
+          }
           // Break at numbered step headers (e.g. "2) Containerize (multi-stage
           // Dockerfile)").  These are section headings, not code, even when
           // indented after a code block.
@@ -2467,6 +2485,29 @@ function normalizeTerminalMarkdown(text: string): string {
         continue;
       }
 
+      // Skip capitalized single-word prose headings (e.g. "Assumptions:",
+      // "Prerequisites:") when the following non-blank content is code.
+      // These are section headings, not YAML keys that should start a block.
+      // This prevents "Assumptions:" from merging with subsequent Dockerfile
+      // or shell code into a single code block.
+      if (
+        /^[A-Z]\w+:\s*$/.test(trimmed) &&
+        !looksLikeShellOrDockerCodeLine(trimmed)
+      ) {
+        let peekNext = i + 1;
+        while (peekNext < lines.length && lines[peekNext].trim() === '') peekNext++;
+        if (
+          peekNext < lines.length &&
+          looksLikeShellOrDockerCodeLine(lines[peekNext].trim()) &&
+          !looksLikeYaml(lines[peekNext].trim())
+        ) {
+          // Prose heading before code — emit as-is, don't start indented block
+          result.push(line);
+          i++;
+          continue;
+        }
+      }
+
       const blockLines: string[] = [];
       let j = i;
       let codeLikeLineCount = 0;
@@ -2536,6 +2577,19 @@ function normalizeTerminalMarkdown(text: string): string {
             ) {
               trimTrailingBlanks();
               break;
+            } else if (
+              // Break when a block started with a capitalized prose heading
+              // (e.g. "Assumptions:", "Prerequisites:") and the peek line
+              // is code — the heading was a prose section label, not a YAML
+              // key.  Without this check, "Assumptions:" followed by a blank
+              // line and Dockerfile content merges into one code block.
+              blockLines.length === 1 &&
+              /^[A-Z]\w+:\s*$/.test(blockLines[0].trim()) &&
+              looksLikeShellOrDockerCodeLine(peekTrimmed) &&
+              !looksLikeYaml(peekTrimmed)
+            ) {
+              trimTrailingBlanks();
+              break;
             }
           } else if (startedByFileHeader) {
             trimTrailingBlanks();
@@ -2579,6 +2633,28 @@ function normalizeTerminalMarkdown(text: string): string {
         // Also break at short prose headings ending with colon
         // (e.g. "Also confirm:", "Build + push:").
         if (!startedByFileHeader && isProseHeadingEndingWithColon(blockTrimmed)) {
+          break;
+        }
+
+        // Break at capitalized single-word headings (e.g. "Assumptions:",
+        // "Prerequisites:", "Requirements:") when the block already contains
+        // code (function definitions, imports, braces).  These are prose
+        // section headings, not YAML keys.  Without this check, blank line
+        // collapsing merges code and headings, and the heading gets absorbed
+        // into the code block (e.g. Go code + "Assumptions:" + Dockerfile).
+        if (
+          !startedByFileHeader &&
+          /^[A-Z]\w+:\s*$/.test(blockTrimmed) &&
+          !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
+          blockLines.some(pl => {
+            const plt = pl.trim();
+            return (
+              /^(func |def |class |import |from |package |export |const |let |var |return |type )/.test(
+                plt
+              ) || /[{}()]/.test(plt)
+            );
+          })
+        ) {
           break;
         }
 

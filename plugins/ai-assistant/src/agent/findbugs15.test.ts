@@ -381,4 +381,71 @@ describe('findbugs15 — filename-hint code detection', () => {
     expect(stepBlock).toBeUndefined();
     expect(result).toContain('2) Containerize');
   });
+
+  // ── #12: Capitalized prose heading "Assumptions:" between Go code and Dockerfile ──
+  it('#12 — Assumptions: between Go code and Dockerfile is prose, not code', () => {
+    // When "Assumptions:" appears between a Go code block and a Dockerfile,
+    // it should be treated as a prose heading — NOT absorbed into either
+    // code block.  No empty code blocks should be produced.
+    const body = [
+      boldLine('Go + AKS deployment'),
+      panelBlank(),
+      boldLine('1. Minimal Go HTTP server (healthz + bind 0.0.0.0:8080)'),
+      panelBlank(),
+      panelLine(' package main'),
+      panelLine(' import ('),
+      panelLine('     "fmt"'),
+      panelLine('     "net/http"'),
+      panelLine(' )'),
+      panelLine(' func main() {'),
+      panelLine('     mux := http.NewServeMux()'),
+      panelLine('     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {'),
+      panelLine('         fmt.Fprintln(w, "hello from go")'),
+      panelLine('     })'),
+      panelLine('     port := os.Getenv("PORT")'),
+      panelLine('     if port == "" {'),
+      panelLine('         port = "8080"'),
+      panelLine('     }'),
+      panelLine('     log.Fatal(http.ListenAndServe(":8080", nil))'),
+      panelLine(' }'),
+      panelBlank(),
+      panelLine('Assumptions:'),
+      panelBlank(),
+      panelLine('FROM maven:3.9.8-eclipse-temurin-21 AS builder'),
+      panelLine('WORKDIR /src'),
+      panelLine('COPY pom.xml .'),
+      panelLine('COPY src ./src'),
+      panelLine('RUN mvn -q -DskipTests package'),
+      panelLine('# runtime stage'),
+      panelLine('FROM eclipse-temurin:21-jre-jammy'),
+      panelLine('WORKDIR /app'),
+      panelLine('COPY --from=builder /src/target/*.jar /app/app.jar'),
+      panelLine('# optional hardening'),
+      panelLine('RUN useradd -r -u 10001 appuser && chown -R 10001:10001 /app'),
+      panelLine('USER 10001'),
+      panelLine('EXPOSE 8080'),
+      panelLine('ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseG1GC"'),
+      panelLine('ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app/app.jar"]'),
+    ];
+    const result = extractAIAnswer(makeRaw(body));
+    assertNoAnsiLeaks(result);
+
+    // Assumptions: should appear as prose, NOT in any code block
+    const blocks = extractCodeBlocks(result);
+    const assumptionsBlock = blocks.find(b => b.includes('Assumptions:'));
+    expect(assumptionsBlock).toBeUndefined();
+    expect(result).toContain('Assumptions:');
+
+    // No empty code blocks
+    const emptyBlock = blocks.find(b => b.trim() === '');
+    expect(emptyBlock).toBeUndefined();
+
+    // Go code should be in a code block
+    const goBlock = blocks.find(b => b.includes('package main') && b.includes('func main()'));
+    expect(goBlock).toBeDefined();
+
+    // Dockerfile should be in a separate code block
+    const dockerBlock = blocks.find(b => b.includes('FROM maven'));
+    expect(dockerBlock).toBeDefined();
+  });
 });
