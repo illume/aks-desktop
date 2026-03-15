@@ -777,7 +777,7 @@ export const RealWorldRustK8sDeploymentDark: StoryFn<typeof ContentRenderer> = (
   </ThemeProvider>
 );
 
-// ── Synthetic fixture stories (round-representative, one per findbugs round) ─
+// ── Synthetic fixture stories (round-representative, one per fixture round) ──
 
 export const SyntheticRound01TwoFileHeadings: StoryFn<typeof ContentRenderer> = () => (
   <ContentRenderer
