@@ -2651,7 +2651,7 @@ export async function runAksAgent(
       }
 
       debugLog(
-        '[AKS Agent] Starting self-review (mode:', reviewStep + '),',
+        `[AKS Agent] Starting self-review (mode: ${reviewStep}),`,
         'original answer length:', answer.length,
         'answer:', answer
       );
