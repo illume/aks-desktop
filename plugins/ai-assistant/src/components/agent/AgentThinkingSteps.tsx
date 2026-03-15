@@ -114,7 +114,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
         scrollParentRef.current = sp;
       }
 
-      // Delay scroll to let MUI Collapse animations finish (outer=300ms, inner=200ms)
+      // Delay scroll to let MUI Collapse animations settle (300ms outer + buffer)
       const timer = setTimeout(() => {
         const scrollParent = scrollParentRef.current;
 
