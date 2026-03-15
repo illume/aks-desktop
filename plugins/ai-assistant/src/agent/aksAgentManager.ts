@@ -310,7 +310,11 @@ function stripAnsi(text: string): string {
     .replace(/\x1b[()][AB012]/g, '') // Character set selection
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
-    .replace(/\[\d[\d;]*m(?![)\]}\w])/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping); require at least one digit before 'm' so text like [main], [master] is not corrupted; negative lookahead prevents stripping Prometheus-style durations like [5m] or [30m]
+    // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping).
+    // Require at least one digit before 'm' so text like [main], [master]
+    // is not corrupted.  Negative lookahead prevents stripping Prometheus-style
+    // durations like [5m] or [30m] (followed by ], ), }, or word char).
+    .replace(/\[\d[\d;]*m(?![)\]}\w])/g, '')
     .replace(/\s?\[(\d{1,3}(;\d{1,3})*)?$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m", or bare "[" from "\x1b[" at line end)
     .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, '') // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
     .replace(/^0m\s*$/gm, '') // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
@@ -1591,12 +1595,7 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // ── Tier 6c: Makefile directive patterns ──
 
   // .PHONY, .SUFFIXES, .DEFAULT_GOAL, etc.
-  if (
-    /^\.(PHONY|SUFFIXES|DEFAULT_GOAL|PRECIOUS|INTERMEDIATE|SECONDARY|SECONDEXPANSION|DELETE_ON_ERROR|EXPORT_ALL_VARIABLES|NOTPARALLEL|ONESHELL|POSIX):/.test(
-      trimmed
-    )
-  )
-    return true;
+  if (isMakefileDirective(trimmed)) return true;
 
   // ── Tier 7: XML/HTML patterns ──
 
