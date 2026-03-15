@@ -1571,7 +1571,7 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // Go/Rust short variable declaration: identifier := expr
   // Also handles Go multi-return: a, b := expr
-  if (/^[\w,\s]+:=\s*\S/.test(trimmed) && /:=/.test(trimmed)) return true;
+  if (/^\w+(\s*,\s*\w+)*\s*:=\s*\S/.test(trimmed)) return true;
 
   // Go channel send: identifier <- expr
   if (/^\w+\s*<-\s*\S/.test(trimmed)) return true;
