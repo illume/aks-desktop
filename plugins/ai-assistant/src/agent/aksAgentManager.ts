@@ -1470,9 +1470,7 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   if (/^(async\s+)?def\s+\w+\s*\(/.test(trimmed)) return true;
 
   // Python/Ruby/Java/Scala/Kotlin class definition
-  if (
-    /^((?:public|abstract|data|case|sealed)\s+)*class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed)
-  )
+  if (/^((?:public|abstract|data|case|sealed)\s+)*class\s+[A-Z]\w*([\s(:;<]|$)/.test(trimmed))
     return true;
   // Scala object: object Name { ... }
   if (/^object\s+[A-Z]\w*([\s{]|$)/.test(trimmed)) return true;
@@ -1593,7 +1591,11 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // ── Tier 6c: Makefile directive patterns ──
 
   // .PHONY, .SUFFIXES, .DEFAULT_GOAL, etc.
-  if (/^\.(PHONY|SUFFIXES|DEFAULT_GOAL|PRECIOUS|INTERMEDIATE|SECONDARY|SECONDEXPANSION|DELETE_ON_ERROR|EXPORT_ALL_VARIABLES|NOTPARALLEL|ONESHELL|POSIX):/.test(trimmed))
+  if (
+    /^\.(PHONY|SUFFIXES|DEFAULT_GOAL|PRECIOUS|INTERMEDIATE|SECONDARY|SECONDEXPANSION|DELETE_ON_ERROR|EXPORT_ALL_VARIABLES|NOTPARALLEL|ONESHELL|POSIX):/.test(
+      trimmed
+    )
+  )
     return true;
 
   // ── Tier 7: XML/HTML patterns ──
@@ -1964,7 +1966,7 @@ function normalizeTerminalMarkdown(text: string): string {
       if (yamlPanelLines.length >= 3 && !hasApiVersion) {
         const nonBlank = yamlPanelLines.filter(l => l.trim() !== '');
         const minIndent = nonBlank.reduce(
-          (min, l) => Math.min(min, (l.match(/^(\s*)/)?.[1].length ?? 0)),
+          (min, l) => Math.min(min, l.match(/^(\s*)/)?.[1].length ?? 0),
           Infinity
         );
         const shift = minIndent === Infinity ? 0 : minIndent;
