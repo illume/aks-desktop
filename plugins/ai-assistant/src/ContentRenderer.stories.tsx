@@ -6,6 +6,36 @@ import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import {
+  fb1_dockerCompose,
+  fb1_twoFileHeadings,
+  fb2_bareNonK8sYaml,
+  fb2_shellHeredoc,
+  fb3_cssPanel,
+  fb3_sqlPanel,
+  fb4_yamlMergeKey,
+  fb5_cIncludeHeaders,
+  fb5_shellCaseStatement,
+  fb5_terraformHcl,
+  fb6_goGoroutineChannel,
+  fb6_javaTryCatchFinally,
+  fb7_kotlinDataClass,
+  fb7_rubyClassMethods,
+  fb8_githubActionsYaml,
+  fb8_k8sCrdDefinition,
+  fb9_phpClassNamespace,
+  fb9_scalaCaseClass,
+  fb10_configMapLiteralBlock,
+  fb10_helmValuesYaml,
+  fb11_aksTroubleshooting,
+  fb11_dockerBuildSteps,
+  fb11_helmTemplateGoExpr,
+  fb12_barePrometheusMetrics,
+  fb12_coreDNSCorefile,
+  fb13_mixedMarkdownFormatting,
+  fb13_proseColonEnding,
+  fb14_panelCodeThenAlsoConfirm,
+  fb15_assumptionsBetweenCodeBlocks,
+  fb15_mainPyPanel,
   rawBareYamlService,
   rawBestPractices,
   rawCrashDiagnosis,
@@ -745,4 +775,197 @@ export const RealWorldRustK8sDeploymentDark: StoryFn<typeof ContentRenderer> = (
       content={extractAIAnswer(rawRustK8sDeployment)}
     />
   </ThemeProvider>
+);
+
+// ── Synthetic fixture stories (round-representative, one per findbugs round) ─
+
+export const SyntheticRound01TwoFileHeadings: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb1_twoFileHeadings)}
+  />
+);
+
+export const SyntheticRound02ShellHeredoc: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb2_shellHeredoc)} />
+);
+
+export const SyntheticRound03CssPanel: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb3_cssPanel)} />
+);
+
+export const SyntheticRound04YamlMergeKey: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb4_yamlMergeKey)} />
+);
+
+export const SyntheticRound05CIncludeHeaders: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb5_cIncludeHeaders)}
+  />
+);
+
+export const SyntheticRound06JavaTryCatchFinally: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb6_javaTryCatchFinally)}
+  />
+);
+
+export const SyntheticRound07RubyClassMethods: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb7_rubyClassMethods)}
+  />
+);
+
+export const SyntheticRound08K8sCrdDefinition: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb8_k8sCrdDefinition)}
+  />
+);
+
+export const SyntheticRound09ScalaCaseClass: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb9_scalaCaseClass)}
+  />
+);
+
+export const SyntheticRound10ConfigMapLiteralBlock: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb10_configMapLiteralBlock)}
+  />
+);
+
+export const SyntheticRound11AksTroubleshooting: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb11_aksTroubleshooting)}
+  />
+);
+
+export const SyntheticRound12CoreDnsCorefile: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb12_coreDNSCorefile)}
+  />
+);
+
+export const SyntheticRound13MixedMarkdownNegative: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb13_mixedMarkdownFormatting)}
+  />
+);
+
+export const SyntheticRound14PanelCodeThenAlsoConfirm: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb14_panelCodeThenAlsoConfirm)}
+  />
+);
+
+export const SyntheticRound15AssumptionsBetweenCodeBlocks: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb15_assumptionsBetweenCodeBlocks)}
+  />
+);
+
+// ── Additional synthetic fixture stories ─────────────────────────────────────
+
+export const SyntheticDockerComposeYaml: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb1_dockerCompose)} />
+);
+
+export const SyntheticBareNonK8sYaml: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb2_bareNonK8sYaml)}
+  />
+);
+
+export const SyntheticSqlPanel: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb3_sqlPanel)} />
+);
+
+export const SyntheticTerraformHcl: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb5_terraformHcl)} />
+);
+
+export const SyntheticShellCaseStatement: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb5_shellCaseStatement)}
+  />
+);
+
+export const SyntheticGoGoroutineChannel: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb6_goGoroutineChannel)}
+  />
+);
+
+export const SyntheticKotlinDataClass: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb7_kotlinDataClass)}
+  />
+);
+
+export const SyntheticGitHubActionsYaml: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb8_githubActionsYaml)}
+  />
+);
+
+export const SyntheticPhpClassNamespace: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb9_phpClassNamespace)}
+  />
+);
+
+export const SyntheticHelmValuesYaml: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb10_helmValuesYaml)}
+  />
+);
+
+export const SyntheticDockerBuildSteps: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb11_dockerBuildSteps)}
+  />
+);
+
+export const SyntheticHelmTemplateGoExpr: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb11_helmTemplateGoExpr)}
+  />
+);
+
+export const SyntheticBarePrometheusMetrics: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb12_barePrometheusMetrics)}
+  />
+);
+
+export const SyntheticProseColonEndingNegative: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer
+    onYamlDetected={noopYamlDetected}
+    content={extractAIAnswer(fb13_proseColonEnding)}
+  />
+);
+
+export const SyntheticMainPyFilenameHint: StoryFn<typeof ContentRenderer> = () => (
+  <ContentRenderer onYamlDetected={noopYamlDetected} content={extractAIAnswer(fb15_mainPyPanel)} />
 );
