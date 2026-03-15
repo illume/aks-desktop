@@ -5,7 +5,8 @@
  * findbugs6.test.ts (round 6), findbugs7.test.ts (round 7),
  * findbugs8.test.ts (round 8), findbugs9.test.ts (round 9),
  * findbugs10.test.ts (round 10), findbugs11.test.ts (round 11),
- * and findbugs12.test.ts (round 12).
+ * findbugs12.test.ts (round 12), findbugs13.test.ts (round 13),
+ * findbugs14.test.ts (round 14), and findbugs15.test.ts (round 15).
  *
  * Each fixture is the raw terminal output for a single test case,
  * exported as a named constant following the convention fb{round}_{shortName}.
@@ -25,6 +26,11 @@ function panelLine(content: string, keyColor = '97;40'): string {
 /** Empty panel line (80 spaces with ANSI background). */
 function panelBlank(): string {
   return '\x1b[40m' + ' '.repeat(80) + '\x1b[0m';
+}
+
+/** Rich-terminal bold panel line (e.g. filename headings). Uses bold weight (1;97) unlike panelLine. */
+function boldLine(content: string): string {
+  return `\x1b[40m \x1b[0m\x1b[1;97;40m${content.padEnd(78)}\x1b[0m\x1b[40m \x1b[0m`;
 }
 
 /** Wrap a body array with the standard terminal prefix / suffix. */
@@ -75,7 +81,7 @@ function assertNoAnsiLeaks(result: string): void {
   }
 }
 
-export { panelLine, panelBlank, makeRaw, extractCodeBlocks, assertNoAnsiLeaks };
+export { panelLine, panelBlank, boldLine, makeRaw, extractCodeBlocks, assertNoAnsiLeaks };
 
 // ===========================================================================
 // Round 1 – findbugs.test.ts
@@ -2988,4 +2994,472 @@ export const fb12_bareKeyValueDiagnostics = makeRaw([
   panelLine('pod.name=my-app-abc12 namespace=production node=aks-node-0'),
   panelLine('container.id=abc123def456 image=myapp:v2.0.0 state=running'),
   panelBlank(),
+]);
+
+// ===========================================================================
+// Round 13 — Negative examples (things that should NOT be wrapped as code)
+// ===========================================================================
+
+/** prose sentence ending with colon — should NOT produce a code block */
+export const fb13_proseColonEnding = makeRaw([
+  "Send one of these and I'll diagnose it:",
+  '',
+  'You can also describe what went wrong in your own words.',
+]);
+
+/** diagnostic summary ending with colon — should NOT be code */
+export const fb13_diagnosticSummaryColon = makeRaw([
+  'No obvious pod problems right now:',
+  '',
+  'If you want, I can dig into why those restarted by describing those pods and',
+  'pulling their previous logs.',
+]);
+
+/** step heading "Build + push:" should not produce an empty code block */
+export const fb13_stepHeadingColon = makeRaw([
+  'Build + push:',
+  '',
+  'export IMAGE=ghcr.io/<you>/rust-app:0.1.0',
+  'docker build -t $IMAGE .',
+  'docker push $IMAGE',
+]);
+
+/** "Assumes:" heading followed by Dockerfile — no empty code block from heading */
+export const fb13_assumesHeadingColon = makeRaw([
+  'Assumes:',
+  '',
+  'FROM golang:1.22-bookworm AS builder',
+  'WORKDIR /src',
+  'COPY go.mod go.sum ./',
+  'RUN go mod download',
+]);
+
+/** markdown bold text with k8s terms — NOT code */
+export const fb13_boldK8sTerms = makeRaw([
+  'The **deployment** is running in the **kube-system** namespace.',
+  'Check the **pod** status with the command above.',
+  'The **service** endpoint should be reachable at port 443.',
+]);
+
+/** markdown bullet list with technical terms — NOT code */
+export const fb13_bulletListTechTerms = makeRaw([
+  'Common reasons for pod restarts:',
+  '',
+  '- Out of memory (OOMKilled)',
+  '- Liveness probe failure',
+  '- Image pull errors',
+  '- CrashLoopBackOff due to application bugs',
+  '- Volume mount failures',
+]);
+
+/** numbered step list with k8s actions — NOT code */
+export const fb13_numberedStepList = makeRaw([
+  'Follow these steps:',
+  '',
+  '1. Create the deployment using the YAML above',
+  '2. Verify pods are running with kubectl get pods',
+  '3. Check the service endpoints',
+  '4. Test connectivity from another pod',
+]);
+
+/** markdown headers — NOT YAML comments or code */
+export const fb13_markdownHeaders = makeRaw([
+  '## Troubleshooting Pod Restarts',
+  '',
+  'Here are some things to check when pods keep restarting.',
+  '',
+  '### Step 1: Check Pod Events',
+  '',
+  'Look at the events section of the pod describe output.',
+  '',
+  '### Step 2: Check Logs',
+  '',
+  'Pull the previous container logs to see what happened.',
+]);
+
+/** prose with URLs — NOT code */
+export const fb13_proseWithUrls = makeRaw([
+  'For more information, see the Kubernetes documentation:',
+  'https://kubernetes.io/docs/concepts/workloads/pods/',
+  '',
+  'You can also check the Azure AKS troubleshooting guide at',
+  'https://learn.microsoft.com/en-us/azure/aks/troubleshooting',
+]);
+
+/** "Note:" prefix with explanation — NOT code */
+export const fb13_notePrefix = makeRaw([
+  'Note: the above configuration assumes you have cluster-admin permissions.',
+  'If you are using a restricted RBAC role, you may need to request additional',
+  'access from your platform team.',
+]);
+
+/** multi-paragraph technical explanation — NOT code */
+export const fb13_multiParagraphExplanation = makeRaw([
+  'The pod is in CrashLoopBackOff because the container exits immediately.',
+  'This usually means the application crashed during startup.',
+  '',
+  'Common causes include missing environment variables, incorrect',
+  'database connection strings, or insufficient memory limits.',
+  '',
+  'I recommend checking the previous container logs first.',
+]);
+
+/** prose with inline code backticks — NOT wrapped in code fence */
+export const fb13_inlineCodeBackticks = makeRaw([
+  'You can check the status by running `kubectl get pods -n kube-system`.',
+  'The output should show all pods in Running state.',
+  'If any show `CrashLoopBackOff`, check their logs with `kubectl logs`.',
+]);
+
+/** prose with colon-separated key-value descriptions — NOT YAML */
+export const fb13_proseKeyValueDescriptions = makeRaw([
+  "Here's what I found:",
+  '',
+  'The cluster has 3 node pools with a total of 12 nodes.',
+  'All nodes show Ready status and have sufficient resources.',
+  'The API server is responding normally with no error spikes.',
+]);
+
+/** questions about k8s resources — NOT code */
+export const fb13_questionsAboutK8s = makeRaw([
+  'A few questions to narrow this down:',
+  '',
+  'Which namespace is the deployment in?',
+  'How many replicas are configured?',
+  'Are there any resource limits set on the containers?',
+  'Is the cluster using a custom CNI plugin?',
+]);
+
+/** mixed markdown formatting (bold, italic, lists, headers) — NOT code */
+export const fb13_mixedMarkdownFormatting = makeRaw([
+  '## Summary',
+  '',
+  "Your cluster looks **healthy** overall. Here's what I checked:",
+  '',
+  '- **Node status**: all 6 nodes are _Ready_',
+  '- **Pod health**: 42/45 pods running (3 in Pending)',
+  '- **Resource usage**: ~60% CPU, ~70% memory',
+  '',
+  'The 3 pending pods are waiting for node scale-up.',
+  'This should resolve within 5-10 minutes as the autoscaler kicks in.',
+]);
+
+// ===========================================================================
+// Round 14 — Prose-colon false positives in panel recovery
+// ===========================================================================
+
+/** "Also confirm:" after kubectl commands — prose, not code */
+export const fb14_alsoConfirmAfterShell = makeRaw([
+  ' kubectl get pods -n production',
+  ' kubectl get svc -n production',
+  '',
+  ' Also confirm:',
+  '',
+  ' - the image tag matches what was pushed',
+  ' - the pull secret exists in the namespace',
+]);
+
+/** "Also confirm:" without blank line after shell — not code */
+export const fb14_alsoConfirmNoBlank = makeRaw([
+  ' kubectl get pods -n production',
+  ' Also confirm:',
+  ' - the image tag matches',
+]);
+
+/** "Also confirm:" after double blank — not code */
+export const fb14_alsoConfirmDoubleBlank = makeRaw([
+  ' kubectl get pods -n production',
+  ' kubectl get svc -n production',
+  '',
+  '',
+  ' Also confirm:',
+  '',
+  ' - the image tag matches',
+]);
+
+/** "Build + push:" prose heading — not code */
+export const fb14_buildPushProseHeading = makeRaw([
+  ' docker build -t myapp:latest .',
+  ' Build + push:',
+  ' You can push with docker push.',
+]);
+
+/** Rich panel code then "Also confirm:" stays prose */
+export const fb14_panelCodeThenAlsoConfirm = makeRaw([
+  boldLine('Commands'),
+  panelBlank(),
+  panelLine('kubectl get deploy -n prod'),
+  panelLine('kubectl get svc -n prod'),
+  panelBlank(),
+  '',
+  'Also confirm:',
+  '',
+  '- the image tag matches',
+  '- the pull secret exists',
+]);
+
+// ===========================================================================
+// Round 15 — Filename-hint detection, numbered step headers, capitalized headings
+// ===========================================================================
+
+/** requirements.txt followed by pinned dependencies (panel format) */
+export const fb15_requirementsTxtPanel = makeRaw([
+  panelLine('Here are the project files:'),
+  panelBlank(),
+  boldLine('requirements.txt'),
+  panelBlank(),
+  panelLine(' fastapi==0.110.0'),
+  panelLine(' uvicorn[standard]==0.27.1'),
+  panelBlank(),
+]);
+
+/** main.py followed by Python code (panel format) */
+export const fb15_mainPyPanel = makeRaw([
+  panelLine('Create this file:'),
+  panelBlank(),
+  boldLine('main.py'),
+  panelBlank(),
+  panelLine(' from fastapi import FastAPI'),
+  panelLine(' import os'),
+  panelLine(' app = FastAPI()'),
+  panelLine(' @app.get("/")'),
+  panelLine(' def root():'),
+  panelLine('     return {"message": "hello"}'),
+  panelBlank(),
+]);
+
+/** numbered step header "3) ..." is NOT a code block (panel format) */
+export const fb15_numberedStepHeaderPanel = makeRaw([
+  panelLine('                3) Kubernetes (Deployment + Service + optional Ingress)'),
+  panelBlank(),
+  panelLine('Create a deployment manifest:'),
+]);
+
+/** Dockerfile filename followed by Dockerfile content (panel format) */
+export const fb15_dockerfilePanel = makeRaw([
+  boldLine('Dockerfile'),
+  panelBlank(),
+  panelLine(' FROM python:3.12-slim AS builder'),
+  panelLine(' WORKDIR /app'),
+  panelLine(' COPY requirements.txt .'),
+  panelLine(' RUN pip install --no-cache-dir -r requirements.txt'),
+  panelBlank(),
+  panelLine(' FROM python:3.12-slim'),
+  panelLine(' WORKDIR /app'),
+  panelLine(' COPY --from=builder /app /app'),
+  panelLine(' CMD ["uvicorn", "main:app", "--host", "0.0.0.0"]'),
+  panelBlank(),
+]);
+
+/** requirements.txt followed by deps (non-panel format) */
+// Non-panel fixtures use inline prefix/suffix (no blank line before trailing
+// prompt) to match the original test construction in findbugs15.test.ts.
+export const fb15_requirementsTxtNonPanel = (() => {
+  const body = [
+    'Here are the files:',
+    '',
+    'requirements.txt',
+    '',
+    'fastapi==0.110.0',
+    'uvicorn[standard]==0.27.1',
+    '',
+  ];
+  return [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: ['azure/gpt-4']",
+    '\x1b[1;96mAI:\x1b[0m ',
+    '',
+    ...body,
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+  ].join('\n');
+})();
+
+/** main.py followed by Python code (non-panel format) */
+export const fb15_mainPyNonPanel = (() => {
+  const body = [
+    'Create this file:',
+    '',
+    'main.py',
+    '',
+    'from fastapi import FastAPI',
+    'import os',
+    'app = FastAPI()',
+    '@app.get("/")',
+    'def root():',
+    '    return {"message": "hello"}',
+    '',
+  ];
+  return [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: ['azure/gpt-4']",
+    '\x1b[1;96mAI:\x1b[0m ',
+    '',
+    ...body,
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+  ].join('\n');
+})();
+
+/** numbered header "3) ..." is NOT code (non-panel format) */
+export const fb15_numberedStepHeaderNonPanel = (() => {
+  const body = [
+    '3) Kubernetes (Deployment + Service + optional Ingress)',
+    '',
+    'Create a deployment YAML for your app.',
+  ];
+  return [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: ['azure/gpt-4']",
+    '\x1b[1;96mAI:\x1b[0m ',
+    '',
+    ...body,
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+  ].join('\n');
+})();
+
+/** Cargo.toml: with trailing colon wraps TOML content (non-panel format) */
+export const fb15_cargoTomlNonPanel = (() => {
+  const body = [
+    'Cargo.toml:',
+    '',
+    '[package]',
+    'name = "myapp"',
+    'version = "0.1.0"',
+    '',
+    '[dependencies]',
+    'tokio = { version = "1", features = ["full"] }',
+    '',
+  ];
+  return [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: ['azure/gpt-4']",
+    '\x1b[1;96mAI:\x1b[0m ',
+    '',
+    ...body,
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+  ].join('\n');
+})();
+
+/** deployment.yaml heading keeps YAML separate from filename (panel format) */
+export const fb15_deploymentYamlPanel = makeRaw([
+  panelLine('Create this manifest:'),
+  panelBlank(),
+  boldLine('deployment.yaml'),
+  panelBlank(),
+  panelLine(' apiVersion: apps/v1'),
+  panelLine(' kind: Deployment'),
+  panelLine(' metadata:'),
+  panelLine('   name: myapp'),
+  panelBlank(),
+]);
+
+/** src/main.rs: with trailing colon wraps Rust code (non-panel format) */
+export const fb15_mainRsNonPanel = (() => {
+  const body = [
+    'src/main.rs:',
+    '',
+    'fn main() {',
+    '    println!("Hello, world!");',
+    '}',
+    '',
+  ];
+  return [
+    'stty -echo',
+    '\x1b[?2004l',
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+    '\x1b[?2004l',
+    '',
+    "Loaded models: ['azure/gpt-4']",
+    '\x1b[1;96mAI:\x1b[0m ',
+    '',
+    ...body,
+    '\x1b[?2004hroot@aks-agent-abc123:/app# ',
+  ].join('\n');
+})();
+
+/** indented numbered step header after Go code is NOT a code block */
+export const fb15_numberedStepAfterGoCode = makeRaw([
+  boldLine('1. Minimal Go HTTP server'),
+  panelBlank(),
+  panelLine(' package main'),
+  panelLine(' import ('),
+  panelLine('     "fmt"'),
+  panelLine('     "log"'),
+  panelLine('     "net/http"'),
+  panelLine('     "os"'),
+  panelLine(' )'),
+  panelLine(' func main() {'),
+  panelLine('     mux := http.NewServeMux()'),
+  panelLine('     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {'),
+  panelLine('         fmt.Fprintln(w, "hello from go")'),
+  panelLine('     })'),
+  panelLine('     port := os.Getenv("PORT")'),
+  panelLine('     if port == "" {'),
+  panelLine('         port = "8080"'),
+  panelLine('     }'),
+  panelLine('     addr := "0.0.0.0:" + port'),
+  panelLine('     log.Printf("listening on %s\\n", addr)'),
+  panelLine('     log.Fatal(http.ListenAndServe(addr, mux))'),
+  panelLine(' }'),
+  panelBlank(),
+  panelLine('    2) Containerize (multi-stage Dockerfile, static binary, nonroot)'),
+  panelBlank(),
+  panelLine('Create a Dockerfile:'),
+]);
+
+/** "Assumptions:" between Go code and Dockerfile — prose, not code */
+export const fb15_assumptionsBetweenCodeBlocks = makeRaw([
+  boldLine('Go + AKS deployment'),
+  panelBlank(),
+  boldLine('1. Minimal Go HTTP server (healthz + bind 0.0.0.0:8080)'),
+  panelBlank(),
+  panelLine(' package main'),
+  panelLine(' import ('),
+  panelLine('     "fmt"'),
+  panelLine('     "net/http"'),
+  panelLine(' )'),
+  panelLine(' func main() {'),
+  panelLine('     mux := http.NewServeMux()'),
+  panelLine('     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {'),
+  panelLine('         fmt.Fprintln(w, "hello from go")'),
+  panelLine('     })'),
+  panelLine('     port := os.Getenv("PORT")'),
+  panelLine('     if port == "" {'),
+  panelLine('         port = "8080"'),
+  panelLine('     }'),
+  panelLine('     log.Fatal(http.ListenAndServe(":8080", nil))'),
+  panelLine(' }'),
+  panelBlank(),
+  panelLine('Assumptions:'),
+  panelBlank(),
+  panelLine('FROM maven:3.9.8-eclipse-temurin-21 AS builder'),
+  panelLine('WORKDIR /src'),
+  panelLine('COPY pom.xml .'),
+  panelLine('COPY src ./src'),
+  panelLine('RUN mvn -q -DskipTests package'),
+  panelLine('# runtime stage'),
+  panelLine('FROM eclipse-temurin:21-jre-jammy'),
+  panelLine('WORKDIR /app'),
+  panelLine('COPY --from=builder /src/target/*.jar /app/app.jar'),
+  panelLine('# optional hardening'),
+  panelLine('RUN useradd -r -u 10001 appuser && chown -R 10001:10001 /app'),
+  panelLine('USER 10001'),
+  panelLine('EXPOSE 8080'),
+  panelLine('ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseG1GC"'),
+  panelLine('ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app/app.jar"]'),
 ]);
