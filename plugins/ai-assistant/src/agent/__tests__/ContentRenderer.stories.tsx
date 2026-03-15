@@ -5,6 +5,8 @@ import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import ContentRenderer from '../../ContentRenderer';
+import { _testing } from '../aksAgentManager';
 import {
   fb1_dockerCompose,
   fb1_twoFileHeadings,
@@ -50,9 +52,7 @@ import {
   rawPythonFlaskApp,
   rawRustAxumApp,
   rawRustK8sDeployment,
-} from './agent/__tests__/fixtures';
-import { _testing } from './agent/aksAgentManager';
-import ContentRenderer from './ContentRenderer';
+} from './fixtures';
 
 const { extractAIAnswer } = _testing;
 

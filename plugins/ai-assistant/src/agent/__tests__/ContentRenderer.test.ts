@@ -21,16 +21,16 @@ vi.mock('remark-gfm', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('./components', () => ({
+vi.mock('../../components', () => ({
   LogsButton: vi.fn(),
   YamlDisplay: vi.fn(),
 }));
 
-vi.mock('./utils/promptLinkHelper', () => ({
+vi.mock('../../utils/promptLinkHelper', () => ({
   getHeadlampLink: vi.fn(),
 }));
 
-vi.mock('./utils/SampleYamlLibrary', () => ({
+vi.mock('../../utils/SampleYamlLibrary', () => ({
   parseKubernetesYAML: vi.fn(),
 }));
 
@@ -40,7 +40,7 @@ import {
   looksLikeYamlContent,
   parseJsonContent,
   parseLogsButtonData,
-} from './ContentRenderer';
+} from '../../ContentRenderer';
 
 describe('parseLogsButtonData', () => {
   it('parses valid logs button JSON', () => {
