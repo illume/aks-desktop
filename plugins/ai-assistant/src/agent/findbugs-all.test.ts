@@ -97,6 +97,66 @@ import {
   fb5_dockerComposeYaml,
   fb5_rustLifetimes,
   fb5_numberedStepsShell,
+  fb6_javaTryCatchFinally,
+  fb6_printLogStatements,
+  fb6_arrowFunctions,
+  fb6_tsInterfaceColonMembers,
+  fb6_shellUntilLoop,
+  fb6_proseBetweenCodeBlocks,
+  fb6_pythonFStringBraces,
+  fb6_yamlAnchorsAliases,
+  fb6_rustEnumDerive,
+  fb6_shellIfElifElse,
+  fb6_goGoroutineChannel,
+  fb6_dockerRunBackslash,
+  fb6_javaAnnotationsClass,
+  fb6_kubectlPatchJson,
+  fb6_yamlShellProseSeparated,
+  fb7_luaLocalFunction,
+  fb7_exportEnvVars,
+  fb7_awkSedCommands,
+  fb7_cssRules,
+  fb7_protobufMessage,
+  fb7_systemdUnitFile,
+  fb7_shellPipeChain,
+  fb7_shellScriptVarsCommands,
+  fb7_jsonConfigObject,
+  fb7_rubyClassMethods,
+  fb7_kotlinDataClass,
+  fb7_cStructTypedef,
+  fb7_azCliJmesPath,
+  fb7_pythonAsyncTypeHints,
+  fb7_numberedStepsCodeBlocks,
+  fb8_goStructLiteral,
+  fb8_pythonKwargs,
+  fb8_shellTrapSource,
+  fb8_githubActionsYaml,
+  fb8_rustClosuresIterators,
+  fb8_shellHeredocYaml,
+  fb8_dockerComposeBuildContext,
+  fb8_shellFunctionDef,
+  fb8_pythonNestedExpressions,
+  fb8_terraformMultipleResources,
+  fb8_sqlJoinQuery,
+  fb8_k8sCrdDefinition,
+  fb8_swiftStructProperties,
+  fb8_makefileIfeq,
+  fb8_elixirModule,
+  fb9_tsGenericTypes,
+  fb9_phpClassNamespace,
+  fb9_scalaCaseClass,
+  fb9_shellArraysParamExpansion,
+  fb9_iniConfigFile,
+  fb9_rustTurbofish,
+  fb9_pythonMultiLineString,
+  fb9_javaSpringBootService,
+  fb9_shellHereString,
+  fb9_curlJsonBody,
+  fb9_kotlinSuspendFunction,
+  fb9_terraformLocalsData,
+  fb9_markdownTable,
+  fb9_shellProcessSubstitution,
+  fb9_requirementsTxt,
 } from './findbugFixtures';
 
 const { extractAIAnswer } = _testing;
@@ -970,6 +1030,617 @@ describe('findbugs: all extractAIAnswer edge cases', () => {
       expect(blocks[0]).toContain('kubectl create namespace');
       expect(blocks[1]).toContain('kubectl apply');
       expect(blocks[2]).toContain('kubectl get pods');
+    });
+  });
+
+  describe('round 6', () => {
+    it('1. Java try-catch-finally stays in one code block', () => {
+      const result = extractAIAnswer(fb6_javaTryCatchFinally);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('try {');
+      expect(all).toContain('catch');
+      expect(all).toContain('finally');
+    });
+
+    it('2. Print/log statements detected as code', () => {
+      const result = extractAIAnswer(fb6_printLogStatements);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('console.log');
+    });
+
+    it('3. Arrow functions and modern JS syntax in code block', () => {
+      const result = extractAIAnswer(fb6_arrowFunctions);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('=>');
+      expect(all).toContain('res.json');
+    });
+
+    it('4. TypeScript interface with colon-typed members stays in code block', () => {
+      const result = extractAIAnswer(fb6_tsInterfaceColonMembers);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('interface PodStatus');
+      expect(all).toContain('name: string');
+      expect(all).toContain('restartCount: number');
+    });
+
+    it('5. Shell until loop stays in one code block', () => {
+      const result = extractAIAnswer(fb6_shellUntilLoop);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('until');
+      expect(all).toContain('done');
+    });
+
+    it('6. Prose between two code blocks keeps them separate', () => {
+      const result = extractAIAnswer(fb6_proseBetweenCodeBlocks);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      expect(blocks[0]).toContain('create namespace');
+      expect(blocks[1]).toContain('kubectl apply');
+    });
+
+    it('7. Python f-string with braces stays in code block', () => {
+      const result = extractAIAnswer(fb6_pythonFStringBraces);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('logger.info');
+      expect(all).toContain('logger.error');
+    });
+
+    it('8. K8s YAML with anchors and aliases stays in one block', () => {
+      const result = extractAIAnswer(fb6_yamlAnchorsAliases);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('apiVersion');
+      expect(all).toContain('500m');
+    });
+
+    it('9. Rust enum with derive and variants stays in one block', () => {
+      const result = extractAIAnswer(fb6_rustEnumDerive);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('#[derive');
+      expect(all).toContain('pub enum AppError');
+    });
+
+    it('10. Shell if/elif/else/fi stays in one block', () => {
+      const result = extractAIAnswer(fb6_shellIfElifElse);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('if kubectl');
+      expect(all).toContain('fi');
+    });
+
+    it('11. Go goroutine with channel stays in code block', () => {
+      const result = extractAIAnswer(fb6_goGoroutineChannel);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('func worker');
+      expect(all).toContain('results <- j * 2');
+    });
+
+    it('12. Docker run with backslash continuation stays together', () => {
+      const result = extractAIAnswer(fb6_dockerRunBackslash);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('docker run');
+      expect(all).toContain('myimage:latest');
+    });
+
+    it('13. Java annotations and class stay in one block', () => {
+      const result = extractAIAnswer(fb6_javaAnnotationsClass);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('@RestController');
+      expect(all).toContain('class UserController');
+    });
+
+    it('14. kubectl patch with inline JSON stays in one block', () => {
+      const result = extractAIAnswer(fb6_kubectlPatchJson);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl patch');
+      expect(all).toContain('kubectl get pods');
+    });
+
+    it('15. YAML and shell blocks separated by prose', () => {
+      const result = extractAIAnswer(fb6_yamlShellProseSeparated);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      const all = blocks.join('\n');
+      expect(all).toContain('apiVersion: v1');
+      expect(all).toContain('kubectl apply');
+    });
+  });
+
+  describe('round 7', () => {
+    it('1. Lua code with local and function detected as code', () => {
+      const result = extractAIAnswer(fb7_luaLocalFunction);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('local M');
+      expect(all).toContain('function M.setup');
+    });
+
+    it('2. Export environment variables detected as shell code', () => {
+      const result = extractAIAnswer(fb7_exportEnvVars);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('export KUBECONFIG');
+      expect(all).toContain('export REGISTRY');
+    });
+
+    it('3. awk and sed commands detected as code', () => {
+      const result = extractAIAnswer(fb7_awkSedCommands);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('awk');
+      expect(all).toContain('sed');
+    });
+
+    it('4. CSS rules detected as code block', () => {
+      const result = extractAIAnswer(fb7_cssRules);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('.container {');
+      expect(all).toContain('display: flex');
+    });
+
+    it('5. Protobuf message definition detected as code', () => {
+      const result = extractAIAnswer(fb7_protobufMessage);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('syntax = "proto3"');
+      expect(all).toContain('message PodMetrics');
+    });
+
+    it('6. Systemd unit file stays in one block', () => {
+      const result = extractAIAnswer(fb7_systemdUnitFile);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('[Unit]');
+      expect(all).toContain('[Service]');
+    });
+
+    it('7. Shell pipe chain with line continuations stays together', () => {
+      const result = extractAIAnswer(fb7_shellPipeChain);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl get pods');
+      expect(all).toContain('head -10');
+    });
+
+    it('8. Shell script with variables and commands stays together', () => {
+      const result = extractAIAnswer(fb7_shellScriptVarsCommands);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('#!/bin/bash');
+      expect(all).toContain('kubectl set image');
+    });
+
+    it('9. JSON configuration object stays in one block', () => {
+      const result = extractAIAnswer(fb7_jsonConfigObject);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('"scripts"');
+      expect(all).toContain('"test"');
+    });
+
+    it('10. Ruby class with methods stays in one block', () => {
+      const result = extractAIAnswer(fb7_rubyClassMethods);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('class KubernetesClient');
+      expect(all).toContain('def get_pods');
+    });
+
+    it('11. Kotlin data class detected as code', () => {
+      const result = extractAIAnswer(fb7_kotlinDataClass);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('data class PodInfo');
+      expect(all).toContain('val name');
+    });
+
+    it('12. C struct typedef stays in one code block', () => {
+      const result = extractAIAnswer(fb7_cStructTypedef);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('typedef struct');
+      expect(all).toContain('ServiceConfig');
+    });
+
+    it('13. az CLI commands with JMESPath queries stay in one block', () => {
+      const result = extractAIAnswer(fb7_azCliJmesPath);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('az aks show');
+      expect(all).toContain('--output table');
+    });
+
+    it('14. Python async function with type hints stays in one block', () => {
+      const result = extractAIAnswer(fb7_pythonAsyncTypeHints);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('async def get_pods');
+      expect(all).toContain('await client');
+    });
+
+    it('15. Numbered steps with code blocks render separately', () => {
+      const result = extractAIAnswer(fb7_numberedStepsCodeBlocks);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(3);
+      const all = blocks.join('\n');
+      expect(all).toContain('create secret');
+      expect(all).toContain('kubectl apply');
+      expect(all).toContain('kubectl get all');
+    });
+  });
+
+  describe('round 8', () => {
+    it('1. Go struct literal with field: value stays in code block', () => {
+      const result = extractAIAnswer(fb8_goStructLiteral);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('config :=');
+      expect(all).toContain('Host:');
+      expect(all).toContain('MaxConns: 100');
+    });
+
+    it('2. Python function call with kwargs stays in code block', () => {
+      const result = extractAIAnswer(fb8_pythonKwargs);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('logging.basicConfig');
+      expect(all).toContain('FileHandler');
+    });
+
+    it('3. Shell trap and source commands detected as code', () => {
+      const result = extractAIAnswer(fb8_shellTrapSource);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('#!/bin/bash');
+      expect(all).toContain('trap');
+    });
+
+    it('4. GitHub Actions YAML workflow stays in one block', () => {
+      const result = extractAIAnswer(fb8_githubActionsYaml);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('name: Deploy');
+      expect(all).toContain('runs-on');
+    });
+
+    it('5. Rust closures and iterator chains stay in one block', () => {
+      const result = extractAIAnswer(fb8_rustClosuresIterators);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('let results');
+      expect(all).toContain('.collect()');
+    });
+
+    it('6. Shell heredoc with YAML content stays in one block', () => {
+      const result = extractAIAnswer(fb8_shellHeredocYaml);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('cat <<EOF');
+      expect(all).toContain('apiVersion: v1');
+      expect(all).toContain('EOF');
+    });
+
+    it('7. Docker Compose with build context stays in one block', () => {
+      const result = extractAIAnswer(fb8_dockerComposeBuildContext);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('version:');
+      expect(all).toContain('depends_on');
+    });
+
+    it('8. Shell function definition stays in one block', () => {
+      const result = extractAIAnswer(fb8_shellFunctionDef);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('check_pod_ready()');
+      expect(all).toContain('kubectl get pod');
+    });
+
+    it('9. Python nested expressions stay in code block', () => {
+      const result = extractAIAnswer(fb8_pythonNestedExpressions);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('import json');
+      expect(all).toContain('json.dumps');
+    });
+
+    it('10. Terraform with multiple resource types stays in one block', () => {
+      const result = extractAIAnswer(fb8_terraformMultipleResources);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('provider "azurerm"');
+      expect(all).toContain('resource "azurerm_kubernetes_cluster"');
+    });
+
+    it('11. SQL JOIN query stays in one code block', () => {
+      const result = extractAIAnswer(fb8_sqlJoinQuery);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('SELECT');
+      expect(all).toContain('INNER JOIN');
+    });
+
+    it('12. K8s CRD definition stays in one YAML block', () => {
+      const result = extractAIAnswer(fb8_k8sCrdDefinition);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('apiextensions.k8s.io');
+      expect(all).toContain('openAPIV3Schema');
+    });
+
+    it('13. Swift struct with properties stays in code block', () => {
+      const result = extractAIAnswer(fb8_swiftStructProperties);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('struct PodInfo');
+      expect(all).toContain('isReady');
+    });
+
+    it('14. Makefile with ifeq conditional stays in one block', () => {
+      const result = extractAIAnswer(fb8_makefileIfeq);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('REGISTRY');
+      expect(all).toContain('docker build');
+    });
+
+    it('15. Elixir module with functions stays in one block', () => {
+      const result = extractAIAnswer(fb8_elixirModule);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('defmodule');
+      expect(all).toContain('get_pods');
+    });
+  });
+
+  describe('round 9', () => {
+    it('1. TypeScript generic types not confused with HTML tags', () => {
+      const result = extractAIAnswer(fb9_tsGenericTypes);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('KubernetesClient');
+      expect(all).toContain('client.list');
+    });
+
+    it('2. PHP class with namespace stays in one block', () => {
+      const result = extractAIAnswer(fb9_phpClassNamespace);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('<?php');
+      expect(all).toContain('class PodController');
+    });
+
+    it('3. Scala case class detected as code', () => {
+      const result = extractAIAnswer(fb9_scalaCaseClass);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('case class Pod');
+      expect(all).toContain('object PodService');
+    });
+
+    it('4. Shell arrays and parameter expansion stay in code block', () => {
+      const result = extractAIAnswer(fb9_shellArraysParamExpansion);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('NAMESPACES=');
+      expect(all).toContain('done');
+    });
+
+    it('5. INI config file detected as code block', () => {
+      const result = extractAIAnswer(fb9_iniConfigFile);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('[global]');
+      expect(all).toContain('scrape_interval');
+    });
+
+    it('6. Rust with turbofish and type annotations stays in code block', () => {
+      const result = extractAIAnswer(fb9_rustTurbofish);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('serde_json');
+      expect(all).toContain('collect::<Vec');
+    });
+
+    it('7. Python multi-line string stays in code block', () => {
+      const result = extractAIAnswer(fb9_pythonMultiLineString);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('YAML_TEMPLATE');
+      expect(all).toContain('kind: Deployment');
+    });
+
+    it('8. Java Spring Boot service stays in one block', () => {
+      const result = extractAIAnswer(fb9_javaSpringBootService);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('@Service');
+      expect(all).toContain('listPods');
+    });
+
+    it('9. Shell with here-string stays in code block', () => {
+      const result = extractAIAnswer(fb9_shellHereString);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('kubectl get nodes');
+      expect(all).toContain('done');
+    });
+
+    it('10. curl with JSON body stays in one block', () => {
+      const result = extractAIAnswer(fb9_curlJsonBody);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('curl -X POST');
+      expect(all).toContain('"namespace"');
+    });
+
+    it('11. Kotlin suspend function stays in code block', () => {
+      const result = extractAIAnswer(fb9_kotlinSuspendFunction);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('suspend fun');
+      expect(all).toContain('withContext');
+    });
+
+    it('12. Terraform locals and data sources stay in one block', () => {
+      const result = extractAIAnswer(fb9_terraformLocalsData);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('locals {');
+      expect(all).toContain('data "azurerm_client_config"');
+    });
+
+    it('13. Markdown table passes through without code wrapping', () => {
+      const result = extractAIAnswer(fb9_markdownTable);
+      assertNoAnsiLeaks(result);
+      // Tables should NOT be in code blocks
+      expect(result).toContain('| Name | Status |');
+      const blocks = extractCodeBlocks(result);
+      const all = blocks.join('\n');
+      expect(all).not.toContain('| Name |');
+    });
+
+    it('14. Shell process substitution stays in code block', () => {
+      const result = extractAIAnswer(fb9_shellProcessSubstitution);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('diff');
+      expect(all).toContain('kubectl get cm');
+    });
+
+    it('15. Requirements.txt content stays in code block', () => {
+      const result = extractAIAnswer(fb9_requirementsTxt);
+      assertNoAnsiLeaks(result);
+      const blocks = extractCodeBlocks(result);
+      expect(blocks.length).toBeGreaterThanOrEqual(1);
+      const all = blocks.join('\n');
+      expect(all).toContain('flask==3.0.0');
+      expect(all).toContain('kubernetes==28.1.0');
     });
   });
 });
