@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   BASE_AKS_AGENT_PROMPT,
-  SELF_REVIEW_PROMPT,
   buildEnrichedPrompt,
   buildSelfReviewPrompt,
+  type ReviewStep,
+  reviewStep,
+  SELF_REVIEW_PROMPT,
   shellEscapeSingleQuote,
 } from './aksAgentManager';
 
@@ -141,5 +143,16 @@ describe('SELF_REVIEW_PROMPT', () => {
 
   it('checks for code block formatting', () => {
     expect(SELF_REVIEW_PROMPT).toContain('fenced markdown code blocks');
+  });
+});
+
+describe('reviewStep', () => {
+  it('is one of the allowed ReviewStep values', () => {
+    const allowed: ReviewStep[] = ['off', 'model', 'agent'];
+    expect(allowed).toContain(reviewStep);
+  });
+
+  it('defaults to "agent"', () => {
+    expect(reviewStep).toBe('agent');
   });
 });

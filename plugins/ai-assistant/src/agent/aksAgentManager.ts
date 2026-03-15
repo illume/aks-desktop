@@ -52,6 +52,33 @@ export function buildSelfReviewPrompt(answer: string): string {
   return SELF_REVIEW_PROMPT.replace('{RESPONSE}', answer);
 }
 
+/**
+ * Controls whether and how the self-review step runs after each agent response.
+ *
+ * - `"off"`   — no self-review; use the raw extracted answer directly.
+ * - `"model"` — send the review prompt to the configured LLM model (fast,
+ *   needs a `modelReviewFn` callback passed to `runAksAgent`).
+ * - `"agent"` — send the review prompt back through the agent pod session
+ *   (reuses the existing exec connection).
+ */
+export type ReviewStep = 'off' | 'model' | 'agent';
+
+/**
+ * Current self-review mode.  Change this value to toggle the behaviour:
+ *
+ *   "off"   – skip the review entirely
+ *   "model" – use the configured chat model for the review
+ *   "agent" – use the agent pod session for the review (default)
+ */
+export const reviewStep: ReviewStep = 'agent';
+
+/**
+ * Optional callback signature for model-based self-review.
+ * Accepts a prompt string and returns the model's response text.
+ * Passed into `runAksAgent` when `reviewStep === "model"`.
+ */
+export type ModelReviewFn = (prompt: string) => Promise<string>;
+
 /** Represents a single exchange (question + answer) from the conversation history. */
 export interface ConversationEntry {
   role: 'user' | 'assistant';
@@ -2585,13 +2612,17 @@ const MIN_REVIEW_LENGTH_RATIO = 0.3;
  *
  * @param onProgress — optional callback invoked with an updated array of
  *   thinking steps every time a new step is detected in the agent stream.
+ * @param modelReviewFn — optional callback for model-based self-review.
+ *   Required when `reviewStep === "model"`.  Receives the review prompt
+ *   and should return the model's response text.
  */
 export async function runAksAgent(
   question: string,
   podInfo: AksAgentPodInfo,
   clusterName: string,
   onProgress?: AgentProgressCallback,
-  conversationHistory: ConversationEntry[] = []
+  conversationHistory: ConversationEntry[] = [],
+  modelReviewFn?: ModelReviewFn
 ): Promise<string> {
   console.log(
     `[AKS Agent] Exec into pod ${podInfo.podName} in namespace ${podInfo.namespace}, cluster ${clusterName}`
@@ -2609,41 +2640,86 @@ export async function runAksAgent(
     const answer = extractAIAnswer(result);
     console.log(`[AKS Agent] Exec succeeded, extracted answer length: ${answer.length}`);
     if (answer) {
-      // Self-review: always ask the agent to review its response once for
-      // formatting and correctness.  A single pass — no loop.
-      debugLog('[AKS Agent] Starting self-review, original answer length:', answer.length, 'answer:', answer);
+      // ── Self-review ──────────────────────────────────────────────────
+      // Controlled by the exported `reviewStep` constant:
+      //   "off"   → skip review, return raw answer
+      //   "agent" → send review prompt via the agent pod session
+      //   "model" → send review prompt via the configured LLM model
+      if (reviewStep === 'off') {
+        debugLog('[AKS Agent] Self-review: skipped (reviewStep = "off")');
+        return answer;
+      }
+
+      debugLog(
+        '[AKS Agent] Starting self-review (mode:', reviewStep + '),',
+        'original answer length:', answer.length,
+        'answer:', answer
+      );
+
       try {
-        const reviewPrompt = buildSelfReviewPrompt(answer);
-        const reviewResult = await session.ask(reviewPrompt);
-        if (reviewResult && reviewResult.trim().length > 0) {
-          debugLog('[AKS Agent] Self-review: raw reviewResult length:', reviewResult.length, 'reviewResult:', reviewResult);
-          const reviewAnswer = extractAIAnswer(reviewResult);
-          const trimmedReview = reviewAnswer.trim();
-          debugLog('[AKS Agent] Self-review: extracted reviewAnswer length:', reviewAnswer.length, 'reviewAnswer:', reviewAnswer);
-          // If the agent confirms the response is fine, use the original
-          if (trimmedReview.startsWith('LGTM')) {
-            debugLog('[AKS Agent] Self-review: agent confirmed response is well-formatted');
+        const reviewPromptText = buildSelfReviewPrompt(answer);
+        let reviewAnswer: string;
+
+        if (reviewStep === 'model') {
+          // ── Model-based review ──
+          if (!modelReviewFn) {
+            console.warn(
+              '[AKS Agent] Self-review: reviewStep is "model" but no modelReviewFn provided — skipping review.'
+            );
             return answer;
-          } else if (
-            reviewAnswer &&
-            reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
-          ) {
-            // Use the corrected version (sanity check: must be substantial)
-            debugLog(
-              '[AKS Agent] Self-review: using corrected response, length:',
-              reviewAnswer.length,
-              'corrected response:',
-              reviewAnswer
-            );
-            return reviewAnswer;
-          } else {
-            debugLog(
-              '[AKS Agent] Self-review: corrected response too short — keeping original.',
-              'original length:', answer.length,
-              'review length:', reviewAnswer.length,
-              'reviewAnswer:', reviewAnswer
-            );
           }
+          const modelResponse = await modelReviewFn(reviewPromptText);
+          debugLog(
+            '[AKS Agent] Self-review (model): raw response length:',
+            modelResponse.length,
+            'response:', modelResponse
+          );
+          reviewAnswer = modelResponse.trim();
+        } else {
+          // ── Agent-based review (default) ──
+          const reviewResult = await session.ask(reviewPromptText);
+          if (!reviewResult || reviewResult.trim().length === 0) {
+            debugLog('[AKS Agent] Self-review (agent): empty result — keeping original');
+            return answer;
+          }
+          debugLog(
+            '[AKS Agent] Self-review (agent): raw reviewResult length:',
+            reviewResult.length,
+            'reviewResult:', reviewResult
+          );
+          reviewAnswer = extractAIAnswer(reviewResult);
+        }
+
+        const trimmedReview = reviewAnswer.trim();
+        debugLog(
+          '[AKS Agent] Self-review: extracted reviewAnswer length:',
+          reviewAnswer.length,
+          'reviewAnswer:', reviewAnswer
+        );
+
+        // If the reviewer confirms the response is fine, use the original
+        if (trimmedReview.startsWith('LGTM')) {
+          debugLog('[AKS Agent] Self-review: reviewer confirmed response is well-formatted');
+          return answer;
+        } else if (
+          reviewAnswer &&
+          reviewAnswer.length > answer.length * MIN_REVIEW_LENGTH_RATIO
+        ) {
+          // Use the corrected version (sanity check: must be substantial)
+          debugLog(
+            '[AKS Agent] Self-review: using corrected response, length:',
+            reviewAnswer.length,
+            'corrected response:',
+            reviewAnswer
+          );
+          return reviewAnswer;
+        } else {
+          debugLog(
+            '[AKS Agent] Self-review: corrected response too short — keeping original.',
+            'original length:', answer.length,
+            'review length:', reviewAnswer.length,
+            'reviewAnswer:', reviewAnswer
+          );
         }
       } catch (e) {
         console.warn('[AKS Agent] Self-review failed, using original response:', e);

@@ -9,6 +9,8 @@ import {
   type AgentThinkingStep,
   type ConversationEntry,
   destroyAgentSession,
+  type ModelReviewFn,
+  reviewStep,
   runAksAgent,
 } from './agent/aksAgentManager';
 import AIManager, { Prompt } from './ai/manager';
@@ -530,12 +532,24 @@ export default function AIPrompt(props: {
         .filter(p => (p.role === 'user' || p.role === 'assistant') && !p.error && p.content)
         .map(p => ({ role: p.role as 'user' | 'assistant', content: p.content }));
 
+      // Build a model-review callback when the configured reviewStep is "model"
+      // and a chat model is available.  The callback sends the review prompt
+      // through the LangChainManager and returns the model's response text.
+      let modelReviewFn: ModelReviewFn | undefined;
+      if (reviewStep === 'model' && aiManager) {
+        modelReviewFn = async (prompt: string) => {
+          const result = await aiManager.userSend(prompt);
+          return result.content;
+        };
+      }
+
       const response = await runAksAgent(
         prompt,
         agentPodInfo,
         selectedAgentCluster,
         steps => setAgentThinkingSteps(steps),
-        conversationHistory
+        conversationHistory,
+        modelReviewFn
       );
 
       setPromptHistory(prev => [...prev, { role: 'assistant', content: response }]);
