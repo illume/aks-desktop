@@ -63,6 +63,13 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     const [collapsedPhases, setCollapsedPhases] = useState<Set<Phase>>(new Set());
     const prevPhaseCountRef = useRef<Record<Phase, number>>({ init: 0, planning: 0, executing: 0 });
     const rootRef = useRef<HTMLDivElement>(null);
+    const scrollParentRef = useRef<HTMLElement | null>(null);
+
+    // Query prefers-reduced-motion once at mount (static for component lifetime)
+    const prefersReducedMotion = useMemo(
+      () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      []
+    );
 
     // Group steps by phase
     const grouped = useMemo(() => {
@@ -96,12 +103,35 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
       };
     }, [grouped]);
 
-    // Scroll into view when new steps appear, but only if not already visible
+    // Scroll into view when new steps appear, but only if the component is
+    // already near the viewport. This avoids yanking the scroll position when
+    // the user has intentionally scrolled away to read older messages.
     useEffect(() => {
-      if (steps.length > 0 && rootRef.current) {
-        rootRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const el = rootRef.current;
+      if (steps.length === 0 || !el) return;
+
+      // Cache the nearest scrollable ancestor
+      if (!scrollParentRef.current) {
+        let sp: HTMLElement | null = el.parentElement;
+        while (sp && sp.scrollHeight <= sp.clientHeight) {
+          sp = sp.parentElement;
+        }
+        scrollParentRef.current = sp;
       }
-    }, [steps.length]);
+      const scrollParent = scrollParentRef.current;
+      if (!scrollParent) return;
+
+      // Only auto-scroll if the component is within one viewport-height of the
+      // visible area (i.e. the user hasn't scrolled far away).
+      const spRect = scrollParent.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const margin = spRect.height;
+      const isNearViewport =
+        elRect.bottom >= spRect.top - margin && elRect.top <= spRect.bottom + margin;
+      if (!isNearViewport) return;
+
+      el.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    }, [steps.length, prefersReducedMotion]);
 
     if (steps.length === 0) return null;
 
