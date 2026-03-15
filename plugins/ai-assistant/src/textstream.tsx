@@ -242,8 +242,8 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   // Auto-scroll only when loading starts (not when it finishes)
   useEffect(() => {
     if (isLoading && wasNearBottomRef.current) {
-      // Reuse scrollToShowNewMessage which already handles user-message scroll
-      // positioning (shows the question with the loading indicator below).
+      // Reuse scrollToShowNewMessage — its user-message branch positions
+      // the question element so the loading indicator below it is visible.
       setTimeout(scrollToShowNewMessage, 100);
     }
   }, [isLoading, scrollToShowNewMessage]);
