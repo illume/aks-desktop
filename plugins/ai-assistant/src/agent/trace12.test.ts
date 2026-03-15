@@ -57,31 +57,23 @@ describe('trace12: Trace transformations', () => {
     ];
 
     const raw = makeRaw(hpaBody);
-
+    
     // Step 1: Strip ANSI codes
     const stripped = raw.replace(/\x1b\[[0-9;]*m/g, '');
-
+    
     console.log('\n========== STEP 1: After ANSI strip (lines 7-27) ==========');
-    stripped
-      .split('\n')
-      .slice(7, 28)
-      .forEach((line) => {
-        const indent = line.match(/^ */)?.[0].length || 0;
-        console.log(
-          `Line ${i.toString().padEnd(2)}: indent=${indent.toString().padEnd(2)} | ${line.slice(
-            0,
-            60
-          )}`
-        );
-      });
-
+    stripped.split('\n').slice(7, 28).forEach((line, i) => {
+      const indent = line.match(/^ */)?.[0].length || 0;
+      console.log(`Line ${i.toString().padEnd(2)}: indent=${indent.toString().padEnd(2)} | ${line.slice(0, 60)}`);
+    });
+    
     // Step 2: normalizeTerminalMarkdown
     console.log('\n========== STEP 2: After normalizeTerminalMarkdown ==========');
     const afterNormalize = normalizeTerminalMarkdown(stripped);
     let inFence = false;
     let fenceType = '';
     let blockNum = 0;
-    afterNormalize.split('\n').forEach((line) => {
+    afterNormalize.split('\n').forEach(line => {
       if (/^```/.test(line.trim())) {
         if (inFence) {
           console.log(`Block ${blockNum} END\n`);
@@ -96,13 +88,13 @@ describe('trace12: Trace transformations', () => {
         console.log(`  indent=${indent.toString().padEnd(2)} | ${line.slice(0, 55)}`);
       }
     });
-
+    
     // Step 3: wrapBareYamlBlocks
     console.log('\n========== STEP 3: After wrapBareYamlBlocks ==========');
     const afterYaml = wrapBareYamlBlocks(afterNormalize);
     inFence = false;
     blockNum = 0;
-    afterYaml.split('\n').forEach((line) => {
+    afterYaml.split('\n').forEach(line => {
       if (/^```/.test(line.trim())) {
         if (inFence) {
           console.log(`Block ${blockNum} END\n`);
