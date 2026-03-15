@@ -344,6 +344,28 @@ function normalizeBullets(text: string): string {
 const PROSE_WORD_THRESHOLD = 5;
 
 /**
+ * Regex matching code-like characters that should NOT appear in prose headings.
+ * Used by isProseHeadingEndingWithColon to exclude Python type hints,
+ * function signatures, shell constructs, etc.
+ */
+const CODE_LIKE_CHARS_RE = /[(){}\[\]=<>|\\;]/;
+
+/**
+ * Detect prose headings ending with colon that should NOT be treated as code
+ * or YAML keys.  Matches lines like "Also confirm:", "Build + push:" but
+ * excludes YAML keys ("spec:"), code lines, and lines with code-like characters
+ * (e.g. Python `) -> list[dict]:`, shell `if [ -f x ]:`, etc.).
+ */
+function isProseHeadingEndingWithColon(trimmed: string): boolean {
+  return (
+    /:\s*$/.test(trimmed) &&
+    !/^[\w][\w.\/-]*:/.test(trimmed) &&
+    !looksLikeShellOrDockerCodeLine(trimmed) &&
+    !CODE_LIKE_CHARS_RE.test(trimmed)
+  );
+}
+
+/**
  * Curated set of first-word tokens that **unambiguously** indicate a shell
  * command, Dockerfile instruction, or similar code line.  These words almost
  * never begin an English sentence, so a first-word match is sufficient.
@@ -1828,12 +1850,8 @@ function collapseTerminalBlankLines(text: string): string {
         // Ordered list items (" 1 Create...", " 2 Apply...") are prose, not code
         if (/^\d+\s+\S/.test(t)) return false;
         // Multi-word prose headings ending with colon (e.g. "Also confirm:",
-        // "Build + push:") are prose, not code.  Single-word YAML keys like
-        // "spec:" match /^[\w][\w.\/-]*:/ and are caught earlier.
-        // Exclude lines with code-like characters (parens, brackets, etc.)
-        // which are Python type hints, function signatures, etc.
-        if (/:\s*$/.test(t) && !/^[\w][\w.\/-]*:/.test(t) && !/[(){}\[\]=<>|\\;]/.test(t))
-          return false;
+        // "Build + push:") are prose, not code.
+        if (isProseHeadingEndingWithColon(t)) return false;
         return true; // default: treat as code for short lines
       }
       // Heavily indented — only treat as code if it looks like code/YAML
@@ -1991,17 +2009,9 @@ function normalizeTerminalMarkdown(text: string): string {
             }
             break;
           }
-          // Break at prose headings ending with colon that don't match YAML
-          // key patterns (e.g. "Also confirm:", "Build + push:").  These are
-          // clearly not code/YAML panel content.  Exclude lines with code-like
-          // characters (parens, brackets, arrows) which are Python type hints,
-          // function signatures, etc.
-          if (
-            /:\s*$/.test(pt) &&
-            !/^[\w][\w.\/-]*:/.test(pt) &&
-            !looksLikeShellOrDockerCodeLine(pt) &&
-            !/[(){}\[\]=<>|\\;]/.test(pt)
-          ) {
+          // Break at prose headings ending with colon (e.g. "Also confirm:",
+          // "Build + push:").  These are clearly not code/YAML panel content.
+          if (isProseHeadingEndingWithColon(pt)) {
             break;
           }
           if (
@@ -2543,15 +2553,9 @@ function normalizeTerminalMarkdown(text: string): string {
         // match YAML key patterns (e.g. "Also confirm:", "Build + push:").
         // These are too short for the PROSE_WORD_THRESHOLD check above but
         // are clearly prose headings, not code or YAML data.  Exclude lines
-        // with code-like characters (parens, brackets, arrows) which are
-        // Python type hints, function signatures, etc.
-        if (
-          !startedByFileHeader &&
-          /:\s*$/.test(blockTrimmed) &&
-          !/^[\w][\w.\/-]*:/.test(blockTrimmed) &&
-          !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
-          !/[(){}\[\]=<>|\\;]/.test(blockTrimmed)
-        ) {
+        // Also break at short prose headings ending with colon
+        // (e.g. "Also confirm:", "Build + push:").
+        if (!startedByFileHeader && isProseHeadingEndingWithColon(blockTrimmed)) {
           break;
         }
 
