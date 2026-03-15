@@ -62,7 +62,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     const successColor = theme.palette.success.main;
     const [collapsedPhases, setCollapsedPhases] = useState<Set<Phase>>(new Set());
     const prevPhaseCountRef = useRef<Record<Phase, number>>({ init: 0, planning: 0, executing: 0 });
-    const rootRef = useRef<HTMLDivElement>(null);
+    const endRef = useRef<HTMLDivElement>(null);
     const scrollParentRef = useRef<HTMLElement | null>(null);
 
     // Group steps by phase
@@ -97,11 +97,12 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
       };
     }, [grouped]);
 
-    // Scroll into view when new steps appear, but only if the user is near
-    // the bottom of the scroll container (matches TextStreamContainer's pattern).
-    // This avoids yanking the viewport when the user has scrolled away.
+    // Scroll the bottom of the component into view when new steps appear,
+    // but only if the user is near the bottom of the scroll container
+    // (matches TextStreamContainer's "near bottom" pattern).
+    // Uses a delay to let MUI Collapse animations finish before measuring.
     useEffect(() => {
-      const el = rootRef.current;
+      const el = endRef.current;
       if (steps.length === 0 || !el) return;
 
       // Cache the nearest scrollable ancestor
@@ -112,22 +113,28 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
         }
         scrollParentRef.current = sp;
       }
-      const scrollParent = scrollParentRef.current;
 
-      // Only auto-scroll if user is near the bottom of the scroll container
-      if (scrollParent) {
-        const distanceFromBottom =
-          scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
-        if (distanceFromBottom > scrollParent.clientHeight) return;
-      }
+      // Delay scroll to let MUI Collapse animations finish (outer=300ms, inner=200ms)
+      const timer = setTimeout(() => {
+        const scrollParent = scrollParentRef.current;
 
-      // Respect prefers-reduced-motion for accessibility (with SSR guard)
-      const reducedMotion =
-        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-          ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          : false;
+        // Only auto-scroll if user is near the bottom of the scroll container
+        if (scrollParent) {
+          const distanceFromBottom =
+            scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
+          if (distanceFromBottom > scrollParent.clientHeight) return;
+        }
 
-      el.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+        // Respect prefers-reduced-motion for accessibility (with SSR guard)
+        const reducedMotion =
+          typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+            ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            : false;
+
+        el.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+      }, 350);
+
+      return () => clearTimeout(timer);
     }, [steps.length]);
 
     if (steps.length === 0) return null;
@@ -270,7 +277,6 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     return (
       <Collapse in={steps.length > 0}>
         <Box
-          ref={rootRef}
           sx={{
             my: 1.5,
             mx: 0,
@@ -309,6 +315,9 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
 
           {/* Phase sections */}
           {activePhases.map(renderPhaseSection)}
+
+          {/* Scroll sentinel: scrolled into view when new steps arrive */}
+          <div ref={endRef} />
         </Box>
 
         {/* Spinner keyframes (shared) */}
