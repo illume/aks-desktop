@@ -3,7 +3,9 @@
  * findbugs2.test.ts (round 2), findbugs3.test.ts (round 3),
  * findbugs4.test.ts (round 4), findbugs5.test.ts (round 5),
  * findbugs6.test.ts (round 6), findbugs7.test.ts (round 7),
- * findbugs8.test.ts (round 8), and findbugs9.test.ts (round 9).
+ * findbugs8.test.ts (round 8), findbugs9.test.ts (round 9),
+ * findbugs10.test.ts (round 10), findbugs11.test.ts (round 11),
+ * and findbugs12.test.ts (round 12).
  *
  * Each fixture is the raw terminal output for a single test case,
  * exported as a named constant following the convention fb{round}_{shortName}.
@@ -1955,5 +1957,1035 @@ export const fb9_requirementsTxt = makeRaw([
   panelLine('requests>=2.31.0'),
   panelLine('gunicorn~=21.2'),
   panelLine('prometheus-client>=0.17'),
+  panelBlank(),
+]);
+
+// ===========================================================================
+// Round 10 – findbugs10.test.ts
+// ===========================================================================
+
+/** GitHub Actions YAML branches: [main] not corrupted by ANSI stripping */
+export const fb10_ghActionsBranchesMain = makeRaw([
+  'Create .github/workflows/deploy.yml:',
+  '',
+  panelLine('name: Deploy to AKS'),
+  panelLine('on:'),
+  panelLine('  push:'),
+  panelLine('    branches: [main]'),
+  panelLine(''),
+  panelLine('jobs:'),
+  panelLine('  deploy:'),
+  panelLine('    runs-on: ubuntu-latest'),
+  panelLine('    steps:'),
+  panelLine('    - uses: actions/checkout@v4'),
+  panelLine('    - run: kubectl apply -f manifests/'),
+  panelBlank(),
+]);
+
+/** Prometheus [5m] duration selector not corrupted */
+export const fb10_prometheusDuration5m = makeRaw([
+  'Create alert rule:',
+  '',
+  panelLine('apiVersion: monitoring.coreos.com/v1'),
+  panelLine('kind: PrometheusRule'),
+  panelLine('spec:'),
+  panelLine('  groups:'),
+  panelLine('  - name: alerts'),
+  panelLine('    rules:'),
+  panelLine('    - alert: HighLatency'),
+  panelLine('      expr: histogram_quantile(0.99, rate(http_duration_seconds_bucket[5m])) > 1'),
+  panelLine('      for: 10m'),
+  panelBlank(),
+]);
+
+/** Kustomization YAML in panel gets wrapped in code fence */
+export const fb10_kustomizationYaml = makeRaw([
+  'Create kustomization.yaml:',
+  '',
+  panelLine('resources:'),
+  panelLine('- deployment.yaml'),
+  panelLine('- service.yaml'),
+  panelLine('- ingress.yaml'),
+  panelLine(''),
+  panelLine('namePrefix: prod-'),
+  panelLine(''),
+  panelLine('commonLabels:'),
+  panelLine('  app: my-app'),
+  panelLine('  env: production'),
+  panelBlank(),
+]);
+
+/** Helm values.yaml in panel gets wrapped in code fence */
+export const fb10_helmValuesYaml = makeRaw([
+  'Create values.yaml:',
+  '',
+  panelLine('replicaCount: 3'),
+  panelLine(''),
+  panelLine('image:'),
+  panelLine('  repository: myregistry.azurecr.io/myapp'),
+  panelLine('  tag: "v1.2.3"'),
+  panelLine('  pullPolicy: IfNotPresent'),
+  panelLine(''),
+  panelLine('service:'),
+  panelLine('  type: LoadBalancer'),
+  panelLine('  port: 80'),
+  panelBlank(),
+  '',
+  'Install with:',
+  '',
+  panelLine('helm install my-release ./chart -f values.yaml'),
+  panelBlank(),
+]);
+
+/** Azure DevOps pipeline YAML in panel gets wrapped */
+export const fb10_azureDevOpsPipeline = makeRaw([
+  'Create azure-pipelines.yml:',
+  '',
+  panelLine('trigger:'),
+  panelLine('  branches:'),
+  panelLine('    include:'),
+  panelLine('    - main'),
+  panelLine(''),
+  panelLine('pool:'),
+  panelLine('  vmImage: ubuntu-latest'),
+  panelLine(''),
+  panelLine('steps:'),
+  panelLine('- task: KubernetesManifest@0'),
+  panelLine('  inputs:'),
+  panelLine('    action: deploy'),
+  panelLine('    kubernetesServiceConnection: myAKS'),
+  panelLine('    namespace: production'),
+  panelBlank(),
+]);
+
+/** Ansible playbook YAML in panel gets wrapped */
+export const fb10_ansiblePlaybook = makeRaw([
+  'Here is the Ansible playbook:',
+  '',
+  panelLine('---'),
+  panelLine('- name: Deploy to AKS'),
+  panelLine('  hosts: localhost'),
+  panelLine('  tasks:'),
+  panelLine('  - name: Login to Azure'),
+  panelLine('    azure.azcollection.azure_rm_aks_info:'),
+  panelLine('      resource_group: myResourceGroup'),
+  panelLine('      name: myAKSCluster'),
+  panelLine('  - name: Apply manifests'),
+  panelLine('    kubernetes.core.k8s:'),
+  panelLine('      state: present'),
+  panelLine('      src: manifests/'),
+  panelBlank(),
+]);
+
+/** ConfigMap with literal block scalar bash script stays in one block */
+export const fb10_configMapLiteralBlock = makeRaw([
+  'Create the ConfigMap:',
+  '',
+  panelLine('apiVersion: v1'),
+  panelLine('kind: ConfigMap'),
+  panelLine('metadata:'),
+  panelLine('  name: init-script'),
+  panelLine('data:'),
+  panelLine('  init.sh: |'),
+  panelLine('    #!/bin/bash'),
+  panelLine('    echo "Initializing..."'),
+  panelLine('    until pg_isready -h $DB_HOST; do'),
+  panelLine('      echo "Waiting..."'),
+  panelLine('      sleep 2'),
+  panelLine('    done'),
+  panelLine('    echo "Ready!"'),
+  panelBlank(),
+]);
+
+/** Makefile .PHONY and variable assignments stay in code block */
+export const fb10_makefilePhony = makeRaw([
+  'Create Makefile:',
+  '',
+  panelLine('.PHONY: build push deploy'),
+  panelLine(''),
+  panelLine('IMAGE ?= myregistry.azurecr.io/myapp'),
+  panelLine('TAG ?= $(shell git rev-parse --short HEAD)'),
+  panelLine(''),
+  panelLine('build:'),
+  panelLine('\tdocker build -t $(IMAGE):$(TAG) .'),
+  panelLine(''),
+  panelLine('push: build'),
+  panelLine('\tdocker push $(IMAGE):$(TAG)'),
+  panelLine(''),
+  panelLine('deploy: push'),
+  panelLine('\tkubectl set image deployment/myapp app=$(IMAGE):$(TAG)'),
+  panelBlank(),
+]);
+
+/** NGINX config with proxy_pass stays in one code block */
+export const fb10_nginxProxyPass = makeRaw([
+  'Configure NGINX:',
+  '',
+  panelLine('server {'),
+  panelLine('    listen 80;'),
+  panelLine('    server_name myapp.example.com;'),
+  panelLine(''),
+  panelLine('    location / {'),
+  panelLine('        proxy_pass http://localhost:8080;'),
+  panelLine('        proxy_set_header Host $host;'),
+  panelLine('        proxy_set_header X-Real-IP $remote_addr;'),
+  panelLine('    }'),
+  panelLine(''),
+  panelLine('    location /healthz {'),
+  panelLine('        return 200 "OK";'),
+  panelLine('    }'),
+  panelLine('}'),
+  panelBlank(),
+]);
+
+/** Python K8s operator with deep nesting stays in one block */
+export const fb10_pythonK8sOperator = makeRaw([
+  'Create the operator:',
+  '',
+  panelLine('import kopf'),
+  panelLine(''),
+  panelLine('@kopf.on.create("v1", "pods")'),
+  panelLine('def create_fn(spec, **kwargs):'),
+  panelLine('    result = api.create('),
+  panelLine('        namespace="default",'),
+  panelLine('        body={'),
+  panelLine('            "metadata": {"name": "test"},'),
+  panelLine('        }'),
+  panelLine('    )'),
+  panelLine('    return {"ok": True}'),
+  panelBlank(),
+]);
+
+/** Grafana JSON in ConfigMap with [5m] Prometheus duration preserved */
+export const fb10_grafanaConfigMap5m = makeRaw([
+  'Create dashboard ConfigMap:',
+  '',
+  panelLine('apiVersion: v1'),
+  panelLine('kind: ConfigMap'),
+  panelLine('metadata:'),
+  panelLine('  name: grafana-dashboard'),
+  panelLine('data:'),
+  panelLine('  dashboard.json: |'),
+  panelLine('    {'),
+  panelLine('      "title": "Request Rate",'),
+  panelLine('      "targets": ['),
+  panelLine('        {'),
+  panelLine('          "expr": "rate(http_requests_total[5m])"'),
+  panelLine('        }'),
+  panelLine('      ]'),
+  panelLine('    }'),
+  panelBlank(),
+]);
+
+/** Docker Compose YAML in panel gets wrapped */
+export const fb10_dockerComposeYaml = makeRaw([
+  'Create docker-compose.yml:',
+  '',
+  panelLine('version: "3.8"'),
+  panelLine(''),
+  panelLine('services:'),
+  panelLine('  app:'),
+  panelLine('    build: .'),
+  panelLine('    ports:'),
+  panelLine('    - "8080:8080"'),
+  panelLine('    environment:'),
+  panelLine('    - DATABASE_URL=postgres://localhost/mydb'),
+  panelLine('  db:'),
+  panelLine('    image: postgres:15'),
+  panelBlank(),
+]);
+
+/** Envoy proxy config YAML gets wrapped in panel */
+export const fb10_envoyProxyConfig = makeRaw([
+  'Create the Envoy config:',
+  '',
+  panelLine('static_resources:'),
+  panelLine('  listeners:'),
+  panelLine('  - name: listener_0'),
+  panelLine('    address:'),
+  panelLine('      socket_address:'),
+  panelLine('        address: 0.0.0.0'),
+  panelLine('        port_value: 8080'),
+  panelLine('    filter_chains:'),
+  panelLine('    - filters:'),
+  panelLine('      - name: envoy.filters.network.http_connection_manager'),
+  panelBlank(),
+]);
+
+/** Azure Bicep for AKS stays in one code block */
+export const fb10_azureBicepAks = makeRaw([
+  'Create main.bicep:',
+  '',
+  panelLine("resource aks 'Microsoft.ContainerService/managedClusters@2024-01-01' = {"),
+  panelLine("  name: 'myAKSCluster'"),
+  panelLine('  identity: {'),
+  panelLine("    type: 'SystemAssigned'"),
+  panelLine('  }'),
+  panelLine('  properties: {'),
+  panelLine('    agentPoolProfiles: ['),
+  panelLine('      {'),
+  panelLine("        name: 'agentpool'"),
+  panelLine('        count: 3'),
+  panelLine("        vmSize: 'Standard_D2s_v3'"),
+  panelLine('      }'),
+  panelLine('    ]'),
+  panelLine('  }'),
+  panelLine('}'),
+  panelBlank(),
+]);
+
+/** kubectl top millicore values not corrupted */
+export const fb10_kubectlTopMillicores = makeRaw([
+  'Resource usage:',
+  '',
+  panelLine('$ kubectl top pods -n production'),
+  panelLine('NAME                     CPU(cores)   MEMORY(bytes)'),
+  panelLine('my-app-7b94c5d4f-abc12   250m         128Mi'),
+  panelLine('my-app-7b94c5d4f-def34   100m         96Mi'),
+  panelLine('my-app-7b94c5d4f-ghi56   500m         256Mi'),
+  panelBlank(),
+]);
+
+// ===========================================================================
+// Round 11 – findbugs11.test.ts
+// ===========================================================================
+
+/** kubectl resource action output lines detected as code */
+export const fb11_kubectlScaleOutput = makeRaw([
+  'Scale the deployment:',
+  '',
+  panelLine('$ kubectl scale deployment my-app --replicas=5 -n production'),
+  panelLine('deployment.apps/my-app scaled'),
+  panelBlank(),
+  '',
+  'Verify:',
+  '',
+  panelLine('$ kubectl get deployment my-app -n production'),
+  panelLine('NAME     READY   UP-TO-DATE   AVAILABLE   AGE'),
+  panelLine('my-app   5/5     5            5           3d'),
+  panelBlank(),
+]);
+
+/** kubectl apply output lines stay in code block */
+export const fb11_kubectlApplyOutput = makeRaw([
+  'Apply manifests:',
+  '',
+  panelLine('$ kubectl apply -f manifests/ -n production'),
+  panelLine('namespace/production unchanged'),
+  panelLine('serviceaccount/my-app created'),
+  panelLine('deployment.apps/my-app configured'),
+  panelLine('service/my-app-svc created'),
+  panelLine('configmap/my-config unchanged'),
+  panelLine('ingress.networking.k8s.io/my-ingress created'),
+  panelBlank(),
+]);
+
+/** Helm status output not treated as YAML keys */
+export const fb11_helmStatusOutput = makeRaw([
+  'Check Helm release:',
+  '',
+  panelLine('$ helm status my-release -n production'),
+  panelLine('NAME: my-release'),
+  panelLine('LAST DEPLOYED: Mon Jan 15 10:30:00 2024'),
+  panelLine('NAMESPACE: production'),
+  panelLine('STATUS: deployed'),
+  panelLine('REVISION: 3'),
+  panelLine('TEST SUITE: None'),
+  panelLine('NOTES:'),
+  panelLine('  Get the URL by running:'),
+  panelLine('  kubectl get svc my-release -n production'),
+  panelBlank(),
+]);
+
+/** kubectl rollout output stays in code block */
+export const fb11_kubectlRolloutStatus = makeRaw([
+  'Wait for rollout:',
+  '',
+  panelLine('$ kubectl rollout status deployment/my-app -n production'),
+  panelLine(
+    'Waiting for deployment "my-app" rollout to finish: 1 of 3 updated replicas are available...'
+  ),
+  panelLine(
+    'Waiting for deployment "my-app" rollout to finish: 2 of 3 updated replicas are available...'
+  ),
+  panelLine('deployment "my-app" successfully rolled out'),
+  panelBlank(),
+]);
+
+/** terraform plan output with + prefix detected as code */
+export const fb11_terraformPlanOutput = makeRaw([
+  'Plan the AKS cluster:',
+  '',
+  panelLine('$ terraform plan'),
+  panelLine(''),
+  panelLine('Terraform will perform the following actions:'),
+  panelLine(''),
+  panelLine('  # azurerm_kubernetes_cluster.aks will be created'),
+  panelLine('  + resource "azurerm_kubernetes_cluster" "aks" {'),
+  panelLine('      + dns_prefix          = "myaks"'),
+  panelLine('      + location            = "eastus"'),
+  panelLine('      + name                = "myAKSCluster"'),
+  panelLine('      + resource_group_name = "myResourceGroup"'),
+  panelLine('    }'),
+  panelLine(''),
+  panelLine('Plan: 1 to add, 0 to change, 0 to destroy.'),
+  panelBlank(),
+]);
+
+/** Docker build step output stays in code block */
+export const fb11_dockerBuildSteps = makeRaw([
+  'Build the image:',
+  '',
+  panelLine('$ docker build -t myapp:latest .'),
+  panelLine('Step 1/5 : FROM node:18-alpine'),
+  panelLine(' ---> abc123def456'),
+  panelLine('Step 2/5 : WORKDIR /app'),
+  panelLine(' ---> Using cache'),
+  panelLine(' ---> def456789abc'),
+  panelLine('Step 3/5 : COPY package*.json ./'),
+  panelLine(' ---> 789abcdef012'),
+  panelLine('Step 4/5 : RUN npm ci --production'),
+  panelLine(' ---> Running in container123'),
+  panelLine('Step 5/5 : CMD ["node", "server.js"]'),
+  panelLine(' ---> 012345678abc'),
+  panelLine('Successfully built 012345678abc'),
+  panelLine('Successfully tagged myapp:latest'),
+  panelBlank(),
+]);
+
+/** Helm template Go expressions in bare output wrapped as code */
+export const fb11_helmTemplateGoExpr = makeRaw([
+  'The Helm template generates:',
+  '',
+  panelLine('{{- if .Values.ingress.enabled -}}'),
+  panelLine('apiVersion: networking.k8s.io/v1'),
+  panelLine('kind: Ingress'),
+  panelLine('metadata:'),
+  panelLine('  name: {{ include "mychart.fullname" . }}'),
+  panelLine('  {{- with .Values.ingress.annotations }}'),
+  panelLine('  annotations:'),
+  panelLine('    {{- toYaml . | nindent 4 }}'),
+  panelLine('  {{- end }}'),
+  panelLine('spec:'),
+  panelLine('  rules:'),
+  panelLine('  {{- range .Values.ingress.hosts }}'),
+  panelLine('  - host: {{ .host }}'),
+  panelLine('{{- end }}'),
+  panelBlank(),
+]);
+
+/** ConfigMap with embedded Spring properties stays together */
+export const fb11_configMapSpringProperties = makeRaw([
+  'Create ConfigMap:',
+  '',
+  panelLine('apiVersion: v1'),
+  panelLine('kind: ConfigMap'),
+  panelLine('metadata:'),
+  panelLine('  name: app-config'),
+  panelLine('data:'),
+  panelLine('  application.properties: |'),
+  panelLine('    server.port=8080'),
+  panelLine('    spring.datasource.url=jdbc:postgresql://db:5432/mydb'),
+  panelLine('    spring.datasource.username=${DB_USER}'),
+  panelLine('    spring.jpa.hibernate.ddl-auto=update'),
+  panelLine('    management.endpoints.web.exposure.include=health,info'),
+  panelBlank(),
+]);
+
+/** kubectl error messages not absorbed into YAML blocks */
+export const fb11_kubectlErrorMessage = makeRaw([
+  'Try to access the resource:',
+  '',
+  panelLine('$ kubectl get pods -n production'),
+  panelLine('NAME                     READY   STATUS    RESTARTS   AGE'),
+  panelLine('api-server-abc12         1/1     Running   0          2d'),
+  panelBlank(),
+  '',
+  'If you see an error like:',
+  '',
+  panelLine('$ kubectl get customresource -n production'),
+  panelLine('error: the server doesnt have a resource type "customresource"'),
+  panelBlank(),
+  '',
+  'It means the CRD is not installed.',
+]);
+
+/** kubectl deprecation warnings stay with command output */
+export const fb11_kubectlWarningDeprecation = makeRaw([
+  'Apply the policy:',
+  '',
+  panelLine('$ kubectl apply -f psp.yaml'),
+  panelLine('Warning: policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+'),
+  panelLine('podsecuritypolicy.policy/restricted created'),
+  panelBlank(),
+]);
+
+/** bare kubectl events table detected as code */
+export const fb11_kubectlEventsTable = makeRaw([
+  'Recent events in the namespace:',
+  '',
+  panelLine('LAST SEEN   TYPE      REASON              OBJECT                        MESSAGE'),
+  panelLine(
+    '30s         Normal    Scheduled           pod/api-server-abc12          Successfully assigned'
+  ),
+  panelLine(
+    '28s         Normal    Pulling             pod/api-server-abc12          Pulling image "myapp:v2"'
+  ),
+  panelLine(
+    '15s         Normal    Pulled              pod/api-server-abc12          Successfully pulled image'
+  ),
+  panelLine(
+    '14s         Normal    Created             pod/api-server-abc12          Created container api'
+  ),
+  panelLine(
+    '14s         Normal    Started             pod/api-server-abc12          Started container api'
+  ),
+  panelLine(
+    '5s          Warning   BackOff             pod/worker-xyz99              Back-off restarting failed'
+  ),
+  panelBlank(),
+]);
+
+/** Kustomization with patchesStrategicMerge wrapped as YAML */
+export const fb11_kustomizationPatches = makeRaw([
+  'Create kustomization.yaml:',
+  '',
+  panelLine(' resources:'),
+  panelLine(' - deployment.yaml'),
+  panelLine(' - service.yaml'),
+  panelLine(' patchesStrategicMerge:'),
+  panelLine(' - |-'),
+  panelLine('   apiVersion: apps/v1'),
+  panelLine('   kind: Deployment'),
+  panelLine('   metadata:'),
+  panelLine('     name: my-app'),
+  panelLine('   spec:'),
+  panelLine('     replicas: 5'),
+  panelLine(' commonLabels:'),
+  panelLine('   app: my-app'),
+  panelLine('   env: production'),
+  panelBlank(),
+]);
+
+/** Go client-go code stays in one code block */
+export const fb11_goClientGoCode = makeRaw([
+  'Create main.go:',
+  '',
+  panelLine('package main'),
+  panelLine(''),
+  panelLine('import ('),
+  panelLine('  "context"'),
+  panelLine('  "fmt"'),
+  panelLine('  metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"'),
+  panelLine('  "k8s.io/client-go/kubernetes"'),
+  panelLine('  "k8s.io/client-go/tools/clientcmd"'),
+  panelLine(')'),
+  panelLine(''),
+  panelLine('func main() {'),
+  panelLine('  config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)'),
+  panelLine('  if err != nil {'),
+  panelLine('    panic(err)'),
+  panelLine('  }'),
+  panelLine('  clientset, err := kubernetes.NewForConfig(config)'),
+  panelLine(
+    '  pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})'
+  ),
+  panelLine('  for _, pod := range pods.Items {'),
+  panelLine('    fmt.Printf("Pod: %s\\n", pod.Name)'),
+  panelLine('  }'),
+  panelLine('}'),
+  panelBlank(),
+]);
+
+/** RBAC ClusterRole with complex rules stays together */
+export const fb11_rbacClusterRole = makeRaw([
+  'Create ClusterRole:',
+  '',
+  panelLine('apiVersion: rbac.authorization.k8s.io/v1'),
+  panelLine('kind: ClusterRole'),
+  panelLine('metadata:'),
+  panelLine('  name: monitoring-role'),
+  panelLine('rules:'),
+  panelLine('- apiGroups: [""]'),
+  panelLine('  resources: ["pods", "nodes", "services", "endpoints"]'),
+  panelLine('  verbs: ["get", "list", "watch"]'),
+  panelLine('- apiGroups: ["apps"]'),
+  panelLine('  resources: ["deployments", "replicasets", "statefulsets"]'),
+  panelLine('  verbs: ["get", "list", "watch"]'),
+  panelLine('- apiGroups: ["monitoring.coreos.com"]'),
+  panelLine('  resources: ["prometheuses", "servicemonitors", "alertmanagers"]'),
+  panelLine('  verbs: ["*"]'),
+  panelBlank(),
+]);
+
+/** Multiple kubectl commands with prose rendered correctly */
+export const fb11_multiKubectlWithProse = makeRaw([
+  'First, create the namespace:',
+  '',
+  panelLine('$ kubectl create namespace monitoring'),
+  panelLine('namespace/monitoring created'),
+  panelBlank(),
+  '',
+  'Then install Prometheus:',
+  '',
+  panelLine('$ helm install prometheus prometheus-community/kube-prometheus-stack \\'),
+  panelLine('    --namespace monitoring \\'),
+  panelLine('    --set grafana.enabled=true \\'),
+  panelLine('    --set alertmanager.enabled=true'),
+  panelBlank(),
+  '',
+  'Verify the pods are running:',
+  '',
+  panelLine('$ kubectl get pods -n monitoring'),
+  panelLine(
+    'NAME                                                  READY   STATUS    RESTARTS   AGE'
+  ),
+  panelLine(
+    'prometheus-kube-prometheus-operator-7d9f5b6c4-abc12   1/1     Running   0          60s'
+  ),
+  panelLine(
+    'prometheus-grafana-85f4c9d7b-xyz99                    3/3     Running   0          60s'
+  ),
+  panelLine(
+    'alertmanager-prometheus-alertmanager-0                1/1     Running   0          60s'
+  ),
+  panelBlank(),
+]);
+
+/** klog-format log lines from kubectl logs detected as code */
+export const fb11_klogFormatLogs = makeRaw([
+  'Check controller logs:',
+  '',
+  panelLine('$ kubectl logs -n kube-system deployment/kube-controller-manager --tail=5'),
+  panelLine('I0115 10:30:00.123456       1 main.go:50] Starting controller v1.28.0'),
+  panelLine('I0115 10:30:01.234567       1 leaderelection.go:258] successfully acquired lease'),
+  panelLine('W0115 10:30:05.345678       1 reflector.go:302] pkg/mod/cache: watch closed'),
+  panelLine(
+    'E0115 10:30:06.456789       1 controller.go:114] error syncing key: connection refused'
+  ),
+  panelLine('I0115 10:30:07.567890       1 controller.go:120] requeue: default/my-deployment'),
+  panelBlank(),
+]);
+
+/** logfmt structured logging lines detected as code */
+export const fb11_logfmtStructuredLogs = makeRaw([
+  'Application logs:',
+  '',
+  panelLine('$ kubectl logs -n production deployment/api-server --tail=5'),
+  panelLine('level=info msg="server started" port=8080 version=v1.2.3'),
+  panelLine('level=info msg="connected to database" host=postgres:5432 db=myapp'),
+  panelLine('level=error msg="request failed" status=503 path=/api/health'),
+  panelLine('level=warn msg="slow query" duration=2.5s table=users'),
+  panelLine('level=info msg="graceful shutdown" signal=SIGTERM'),
+  panelBlank(),
+]);
+
+/** K8s validation errors stay in code block */
+export const fb11_k8sValidationErrors = makeRaw([
+  'If validation fails:',
+  '',
+  panelLine('$ kubectl apply -f deployment.yaml'),
+  panelLine('The Deployment "my-app" is invalid:'),
+  panelLine('* spec.containers[0].image: Required value'),
+  panelLine('* spec.containers[0].name: Required value'),
+  panelLine('* spec.template.metadata.labels: Invalid value: map[string]string(nil)'),
+  panelBlank(),
+]);
+
+/** K8s scheduling messages stay in kubectl describe output */
+export const fb11_k8sSchedulingDescribe = makeRaw([
+  'Check pod status:',
+  '',
+  panelLine('$ kubectl describe pod stuck-pod -n production'),
+  panelLine('Name:         stuck-pod'),
+  panelLine('Status:       Pending'),
+  panelLine('Conditions:'),
+  panelLine('  Type             Status'),
+  panelLine('  PodScheduled     False'),
+  panelLine('Events:'),
+  panelLine('  Type     Reason            Message'),
+  panelLine('  ----     ------            -------'),
+  panelLine(
+    '  Warning  FailedScheduling  0/3 nodes are available: 1 Insufficient cpu, 2 node(s) had taint'
+  ),
+  panelBlank(),
+]);
+
+/** PVC and other resource status lines detected as code */
+export const fb11_pvcResourceStatus = makeRaw([
+  'Apply storage:',
+  '',
+  panelLine('$ kubectl apply -f storage.yaml'),
+  panelLine('storageclass.storage.k8s.io/fast-ssd created'),
+  panelLine('persistentvolumeclaim/data-pvc created'),
+  panelLine('persistentvolume/nfs-pv configured'),
+  panelBlank(),
+]);
+
+/** helm upgrade output with hooks and notes stays in code block */
+export const fb11_helmUpgradeHooks = makeRaw([
+  'Upgrade the release:',
+  '',
+  panelLine('$ helm upgrade my-release ./chart -n production --install'),
+  panelLine('Release "my-release" has been upgraded. Happy Helming!'),
+  panelLine('NAME: my-release'),
+  panelLine('LAST DEPLOYED: Mon Jan 15 10:30:00 2024'),
+  panelLine('NAMESPACE: production'),
+  panelLine('STATUS: deployed'),
+  panelLine('REVISION: 5'),
+  panelLine('HOOKS:'),
+  panelLine('---'),
+  panelLine('# Source: mychart/templates/tests/test-connection.yaml'),
+  panelLine('apiVersion: v1'),
+  panelLine('kind: Pod'),
+  panelBlank(),
+]);
+
+/** az aks and kubeconfig commands with output stay together */
+export const fb11_azAksGetCredentials = makeRaw([
+  'Connect to AKS:',
+  '',
+  panelLine('$ az aks get-credentials --resource-group myRG --name myAKS --overwrite-existing'),
+  panelLine('Merged "myAKS" as current context in /home/user/.kube/config'),
+  panelBlank(),
+  '',
+  'Verify context:',
+  '',
+  panelLine('$ kubectl config current-context'),
+  panelLine('myAKS'),
+  panelBlank(),
+  '',
+  'Check nodes:',
+  '',
+  panelLine('$ kubectl get nodes'),
+  panelLine('NAME                                STATUS   ROLES   AGE   VERSION'),
+  panelLine('aks-nodepool1-12345678-vmss000000   Ready    agent   5d    v1.28.3'),
+  panelLine('aks-nodepool1-12345678-vmss000001   Ready    agent   5d    v1.28.3'),
+  panelLine('aks-nodepool1-12345678-vmss000002   Ready    agent   5d    v1.28.3'),
+  panelBlank(),
+]);
+
+/** Pod with service mesh annotations stays in one YAML block */
+export const fb11_istioSidecarAnnotations = makeRaw([
+  'Add Istio sidecar injection:',
+  '',
+  panelLine('apiVersion: v1'),
+  panelLine('kind: Pod'),
+  panelLine('metadata:'),
+  panelLine('  name: my-app'),
+  panelLine('  annotations:'),
+  panelLine('    sidecar.istio.io/inject: "true"'),
+  panelLine('    sidecar.istio.io/proxyMemory: "256Mi"'),
+  panelLine('    prometheus.io/scrape: "true"'),
+  panelLine('    prometheus.io/port: "8080"'),
+  panelLine('spec:'),
+  panelLine('  containers:'),
+  panelLine('  - name: my-app'),
+  panelLine('    image: myapp:latest'),
+  panelLine('    ports:'),
+  panelLine('    - containerPort: 8080'),
+  panelBlank(),
+]);
+
+/** bare logfmt structured logging wrapped in code block */
+export const fb11_bareLogfmtOutput = makeRaw([
+  'The application logs show:',
+  '',
+  panelLine('level=info msg="server started" port=8080 version=v1.2.3'),
+  panelLine('level=info msg="connected to database" host=postgres:5432'),
+  panelLine('level=error msg="request failed" status=503 path=/api/health'),
+  panelBlank(),
+]);
+
+/** bare klog format controller logs wrapped in code block */
+export const fb11_bareKlogFormat = makeRaw([
+  'Controller logs show:',
+  '',
+  panelLine('I0115 10:30:00.123456       1 main.go:50] Starting controller v1.28.0'),
+  panelLine('I0115 10:30:01.234567       1 leaderelection.go:258] acquired lease'),
+  panelLine('W0115 10:30:05.345678       1 reflector.go:302] watch closed'),
+  panelBlank(),
+]);
+
+/** bare kubectl resource action output from panel wrapped as code */
+export const fb11_bareResourceActionOutput = makeRaw([
+  'After applying:',
+  '',
+  panelLine('deployment.apps/my-app configured'),
+  panelLine('service/my-app-svc created'),
+  panelLine('configmap/my-config unchanged'),
+  panelLine('ingress.networking.k8s.io/my-ingress created'),
+  panelBlank(),
+]);
+
+/** terraform output values at panel indent wrapped as code */
+export const fb11_terraformOutputValues = makeRaw([
+  'Terraform outputs:',
+  '',
+  panelLine('cluster_endpoint = "https://myaks-abc.hcp.eastus.azmk8s.io:443"'),
+  panelLine('cluster_name = "myAKSCluster"'),
+  panelLine('resource_group = "myResourceGroup"'),
+  panelLine('kube_config = <sensitive>'),
+  panelBlank(),
+]);
+
+/** bare PromQL expression with [5m] wrapped as code */
+export const fb11_barePromQL5m = makeRaw([
+  'Use this PromQL query:',
+  '',
+  panelLine('sum(rate(container_cpu_usage_seconds_total{namespace="prod"}[5m])) by (pod)'),
+  panelBlank(),
+]);
+
+/** multi-step AKS troubleshooting with commands and YAML */
+export const fb11_aksTroubleshooting = makeRaw([
+  'Troubleshoot the failing pod:',
+  '',
+  '1. Check the pods:',
+  '',
+  panelLine('$ kubectl get pods -n production -l app=my-app'),
+  panelLine('NAME                     READY   STATUS             RESTARTS   AGE'),
+  panelLine('my-app-abc12             0/1     CrashLoopBackOff   5          10m'),
+  panelBlank(),
+  '',
+  '2. Check the logs:',
+  '',
+  panelLine('$ kubectl logs my-app-abc12 -n production --previous'),
+  panelLine('Error: Cannot find module "/app/server.js"'),
+  panelBlank(),
+  '',
+  '3. Fix the Deployment:',
+  '',
+  panelLine('apiVersion: apps/v1'),
+  panelLine('kind: Deployment'),
+  panelLine('metadata:'),
+  panelLine('  name: my-app'),
+  panelLine('spec:'),
+  panelLine('  template:'),
+  panelLine('    spec:'),
+  panelLine('      containers:'),
+  panelLine('      - name: my-app'),
+  panelLine('        command: ["node", "dist/server.js"]'),
+  panelBlank(),
+]);
+
+/** K8s Secret with base64 data stays in one YAML block */
+export const fb11_k8sSecretBase64 = makeRaw([
+  'Create the Secret:',
+  '',
+  panelLine('apiVersion: v1'),
+  panelLine('kind: Secret'),
+  panelLine('metadata:'),
+  panelLine('  name: db-credentials'),
+  panelLine('  namespace: production'),
+  panelLine('type: Opaque'),
+  panelLine('data:'),
+  panelLine('  DB_HOST: cG9zdGdyZXMucHJvZHVjdGlvbi5zdmMuY2x1c3Rlci5sb2NhbA=='),
+  panelLine('  DB_USER: bXlhcHB1c2Vy'),
+  panelLine('  DB_PASS: c3VwZXJzZWNyZXRwYXNzd29yZA=='),
+  panelLine('  DB_NAME: bXlhcHBkYg=='),
+  panelBlank(),
+]);
+
+// ===========================================================================
+// Round 12 – findbugs12.test.ts
+// ===========================================================================
+
+/** bare PromQL expressions detected as code */
+export const fb12_barePromQLExpressions = makeRaw([
+  'Use these PromQL queries to monitor:',
+  '',
+  panelLine('sum(rate(container_cpu_usage_seconds_total{namespace="prod"}[5m])) by (pod)'),
+  panelBlank(),
+]);
+
+/** bare K8s event messages detected as code */
+export const fb12_bareK8sEventMessages = makeRaw([
+  'The pod events show:',
+  '',
+  panelLine('Pulling image "nginx:1.25"'),
+  panelLine('Successfully assigned production/web-abc12 to aks-node-0'),
+  panelLine('Container image "nginx:1.25" already present on machine'),
+  panelLine('Created container nginx'),
+  panelLine('Started container nginx'),
+  panelBlank(),
+]);
+
+/** bare scheduling failure messages detected as code */
+export const fb12_bareSchedulingFailure = makeRaw([
+  'The scheduling error shows:',
+  '',
+  panelLine('0/3 nodes are available: 1 Insufficient cpu, 2 node(s) had taint'),
+  panelLine('{node.kubernetes.io/not-ready: }, that the pod did not tolerate.'),
+  panelBlank(),
+]);
+
+/** bare Prometheus metric query results detected as code */
+export const fb12_barePrometheusMetrics = makeRaw([
+  'Current metric values:',
+  '',
+  panelLine('container_memory_working_set_bytes{namespace="prod",pod="api-abc12"} 134217728'),
+  panelLine('container_cpu_usage_seconds_total{namespace="prod",pod="api-abc12"} 45.23'),
+  panelLine('kube_pod_status_phase{namespace="prod",phase="Running"} 5'),
+  panelBlank(),
+]);
+
+/** bare readiness probe failure messages detected as code */
+export const fb12_bareProbeFailures = makeRaw([
+  'The health check errors show:',
+  '',
+  panelLine('Readiness probe failed: Get "http://10.0.0.5:8080/healthz": connection refused'),
+  panelLine('Liveness probe failed: HTTP probe failed with statuscode: 503'),
+  panelLine(
+    'Startup probe failed: Get "http://10.0.0.5:8080/ready": context deadline exceeded'
+  ),
+  panelBlank(),
+]);
+
+/** CoreDNS Corefile with deep nesting stays complete */
+export const fb12_coreDNSCorefile = makeRaw([
+  'The CoreDNS Corefile should look like:',
+  '',
+  panelLine('.:53 {'),
+  panelLine('    errors'),
+  panelLine('    health {'),
+  panelLine('        lameduck 5s'),
+  panelLine('    }'),
+  panelLine('    ready'),
+  panelLine('    kubernetes cluster.local in-addr.arpa ip6.arpa {'),
+  panelLine('        pods insecure'),
+  panelLine('        fallthrough in-addr.arpa ip6.arpa'),
+  panelLine('        ttl 30'),
+  panelLine('    }'),
+  panelLine('    prometheus :9153'),
+  panelLine('    forward . /etc/resolv.conf'),
+  panelLine('    cache 30'),
+  panelLine('    loop'),
+  panelLine('    reload'),
+  panelLine('    loadbalance'),
+  panelLine('}'),
+  panelBlank(),
+]);
+
+/** PrometheusRule CRD YAML with deep rules stays complete */
+export const fb12_prometheusRuleCRD = makeRaw([
+  'Create the PrometheusRule:',
+  '',
+  panelLine('apiVersion: monitoring.coreos.com/v1'),
+  panelLine('kind: PrometheusRule'),
+  panelLine('metadata:'),
+  panelLine('  name: app-alerts'),
+  panelLine('spec:'),
+  panelLine('  groups:'),
+  panelLine('  - name: app.rules'),
+  panelLine('    rules:'),
+  panelLine('    - alert: HighErrorRate'),
+  panelLine('      expr: sum(rate(http_requests_total{code=~"5.."}[5m])) > 0.1'),
+  panelLine('      for: 5m'),
+  panelLine('      labels:'),
+  panelLine('        severity: critical'),
+  panelLine('      annotations:'),
+  panelLine('        summary: High error rate detected'),
+  panelLine('        description: Error rate is above 10% for 5 minutes'),
+  panelBlank(),
+]);
+
+/** deeply nested az aks JSON output stays complete */
+export const fb12_azAksJsonOutput = makeRaw([
+  'Node pool details:',
+  '',
+  panelLine('{'),
+  panelLine('  "agentPoolProfiles": ['),
+  panelLine('    {'),
+  panelLine('      "name": "nodepool1",'),
+  panelLine('      "count": 3,'),
+  panelLine('      "vmSize": "Standard_DS2_v2",'),
+  panelLine('      "provisioningState": "Succeeded",'),
+  panelLine('      "powerState": {'),
+  panelLine('        "code": "Running"'),
+  panelLine('      },'),
+  panelLine('      "nodeLabels": {'),
+  panelLine('        "env": "production"'),
+  panelLine('      }'),
+  panelLine('    }'),
+  panelLine('  ]'),
+  panelLine('}'),
+  panelBlank(),
+]);
+
+/** bare container crash messages detected as code */
+export const fb12_bareContainerCrash = makeRaw([
+  'The pod restart events:',
+  '',
+  panelLine('Back-off restarting failed container my-app in pod my-app-abc12'),
+  panelLine('Killing container with a]id docker://abc123def to re-create'),
+  panelLine('Container my-app definition changed, will be restarted'),
+  panelBlank(),
+]);
+
+/** bare volume mount failure messages detected as code */
+export const fb12_bareVolumeMountFailure = makeRaw([
+  'The storage errors show:',
+  '',
+  panelLine('MountVolume.SetUp failed for volume "data-vol" : secret "app-secret" not found'),
+  panelLine('Unable to attach or mount volumes: timed out waiting for the condition'),
+  panelLine('AttachVolume.Attach failed for volume "pvc-abc123" : disk not found'),
+  panelBlank(),
+]);
+
+/** bare image pull failure messages detected as code */
+export const fb12_bareImagePullFailure = makeRaw([
+  'The image pull errors:',
+  '',
+  panelLine('Failed to pull image "myregistry.azurecr.io/myapp:v2.0.0": rpc error'),
+  panelLine('Error response from daemon: manifest for myapp:v2.0.0 not found'),
+  panelLine('Normal BackOff 5m (x3 over 10m) kubelet Back-off pulling image'),
+  panelBlank(),
+]);
+
+/** bare scheduling detail messages detected as code */
+export const fb12_bareSchedulingDetails = makeRaw([
+  'Scheduling failure details:',
+  '',
+  panelLine('Insufficient cpu (1500m requested vs 1000m available)'),
+  panelLine('Insufficient memory (2Gi requested vs 512Mi available)'),
+  panelLine('node(s) had volume node affinity conflict'),
+  panelLine('node(s) did not match Pod topologySpreadConstraints'),
+  panelBlank(),
+]);
+
+/** bare CRI-O container log lines detected as code */
+export const fb12_bareCRIOLogs = makeRaw([
+  'Raw container runtime logs:',
+  '',
+  panelLine('stdout F Starting application v2.1.0'),
+  panelLine('stdout F Connected to database at postgres:5432'),
+  panelLine('stdout F Listening on port 8080'),
+  panelLine('stderr F Error: connection reset by peer'),
+  panelLine('stdout F GET /api/health 200 2ms'),
+  panelBlank(),
+]);
+
+/** bare multi-line container lifecycle events detected as code */
+export const fb12_bareContainerLifecycle = makeRaw([
+  'Container lifecycle events:',
+  '',
+  panelLine('Pulling image "myapp:v2.0.0"'),
+  panelLine('Successfully pulled image "myapp:v2.0.0" in 3.2s'),
+  panelLine('Created container my-app'),
+  panelLine('Started container my-app'),
+  panelLine('Liveness probe failed: HTTP probe failed with statuscode: 503'),
+  panelLine('Container my-app failed liveness probe, will be restarted'),
+  panelBlank(),
+]);
+
+/** bare key=value diagnostic output detected as code */
+export const fb12_bareKeyValueDiagnostics = makeRaw([
+  'Container runtime info:',
+  '',
+  panelLine('runtime.name=containerd runtime.version=1.7.2'),
+  panelLine('runtime.endpoint=/run/containerd/containerd.sock'),
+  panelLine('pod.name=my-app-abc12 namespace=production node=aks-node-0'),
+  panelLine('container.id=abc123def456 image=myapp:v2.0.0 state=running'),
   panelBlank(),
 ]);
