@@ -310,7 +310,7 @@ function stripAnsi(text: string): string {
     .replace(/\x1b[()][AB012]/g, '') // Character set selection
     .replace(/\r/g, '') // Carriage returns
     .replace(/\x1b/g, '') // Stray ESC characters (from split sequences)
-    .replace(/\[[\d;]*m/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping)
+    .replace(/\[\d[\d;]*m(?![)\]}\w])/g, '') // Orphaned ANSI codes missing ESC prefix (from terminal line wrapping); require at least one digit before 'm' so text like [main], [master] is not corrupted; negative lookahead prevents stripping Prometheus-style durations like [5m] or [30m]
     .replace(/\s?\[(\d{1,3}(;\d{1,3})*)?$/gm, '') // Trailing orphan "[" fragments from split sequences (e.g. "[4" from "[4\n0m", or bare "[" from "\x1b[" at line end)
     .replace(/^(?:\d{1,3};)+\d{1,3}m\s?/gm, '') // Orphaned multi-part ANSI at line start (e.g. "97;40m" from split sequence)
     .replace(/^0m\s*$/gm, '') // Bare ANSI reset "0m" alone on a line (from split "[4\n0m"); K8s millicores like 25m/50m/200m appear in tabular data, not alone on a line
@@ -1430,6 +1430,9 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Environment variable assignment: VAR=value or VAR="value"
   if (/^[A-Z_][A-Z0-9_]*=\S/.test(trimmed)) return true;
 
+  // Makefile variable assignment: VAR ?= value, VAR := value, VAR += value
+  if (/^[A-Z_][A-Z0-9_]*\s*[?:+]=/.test(trimmed)) return true;
+
   // Pipe between commands: word | word  (but not markdown table starting with |)
   if (/\w\s+\|\s+\w/.test(trimmed) && !/^\|/.test(trimmed)) return true;
 
@@ -1568,6 +1571,10 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
   // Go channel send: identifier <- expr
   if (/^\w+\s*<-\s*\S/.test(trimmed)) return true;
 
+  // Config directive lines ending with semicolon: proxy_pass http://...; listen 80;
+  // Common in NGINX, Apache, and similar config formats
+  if (/^\w[\w_]*\s+\S.*;\s*$/.test(trimmed) && trimmed.length < 120) return true;
+
   // ── Tier 6: TOML / INI config patterns ──
 
   // TOML section headers: [package], [dependencies], [workspace.dependencies], etc.
@@ -1582,6 +1589,12 @@ function looksLikeShellOrDockerCodeLine(trimmed: string): boolean {
 
   // HCL resource/data/variable/output/provider/module/locals blocks
   if (/^(resource|data|variable|output|provider|module|locals)\s+["{\w]/.test(trimmed)) return true;
+
+  // ── Tier 6c: Makefile directive patterns ──
+
+  // .PHONY, .SUFFIXES, .DEFAULT_GOAL, etc.
+  if (/^\.(PHONY|SUFFIXES|DEFAULT_GOAL|PRECIOUS|INTERMEDIATE|SECONDARY|SECONDEXPANSION|DELETE_ON_ERROR|EXPORT_ALL_VARIABLES|NOTPARALLEL|ONESHELL|POSIX):/.test(trimmed))
+    return true;
 
   // ── Tier 7: XML/HTML patterns ──
 
@@ -1908,6 +1921,64 @@ function normalizeTerminalMarkdown(text: string): string {
       }
     }
 
+    // ── Panel YAML recovery: shallow-indented (1-space) YAML from Rich panels ──
+    // When Rich panel content has no bold file heading, YAML lines arrive with
+    // 1-space indent after ANSI stripping.  Collect runs of 1-space-indented YAML
+    // and wrap them in ```yaml fences with dedentation.
+    // Only trigger after a blank line (start of a new section) to avoid intercepting
+    // YAML that's part of a bold-file-heading block or other context.
+    const prevLineBlank = i === 0 || lines[i - 1].trim() === '';
+    if (
+      prevLineBlank &&
+      /^ \S/.test(line) &&
+      looksLikeYaml(trimmed) &&
+      !looksLikeShellOrDockerCodeLine(trimmed) &&
+      !/^\s*apiVersion:\s/.test(line) &&
+      i + 1 < lines.length
+    ) {
+      const yamlPanelLines: string[] = [line];
+      let yj = i + 1;
+      let hasApiVersion = false;
+      while (yj < lines.length) {
+        const yl = lines[yj];
+        const yt = yl.trim();
+        if (/^\s*apiVersion:\s/.test(yl)) hasApiVersion = true;
+        if (yt === '') {
+          // Allow blank lines if followed by more indented content
+          if (yj + 1 < lines.length && /^\s/.test(lines[yj + 1]) && lines[yj + 1].trim() !== '') {
+            yamlPanelLines.push(yl);
+            yj++;
+            continue;
+          }
+          break;
+        }
+        if (/^\s/.test(yl) && (looksLikeYaml(yt) || /^\s{2,}/.test(yl))) {
+          yamlPanelLines.push(yl);
+          yj++;
+          continue;
+        }
+        break;
+      }
+      // Only wrap if: 3+ lines, no K8s apiVersion (let wrapBareYamlBlocks handle that),
+      // and not a single-key YAML-like line
+      if (yamlPanelLines.length >= 3 && !hasApiVersion) {
+        const nonBlank = yamlPanelLines.filter(l => l.trim() !== '');
+        const minIndent = nonBlank.reduce(
+          (min, l) => Math.min(min, (l.match(/^(\s*)/)?.[1].length ?? 0)),
+          Infinity
+        );
+        const shift = minIndent === Infinity ? 0 : minIndent;
+        result.push('```yaml');
+        for (const yl of yamlPanelLines) {
+          result.push(yl.trim() === '' ? '' : yl.slice(shift));
+        }
+        result.push('```');
+        wrappedCodeBlockCount++;
+        i = yj;
+        continue;
+      }
+    }
+
     const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
     const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : '';
     if (
@@ -2126,6 +2197,11 @@ function normalizeTerminalMarkdown(text: string): string {
       if (startedByFileHeader) {
         codeLikeLineCount++; // count the file header itself
       }
+      // Track YAML literal/folded block scalars (| or >) inside indented blocks
+      // so that deeply indented content (e.g. embedded bash scripts in ConfigMaps)
+      // is not broken out of the block by the deep-indent check.
+      let indBlockInLiteral = false;
+      let indBlockLiteralIndent = 0;
 
       while (j < lines.length) {
         const blockLine = lines[j];
@@ -2198,11 +2274,24 @@ function normalizeTerminalMarkdown(text: string): string {
         // Stop at heavily-indented non-code lines (centered headings)
         // Skip this check for file-header blocks since config/YAML files
         // commonly have deep indentation.
+        // Also skip when inside a YAML literal/folded block scalar (| or >)
+        // since the content may be embedded scripts at deeper indentation.
         const lineIndent = blockLine.match(/^(\s*)/)?.[1].length ?? 0;
+        if (indBlockInLiteral) {
+          if (lineIndent > indBlockLiteralIndent) {
+            // Still inside literal block — keep going
+            blockLines.push(blockLine);
+            if (looksLikeShellOrDockerCodeLine(blockTrimmed)) codeLikeLineCount++;
+            j++;
+            continue;
+          }
+          indBlockInLiteral = false;
+        }
         if (
           !startedByFileHeader &&
           lineIndent > baseIndent + 4 &&
-          !looksLikeShellOrDockerCodeLine(blockTrimmed)
+          !looksLikeShellOrDockerCodeLine(blockTrimmed) &&
+          !hasStructuredCodeContext(blockLines)
         ) {
           break;
         }
@@ -2212,6 +2301,11 @@ function normalizeTerminalMarkdown(text: string): string {
         }
 
         blockLines.push(blockLine);
+        // Track start of YAML literal/folded block scalar (e.g. "key: |")
+        if (/[|>][-+]?\d?\s*$/.test(blockTrimmed)) {
+          indBlockInLiteral = true;
+          indBlockLiteralIndent = lineIndent;
+        }
         j++;
       }
 
