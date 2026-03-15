@@ -4,7 +4,6 @@
 import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { _testing } from './agent/aksAgentManager';
 import {
   fb1_dockerCompose,
   fb1_twoFileHeadings,
@@ -36,7 +35,8 @@ import {
   fb14_panelCodeThenAlsoConfirm,
   fb15_assumptionsBetweenCodeBlocks,
   fb15_mainPyPanel,
-} from './agent/findbugFixtures';
+} from './agent/__tests__/fixtures';
+import { _testing } from './agent/aksAgentManager';
 import ContentRenderer from './ContentRenderer';
 
 const { extractAIAnswer } = _testing;

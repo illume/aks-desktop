@@ -51,7 +51,6 @@ function panelBlank(): string {
   return '\x1b[40m' + ' '.repeat(80) + '\x1b[0m';
 }
 
-
 /** Rich-terminal bold panel line (e.g. filename headings). Uses bold weight (1;97) unlike panelLine. */
 function boldLine(content: string): string {
   return `\x1b[40m \x1b[0m\x1b[1;97;40m${content.padEnd(78)}\x1b[0m\x1b[40m \x1b[0m`;
@@ -106,7 +105,6 @@ function assertNoAnsiLeaks(result: string): void {
 }
 
 export { panelLine, panelBlank, boldLine, makeRaw, extractCodeBlocks, assertNoAnsiLeaks };
-
 
 // ===========================================================================
 // Real-world fixtures (from testFixtures.ts)
@@ -1339,7 +1337,6 @@ export const rawMicroserviceYaml = [
 // ===========================================================================
 // Synthetic edge-case fixtures (from syntheticFixtures.ts)
 // ===========================================================================
-
 
 // ---------------------------------------------------------------------------
 // 1. Go HTTP server — `:=`, `defer`, `go func`, `import (...)` block
@@ -5954,7 +5951,6 @@ export const syntheticSqlSchema = [
 // ===========================================================================
 // Bug-hunt regression fixtures (from findbugFixtures.ts)
 // ===========================================================================
-
 
 // ===========================================================================
 // Round 1 – findbugs.test.ts

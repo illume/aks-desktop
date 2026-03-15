@@ -5,7 +5,6 @@ import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { _testing } from './agent/aksAgentManager';
 import {
   rawBareYamlService,
   rawBestPractices,
@@ -21,7 +20,8 @@ import {
   rawPythonFlaskApp,
   rawRustAxumApp,
   rawRustK8sDeployment,
-} from './agent/testFixtures';
+} from './agent/__tests__/fixtures';
+import { _testing } from './agent/aksAgentManager';
 import ContentRenderer from './ContentRenderer';
 
 const { extractAIAnswer } = _testing;
