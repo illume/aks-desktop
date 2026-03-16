@@ -104,7 +104,7 @@ export const useDeployments = (
     }
 
     return;
-  }, [namespace, cluster, t]);
+  }, [namespace, cluster]);
 
   return {
     deployments,
