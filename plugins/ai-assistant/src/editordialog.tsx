@@ -1,4 +1,4 @@
-import { clusterAction } from '@kinvolk/headlamp-plugin/lib';
+import { clusterAction, useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { apply } from '@kinvolk/headlamp-plugin/lib/ApiProxy';
 import { Dialog } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { getCluster } from '@kinvolk/headlamp-plugin/lib/Utils';
@@ -31,6 +31,7 @@ export default function EditorDialog({
 }: EditorDialogProps) {
   const [content, setContent] = useState(yamlContent);
   const { enqueueSnackbar } = useSnackbar();
+  const { t } = useTranslation();
   const themeName = localStorage.getItem('headlampThemePreference');
 
   // Reset content when yamlContent prop changes (e.g. when dialog is opened with new content)
@@ -86,15 +87,15 @@ export default function EditorDialog({
           }
         },
         {
-          startMessage: `Applying ${displayResourceType} to cluster ${cluster}...`,
-          cancelledMessage: `Cancelled applying ${displayResourceType} to cluster.`,
-          successMessage: `${displayResourceType} applied successfully.`,
-          errorMessage: `Failed to apply ${displayResourceType}.`,
+          startMessage: t('Applying {{resourceType}} to cluster {{cluster}}...', { resourceType: displayResourceType, cluster }),
+          cancelledMessage: t('Cancelled applying {{resourceType}} to cluster.', { resourceType: displayResourceType }),
+          successMessage: t('{{resourceType}} applied successfully.', { resourceType: displayResourceType }),
+          errorMessage: t('Failed to apply {{resourceType}}.', { resourceType: displayResourceType }),
         }
       );
     } catch (error) {
       console.error('Error applying resource:', error);
-      enqueueSnackbar(`Error applying resource: ${error.message}`, {
+      enqueueSnackbar(t('Error applying resource: {{message}}', { message: error.message }), {
         variant: 'error',
       });
     }
@@ -134,12 +135,12 @@ export default function EditorDialog({
         <Box mr={2} display="flex">
           <Box mr={1}>
             <Button variant="outlined" color="primary" onClick={onClose}>
-              Cancel
+              {t('Cancel')}
             </Button>
           </Box>
           <Box>
             <Button variant="contained" color="primary" onClick={handleApply}>
-              Apply to Cluster
+              {t('Apply to Cluster')}
             </Button>
           </Box>
         </Box>

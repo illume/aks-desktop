@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import Editor from '@monaco-editor/react';
 import { Button } from '@mui/material';
 import { useTheme } from '@mui/material';
@@ -19,6 +20,7 @@ const YamlDisplay: React.FC<YamlDisplayProps> = React.memo(
     const [resourceType, setResourceType] = useState<string>('Resource');
     const [resourceName, setResourceName] = useState<string>('');
     const [processedYaml, setProcessedYaml] = useState<string>(yaml);
+    const { t } = useTranslation();
     const theme = useTheme();
     const [editor, setEditor] = useState<any>(null);
     const parentRef = useRef<HTMLDivElement>(null);
@@ -242,7 +244,7 @@ const YamlDisplay: React.FC<YamlDisplayProps> = React.memo(
               startIcon={<Icon icon="mdi:file-edit-outline" />}
               onClick={handleOpenInEditor}
             >
-              Open In Editor
+              {t('Open In Editor')}
             </Button>
           </Box>
 

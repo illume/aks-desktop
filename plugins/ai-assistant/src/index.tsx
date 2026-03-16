@@ -4,6 +4,7 @@ import {
   registerHeadlampEventCallback,
   registerPluginSettings,
   registerUIPanel,
+  useTranslation,
 } from '@kinvolk/headlamp-plugin/lib';
 // @todo: this HeadlampEventType import is weird. Maybe fix in headlamp to be better.
 import { DefaultHeadlampEvents as HeadlampEventType } from '@kinvolk/headlamp-plugin/lib/plugin/registry';
@@ -135,6 +136,7 @@ registerUIPanel({
 function HeadlampAIPrompt() {
   const pluginState = useGlobalState();
   const savedConfigs = usePluginConfig();
+  const { t } = useTranslation();
   const history = useHistory();
   const [popoverAnchor, setPopoverAnchor] = React.useState<HTMLElement | null>(null);
   const [showPopover, setShowPopover] = React.useState(false);
@@ -231,12 +233,12 @@ function HeadlampAIPrompt() {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <Tooltip title="AI Assistant">
+      <Tooltip title={t('AI Assistant')}>
         <ToggleButton
           ref={el => {
             setPopoverAnchor(el);
           }}
-          aria-label={'AI Assistant'}
+          aria-label={t('AI Assistant')}
           onClick={() => {
             // Toggle the UI panel state
             pluginState.setIsUIPanelOpen(!pluginState.isUIPanelOpen);
@@ -283,18 +285,19 @@ function HeadlampAIPrompt() {
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              Configure AI Assistant
+              {t('Configure AI Assistant')}
             </Typography>
             <IconButton size="small" onClick={handleClosePopover} sx={{ ml: 1, mt: -0.5 }}>
               <Icon icon="mdi:close" />
             </IconButton>
           </Box>
           <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-            To use the AI Assistant, you need to configure at least one AI model provider in the
-            settings.
+            {t(
+              'To use the AI Assistant, you need to configure at least one AI model provider in the settings.'
+            )}
           </Typography>
           <Button variant="contained" size="small" onClick={handleConfigureClick} fullWidth>
-            Open Settings
+            {t('Open Settings')}
           </Button>
         </Paper>
       </Popper>
@@ -369,6 +372,7 @@ registerAppBarAction(() => {
  */
 function Settings() {
   const savedConfigs = usePluginConfig();
+  const { t } = useTranslation();
 
   // Track the active configuration in a single state object
   const [activeConfiguration, setActiveConfiguration] = React.useState<{
@@ -455,10 +459,11 @@ function Settings() {
           }
           label={
             <Box>
-              <Typography variant="body1">Enable AI Assistant (Preview)</Typography>
+              <Typography variant="body1">{t('Enable AI Assistant (Preview)')}</Typography>
               <Typography variant="caption" color="text.secondary">
-                Enable the AI Assistant preview feature. This is experimental and may incur costs
-                from the AI provider.
+                {t(
+                  'Enable the AI Assistant preview feature. This is experimental and may incur costs from the AI provider.'
+                )}
               </Typography>
             </Box>
           }
@@ -467,15 +472,16 @@ function Settings() {
 
       {!previewEnabled && (
         <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-          Enable the preview above to configure the AI Assistant.
+          {t('Enable the preview above to configure the AI Assistant.')}
         </Typography>
       )}
 
       {previewEnabled && (
         <>
           <Typography variant="body1" sx={{ mb: 3 }}>
-            This plugin is in early development and is not yet ready for production use. Using it
-            may incur in costs from the AI provider! Use at your own risk.
+            {t(
+              'This plugin is in early development and is not yet ready for production use. Using it may incur in costs from the AI provider! Use at your own risk.'
+            )}
           </Typography>
 
           <Divider sx={{ my: 3 }} />
@@ -488,10 +494,11 @@ function Settings() {
                   }
                   label={
                     <Box>
-                      <Typography variant="body1">Test Mode</Typography>
+                      <Typography variant="body1">{t('Test Mode')}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Enable test mode to manually input AI responses and see how they render in
-                        the chat window
+                        {t(
+                          'Enable test mode to manually input AI responses and see how they render in the chat window'
+                        )}
                       </Typography>
                     </Box>
                   }
@@ -503,11 +510,13 @@ function Settings() {
                   sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
                   <Box>
-                    <Typography variant="body1">Configuration Popover</Typography>
+                    <Typography variant="body1">{t('Configuration Popover')}</Typography>
                     <Typography variant="caption" color="text.secondary">
                       {hasShownConfigPopover
-                        ? 'The configuration popover has been shown and dismissed'
-                        : 'The configuration popover will show when no AI providers are configured'}
+                        ? t('The configuration popover has been shown and dismissed')
+                        : t(
+                            'The configuration popover will show when no AI providers are configured'
+                          )}
                     </Typography>
                   </Box>
                   <Button
@@ -516,7 +525,7 @@ function Settings() {
                     onClick={handleResetPopover}
                     disabled={!hasShownConfigPopover}
                   >
-                    Reset
+                    {t('Reset')}
                   </Button>
                 </Box>
               </Box>
@@ -538,7 +547,7 @@ function Settings() {
           {/* AI Tools Section */}
           <Divider sx={{ my: 3 }} />
           <Typography variant="h6" sx={{ mb: 2 }}>
-            AI Tools
+            {t('AI Tools')}
           </Typography>
           <Box>
             {toolsList.map(tool => (
