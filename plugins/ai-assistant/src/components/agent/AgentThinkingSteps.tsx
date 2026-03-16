@@ -301,7 +301,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
           <Box
             role="status"
             aria-live="polite"
-            aria-atomic
+            aria-atomic="true"
             sx={{
               display: 'flex',
               alignItems: 'center',
