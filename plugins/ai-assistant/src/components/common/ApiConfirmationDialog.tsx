@@ -45,6 +45,14 @@ export default function ApiConfirmationDialog({
   const [openEditorDialog, setOpenEditorDialog] = React.useState(true);
   const [showUpdateConfirm, setShowUpdateConfirm] = React.useState(false);
 
+  // Auto-confirm GET requests without showing a dialog
+  React.useEffect(() => {
+    if (open && upperMethod === 'GET') {
+      onConfirm();
+      onClose();
+    }
+  }, [open, upperMethod, onConfirm, onClose]);
+
   React.useEffect(() => {
     if (upperMethod === 'DELETE') {
       setShowDeleteConfirm(true);
@@ -292,8 +300,6 @@ export default function ApiConfirmationDialog({
   }
 
   if (upperMethod === 'GET') {
-    onConfirm();
-    onClose();
     return null;
   }
 

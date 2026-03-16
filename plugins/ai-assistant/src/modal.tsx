@@ -803,7 +803,7 @@ export default function AIPrompt(props: {
         >
           <CircularProgress size={24} />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Checking for available AI agents...
+            {t('Checking for available AI agents...')}
           </Typography>
         </Box>
       );
@@ -824,11 +824,12 @@ export default function AIPrompt(props: {
           }}
         >
           <Typography variant="h6" gutterBottom>
-            AI Assistant Setup Required
+            {t('AI Assistant Setup Required')}
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
-            To use the AI Assistant, please configure your AI provider credentials in the settings
-            page.
+            {t(
+              'To use the AI Assistant, please configure your AI provider credentials in the settings page.'
+            )}
           </Typography>
           <Button
             variant="contained"
@@ -838,7 +839,7 @@ export default function AIPrompt(props: {
               setOpenPopup(false);
             }}
           >
-            Go to Settings
+            {t('Go to Settings')}
           </Button>
         </Box>
       );

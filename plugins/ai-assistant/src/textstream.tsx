@@ -248,22 +248,22 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
   const handleYamlDetected = useCallback((yaml: string, resourceType: string) => {
     // Since we're removing the Delete button, we'll set isDelete to false always
     setEditorContent(yaml);
-    setEditorTitle(`Apply ${resourceType}`);
+    setEditorTitle(t('Apply {{resourceType}}', { resourceType }));
     setResourceType(resourceType);
     setIsDelete(false); // Always false since we don't show delete button
     setShowEditor(true);
-  }, []);
+  }, [t]);
 
   // Memoize the onYamlDetected callback to prevent ContentRenderer from re-rendering
   const memoizedOnYamlDetected = useCallback(
     (yaml: string, resourceType: string) => {
       if (onYamlAction) {
-        onYamlAction(yaml, `Apply ${resourceType}`, resourceType, false);
+        onYamlAction(yaml, t('Apply {{resourceType}}', { resourceType }), resourceType, false);
       } else {
         handleYamlDetected(yaml, resourceType);
       }
     },
-    [onYamlAction, handleYamlDetected]
+    [onYamlAction, handleYamlDetected, t]
   );
 
   const renderMessage = useCallback(
@@ -346,7 +346,7 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
         </Box>
       );
     },
-    [history.length, theme.palette, memoizedOnYamlDetected]
+    [history.length, theme.palette, memoizedOnYamlDetected, t]
   );
 
   return (
