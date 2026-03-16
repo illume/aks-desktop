@@ -299,6 +299,9 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
         >
           {/* Top-level header */}
           <Box
+            role="status"
+            aria-live="polite"
+            aria-atomic
             sx={{
               display: 'flex',
               alignItems: 'center',

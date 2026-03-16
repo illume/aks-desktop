@@ -906,7 +906,7 @@ export default function ModelSelector({
                               component="span"
                               sx={{ color: 'primary.main', fontWeight: 'medium' }}
                             >
-                              {` • ${t('Only this model')}`}
+                              {t(' • Only this model')}
                             </Box>
                           )}
                         </Box>
