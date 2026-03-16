@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-// Collects translation keys from plugins/aks-desktop and headlamp/frontend
-// into JSON files for the translation team, and distributes completed
-// translations back to the source locale directories.
+// Collects translation keys from plugins/aks-desktop, plugins/ai-assistant,
+// and headlamp/frontend into JSON files for the translation team, and
+// distributes completed translations back to the source locale directories.
 //
 // Usage:
 //   node Localize/translation-manager.mjs collect
@@ -28,6 +28,11 @@ const SOURCES = [
   {
     name: 'plugin',
     localesDir: path.join(ROOT, 'plugins/aks-desktop/locales'),
+    namespaces: ['translation'],
+  },
+  {
+    name: 'ai-assistant',
+    localesDir: path.join(ROOT, 'plugins/ai-assistant/locales'),
     namespaces: ['translation'],
   },
 ];
