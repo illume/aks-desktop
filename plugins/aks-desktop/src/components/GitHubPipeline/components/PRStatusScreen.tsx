@@ -108,7 +108,7 @@ function useElapsedTime(startedAt: string | null): string | null {
     update();
     const id = setInterval(update, 30_000);
     return () => clearInterval(id);
-  }, [startedAt, t]);
+  }, [startedAt]);
 
   return elapsed;
 }
