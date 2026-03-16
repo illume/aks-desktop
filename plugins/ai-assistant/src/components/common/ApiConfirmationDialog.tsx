@@ -45,6 +45,17 @@ export default function ApiConfirmationDialog({
   const [openEditorDialog, setOpenEditorDialog] = React.useState(true);
   const [showUpdateConfirm, setShowUpdateConfirm] = React.useState(false);
 
+  // Reset internal state when dialog closes so each open cycle starts fresh
+  React.useEffect(() => {
+    if (!open) {
+      setShowDeleteConfirm(false);
+      setShowUpdateConfirm(false);
+      setOpenEditorDialog(true);
+      setEditedBody('');
+      setResourceInfo(null);
+    }
+  }, [open]);
+
   // Auto-confirm GET requests without showing a dialog
   React.useEffect(() => {
     if (open && upperMethod === 'GET') {
@@ -54,6 +65,7 @@ export default function ApiConfirmationDialog({
   }, [open, upperMethod, onConfirm, onClose]);
 
   React.useEffect(() => {
+    if (!open) return;
     if (upperMethod === 'DELETE') {
       setShowDeleteConfirm(true);
     }
@@ -99,9 +111,10 @@ export default function ApiConfirmationDialog({
       setEditedBody('');
       setResourceInfo(null);
     }
-  }, [body, method]);
+  }, [open, body, method]);
 
   React.useEffect(() => {
+    if (!open) return;
     if (!resourceInfo && url) {
       const urlParts = url.split('/');
       const nameIndex = urlParts.length - 1;
@@ -123,7 +136,7 @@ export default function ApiConfirmationDialog({
         }
       }
     }
-  }, [url, resourceInfo]);
+  }, [open, url, resourceInfo]);
 
   React.useEffect(() => {
     if (open && upperMethod === 'PUT' && body && resourceInfo) {

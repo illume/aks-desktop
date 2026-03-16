@@ -171,7 +171,7 @@ function ConfigurationDialog({
         {provider && (
           <Box sx={{ p: 1 }}>
             <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
-              {provider.description}
+              {t(provider.description)}
             </Typography>
 
             {onConfigNameChange && (
@@ -198,7 +198,7 @@ function ConfigurationDialog({
                   {field.type === 'select' && field.name === 'model' ? (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {field.label}
+                        {t(field.label)}
                         {field.required && (
                           <Box component="span" sx={{ color: 'error.main' }}>
                             {' '}
@@ -264,12 +264,12 @@ function ConfigurationDialog({
                           />
                         )}
                       />
-                      {field.description && <FormHelperText>{field.description}</FormHelperText>}
+                      {field.description && <FormHelperText>{t(field.description)}</FormHelperText>}
                     </Box>
                   ) : field.type === 'select' ? (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {field.label}
+                        {t(field.label)}
                         {field.required && (
                           <Box component="span" sx={{ color: 'error.main' }}>
                             {' '}
@@ -285,7 +285,7 @@ function ConfigurationDialog({
                         displayEmpty
                       >
                         <MenuItem value="" disabled>
-                          <em>{t('Select {{field}}', { field: field.label })}</em>
+                          <em>{t('Select {{field}}', { field: t(field.label) })}</em>
                         </MenuItem>
                         {field.options?.map(option => (
                           <MenuItem key={option} value={option}>
@@ -293,12 +293,12 @@ function ConfigurationDialog({
                           </MenuItem>
                         ))}
                       </Select>
-                      {field.description && <FormHelperText>{field.description}</FormHelperText>}
+                      {field.description && <FormHelperText>{t(field.description)}</FormHelperText>}
                     </Box>
                   ) : field.type === 'number' ? (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {field.label}
+                        {t(field.label)}
                         {field.required && (
                           <Box component="span" sx={{ color: 'error.main' }}>
                             {' '}
@@ -312,15 +312,15 @@ function ConfigurationDialog({
                         onChange={e => handleFieldChange(field.name, e.target.value)}
                         fullWidth
                         size="small"
-                        placeholder={field.placeholder}
+                        placeholder={field.placeholder ? t(field.placeholder) : undefined}
                         inputProps={{ step: 0.1 }}
                       />
-                      {field.description && <FormHelperText>{field.description}</FormHelperText>}
+                      {field.description && <FormHelperText>{t(field.description)}</FormHelperText>}
                     </Box>
                   ) : (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {field.label}
+                        {t(field.label)}
                         {field.required && (
                           <Box component="span" sx={{ color: 'error.main' }}>
                             {' '}
@@ -334,9 +334,9 @@ function ConfigurationDialog({
                         onChange={e => handleFieldChange(field.name, e.target.value)}
                         fullWidth
                         size="small"
-                        placeholder={field.placeholder}
+                        placeholder={field.placeholder ? t(field.placeholder) : undefined}
                       />
-                      {field.description && <FormHelperText>{field.description}</FormHelperText>}
+                      {field.description && <FormHelperText>{t(field.description)}</FormHelperText>}
                     </Box>
                   )}
                 </Grid>
