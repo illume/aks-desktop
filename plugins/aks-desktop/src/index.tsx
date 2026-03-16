@@ -183,7 +183,9 @@ function TranslatedRegistrations() {
       noAuthRequired: true,
     });
 
-    // Trigger sidebar label update so it picks up the new translation
+    // Re-use the existing azure-auth-update event to trigger
+    // updateAzureAccountLabel, which will re-register the sidebar entry with
+    // the translated 'Azure Account' label (via tFunc) when not logged in.
     window.dispatchEvent(new Event('azure-auth-update'));
   }, [i18n.language, t]);
 
