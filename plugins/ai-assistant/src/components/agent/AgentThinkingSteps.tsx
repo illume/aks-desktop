@@ -47,23 +47,26 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
     const [collapsedPhases, setCollapsedPhases] = useState<Set<Phase>>(new Set());
     const prevPhaseCountRef = useRef<Record<Phase, number>>({ init: 0, planning: 0, executing: 0 });
 
-    const PHASE_META: Record<Phase, PhaseMeta> = {
-      init: {
-        icon: 'mdi:cog-outline',
-        activeLabel: t('Initializing'),
-        doneLabel: t('Initialized'),
-      },
-      planning: {
-        icon: 'mdi:clipboard-list-outline',
-        activeLabel: t('Tasks'),
-        doneLabel: t('All tasks complete'),
-      },
-      executing: {
-        icon: 'mdi:play-circle-outline',
-        activeLabel: t('Executing'),
-        doneLabel: t('Execution complete'),
-      },
-    };
+    const phaseMeta = useMemo<Record<Phase, PhaseMeta>>(
+      () => ({
+        init: {
+          icon: 'mdi:cog-outline',
+          activeLabel: t('Initializing'),
+          doneLabel: t('Initialized'),
+        },
+        planning: {
+          icon: 'mdi:clipboard-list-outline',
+          activeLabel: t('Tasks'),
+          doneLabel: t('All tasks complete'),
+        },
+        executing: {
+          icon: 'mdi:play-circle-outline',
+          activeLabel: t('Executing'),
+          doneLabel: t('Execution complete'),
+        },
+      }),
+      [t]
+    );
     const endRef = useRef<HTMLDivElement>(null);
     const scrollParentRef = useRef<HTMLElement | null>(null);
 
@@ -219,7 +222,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
       const items = grouped[phase];
       if (items.length === 0) return null;
 
-      const meta = PHASE_META[phase];
+      const meta = phaseMeta[phase];
       const done = isPhaseComplete(phase);
       const collapsed = collapsedPhases.has(phase);
 
@@ -318,9 +321,7 @@ const AgentThinkingSteps: React.FC<AgentThinkingStepsProps> = React.memo(
             >
               {isRunning ? t('Agent working…') : t('Done')}
             </Typography>
-            {isRunning && (
-              <CircularProgress size={12} thickness={5} aria-label={t('Agent processing')} />
-            )}
+            {isRunning && <CircularProgress size={12} thickness={5} aria-hidden />}
           </Box>
 
           {/* Phase sections */}

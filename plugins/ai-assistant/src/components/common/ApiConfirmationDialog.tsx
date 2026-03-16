@@ -150,20 +150,32 @@ export default function ApiConfirmationDialog({
     onClose();
   }
   const getTitle = () => {
-    const base =
-      method.toUpperCase() === 'DELETE'
-        ? t('Delete')
-        : method.toUpperCase() === 'POST'
-        ? t('Create')
-        : method.toUpperCase() === 'GET'
-        ? t('Fetch')
-        : t('Update');
-
     if (resourceInfo) {
-      return `${base} ${resourceInfo.kind}: ${resourceInfo.name}`;
+      if (method.toUpperCase() === 'DELETE')
+        return t('Delete {{kind}}: {{name}}', {
+          kind: resourceInfo.kind,
+          name: resourceInfo.name,
+        });
+      if (method.toUpperCase() === 'POST')
+        return t('Create {{kind}}: {{name}}', {
+          kind: resourceInfo.kind,
+          name: resourceInfo.name,
+        });
+      if (method.toUpperCase() === 'GET')
+        return t('Fetch {{kind}}: {{name}}', {
+          kind: resourceInfo.kind,
+          name: resourceInfo.name,
+        });
+      return t('Update {{kind}}: {{name}}', {
+        kind: resourceInfo.kind,
+        name: resourceInfo.name,
+      });
     }
 
-    return `${base} ${t('Resource')}`;
+    if (method.toUpperCase() === 'DELETE') return t('Delete Resource');
+    if (method.toUpperCase() === 'POST') return t('Create Resource');
+    if (method.toUpperCase() === 'GET') return t('Fetch Resource');
+    return t('Update Resource');
   };
 
   if (!url || !method) {
@@ -179,7 +191,9 @@ export default function ApiConfirmationDialog({
           onClose();
         }}
         onConfirm={handleDeleteConfirm}
-        title={`${t('Delete')} ${resourceInfo?.kind || t('Resource')}`}
+        title={
+          resourceInfo ? t('Delete {{kind}}', { kind: resourceInfo.kind }) : t('Delete Resource')
+        }
         description={
           <Box>
             <Typography variant="body1" sx={{ mb: 2 }}>
@@ -228,7 +242,11 @@ export default function ApiConfirmationDialog({
             </Typography>
           </Box>
         }
-        confirmLabel={`${t('Yes, Delete')} ${resourceInfo?.kind || t('Resource')}`}
+        confirmLabel={
+          resourceInfo
+            ? t('Yes, Delete {{kind}}', { kind: resourceInfo.kind })
+            : t('Yes, Delete Resource')
+        }
       />
     );
   }
@@ -244,9 +262,14 @@ export default function ApiConfirmationDialog({
           onClose();
         }}
         onConfirm={handleUpdateConfirm}
-        title={`${t('Apply Patch to')} ${
-          resourceInfo ? `${resourceInfo.kind}: ${resourceInfo.name}` : t('Resource')
-        }`}
+        title={
+          resourceInfo
+            ? t('Apply Patch to {{kind}}: {{name}}', {
+                kind: resourceInfo.kind,
+                name: resourceInfo.name,
+              })
+            : t('Apply Patch to Resource')
+        }
         description={
           <Box>
             <Typography variant="body1" sx={{ mb: 2 }}>

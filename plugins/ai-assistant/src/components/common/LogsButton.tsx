@@ -23,17 +23,21 @@ const LogsButton: React.FC<LogsButtonProps> = ({
   const { t } = useTranslation();
 
   const getTitle = () => {
-    const parts = [resourceType];
-    if (resourceName) {
-      parts.push(resourceName);
-    }
     if (containerName) {
-      parts.push(`(${t('container')}: ${containerName})`);
-    } else if (namespace) {
-      parts.push(`(${namespace})`);
+      return t('{{resourceType}} {{resourceName}} (container: {{containerName}}) Logs', {
+        resourceType,
+        resourceName,
+        containerName,
+      });
     }
-    parts.push(t('Logs'));
-    return parts.join(' ');
+    if (namespace) {
+      return t('{{resourceType}} {{resourceName}} ({{namespace}}) Logs', {
+        resourceType,
+        resourceName,
+        namespace,
+      });
+    }
+    return t('{{resourceType}} {{resourceName}} Logs', { resourceType, resourceName });
   };
 
   return (

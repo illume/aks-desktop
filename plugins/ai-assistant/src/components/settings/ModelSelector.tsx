@@ -161,7 +161,9 @@ function ConfigurationDialog({
         <Box display="flex" alignItems="center" gap={1}>
           {provider && <Icon icon={provider.icon} width="24px" height="24px" />}
           <Typography variant="h6">
-            {provider ? `${t('Configure')} ${provider.name}` : t('Configure Provider')}
+            {provider
+              ? t('Configure {{provider}}', { provider: provider.name })
+              : t('Configure Provider')}
           </Typography>
         </Box>
       </DialogTitle>
@@ -225,8 +227,10 @@ function ConfigurationDialog({
                             helperText={
                               config[field.name]
                                 ? field.options?.includes(config[field.name])
-                                  ? `${t('Using model:')} ${config[field.name]}`
-                                  : `${t('Using custom model:')} ${config[field.name]}`
+                                  ? t('Using model: {{model}}', { model: config[field.name] })
+                                  : t('Using custom model: {{model}}', {
+                                      model: config[field.name],
+                                    })
                                 : t('Enter a model name or select from the dropdown')
                             }
                             InputProps={{
@@ -281,9 +285,7 @@ function ConfigurationDialog({
                         displayEmpty
                       >
                         <MenuItem value="" disabled>
-                          <em>
-                            {t('Select')} {field.label}
-                          </em>
+                          <em>{t('Select {{field}}', { field: field.label })}</em>
                         </MenuItem>
                         {field.options?.map(option => (
                           <MenuItem key={option} value={option}>
