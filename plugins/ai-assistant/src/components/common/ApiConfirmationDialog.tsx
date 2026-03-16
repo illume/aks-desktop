@@ -226,14 +226,14 @@ export default function ApiConfirmationDialog({
                   {t('Resource details:')}
                 </Typography>
                 <Typography variant="body2" component="div" sx={{ ml: 2 }}>
-                  <strong>{t('Type: {{type}}', { type: resourceInfo.kind })}</strong>
+                  <strong>{t('Type:')}</strong> {resourceInfo.kind}
                 </Typography>
                 <Typography variant="body2" component="div" sx={{ ml: 2 }}>
-                  <strong>{t('Name: {{name}}', { name: resourceInfo.name })}</strong>
+                  <strong>{t('Name:')}</strong> {resourceInfo.name}
                 </Typography>
                 {resourceInfo.namespace && (
                   <Typography variant="body2" component="div" sx={{ ml: 2 }}>
-                    <strong>{t('Namespace: {{namespace}}', { namespace: resourceInfo.namespace })}</strong>
+                    <strong>{t('Namespace:')}</strong> {resourceInfo.namespace}
                   </Typography>
                 )}
               </Box>
