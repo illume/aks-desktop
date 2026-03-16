@@ -40,6 +40,7 @@ const SOURCES = [
 /** Terms that should be left as-is */
 const LOCKED_TERMS = [
   // Product / brand names
+  'AKS',
   'Kubernetes',
   'Headlamp',
   'Azure',
