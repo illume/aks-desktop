@@ -313,7 +313,7 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
           }}
         >
           <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 'bold' }}>
-            {prompt.role === 'user' ? 'You' : 'AI Assistant'}
+            {prompt.role === 'user' ? t('You') : t('AI Assistant')}
           </Typography>
           <Box sx={{ whiteSpace: 'unset' }}>
             {prompt.role === 'user' ? (
@@ -325,7 +325,9 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
                     {prompt.content}
                     {isContentFilterError && (
                       <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
-                        Tip: Focus your question specifically on Kubernetes administration tasks.
+                        {t(
+                          'Tip: Focus your question specifically on Kubernetes administration tasks.'
+                        )}
                       </Typography>
                     )}
                   </Alert>
@@ -364,8 +366,9 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
         {contentFilterErrors && (
           <Alert severity="info" sx={{ mb: 2, overflowWrap: 'anywhere' }}>
             <Typography variant="body2">
-              Some requests have been blocked by content filters. Please ensure your questions focus
-              only on Kubernetes tasks.
+              {t(
+                'Some requests have been blocked by content filters. Please ensure your questions focus only on Kubernetes tasks.'
+              )}
             </Typography>
           </Alert>
         )}
@@ -397,7 +400,7 @@ const TextStreamContainer = React.memo(function TextStreamContainer({
             right: 16,
             zIndex: 2,
           }}
-          aria-label="scroll to bottom"
+          aria-label={t('scroll to bottom')}
         >
           <Icon icon="mdi:chevron-down" width="20px" />
         </Fab>

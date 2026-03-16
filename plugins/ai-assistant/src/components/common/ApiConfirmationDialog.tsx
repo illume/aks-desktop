@@ -33,6 +33,7 @@ export default function ApiConfirmationDialog({
   onConfirm,
 }: ApiConfirmationDialogProps) {
   const { t } = useTranslation();
+  const upperMethod = method.toUpperCase();
   const [editedBody, setEditedBody] = React.useState('');
   const [resourceInfo, setResourceInfo] = React.useState<{
     kind: string;
@@ -45,7 +46,7 @@ export default function ApiConfirmationDialog({
   const [showUpdateConfirm, setShowUpdateConfirm] = React.useState(false);
 
   React.useEffect(() => {
-    if (method.toUpperCase() === 'DELETE') {
+    if (upperMethod === 'DELETE') {
       setShowDeleteConfirm(true);
     }
     if (body) {
@@ -117,7 +118,7 @@ export default function ApiConfirmationDialog({
   }, [url, resourceInfo]);
 
   React.useEffect(() => {
-    if (open && method.toUpperCase() === 'PUT' && body && resourceInfo) {
+    if (open && upperMethod === 'PUT' && body && resourceInfo) {
       const processedBody = cleanYamlContent(body);
       try {
         const parsed = YAML.parse(processedBody);
@@ -151,17 +152,17 @@ export default function ApiConfirmationDialog({
   }
   const getTitle = () => {
     if (resourceInfo) {
-      if (method.toUpperCase() === 'DELETE')
+      if (upperMethod === 'DELETE')
         return t('Delete {{kind}}: {{name}}', {
           kind: resourceInfo.kind,
           name: resourceInfo.name,
         });
-      if (method.toUpperCase() === 'POST')
+      if (upperMethod === 'POST')
         return t('Create {{kind}}: {{name}}', {
           kind: resourceInfo.kind,
           name: resourceInfo.name,
         });
-      if (method.toUpperCase() === 'GET')
+      if (upperMethod === 'GET')
         return t('Fetch {{kind}}: {{name}}', {
           kind: resourceInfo.kind,
           name: resourceInfo.name,
@@ -172,9 +173,9 @@ export default function ApiConfirmationDialog({
       });
     }
 
-    if (method.toUpperCase() === 'DELETE') return t('Delete Resource');
-    if (method.toUpperCase() === 'POST') return t('Create Resource');
-    if (method.toUpperCase() === 'GET') return t('Fetch Resource');
+    if (upperMethod === 'DELETE') return t('Delete Resource');
+    if (upperMethod === 'POST') return t('Create Resource');
+    if (upperMethod === 'GET') return t('Fetch Resource');
     return t('Update Resource');
   };
 
@@ -251,7 +252,7 @@ export default function ApiConfirmationDialog({
     );
   }
 
-  if (method.toUpperCase() === 'PUT' && showUpdateConfirm) {
+  if (upperMethod === 'PUT' && showUpdateConfirm) {
     return (
       <ConfirmDialog
         // @todo: open does exist on ConfirmDialog, but TS is not recognizing it.
@@ -290,7 +291,7 @@ export default function ApiConfirmationDialog({
     );
   }
 
-  if (method.toUpperCase() === 'GET') {
+  if (upperMethod === 'GET') {
     onConfirm();
     onClose();
     return null;

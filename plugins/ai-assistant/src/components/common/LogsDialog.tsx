@@ -155,7 +155,7 @@ const LogsDialog: React.FC<LogsDialogProps> = ({ open, onClose, logs, title, res
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
-            {t('{{title}} - Editor View', { title })}
+            {t('{{title}} (Editor View)', { title })}
             {getLogLanguage() === 'json' && (
               <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
                 {t('(Auto-formatted)')}
