@@ -14,6 +14,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  Link as MuiLink,
   Paper,
   Popper,
   Switch,
@@ -571,6 +572,23 @@ function Settings() {
                 />
               </Box>
             ))}
+          </Box>
+
+          {/* Documentation Section */}
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            {t('Documentation')}
+          </Typography>
+          <Box sx={{ ml: 2 }}>
+            <MuiLink
+              href="https://learn.microsoft.com/en-us/azure/aks/agentic-cli-for-aks-install"
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <Icon icon="mdi:open-in-new" width="16px" />
+              {t('Learn how to enable the AKS agent CLI on a cluster')}
+            </MuiLink>
           </Box>
         </>
       )}
