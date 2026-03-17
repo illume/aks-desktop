@@ -803,7 +803,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Typography color="text.secondary" role="status" aria-live="polite">{t('No data available')}</Typography>
+                      <Typography color="text.secondary" role="status" aria-live="polite">
+                        {t('No data available')}
+                      </Typography>
                     )}
                   </Card>
                 </Grid>
@@ -877,7 +879,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Typography color="text.secondary" role="status" aria-live="polite">{t('No data available')}</Typography>
+                      <Typography color="text.secondary" role="status" aria-live="polite">
+                        {t('No data available')}
+                      </Typography>
                     )}
                   </Card>
                 </Grid>
@@ -912,7 +916,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Typography color="text.secondary" role="status" aria-live="polite">{t('No data available')}</Typography>
+                      <Typography color="text.secondary" role="status" aria-live="polite">
+                        {t('No data available')}
+                      </Typography>
                     )}
                   </Card>
                 </Grid>
@@ -957,7 +963,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
-                      <Typography color="text.secondary" role="status" aria-live="polite">{t('No data available')}</Typography>
+                      <Typography color="text.secondary" role="status" aria-live="polite">
+                        {t('No data available')}
+                      </Typography>
                     )}
                   </Card>
                 </Grid>

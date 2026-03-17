@@ -33,33 +33,33 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
         {!loading && deployments.length === 0 ? t('No deployments found') : ''}
       </Box>
       <FormControl
-      sx={[{ minWidth: 200 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
-      size="small"
-      variant="outlined"
-    >
-      <InputLabel>{t('Select Deployment')}</InputLabel>
-      <Select
-        value={selectedDeployment || ''}
-        onChange={e => onDeploymentChange(e.target.value as string)}
-        label={t('Select Deployment')}
-        disabled={loading || deployments.length === 0}
+        sx={[{ minWidth: 200 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+        size="small"
+        variant="outlined"
       >
-        {loading ? (
-          <MenuItem disabled>
-            <CircularProgress size={16} style={{ marginRight: 8 }} />
-            {t('Loading deployments')}...
-          </MenuItem>
-        ) : deployments.length === 0 ? (
-          <MenuItem disabled>{t('No deployments found')}</MenuItem>
-        ) : (
-          deployments.map(deployment => (
-            <MenuItem key={deployment.name} value={deployment.name}>
-              {deployment.name}
+        <InputLabel>{t('Select Deployment')}</InputLabel>
+        <Select
+          value={selectedDeployment || ''}
+          onChange={e => onDeploymentChange(e.target.value as string)}
+          label={t('Select Deployment')}
+          disabled={loading || deployments.length === 0}
+        >
+          {loading ? (
+            <MenuItem disabled>
+              <CircularProgress size={16} style={{ marginRight: 8 }} />
+              {t('Loading deployments')}...
             </MenuItem>
-          ))
-        )}
-      </Select>
-    </FormControl>
+          ) : deployments.length === 0 ? (
+            <MenuItem disabled>{t('No deployments found')}</MenuItem>
+          ) : (
+            deployments.map(deployment => (
+              <MenuItem key={deployment.name} value={deployment.name}>
+                {deployment.name}
+              </MenuItem>
+            ))
+          )}
+        </Select>
+      </FormControl>
     </>
   );
 };
