@@ -210,6 +210,7 @@ export default function RegisterAKSClusterDialog({
   return (
     <RegisterAKSClusterDialogPure
       open={open}
+      isChecking={authStatus.isChecking}
       isLoggedIn={authStatus.isLoggedIn}
       loading={loading}
       loadingSubscriptions={loadingSubscriptions}

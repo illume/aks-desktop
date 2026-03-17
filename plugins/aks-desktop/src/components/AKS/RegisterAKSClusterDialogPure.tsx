@@ -36,6 +36,7 @@ export interface AKSCluster {
 
 export interface RegisterAKSClusterDialogPureProps {
   open: boolean;
+  isChecking: boolean;
   isLoggedIn: boolean;
   loading: boolean;
   loadingSubscriptions: boolean;
@@ -60,6 +61,7 @@ export interface RegisterAKSClusterDialogPureProps {
 
 export default function RegisterAKSClusterDialogPure({
   open,
+  isChecking,
   isLoggedIn,
   loading,
   loadingSubscriptions,
@@ -163,13 +165,22 @@ export default function RegisterAKSClusterDialogPure({
               <Alert severity="success">All recommended cluster configurations are in place.</Alert>
             )}
 
-          {!isLoggedIn && (
+          {isChecking && (
+            <Box display="flex" alignItems="center" gap={1}>
+              <CircularProgress size={20} aria-hidden="true" />
+              <Typography variant="body2" color="textSecondary">
+                {t('Checking authentication status')}...
+              </Typography>
+            </Box>
+          )}
+
+          {!isChecking && !isLoggedIn && (
             <Alert severity="warning">
               {t('You need to be logged in to Azure to register AKS clusters.')}
             </Alert>
           )}
 
-          {isLoggedIn && (
+          {!isChecking && isLoggedIn && (
             <>
               <Autocomplete
                 fullWidth
@@ -313,7 +324,9 @@ export default function RegisterAKSClusterDialogPure({
               border: 0,
             }}
           >
-            {loadingSubscriptions
+            {isChecking
+              ? `${t('Checking authentication status')}...`
+              : loadingSubscriptions
               ? `${t('Loading subscriptions')}...`
               : loadingClusters
               ? `${t('Loading AKS clusters')}...`
@@ -338,7 +351,7 @@ export default function RegisterAKSClusterDialogPure({
               onClick={onRegister}
               variant="contained"
               color="primary"
-              disabled={!selectedCluster || loading || !isLoggedIn}
+              disabled={!selectedCluster || loading || !isLoggedIn || isChecking}
               startIcon={
                 loading ? (
                   <CircularProgress size={20} aria-hidden="true" />

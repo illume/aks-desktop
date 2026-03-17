@@ -34,6 +34,7 @@ const SAMPLE_CLUSTERS = [
 
 const baseArgs: RegisterAKSClusterDialogPureProps = {
   open: true,
+  isChecking: false,
   isLoggedIn: true,
   loading: false,
   loadingSubscriptions: false,
@@ -73,6 +74,15 @@ Default.args = { ...baseArgs };
 export const NotLoggedIn = Template.bind({});
 NotLoggedIn.args = {
   ...baseArgs,
+  isLoggedIn: false,
+  subscriptions: [],
+};
+
+/** Checking authentication status — spinner shown while verifying Azure login. */
+export const CheckingAuth = Template.bind({});
+CheckingAuth.args = {
+  ...baseArgs,
+  isChecking: true,
   isLoggedIn: false,
   subscriptions: [],
 };

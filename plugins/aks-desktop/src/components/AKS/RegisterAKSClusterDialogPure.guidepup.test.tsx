@@ -18,6 +18,7 @@
  *  RegisterAKSClusterDialogPure
  *  ├── Default            — dialog landmark; heading; Subscription combobox; Cancel/Register buttons
  *  ├── NotLoggedIn        — warning alert; Register button disabled
+ *  ├── CheckingAuth       — spinner + "Checking authentication status"; no combobox; no warning
  *  ├── LoadingSubscriptions — disabled combobox; loading status region
  *  ├── LoadingClusters    — loading status region with cluster loading text
  *  ├── NoClusters         — info alert "No AKS clusters found"
@@ -67,6 +68,7 @@ import type { RegisterAKSClusterDialogPureProps } from './RegisterAKSClusterDial
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
 import {
   AllCapabilitiesEnabled,
+  CheckingAuth,
   CheckingCapabilities,
   ClusterSelected,
   Default,
@@ -187,6 +189,12 @@ describe('Axe: RegisterAKSClusterDialogPure', () => {
     const violations = await runAxe();
     expect(violations).toEqual([]);
   });
+
+  it('CheckingAuth has no axe violations', async () => {
+    renderStory(CheckingAuth.args as RegisterAKSClusterDialogPureProps);
+    const violations = await runAxe();
+    expect(violations).toEqual([]);
+  });
 });
 
 describe('SR: Default — dialog structure', () => {
@@ -250,6 +258,26 @@ describe('SR: NotLoggedIn — warning alert', () => {
 
   it('does not announce the Subscription combobox', async () => {
     await mount(NotLoggedIn.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('combobox') && p.includes('Subscription'))).toBe(false);
+  });
+});
+
+describe('SR: CheckingAuth — checking authentication', () => {
+  it('announces the status region with checking auth text', async () => {
+    await mount(CheckingAuth.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('Checking authentication status'))).toBe(true);
+  });
+
+  it('does not announce the not-logged-in warning', async () => {
+    await mount(CheckingAuth.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('logged in to Azure'))).toBe(false);
+  });
+
+  it('does not announce the Subscription combobox', async () => {
+    await mount(CheckingAuth.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
     expect(ps.some(p => p.includes('combobox') && p.includes('Subscription'))).toBe(false);
   });
