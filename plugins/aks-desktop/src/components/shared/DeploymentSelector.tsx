@@ -2,8 +2,9 @@
 // Licensed under the Apache 2.0.
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { CircularProgress, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { Box, CircularProgress, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
+import { visuallyHidden } from '@mui/utils';
 import React from 'react';
 
 interface DeploymentSelectorProps {
@@ -27,7 +28,11 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
   const { t } = useTranslation();
 
   return (
-    <FormControl
+    <>
+      <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
+        {!loading && deployments.length === 0 ? t('No deployments found') : ''}
+      </Box>
+      <FormControl
       sx={[{ minWidth: 200 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
       size="small"
       variant="outlined"
@@ -45,7 +50,7 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
             {t('Loading deployments')}...
           </MenuItem>
         ) : deployments.length === 0 ? (
-          <MenuItem disabled role="status" aria-live="polite">{t('No deployments found')}</MenuItem>
+          <MenuItem disabled>{t('No deployments found')}</MenuItem>
         ) : (
           deployments.map(deployment => (
             <MenuItem key={deployment.name} value={deployment.name}>
@@ -55,5 +60,6 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
         )}
       </Select>
     </FormControl>
+    </>
   );
 };
