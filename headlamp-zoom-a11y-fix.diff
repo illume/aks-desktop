@@ -1,0 +1,26 @@
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index 4f5fd20..2a3b75f 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -562,7 +562,7 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+   return (
+     <ProjectDetailsContext.Provider value={contextValue}>
+       <Box
+-        sx={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'flex-start' }}
++        sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', alignItems: 'flex-start' }}
+       >
+         <SectionBox
+           outterBoxProps={{
+diff --git a/frontend/src/components/project/ProjectResourcesTab.tsx b/frontend/src/components/project/ProjectResourcesTab.tsx
+index 2b13a31..4229738 100644
+--- a/frontend/src/components/project/ProjectResourcesTab.tsx
++++ b/frontend/src/components/project/ProjectResourcesTab.tsx
+@@ -389,8 +389,6 @@ export function ProjectResourcesTab({
+           borderColor: theme.palette.divider,
+           borderTop: 0,
+           flexGrow: 1,
+-          minHeight: 0,
+-          flexBasis: 0,
+           [theme.breakpoints.down('md')]: {
+             flexDirection: 'column',
+           },
