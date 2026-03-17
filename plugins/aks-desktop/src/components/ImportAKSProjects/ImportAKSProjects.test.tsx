@@ -459,11 +459,7 @@ describe('ImportAKSProjects', () => {
 
   test('Go To Projects button navigates via history.replace and reloads', async () => {
     const reloadMock = vi.fn();
-    const locationDescriptor = Object.getOwnPropertyDescriptor(window, 'location')!;
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, reload: reloadMock },
-      writable: true,
-    });
+    vi.stubGlobal('location', { ...window.location, reload: reloadMock });
 
     try {
       const ns = makeDiscoveredNamespace({
@@ -496,7 +492,7 @@ describe('ImportAKSProjects', () => {
       expect(mockReplace).toHaveBeenCalledWith('/');
       expect(reloadMock).toHaveBeenCalled();
     } finally {
-      Object.defineProperty(window, 'location', locationDescriptor);
+      vi.unstubAllGlobals();
     }
   });
 });
