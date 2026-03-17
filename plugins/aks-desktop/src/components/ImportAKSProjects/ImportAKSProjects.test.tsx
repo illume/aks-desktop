@@ -457,7 +457,13 @@ describe('ImportAKSProjects', () => {
     expect(screen.getByText(/Failed to convert namespace/)).toBeInTheDocument();
   });
 
-  test('Go To Projects button navigates via history.push instead of window.location', async () => {
+  test('Go To Projects button navigates via history.push and reloads', async () => {
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+    });
+
     const ns = makeDiscoveredNamespace({
       name: 'ns-ok',
       clusterName: 'cluster-a',
@@ -486,5 +492,6 @@ describe('ImportAKSProjects', () => {
     fireEvent.click(screen.getByText('Go To Projects'));
 
     expect(mockPush).toHaveBeenCalledWith('/');
+    expect(reloadMock).toHaveBeenCalled();
   });
 });

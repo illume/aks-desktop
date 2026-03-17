@@ -534,7 +534,11 @@ function ImportAKSProjectsContent() {
                     variant="contained"
                     color="primary"
                     onClick={() => {
+                      // Navigate to root and force a full reload because Headlamp's cluster
+                      // config is loaded at startup and does not reactively update when
+                      // kubeconfig/localStorage changes.
                       history.push('/');
+                      window.location.reload();
                     }}
                     startIcon={<Icon icon="mdi:folder-open" />}
                   >
