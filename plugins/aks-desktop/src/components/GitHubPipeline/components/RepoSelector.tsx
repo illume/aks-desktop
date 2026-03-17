@@ -97,6 +97,7 @@ export function RepoSelector({ octokit, selectedRepo, onRepoSelect }: RepoSelect
           sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}
           role="status"
           aria-live="polite"
+          aria-atomic="true"
         >
           {filter ? t('No repositories match your filter') : t('No repositories found')}
         </Typography>

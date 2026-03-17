@@ -30,7 +30,7 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
   return (
     <>
       <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-        {!loading && deployments.length === 0 ? t('No deployments found') : ''}
+        {!loading && deployments.length === 0 ? t('No deployments available') : ''}
       </Box>
       <FormControl
         sx={[{ minWidth: 200 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}

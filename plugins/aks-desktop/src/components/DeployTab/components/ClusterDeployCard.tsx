@@ -182,6 +182,7 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
                 sx={{ py: 2 }}
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
               >
                 {t('No deployments found in this namespace.')}
               </Typography>
