@@ -622,7 +622,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
 
       {/* Always-mounted consolidated live region for empty chart announcements */}
       <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-        {selectedDeployment && !(metricsLoading && cpuData.length === 0)
+        {selectedDeployment && !metricsLoading
           ? [
               requestErrorData.length === 0 && t('Request & error rate: No data available'),
               responseTimeData.length === 0 && t('Response Time: No response time data available'),
