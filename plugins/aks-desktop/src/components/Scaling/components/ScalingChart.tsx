@@ -86,7 +86,7 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
   if (chartData.length === 0) {
     return (
       <Box display="flex" alignItems="center" justifyContent="center" height="100%">
-        <Typography color="textSecondary" variant="body2">
+        <Typography color="textSecondary" variant="body2" role="status" aria-live="polite">
           {t('No scaling data available')}
         </Typography>
       </Box>

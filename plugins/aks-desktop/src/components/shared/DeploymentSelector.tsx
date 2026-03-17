@@ -45,7 +45,7 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
             {t('Loading deployments')}...
           </MenuItem>
         ) : deployments.length === 0 ? (
-          <MenuItem disabled>{t('No deployments found')}</MenuItem>
+          <MenuItem disabled role="status" aria-live="polite">{t('No deployments found')}</MenuItem>
         ) : (
           deployments.map(deployment => (
             <MenuItem key={deployment.name} value={deployment.name}>

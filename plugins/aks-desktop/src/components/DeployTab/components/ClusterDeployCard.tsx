@@ -176,7 +176,7 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
         {!loading && !error && (
           <>
             {deployments.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }} role="status" aria-live="polite">
                 {t('No deployments found in this namespace.')}
               </Typography>
             ) : (

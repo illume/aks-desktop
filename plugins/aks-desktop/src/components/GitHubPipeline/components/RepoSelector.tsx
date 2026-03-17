@@ -92,7 +92,7 @@ export function RepoSelector({ octokit, selectedRepo, onRepoSelect }: RepoSelect
           <CircularProgress size={32} />
         </Box>
       ) : filtered.length === 0 ? (
-        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }} role="status" aria-live="polite">
           {filter ? t('No repositories match your filter') : t('No repositories found')}
         </Typography>
       ) : (

@@ -35,7 +35,7 @@ function DeployTab({ project }: DeployTabProps) {
       </Box>
 
       {project.clusters?.length === 0 && (
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" role="status" aria-live="polite">
           {t('No clusters in this project.')}
         </Typography>
       )}

@@ -136,7 +136,7 @@ function PipelineCard({ project }: PipelineCardProps) {
           )}
 
           {!loading && !error && runs.length === 0 && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" role="status" aria-live="polite">
               {t('No pipeline runs yet.')}
             </Typography>
           )}
