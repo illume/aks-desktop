@@ -13,9 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
-
-const AKS_AGENT_INSTALL_DOC_URL =
-  'https://learn.microsoft.com/en-us/azure/aks/agentic-cli-for-aks-install';
+import { AKS_AGENT_INSTALL_DOC_URL } from '../../utils';
 
 export type ChatMode = 'chat' | 'agent';
 

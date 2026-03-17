@@ -34,7 +34,7 @@ import { ModelSelector } from './components';
 import { getDefaultConfig } from './config/modelConfig';
 import { isTestModeCheck } from './helper';
 import AIPrompt from './modal';
-import { getSettingsURL, PLUGIN_NAME, pluginStore, useGlobalState, usePluginConfig } from './utils';
+import { AKS_AGENT_INSTALL_DOC_URL, getSettingsURL, PLUGIN_NAME, pluginStore, useGlobalState, usePluginConfig } from './utils';
 import {
   getActiveConfig,
   getSavedConfigurations,
@@ -581,7 +581,7 @@ function Settings() {
           </Typography>
           <Box sx={{ ml: 2 }}>
             <MuiLink
-              href="https://learn.microsoft.com/en-us/azure/aks/agentic-cli-for-aks-install"
+              href={AKS_AGENT_INSTALL_DOC_URL}
               target="_blank"
               rel="noopener noreferrer"
               sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
