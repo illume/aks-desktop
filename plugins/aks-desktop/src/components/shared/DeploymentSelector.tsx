@@ -37,8 +37,10 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
         size="small"
         variant="outlined"
       >
-        <InputLabel>{t('Select Deployment')}</InputLabel>
+        <InputLabel id="deployment-selector-label">{t('Select Deployment')}</InputLabel>
         <Select
+          id="deployment-selector"
+          labelId="deployment-selector-label"
           value={selectedDeployment || ''}
           onChange={e => onDeploymentChange(e.target.value as string)}
           label={t('Select Deployment')}

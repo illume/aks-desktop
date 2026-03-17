@@ -620,6 +620,21 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
         />
       </Box>
 
+      {/* Always-mounted consolidated live region for empty chart announcements */}
+      <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
+        {selectedDeployment && !(metricsLoading && cpuData.length === 0)
+          ? [
+              requestErrorData.length === 0 && t('Request & error rate: No data available'),
+              responseTimeData.length === 0 && t('Response Time: No response time data available'),
+              cpuData.length === 0 && t('CPU Usage: No data available'),
+              memoryData.length === 0 && t('Memory utilization: No data available'),
+              networkData.length === 0 && t('Network I/O: No data available'),
+            ]
+              .filter(Boolean)
+              .join('. ')
+          : ''}
+      </Box>
+
       {deployments.length === 0 ? (
         <Card sx={{ p: 4, textAlign: 'center' }}>
           <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center">
@@ -765,19 +780,6 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ project }) => {
             </>
           ) : (
             <>
-              {/* Single consolidated live region for empty chart announcements */}
-              <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-                {[
-                  requestErrorData.length === 0 && t('Request & error rate: No data available'),
-                  responseTimeData.length === 0 &&
-                    t('Response Time: No response time data available'),
-                  cpuData.length === 0 && t('CPU Usage: No data available'),
-                  memoryData.length === 0 && t('Memory utilization: No data available'),
-                  networkData.length === 0 && t('Network I/O: No data available'),
-                ]
-                  .filter(Boolean)
-                  .join('. ')}
-              </Box>
               {/* Top Row: CPU and Memory */}
               <Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid item xs={12} md={6}>
