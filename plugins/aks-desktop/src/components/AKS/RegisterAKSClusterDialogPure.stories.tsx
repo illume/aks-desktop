@@ -44,12 +44,17 @@ const baseArgs: RegisterAKSClusterDialogPureProps = {
   success: '',
   subscriptions: SAMPLE_SUBSCRIPTIONS,
   selectedSubscription: null,
+  subscriptionInputValue: '',
   clusters: [],
+  filteredClusters: [],
+  clusterInputValue: '',
   selectedCluster: null,
   capabilities: null,
   onClose: noOp,
   onSubscriptionChange: noOp as any,
+  onSubscriptionInputChange: noOp as any,
   onClusterChange: noOp as any,
+  onClusterInputChange: noOp as any,
   onRegister: noOp,
   onDone: noOp,
   onDismissError: noOp,
@@ -117,6 +122,7 @@ WithClusters.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
 };
 
 /** Cluster selected — shows cluster details and enabled Register button. */
@@ -125,7 +131,9 @@ ClusterSelected.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
 };
 
 /** Registration in progress — Register button shows spinner and "Registering...". */
@@ -134,7 +142,9 @@ Registering.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   loading: true,
 };
 
@@ -144,7 +154,9 @@ Success.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   success: "Cluster 'prod-aks-cluster' successfully merged in kubeconfig",
 };
 
@@ -154,7 +166,9 @@ Error.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   error: 'Failed to register cluster: ECONNREFUSED — Could not reach the Kubernetes API server.',
 };
 
@@ -164,7 +178,9 @@ CheckingCapabilities.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   success: "Cluster 'prod-aks-cluster' successfully merged in kubeconfig",
   capabilitiesLoading: true,
 };
@@ -175,7 +191,9 @@ AllCapabilitiesEnabled.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   success: "Cluster 'prod-aks-cluster' successfully merged in kubeconfig",
   capabilities: {
     azureRbacEnabled: true,
@@ -192,7 +210,9 @@ RbacNotEnabled.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   success: "Cluster 'prod-aks-cluster' successfully merged in kubeconfig",
   capabilities: {
     azureRbacEnabled: false,
@@ -209,7 +229,9 @@ NoNetworkPolicy.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: SAMPLE_CLUSTERS,
+  filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
+  clusterInputValue: SAMPLE_CLUSTERS[0].name,
   success: "Cluster 'prod-aks-cluster' successfully merged in kubeconfig",
   capabilities: {
     azureRbacEnabled: true,

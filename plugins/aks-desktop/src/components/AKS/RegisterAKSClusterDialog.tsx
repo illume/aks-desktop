@@ -34,9 +34,32 @@ export default function RegisterAKSClusterDialog({
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
   const [clusters, setClusters] = useState<AKSCluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<AKSCluster | null>(null);
+  const [subscriptionInputValue, setSubscriptionInputValue] = useState('');
+  const [clusterInputValue, setClusterInputValue] = useState('');
   const [capabilities, setCapabilities] = useState<ClusterCapabilities | null>(null);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
   const isMountedRef = useRef(true);
+
+  /** Helper function to filter options by name substring match, ranking prefix matches first. */
+  function rankNameMatches<T extends { name: string }>(options: T[], inputValue: string): T[] {
+    const query = inputValue.trim().toLowerCase();
+    if (!query) return options;
+    return options
+      .filter(o => o.name.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const ai = a.name.toLowerCase().indexOf(query);
+        const bi = b.name.toLowerCase().indexOf(query);
+        return ai !== bi ? ai - bi : a.name.localeCompare(b.name);
+      });
+  }
+
+  const resetClusterState = () => {
+    setClusters([]);
+    setSelectedCluster(null);
+    setClusterInputValue('');
+    setCapabilities(null);
+    setCapabilitiesLoading(false);
+  };
 
   useEffect(() => {
     return () => {
@@ -75,7 +98,9 @@ export default function RegisterAKSClusterDialog({
 
       // Auto-select if only one subscription
       if (result.subscriptions && result.subscriptions.length === 1) {
-        setSelectedSubscription(result.subscriptions[0]);
+        const sub = result.subscriptions[0];
+        setSelectedSubscription(sub);
+        setSubscriptionInputValue(`${sub.name}${sub.state !== 'Enabled' ? ` (${sub.state})` : ''}`);
       }
     } catch (err) {
       console.error('Error loading subscriptions:', err);
@@ -90,6 +115,7 @@ export default function RegisterAKSClusterDialog({
     setError('');
     setClusters([]);
     setSelectedCluster(null);
+    setClusterInputValue('');
 
     try {
       const result = await getAKSClusters(subscriptionId);
@@ -108,12 +134,51 @@ export default function RegisterAKSClusterDialog({
     }
   };
 
+  const filteredSubscriptions = React.useMemo(() => {
+    return selectedSubscription
+      ? subscriptions
+      : rankNameMatches(subscriptions, subscriptionInputValue);
+  }, [subscriptions, subscriptionInputValue, selectedSubscription]);
+
+  const filteredClusters = React.useMemo(() => {
+    return rankNameMatches(clusters, clusterInputValue);
+  }, [clusters, clusterInputValue]);
+
   const handleSubscriptionChange = (event: React.SyntheticEvent, value: Subscription | null) => {
     setSelectedSubscription(value);
+    setSubscriptionInputValue(
+      value ? `${value.name}${value.state !== 'Enabled' ? ` (${value.state})` : ''}` : ''
+    );
+    resetClusterState();
   };
 
-  const handleClusterChange = (event: React.SyntheticEvent, value: AKSCluster | null) => {
+  const handleSubscriptionInputChange = (
+    _event: React.SyntheticEvent,
+    value: string,
+    reason: string
+  ) => {
+    if (reason === 'input' || reason === 'clear') {
+      setSubscriptionInputValue(value);
+      setSelectedSubscription(null);
+      resetClusterState();
+    }
+  };
+
+  const handleClusterChange = (_event: React.SyntheticEvent, value: AKSCluster | null) => {
     setSelectedCluster(value);
+    setClusterInputValue(value ? value.name : '');
+  };
+
+  const handleClusterInputChange = (
+    _event: React.SyntheticEvent,
+    value: string,
+    reason: string
+  ) => {
+    if (reason === 'input' || reason === 'clear') {
+      setClusterInputValue(value);
+      setSelectedCluster(null);
+      setCapabilities(null);
+    }
   };
 
   const handleRegister = async () => {
@@ -218,14 +283,19 @@ export default function RegisterAKSClusterDialog({
       capabilitiesLoading={capabilitiesLoading}
       error={error}
       success={success}
-      subscriptions={subscriptions}
+      subscriptions={filteredSubscriptions}
       selectedSubscription={selectedSubscription}
+      subscriptionInputValue={subscriptionInputValue}
       clusters={clusters}
+      filteredClusters={filteredClusters}
       selectedCluster={selectedCluster}
+      clusterInputValue={clusterInputValue}
       capabilities={capabilities}
       onClose={handleClose}
       onSubscriptionChange={handleSubscriptionChange}
+      onSubscriptionInputChange={handleSubscriptionInputChange}
       onClusterChange={handleClusterChange}
+      onClusterInputChange={handleClusterInputChange}
       onRegister={handleRegister}
       onDone={handleDone}
       onDismissError={() => setError('')}

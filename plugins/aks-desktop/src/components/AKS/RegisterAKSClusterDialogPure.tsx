@@ -46,12 +46,17 @@ export interface RegisterAKSClusterDialogPureProps {
   success: string;
   subscriptions: Subscription[];
   selectedSubscription: Subscription | null;
+  subscriptionInputValue: string;
   clusters: AKSCluster[];
+  filteredClusters: AKSCluster[];
+  clusterInputValue: string;
   selectedCluster: AKSCluster | null;
   capabilities: ClusterCapabilities | null;
   onClose: () => void;
   onSubscriptionChange: (event: React.SyntheticEvent, value: Subscription | null) => void;
+  onSubscriptionInputChange: (event: React.SyntheticEvent, value: string, reason: string) => void;
   onClusterChange: (event: React.SyntheticEvent, value: AKSCluster | null) => void;
+  onClusterInputChange: (event: React.SyntheticEvent, value: string, reason: string) => void;
   onRegister: () => void;
   onDone: () => void;
   onDismissError: () => void;
@@ -71,12 +76,17 @@ export default function RegisterAKSClusterDialogPure({
   success,
   subscriptions,
   selectedSubscription,
+  subscriptionInputValue,
   clusters,
+  filteredClusters,
   selectedCluster,
+  clusterInputValue,
   capabilities,
   onClose,
   onSubscriptionChange,
+  onSubscriptionInputChange,
   onClusterChange,
+  onClusterInputChange,
   onRegister,
   onDone,
   onDismissError,
@@ -145,7 +155,8 @@ export default function RegisterAKSClusterDialogPure({
               capabilities.kedaEnabled !== true ||
               capabilities.vpaEnabled !== true) &&
             selectedSubscription &&
-            selectedCluster && (
+            selectedCluster &&
+            clusterInputValue === selectedCluster.name && (
               <ClusterConfigurePanel
                 capabilities={capabilities}
                 subscriptionId={selectedSubscription.id}
@@ -187,6 +198,10 @@ export default function RegisterAKSClusterDialogPure({
                 options={subscriptions}
                 value={selectedSubscription}
                 onChange={onSubscriptionChange}
+                inputValue={subscriptionInputValue}
+                onInputChange={onSubscriptionInputChange}
+                filterOptions={x => x}
+                getOptionKey={option => option.id}
                 getOptionLabel={option =>
                   `${option.name}${option.state !== 'Enabled' ? ` (${option.state})` : ''}`
                 }
@@ -250,9 +265,13 @@ export default function RegisterAKSClusterDialogPure({
               {!loadingClusters && selectedSubscription && clusters.length > 0 && (
                 <Autocomplete
                   fullWidth
-                  options={clusters}
+                  options={filteredClusters}
                   value={selectedCluster}
                   onChange={onClusterChange}
+                  inputValue={clusterInputValue}
+                  onInputChange={onClusterInputChange}
+                  filterOptions={x => x}
+                  getOptionKey={option => `${option.resourceGroup}/${option.name}`}
                   getOptionLabel={option => option.name}
                   isOptionEqualToValue={(option, value) =>
                     option.name === value.name && option.resourceGroup === value.resourceGroup
@@ -278,7 +297,7 @@ export default function RegisterAKSClusterDialogPure({
                 />
               )}
 
-              {selectedCluster && !success && (
+              {selectedCluster && clusterInputValue === selectedCluster.name && !success && (
                 <Box
                   p={2}
                   bgcolor="action.hover"
