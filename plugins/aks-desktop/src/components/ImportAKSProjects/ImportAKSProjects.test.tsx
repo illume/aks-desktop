@@ -457,41 +457,46 @@ describe('ImportAKSProjects', () => {
     expect(screen.getByText(/Failed to convert namespace/)).toBeInTheDocument();
   });
 
-  test('Go To Projects button navigates via history.push and reloads', async () => {
+  test('Go To Projects button navigates via history.replace and reloads', async () => {
     const reloadMock = vi.fn();
+    const locationDescriptor = Object.getOwnPropertyDescriptor(window, 'location')!;
     Object.defineProperty(window, 'location', {
       value: { ...window.location, reload: reloadMock },
       writable: true,
     });
 
-    const ns = makeDiscoveredNamespace({
-      name: 'ns-ok',
-      clusterName: 'cluster-a',
-      resourceGroup: 'rg-a',
-      subscriptionId: 'sub-a',
-      isAksProject: true,
-      category: 'needs-import',
-    });
-    mockUseNamespaceDiscovery.mockReturnValue(defaultDiscoveryReturn([ns]));
-    mockRegisterAKSCluster.mockResolvedValue({ success: true });
+    try {
+      const ns = makeDiscoveredNamespace({
+        name: 'ns-ok',
+        clusterName: 'cluster-a',
+        resourceGroup: 'rg-a',
+        subscriptionId: 'sub-a',
+        isAksProject: true,
+        category: 'needs-import',
+      });
+      mockUseNamespaceDiscovery.mockReturnValue(defaultDiscoveryReturn([ns]));
+      mockRegisterAKSCluster.mockResolvedValue({ success: true });
 
-    render(<ImportAKSProjects />);
+      render(<ImportAKSProjects />);
 
-    // Select the namespace
-    const row = screen.getByTestId('row-ns-ok');
-    const checkbox = row.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    fireEvent.click(checkbox);
+      // Select the namespace
+      const row = screen.getByTestId('row-ns-ok');
+      const checkbox = row.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      fireEvent.click(checkbox);
 
-    // Click Import Selected (already a project, no conversion dialog)
-    fireEvent.click(screen.getByText('Import Selected Projects'));
+      // Click Import Selected (already a project, no conversion dialog)
+      fireEvent.click(screen.getByText('Import Selected Projects'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Go To Projects')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByText('Go To Projects')).toBeInTheDocument();
+      });
 
-    fireEvent.click(screen.getByText('Go To Projects'));
+      fireEvent.click(screen.getByText('Go To Projects'));
 
-    expect(mockPush).toHaveBeenCalledWith('/');
-    expect(reloadMock).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/');
+      expect(reloadMock).toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'location', locationDescriptor);
+    }
   });
 });
