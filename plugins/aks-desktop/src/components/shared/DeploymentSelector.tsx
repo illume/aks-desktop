@@ -26,6 +26,9 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
   sx,
 }) => {
   const { t } = useTranslation();
+  const id = React.useId();
+  const labelId = `${id}-deployment-selector-label`;
+  const selectId = `${id}-deployment-selector`;
 
   return (
     <>
@@ -37,10 +40,10 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
         size="small"
         variant="outlined"
       >
-        <InputLabel id="deployment-selector-label">{t('Select Deployment')}</InputLabel>
+        <InputLabel id={labelId}>{t('Select Deployment')}</InputLabel>
         <Select
-          id="deployment-selector"
-          labelId="deployment-selector-label"
+          id={selectId}
+          labelId={labelId}
           value={selectedDeployment || ''}
           onChange={e => onDeploymentChange(e.target.value as string)}
           label={t('Select Deployment')}
