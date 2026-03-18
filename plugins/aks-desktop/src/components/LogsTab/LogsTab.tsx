@@ -8,7 +8,7 @@ import { LogsViewer } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { type KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Box, Card, MenuItem, TextField, Typography } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 interface LogsTabProps {
   projectResources: KubeObject[];
@@ -21,6 +21,12 @@ const LogsTab = ({ projectResources }: LogsTabProps) => {
     [projectResources]
   );
   const [deploymentId, setDeploymentId] = useState<string>('');
+  // Deferred flag: starts false so the live region mounts with empty text,
+  // then flips to true after the first paint so the text change is announced.
+  const [liveReady, setLiveReady] = useState(false);
+  useEffect(() => {
+    setLiveReady(true);
+  }, []);
 
   if (!deploymentId && deployments.length > 0) {
     setDeploymentId(deployments[0].jsonData.metadata.uid as string);
@@ -35,7 +41,7 @@ const LogsTab = ({ projectResources }: LogsTabProps) => {
     <>
       {/* Always-mounted live region for empty-state announcement */}
       <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-        {deployments.length === 0 ? t('No Deployments Found') : ''}
+        {liveReady && deployments.length === 0 ? t('No Deployments Found') : ''}
       </Box>
 
       {!deployments.length ? (
