@@ -3,6 +3,7 @@
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Box, Typography } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import React from 'react';
 import { usePreviewFeatures } from '../../hooks/usePreviewFeatures';
 import type { ProjectDefinition } from '../../types/project';
@@ -34,14 +35,12 @@ function DeployTab({ project }: DeployTabProps) {
         <Typography variant="h5">{t('Workloads')}</Typography>
       </Box>
 
+      <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
+        {project.clusters?.length === 0 ? t('No clusters in this project.') : ''}
+      </Box>
+
       {project.clusters?.length === 0 && (
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
+        <Typography variant="body2" color="text.secondary">
           {t('No clusters in this project.')}
         </Typography>
       )}

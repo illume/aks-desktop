@@ -20,6 +20,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import React, { useMemo, useState } from 'react';
 import { useAzureContext } from '../../../hooks/useAzureContext';
 import type { GitHubRepo } from '../../../types/github';
@@ -173,17 +174,16 @@ export function ClusterDeployCard({ cluster, namespace, pipelineEnabled }: Clust
           </Typography>
         )}
 
+        <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
+          {!loading && !error && deployments.length === 0
+            ? t('No deployments found in this namespace.')
+            : ''}
+        </Box>
+
         {!loading && !error && (
           <>
             {deployments.length === 0 ? (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ py: 2 }}
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
+              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
                 {t('No deployments found in this namespace.')}
               </Typography>
             ) : (

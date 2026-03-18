@@ -13,6 +13,9 @@ interface DeploymentSelectorProps {
   loading?: boolean;
   onDeploymentChange: (deploymentName: string) => void;
   sx?: SxProps<Theme>;
+  /** When true, suppress the visually-hidden live region to avoid duplicate announcements
+   *  when multiple DeploymentSelector instances appear on the same page. */
+  suppressLiveRegion?: boolean;
 }
 
 /**
@@ -24,6 +27,7 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
   loading = false,
   onDeploymentChange,
   sx,
+  suppressLiveRegion = false,
 }) => {
   const { t } = useTranslation();
   const id = React.useId();
@@ -32,9 +36,11 @@ export const DeploymentSelector: React.FC<DeploymentSelectorProps> = ({
 
   return (
     <>
-      <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-        {!loading && deployments.length === 0 ? t('No deployments found') : ''}
-      </Box>
+      {!suppressLiveRegion && (
+        <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
+          {!loading && deployments.length === 0 ? t('No deployments found') : ''}
+        </Box>
+      )}
       <FormControl
         sx={[{ minWidth: 200 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
         size="small"
