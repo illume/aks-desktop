@@ -89,7 +89,7 @@ export function RepoSelector({ octokit, selectedRepo, onRepoSelect }: RepoSelect
       )}
 
       <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-        {!loading && filtered.length === 0
+        {!loading && !error && filtered.length === 0
           ? filter
             ? t('No repositories match your filter')
             : t('No repositories found')

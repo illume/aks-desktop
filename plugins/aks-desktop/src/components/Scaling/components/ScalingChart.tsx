@@ -5,7 +5,7 @@ import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, AlertTitle, Box, CircularProgress, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { visuallyHidden } from '@mui/utils';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CartesianGrid,
   Legend,
@@ -55,6 +55,14 @@ interface ScalingChartProps {
 export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, error }) => {
   const { t } = useTranslation();
   const theme = useTheme();
+  // Deferred flag: starts false so the live region mounts with empty text,
+  // then flips to true after the first paint so the text change is announced.
+  const [liveReady, setLiveReady] = useState(false);
+  useEffect(() => {
+    if (!loading) {
+      setLiveReady(true);
+    }
+  }, [loading]);
 
   const renderContent = () => {
     if (loading) {
@@ -163,7 +171,9 @@ export const ScalingChart: React.FC<ScalingChartProps> = ({ chartData, loading, 
   return (
     <>
       <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
-        {!loading && !error && chartData.length === 0 ? t('No scaling data available') : ''}
+        {liveReady && !loading && !error && chartData.length === 0
+          ? t('No scaling data available')
+          : ''}
       </Box>
       {renderContent()}
     </>
