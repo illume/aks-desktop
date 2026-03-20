@@ -92,7 +92,8 @@ export async function registerAKSCluster(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string,
-  managedNamespace?: string
+  managedNamespace?: string,
+  tenantId?: string
 ): Promise<{
   success: boolean;
   message: string;
@@ -120,7 +121,8 @@ export async function registerAKSCluster(
       resourceGroup,
       clusterName,
       false, // isAzureRBACEnabled
-      managedNamespace
+      managedNamespace,
+      tenantId
     );
 
     console.debug('[AKS] Registration result:', result);

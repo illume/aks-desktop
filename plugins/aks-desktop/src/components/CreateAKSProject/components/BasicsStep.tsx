@@ -397,6 +397,7 @@ export const BasicsStep: React.FC<BasicsStepProps> = ({
             cluster={selectedCluster.name}
             resourceGroup={selectedCluster.resourceGroup}
             subscription={formData.subscription}
+            tenantId={subscriptions.find(s => s.id === formData.subscription)?.tenant}
           />
         )}
 
@@ -500,10 +501,12 @@ function RegisterCluster({
   cluster,
   resourceGroup,
   subscription,
+  tenantId,
 }: {
   cluster: string;
   resourceGroup: string;
   subscription: string;
+  tenantId?: string;
 }) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -522,7 +525,13 @@ function RegisterCluster({
     try {
       // Register the cluster by running az aks get-credentials and setting up kubeconfig
       if (DEBUG) console.debug('[AKS] Registering cluster...');
-      const result = await registerAKSCluster(subscription, resourceGroup, cluster);
+      const result = await registerAKSCluster(
+        subscription,
+        resourceGroup,
+        cluster,
+        undefined,
+        tenantId
+      );
       if (DEBUG) console.debug('[AKS] Register cluster result:', result.success);
       if (!result.success) {
         setError(result.message);

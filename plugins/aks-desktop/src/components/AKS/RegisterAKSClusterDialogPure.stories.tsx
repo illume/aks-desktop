@@ -10,9 +10,9 @@ import RegisterAKSClusterDialogPure, {
 const noOp = () => {};
 
 const SAMPLE_SUBSCRIPTIONS = [
-  { id: 'sub-1', name: 'Production Subscription', state: 'Enabled' },
-  { id: 'sub-2', name: 'Development Subscription', state: 'Enabled' },
-  { id: 'sub-3', name: 'Legacy Subscription', state: 'Disabled' },
+  { id: 'sub-1', name: 'Production Subscription', state: 'Enabled', tenantId: 'tenant-1' },
+  { id: 'sub-2', name: 'Development Subscription', state: 'Enabled', tenantId: 'tenant-1' },
+  { id: 'sub-3', name: 'Legacy Subscription', state: 'Disabled', tenantId: 'tenant-2' },
 ];
 
 const SAMPLE_CLUSTERS = [
