@@ -16,7 +16,6 @@ These are hard requirements. AKS desktop will not function with AKS clusters tha
 | **Azure RBAC for Kubernetes authorization** | Required for assigning users to projects with Admin, Writer, or Reader roles. | `az aks show -g <rg> -n <cluster> --query aadProfile.enableAzureRbac` -- must be `true` | Must be set at cluster creation: `--enable-azure-rbac` |
 | **aks-preview CLI extension** | Required for `az aks namespace` commands used to create managed namespaces (AKS Projects). | `az extension show --name aks-preview` | AKS desktop installs this automatically if it is missing. To install manually: `az extension add --name aks-preview` |
 
-> **Preview feature:** AKS Projects use the [AKS Managed Namespace](https://learn.microsoft.com/azure/aks/manage-namespaces) preview feature. Your subscription must have the `ManagedNamespacePreview` feature flag registered. AKS desktop checks for this automatically and will prompt you to register the feature if it is missing. Organizations that restrict the use of preview features should review their policies before enabling this.
 
 ## Recommended configuration
 
