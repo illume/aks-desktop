@@ -14,6 +14,7 @@ export const DEPLOYMENT_STATES = [
   'GitHubAuthorizationNeeded',
   'AppInstallationNeeded',
   'CheckingRepo', // (*)
+  'AcrSelection',
   'WorkloadIdentitySetup', // (*)
   'ReadyForSetup', // (*)
   'SetupPRCreating',
@@ -62,6 +63,10 @@ export interface PipelineConfig {
   port?: number;
   containerConfig?: ContainerConfig;
   repo: GitHubRepo;
+  /** Full Azure resource ID of the selected ACR. */
+  acrResourceId?: string;
+  /** Login server of the selected ACR (e.g., "myregistry.azurecr.io"). */
+  acrLoginServer?: string;
 }
 
 export interface PRTracking {

@@ -14,7 +14,7 @@ import { getAzCommand, getInstallationInstructions } from './az-cli-path';
 const DEBUG_LOGS = process.env.NODE_ENV === 'development' || process.env.DEBUG_AZ_CLI === 'true';
 
 // Helper function for debug logging
-const debugLog = (...args: any[]) => {
+export const debugLog = (...args: any[]) => {
   if (DEBUG_LOGS) {
     console.debug(...args);
   }
@@ -22,7 +22,7 @@ const debugLog = (...args: any[]) => {
 
 // Validate that a string is a valid GUID (prevents KQL injection in Resource Graph queries)
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isValidGuid(value: string): boolean {
+export function isValidGuid(value: string): boolean {
   return GUID_PATTERN.test(value);
 }
 
@@ -1241,39 +1241,45 @@ export async function getAksKubeconfig(options: {
 }
 
 // Azure Container Registry functions
-export async function getContainerRegistries(subscriptionId: string): Promise<any[]> {
-  const { stdout, stderr } = await runCommandAsync('az', [
-    'acr',
-    'list',
-    '--subscription',
-    subscriptionId,
-    '--output',
-    'json',
-  ]);
+export type AcrSku = 'Basic' | 'Standard' | 'Premium';
 
-  if (stderr && needsRelogin(stderr)) {
-    throw new Error('Authentication required. Please log in to Azure CLI: az login');
+export interface AcrInfo {
+  id: string;
+  name: string;
+  resourceGroup: string;
+  loginServer: string;
+  location: string;
+  sku: AcrSku;
+}
+
+export async function getContainerRegistries(subscriptionId: string): Promise<AcrInfo[]> {
+  if (!isValidGuid(subscriptionId)) {
+    throw new Error('Invalid subscription ID format');
   }
 
-  if (stderr && (stderr.includes('ERROR') || stderr.includes('error'))) {
-    console.error('Failed to get container registries:', stderr);
-    throw new Error(`Failed to get container registries: ${stderr}`);
-  }
+  const result = await runAzCommand<AcrInfo[]>(
+    ['acr', 'list', '--subscription', subscriptionId, '--output', 'json'],
+    'Listing container registries:',
+    'list container registries',
+    (stdout: string) => {
+      const registries = JSON.parse(stdout || '[]') as any[];
+      return registries.map(
+        (r): AcrInfo => ({
+          id: r.id,
+          name: r.name,
+          resourceGroup: r.resourceGroup,
+          loginServer: r.loginServer,
+          location: r.location,
+          sku: r.sku?.name ?? r.sku ?? 'Basic',
+        })
+      );
+    }
+  );
 
-  try {
-    const registries = JSON.parse(stdout || '[]');
-    return registries.map((registry: any) => ({
-      id: registry.id,
-      name: registry.name,
-      resourceGroup: registry.resourceGroup,
-      loginServer: registry.loginServer,
-      location: registry.location,
-      sku: registry.sku?.name || 'Basic',
-    }));
-  } catch (error) {
-    console.error('Failed to parse container registries response:', error);
-    return [];
+  if (!result.success) {
+    throw new Error(result.error ?? 'Failed to get container registries');
   }
+  return result.data!;
 }
 
 export async function getContainerImages(
@@ -2920,7 +2926,7 @@ export async function verifyNamespaceAccess(options: {
 }
 
 // Azure CLI prefixes fatal errors with "ERROR: " in stderr
-function isAzError(stderr: string): boolean {
+export function isAzError(stderr: string): boolean {
   return stderr.includes('ERROR: ');
 }
 
@@ -2929,13 +2935,13 @@ const ODATA_SAFE_QUERY_PATTERN = /^[a-zA-Z0-9@._ -]+$/;
 
 // Validates Azure resource names: alphanumeric, hyphens, underscores (1-128 chars)
 const AZ_RESOURCE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
-function isValidAzResourceName(value: string): boolean {
+export function isValidAzResourceName(value: string): boolean {
   return AZ_RESOURCE_NAME_PATTERN.test(value);
 }
 
 // Validates GitHub owner/repo/branch names (no path traversal or shell metacharacters)
 const GITHUB_NAME_PATTERN = /^[a-zA-Z0-9._-]{1,100}$/;
-function isValidGitHubName(value: string): boolean {
+export function isValidGitHubName(value: string): boolean {
   return GITHUB_NAME_PATTERN.test(value);
 }
 
@@ -2963,7 +2969,7 @@ export interface ManagedIdentityResult {
  *                        Return a result object to short-circuit, or `null`
  *                        to fall through to the default checks.
  */
-async function runAzCommand<T>(
+export async function runAzCommand<T>(
   args: string[],
   debugLabel: string,
   errorContext: string,
@@ -3002,7 +3008,7 @@ async function runAzCommand<T>(
   }
 }
 
-function parseManagedIdentityOutput(stdout: string) {
+export function parseManagedIdentityOutput(stdout: string) {
   let identity;
   try {
     identity = JSON.parse(stdout);
@@ -3014,212 +3020,6 @@ function parseManagedIdentityOutput(stdout: string) {
     principalId: identity.principalId as string,
     tenantId: identity.tenantId as string,
   };
-}
-
-export async function getManagedIdentity(options: {
-  identityName: string;
-  resourceGroup: string;
-  subscriptionId: string;
-}): Promise<ManagedIdentityResult> {
-  const { identityName, resourceGroup, subscriptionId } = options;
-
-  if (!isValidGuid(subscriptionId)) {
-    return { success: false, error: 'Invalid subscription ID format' };
-  }
-  if (!isValidAzResourceName(identityName) || !isValidAzResourceName(resourceGroup)) {
-    return { success: false, error: 'Invalid identity name or resource group format' };
-  }
-
-  const result = await runAzCommand(
-    [
-      'identity',
-      'show',
-      '--name',
-      identityName,
-      '--resource-group',
-      resourceGroup,
-      '--subscription',
-      subscriptionId,
-      '--output',
-      'json',
-    ],
-    'Getting managed identity:',
-    'get managed identity',
-    parseManagedIdentityOutput,
-    stderr => {
-      if (stderr.includes('ResourceNotFound') || stderr.includes('was not found')) {
-        return { success: false, notFound: true };
-      }
-      return null;
-    }
-  );
-
-  if (!result.success) {
-    return {
-      success: false,
-      notFound: result.notFound as boolean | undefined,
-      error: result.error,
-    };
-  }
-  return { success: true, ...result.data };
-}
-
-export async function createManagedIdentity(options: {
-  identityName: string;
-  resourceGroup: string;
-  subscriptionId: string;
-}): Promise<ManagedIdentityResult> {
-  const { identityName, resourceGroup, subscriptionId } = options;
-
-  if (!isValidGuid(subscriptionId)) {
-    return { success: false, error: 'Invalid subscription ID format' };
-  }
-  if (!isValidAzResourceName(identityName) || !isValidAzResourceName(resourceGroup)) {
-    return { success: false, error: 'Invalid identity name or resource group format' };
-  }
-
-  const result = await runAzCommand(
-    [
-      'identity',
-      'create',
-      '--name',
-      identityName,
-      '--resource-group',
-      resourceGroup,
-      '--subscription',
-      subscriptionId,
-      '--tags',
-      'purpose=GitHub Actions OIDC',
-      'createdBy=AKS Desktop',
-      '--output',
-      'json',
-    ],
-    'Creating managed identity:',
-    'create managed identity',
-    parseManagedIdentityOutput
-  );
-
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
-  return { success: true, ...result.data };
-}
-
-export async function assignRoleToIdentity(options: {
-  principalId: string;
-  subscriptionId: string;
-  resourceGroup: string;
-}): Promise<{ success: boolean; error?: string }> {
-  const { principalId, subscriptionId, resourceGroup } = options;
-
-  if (!isValidGuid(subscriptionId)) {
-    return { success: false, error: 'Invalid subscription ID format' };
-  }
-  if (!isValidGuid(principalId)) {
-    return { success: false, error: 'Invalid principal ID format' };
-  }
-  if (!isValidAzResourceName(resourceGroup)) {
-    return { success: false, error: 'Invalid resource group format' };
-  }
-
-  const scope = `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}`;
-  const result = await runAzCommand(
-    [
-      'role',
-      'assignment',
-      'create',
-      '--assignee-object-id',
-      principalId,
-      '--assignee-principal-type',
-      'ServicePrincipal',
-      '--role',
-      'Azure Kubernetes Service Cluster User Role',
-      '--scope',
-      scope,
-      '--subscription',
-      subscriptionId,
-      '--output',
-      'json',
-    ],
-    'Assigning AKS Cluster User Role:',
-    'assign role',
-    undefined,
-    stderr => {
-      // Role assignment already exists — treat as success
-      if (stderr.includes('RoleAssignmentExists')) {
-        debugLog('Role assignment already exists, continuing.');
-        return { success: true };
-      }
-      return null;
-    }
-  );
-
-  return { success: result.success, error: result.error };
-}
-
-export async function createFederatedCredential(options: {
-  identityName: string;
-  resourceGroup: string;
-  subscriptionId: string;
-  repoOwner: string;
-  repoName: string;
-  branch: string;
-}): Promise<{ success: boolean; error?: string }> {
-  const { identityName, resourceGroup, subscriptionId, repoOwner, repoName, branch } = options;
-
-  if (!isValidGuid(subscriptionId)) {
-    return { success: false, error: 'Invalid subscription ID format' };
-  }
-  if (!isValidAzResourceName(identityName) || !isValidAzResourceName(resourceGroup)) {
-    return { success: false, error: 'Invalid identity name or resource group format' };
-  }
-  if (!isValidGitHubName(repoOwner) || !isValidGitHubName(repoName) || !isValidGitHubName(branch)) {
-    return { success: false, error: 'Invalid GitHub owner, repo name, or branch format' };
-  }
-
-  const subject = `repo:${repoOwner}/${repoName}:ref:refs/heads/${branch}`;
-  // Sanitize dots in repoName (invalid in Azure resource names) and validate
-  const sanitizedRepoName = repoName.replace(/\./g, '-');
-  const credentialName = `GitHubActions-${sanitizedRepoName}`;
-  if (!isValidAzResourceName(credentialName)) {
-    return { success: false, error: 'Invalid federated credential name format' };
-  }
-  const result = await runAzCommand(
-    [
-      'identity',
-      'federated-credential',
-      'create',
-      '--identity-name',
-      identityName,
-      '--resource-group',
-      resourceGroup,
-      '--subscription',
-      subscriptionId,
-      '--name',
-      credentialName,
-      '--issuer',
-      'https://token.actions.githubusercontent.com',
-      '--subject',
-      subject,
-      '--audiences',
-      'api://AzureADTokenExchange',
-      '--output',
-      'json',
-    ],
-    'Creating federated credential:',
-    'create federated credential',
-    undefined,
-    stderr => {
-      // Federated credential already exists — treat as success
-      if (stderr.includes('FederatedIdentityCredentialAlreadyExists')) {
-        debugLog('Federated credential already exists, continuing.');
-        return { success: true };
-      }
-      return null;
-    }
-  );
-
-  return { success: result.success, error: result.error };
 }
 
 export interface AzureADUser {

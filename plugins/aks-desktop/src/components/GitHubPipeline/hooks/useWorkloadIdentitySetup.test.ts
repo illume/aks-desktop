@@ -11,18 +11,42 @@ const mockGetResourceGroupLocation = vi.fn();
 const mockCreateResourceGroup = vi.fn();
 const mockGetManagedIdentity = vi.fn();
 const mockCreateManagedIdentity = vi.fn();
-const mockAssignRoleToIdentity = vi.fn();
+const mockAssignRolesToIdentity = vi.fn();
 const mockCreateFederatedCredential = vi.fn();
 
 vi.mock('../../../utils/azure/az-cli', () => ({
   resourceGroupExists: (...args: any[]) => mockResourceGroupExists(...args),
   getResourceGroupLocation: (...args: any[]) => mockGetResourceGroupLocation(...args),
   createResourceGroup: (...args: any[]) => mockCreateResourceGroup(...args),
+}));
+
+vi.mock('../../../utils/azure/az-identity', () => ({
   getManagedIdentity: (...args: any[]) => mockGetManagedIdentity(...args),
   createManagedIdentity: (...args: any[]) => mockCreateManagedIdentity(...args),
-  assignRoleToIdentity: (...args: any[]) => mockAssignRoleToIdentity(...args),
+  assignRolesToIdentity: (...args: any[]) => mockAssignRolesToIdentity(...args),
+  getManagedNamespaceResourceId: vi.fn(),
+  buildClusterScope: (sub: string, rg: string, cluster: string) =>
+    `/subscriptions/${sub}/resourceGroups/${rg}/providers/Microsoft.ContainerService/managedClusters/${cluster}`,
+}));
+
+vi.mock('../../../utils/azure/az-federation', () => ({
   createFederatedCredential: (...args: any[]) => mockCreateFederatedCredential(...args),
 }));
+
+vi.mock('../../../utils/azure/identitySetup', async () => {
+  const actual = await vi.importActual('../../../utils/azure/identitySetup');
+  return actual;
+});
+
+vi.mock('../../../utils/azure/identityRoles', async () => {
+  const actual = await vi.importActual('../../../utils/azure/identityRoles');
+  return actual;
+});
+
+vi.mock('../../../utils/azure/identityWithRoles', async () => {
+  const actual = await vi.importActual('../../../utils/azure/identityWithRoles');
+  return actual;
+});
 
 import type { WorkloadIdentitySetupConfig } from './useWorkloadIdentitySetup';
 import { getIdentityName, useWorkloadIdentitySetup } from './useWorkloadIdentitySetup';
@@ -32,7 +56,9 @@ const baseConfig: WorkloadIdentitySetupConfig = {
   resourceGroup: 'cluster-rg',
   identityResourceGroup: 'rg-my-project',
   projectName: 'my-project',
+  clusterName: 'my-cluster',
   repo: { owner: 'testuser', repo: 'my-repo', defaultBranch: 'main' },
+  isManagedNamespace: false,
 };
 
 describe('getIdentityName', () => {
@@ -41,7 +67,7 @@ describe('getIdentityName', () => {
   });
 
   it('handles empty string', () => {
-    expect(getIdentityName('')).toBe('id--github');
+    expect(getIdentityName('')).toBe('id-github');
   });
 });
 
@@ -66,7 +92,7 @@ describe('useWorkloadIdentitySetup', () => {
       principalId: 'pid',
       tenantId: 'tid',
     });
-    mockAssignRoleToIdentity.mockResolvedValue({ success: true });
+    mockAssignRolesToIdentity.mockResolvedValue({ success: true, results: [] });
     mockCreateFederatedCredential.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useWorkloadIdentitySetup());
@@ -94,7 +120,7 @@ describe('useWorkloadIdentitySetup', () => {
       principalId: 'pid',
       tenantId: 'tid',
     });
-    mockAssignRoleToIdentity.mockResolvedValue({ success: true });
+    mockAssignRolesToIdentity.mockResolvedValue({ success: true, results: [] });
     mockCreateFederatedCredential.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useWorkloadIdentitySetup());
@@ -127,7 +153,7 @@ describe('useWorkloadIdentitySetup', () => {
       principalId: 'pid',
       tenantId: 'tid',
     });
-    mockAssignRoleToIdentity.mockResolvedValue({ success: true });
+    mockAssignRolesToIdentity.mockResolvedValue({ success: true, results: [] });
     mockCreateFederatedCredential.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useWorkloadIdentitySetup());
@@ -144,9 +170,9 @@ describe('useWorkloadIdentitySetup', () => {
     expect(mockCreateManagedIdentity).toHaveBeenCalledWith(
       expect.objectContaining({ resourceGroup: 'rg-my-project' })
     );
-    // Role assignment uses the cluster resourceGroup
-    expect(mockAssignRoleToIdentity).toHaveBeenCalledWith(
-      expect.objectContaining({ resourceGroup: 'cluster-rg' })
+    // Role assignment is called with the principalId
+    expect(mockAssignRolesToIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ principalId: 'pid' })
     );
     // Federated credential uses identityResourceGroup
     expect(mockCreateFederatedCredential).toHaveBeenCalledWith(
@@ -196,7 +222,7 @@ describe('useWorkloadIdentitySetup', () => {
       principalId: 'existing-pid',
       tenantId: 'existing-tid',
     });
-    mockAssignRoleToIdentity.mockResolvedValue({ success: true });
+    mockAssignRolesToIdentity.mockResolvedValue({ success: true, results: [] });
     mockCreateFederatedCredential.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useWorkloadIdentitySetup());
@@ -241,9 +267,9 @@ describe('useWorkloadIdentitySetup', () => {
       principalId: 'pid',
       tenantId: 'tid',
     });
-    mockAssignRoleToIdentity.mockResolvedValue({
+    mockAssignRolesToIdentity.mockResolvedValue({
       success: false,
-      error: 'Forbidden',
+      results: [{ role: 'AKS Cluster User', scope: '/sub', success: false, error: 'Forbidden' }],
     });
 
     const { result } = renderHook(() => useWorkloadIdentitySetup());
@@ -264,7 +290,7 @@ describe('useWorkloadIdentitySetup', () => {
       principalId: 'pid',
       tenantId: 'tid',
     });
-    mockAssignRoleToIdentity.mockResolvedValue({ success: true });
+    mockAssignRolesToIdentity.mockResolvedValue({ success: true, results: [] });
     mockCreateFederatedCredential.mockResolvedValue({
       success: false,
       error: 'Credential already exists',

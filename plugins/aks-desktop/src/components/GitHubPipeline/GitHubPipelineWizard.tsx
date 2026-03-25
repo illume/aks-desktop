@@ -5,10 +5,12 @@ import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
 import React, { useEffect, useRef } from 'react';
+import { useNamespaceCapabilities } from '../../hooks/useNamespaceCapabilities';
 import type { GitHubRepo } from '../../types/github';
 import { openExternalUrl } from '../../utils/shared/openExternalUrl';
 import type { ContainerConfig } from '../DeployWizard/hooks/useContainerConfiguration';
 import { useContainerConfiguration } from '../DeployWizard/hooks/useContainerConfiguration';
+import { type AcrSelection, AcrSelector } from './components/AcrSelector';
 import { AgentSetupReview } from './components/AgentSetupReview';
 import { ConnectSourceStep } from './components/ConnectSourceStep';
 import { ReviewAndMergeStep } from './components/ReviewAndMergeStep';
@@ -125,6 +127,12 @@ export function GitHubPipelineWizard({
 }: GitHubPipelineWizardProps) {
   const { t } = useTranslation();
   const localContainerConfig = useContainerConfiguration(appName);
+  const { isManagedNamespace, azureRbacEnabled } = useNamespaceCapabilities({
+    subscriptionId,
+    resourceGroup,
+    clusterName,
+    namespace,
+  });
 
   useEffect(() => {
     if (containerConfig) {
@@ -231,15 +239,51 @@ export function GitHubPipelineWizard({
       case 'CheckingRepo':
         return <LoadingSpinner message={t('Checking repository readiness...')} />;
 
+      case 'AcrSelection':
+        return (
+          <AcrSelector
+            subscriptionId={subscriptionId}
+            resourceGroup={resourceGroup}
+            onSelect={(selection: AcrSelection | null) => {
+              pipeline.updateConfig({
+                acrResourceId: selection?.acrResourceId,
+                acrLoginServer: selection?.acrLoginServer,
+              });
+            }}
+            value={
+              pipeline.state.config?.acrResourceId && pipeline.state.config?.acrLoginServer
+                ? {
+                    acrResourceId: pipeline.state.config.acrResourceId,
+                    acrLoginServer: pipeline.state.config.acrLoginServer,
+                  }
+                : null
+            }
+          />
+        );
+
       case 'WorkloadIdentitySetup': {
-        if (!selectedRepo) return <LoadingSpinner message={t('Loading...')} />;
+        if (!selectedRepo || isManagedNamespace === undefined)
+          return (
+            <LoadingSpinner
+              message={t(
+                isManagedNamespace === undefined
+                  ? 'Resolving namespace capabilities...'
+                  : 'Loading...'
+              )}
+            />
+          );
         return (
           <WorkloadIdentitySetup
             subscriptionId={subscriptionId}
             resourceGroup={resourceGroup}
+            clusterName={clusterName}
             repo={selectedRepo}
             identitySetup={identitySetup}
             projectName={resolvedProjectName ?? namespace}
+            acrResourceId={pipeline.state.config?.acrResourceId}
+            isManagedNamespace={isManagedNamespace}
+            namespaceName={namespace}
+            azureRbacEnabled={azureRbacEnabled}
           />
         );
       }
@@ -343,6 +387,16 @@ export function GitHubPipelineWizard({
           </Button>
         );
       }
+      case 'AcrSelection':
+        return (
+          <Button
+            variant="contained"
+            onClick={() => pipeline.setAcrCompleted()}
+            sx={{ textTransform: 'none' }}
+          >
+            {t('Next')}
+          </Button>
+        );
       case 'ReadyForSetup': {
         const needsApp = !pipeline.state.config?.appName.trim() && !localAppName.trim();
         const readiness = pipeline.state.repoReadiness;
