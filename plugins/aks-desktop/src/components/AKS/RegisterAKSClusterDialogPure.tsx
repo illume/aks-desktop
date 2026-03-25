@@ -24,6 +24,7 @@ export interface Subscription {
   id: string;
   name: string;
   state: string;
+  tenantId: string;
 }
 
 export interface AKSCluster {

@@ -195,7 +195,9 @@ export default function RegisterAKSClusterDialog({
       const result = await registerAKSCluster(
         selectedSubscription.id,
         selectedCluster.resourceGroup,
-        selectedCluster.name
+        selectedCluster.name,
+        undefined, // managedNamespace
+        selectedSubscription.tenantId
       );
 
       if (!result.success) {
