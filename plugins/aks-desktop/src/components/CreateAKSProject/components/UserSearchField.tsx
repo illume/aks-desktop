@@ -4,7 +4,7 @@
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Alert, Autocomplete, Box, CircularProgress, TextField, Typography } from '@mui/material';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { searchAzureADUsers } from '../../../utils/azure/az-cli';
+import { searchAzureADUsers } from '../../../utils/azure/az-ad';
 import { isValidObjectId } from '../validators';
 
 interface UserSearchFieldProps {

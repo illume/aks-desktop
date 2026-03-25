@@ -3,13 +3,8 @@
 // Federated credential CLI functions (GitHub Actions OIDC and K8s service account federation).
 
 import { K8S_DNS_LABEL_PATTERN } from '../kubernetes/k8sNames';
-import {
-  debugLog,
-  isValidAzResourceName,
-  isValidGitHubName,
-  isValidGuid,
-  runAzCommand,
-} from './az-cli';
+import { debugLog, isValidGuid, runAzCommand } from './az-cli-core';
+import { isValidAzResourceName, isValidGitHubName } from './az-validation';
 
 /** Shared helper: runs `az identity federated-credential create` with dedup handling. */
 async function runFederatedCredentialCreate(options: {

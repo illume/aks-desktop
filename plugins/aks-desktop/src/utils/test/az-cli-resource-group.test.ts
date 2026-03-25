@@ -18,7 +18,7 @@ import {
   createResourceGroup,
   getResourceGroupLocation,
   resourceGroupExists,
-} from '../azure/az-cli';
+} from '../azure/az-subscriptions';
 
 const VALID_SUB_ID = '12345678-1234-1234-1234-123456789abc';
 const VALID_RG_NAME = 'my-resource-group';

@@ -3,7 +3,7 @@
 
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { runCommandAsync } from '../utils/azure/az-cli';
+import { runCommandAsync } from '../utils/azure/az-cli-core';
 import {
   PROJECT_ID_LABEL,
   PROJECT_MANAGED_BY_LABEL,

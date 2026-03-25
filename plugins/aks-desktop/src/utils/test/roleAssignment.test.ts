@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const mockCreateNamespaceRoleAssignment = vi.fn();
 const mockVerifyNamespaceAccess = vi.fn();
 
-vi.mock('../azure/az-cli', () => ({
+vi.mock('../azure/az-namespace-access', () => ({
   createNamespaceRoleAssignment: (...args: any[]) => mockCreateNamespaceRoleAssignment(...args),
   verifyNamespaceAccess: (...args: any[]) => mockVerifyNamespaceAccess(...args),
 }));

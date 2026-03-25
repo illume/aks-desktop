@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { useEffect, useState } from 'react';
-import { getClusterCapabilities } from '../utils/azure/az-cli';
+import { getClusterCapabilities } from '../utils/azure/az-clusters';
 import { getManagedNamespaceResourceId } from '../utils/azure/az-identity';
 
 /** Appends a new error message, joining with '; ' if a previous error exists. */

@@ -34,7 +34,8 @@ vi.mock('../azure/az-cli-path', () => ({
 }));
 
 // Import the actual functions under test
-import { enableClusterAddon, getClusterCapabilities, getClusterCount } from '../azure/az-cli';
+import { enableClusterAddon, getClusterCapabilities } from '../azure/az-clusters';
+import { getClusterCount } from '../azure/az-resource-graph';
 
 // Test helper function
 const createMockChildProcess = (stdoutData: string, stderrData: string = ''): MockChildProcess => ({

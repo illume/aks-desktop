@@ -36,7 +36,7 @@ export default function AzureProfilePage() {
     setLoggingOut(true);
     try {
       // Import dynamically to avoid circular dependencies
-      const { runCommandAsync } = await import('../../utils/azure/az-cli');
+      const { runCommandAsync } = await import('../../utils/azure/az-cli-core');
       const result = await runCommandAsync('az', ['logout']);
 
       if (result.stderr && result.stderr.includes('ERROR:')) {

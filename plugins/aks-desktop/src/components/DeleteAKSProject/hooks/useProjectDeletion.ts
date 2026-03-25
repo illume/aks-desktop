@@ -5,7 +5,7 @@ import { clusterAction, K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib
 import type { ApiClient } from '@kinvolk/headlamp-plugin/lib/lib/k8s/api/v1/factories';
 import type { KubeNamespace } from '@kinvolk/headlamp-plugin/lib/lib/k8s/namespace';
 import Namespace from '@kinvolk/headlamp-plugin/lib/lib/k8s/namespace';
-import { deleteManagedNamespace } from '../../../utils/azure/az-cli';
+import { deleteManagedNamespace } from '../../../utils/azure/az-namespaces';
 import {
   PROJECT_ID_LABEL,
   PROJECT_MANAGED_BY_LABEL,

@@ -12,7 +12,7 @@ vi.mock('../../utils/kubernetes/cli-runner', () => ({
   runCommandWithOutput: vi.fn(),
 }));
 
-vi.mock('../../utils/azure/az-cli', () => ({
+vi.mock('../../utils/azure/az-extensions', () => ({
   configureAzureCliExtensions: vi.fn().mockResolvedValue({ success: true }),
 }));
 

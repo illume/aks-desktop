@@ -7,7 +7,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAzureContext } from './useAzureContext';
 
-vi.mock('../utils/azure/az-cli', () => ({
+vi.mock('../utils/azure/az-clusters', () => ({
   getClusterInfo: vi.fn(),
 }));
 
@@ -22,7 +22,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => {
   };
 });
 
-import { getClusterInfo } from '../utils/azure/az-cli';
+import { getClusterInfo } from '../utils/azure/az-clusters';
 import type { AzureAuthStatus } from './useAzureAuth';
 import { useAzureAuth } from './useAzureAuth';
 

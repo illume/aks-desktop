@@ -14,8 +14,8 @@ import {
 } from '@mui/material';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClusterCapabilities } from '../../../types/ClusterCapabilities';
-import type { AddonKey } from '../../../utils/azure/az-cli';
-import { enableClusterAddon, getClusterCapabilities } from '../../../utils/azure/az-cli';
+import type { AddonKey } from '../../../utils/azure/az-clusters';
+import { enableClusterAddon, getClusterCapabilities } from '../../../utils/azure/az-clusters';
 
 interface ClusterConfigurePanelProps {
   capabilities: ClusterCapabilities;

@@ -4,7 +4,8 @@
 import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
-import { checkNamespaceExists, createManagedNamespace } from '../../../utils/azure/az-cli';
+import { checkNamespaceExists } from '../../../utils/azure/az-namespace-access';
+import { createManagedNamespace } from '../../../utils/azure/az-namespaces';
 import { checkAzureCliAndAksPreview } from '../../../utils/azure/checkAzureCli';
 import { assignRolesToNamespace } from '../../../utils/azure/roleAssignment';
 import {

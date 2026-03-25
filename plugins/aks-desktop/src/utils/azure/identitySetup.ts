@@ -1,8 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { createResourceGroup, getResourceGroupLocation, resourceGroupExists } from './az-cli';
 import { createManagedIdentity, getManagedIdentity } from './az-identity';
+import {
+  createResourceGroup,
+  getResourceGroupLocation,
+  resourceGroupExists,
+} from './az-subscriptions';
 
 export type IdentitySetupStatus = 'creating-rg' | 'checking' | 'creating-identity';
 

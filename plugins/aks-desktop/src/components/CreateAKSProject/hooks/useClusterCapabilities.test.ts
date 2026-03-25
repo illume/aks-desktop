@@ -6,12 +6,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-clusters', () => ({
   getClusterCapabilities: vi.fn(),
 }));
 
 import type { ClusterCapabilities } from '../../../types/ClusterCapabilities';
-import { getClusterCapabilities } from '../../../utils/azure/az-cli';
+import { getClusterCapabilities } from '../../../utils/azure/az-clusters';
 import { useClusterCapabilities } from './useClusterCapabilities';
 
 const mockGetClusterCapabilities = vi.mocked(getClusterCapabilities);

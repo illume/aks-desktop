@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { clearChartDataCaches, useChartData } from './useChartData';
 
 // Mock the external dependencies
-vi.mock('../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-clusters', () => ({
   getClusterResourceIdAndGroup: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ vi.mock('../../MetricsTab/queryPrometheus', () => ({
   queryPrometheus: vi.fn(),
 }));
 
-import { getClusterResourceIdAndGroup } from '../../../utils/azure/az-cli';
+import { getClusterResourceIdAndGroup } from '../../../utils/azure/az-clusters';
 import { getPrometheusEndpoint } from '../../MetricsTab/getPrometheusEndpoint';
 import { queryPrometheus } from '../../MetricsTab/queryPrometheus';
 

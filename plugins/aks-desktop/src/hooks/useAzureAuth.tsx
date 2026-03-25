@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { getLoginStatus } from '../utils/azure/az-cli';
+import { getLoginStatus } from '../utils/azure/az-auth';
 
 export interface AzureAuthStatus {
   isLoggedIn: boolean;

@@ -6,7 +6,7 @@ import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import Deployment from '@kinvolk/headlamp-plugin/lib/lib/k8s/deployment';
 import { Box, Typography, useTheme } from '@mui/material';
 import React, { useCallback, useEffect, useState } from 'react';
-import { getClusterResourceIdAndGroup } from '../../utils/azure/az-cli';
+import { getClusterResourceIdAndGroup } from '../../utils/azure/az-clusters';
 import { RESOURCE_GROUP_LABEL, SUBSCRIPTION_LABEL } from '../../utils/constants/projectLabels';
 import { getPrometheusEndpoint } from '../MetricsTab/getPrometheusEndpoint';
 import { queryPrometheus } from '../MetricsTab/queryPrometheus';

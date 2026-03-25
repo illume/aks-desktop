@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   installAksPreviewExtension,
   isAksPreviewExtensionInstalled,
-} from '../../../utils/azure/az-cli';
+} from '../../../utils/azure/az-extensions';
 import type { ExtensionStatus } from '../types';
 
 /**

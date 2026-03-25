@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { useCallback, useState } from 'react';
-import { checkNamespaceExists } from '../../../utils/azure/az-cli';
+import { checkNamespaceExists } from '../../../utils/azure/az-namespace-access';
 import type { NamespaceStatus } from '../types';
 
 /** Set to `true` locally to enable verbose debug logging. Never enable in production. */

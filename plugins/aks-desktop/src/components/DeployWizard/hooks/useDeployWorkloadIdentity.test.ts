@@ -15,7 +15,7 @@ const mockAssignRolesToIdentity = vi.fn();
 const mockGetAksOidcIssuerUrl = vi.fn();
 const mockCreateK8sFederatedCredential = vi.fn();
 
-vi.mock('../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-subscriptions', () => ({
   resourceGroupExists: (...args: any[]) => mockResourceGroupExists(...args),
   getResourceGroupLocation: (...args: any[]) => mockGetResourceGroupLocation(...args),
   createResourceGroup: (...args: any[]) => mockCreateResourceGroup(...args),

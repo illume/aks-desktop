@@ -4,7 +4,7 @@
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import type { ApiClient } from '@kinvolk/headlamp-plugin/lib/lib/k8s/api/v1/factories';
 import type { KubeNamespace } from '@kinvolk/headlamp-plugin/lib/lib/k8s/namespace';
-import { runCommandAsync } from '../azure/az-cli';
+import { runCommandAsync } from '../azure/az-cli-core';
 import {
   PROJECT_ID_LABEL,
   PROJECT_MANAGED_BY_LABEL,

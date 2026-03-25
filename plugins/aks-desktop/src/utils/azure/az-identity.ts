@@ -2,14 +2,9 @@
 // Licensed under the Apache 2.0.
 // Identity-related Azure CLI functions (managed identities, role assignments).
 
-import type { ManagedIdentityResult } from './az-cli';
-import {
-  debugLog,
-  isValidAzResourceName,
-  isValidGuid,
-  parseManagedIdentityOutput,
-  runAzCommand,
-} from './az-cli';
+import { debugLog, isValidGuid, runAzCommand } from './az-cli-core';
+import type { ManagedIdentityResult } from './az-validation';
+import { isValidAzResourceName, parseManagedIdentityOutput } from './az-validation';
 
 // --- Identity CRUD ---
 

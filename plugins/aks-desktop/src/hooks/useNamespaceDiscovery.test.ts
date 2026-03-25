@@ -10,7 +10,7 @@ const mockRunCommandAsync = vi.fn();
 const mockApiList = vi.fn();
 const mockUseClustersConf = vi.fn();
 
-vi.mock('../utils/azure/az-cli', () => ({
+vi.mock('../utils/azure/az-cli-core', () => ({
   runCommandAsync: (...args: any[]) => mockRunCommandAsync(...args),
 }));
 

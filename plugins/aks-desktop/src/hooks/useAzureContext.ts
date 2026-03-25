@@ -3,7 +3,7 @@
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { useEffect, useState } from 'react';
-import { getClusterInfo } from '../utils/azure/az-cli';
+import { getClusterInfo } from '../utils/azure/az-clusters';
 import { useAzureAuth } from './useAzureAuth';
 
 export interface AzureContext {

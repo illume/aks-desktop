@@ -6,7 +6,7 @@ import {
   isManagedNamespacePreviewRegistered,
   registerContainerServiceProvider,
   registerManagedNamespacePreview,
-} from '../../../utils/azure/az-cli';
+} from '../../../utils/azure/az-extensions';
 import type { FeatureStatus } from '../types';
 
 /**

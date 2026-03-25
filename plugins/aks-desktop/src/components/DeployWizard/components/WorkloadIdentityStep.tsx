@@ -16,8 +16,8 @@ import {
   Typography,
 } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
-import { isValidAzResourceName } from '../../../utils/azure/az-cli';
 import { listManagedIdentities } from '../../../utils/azure/az-identity';
+import { isValidAzResourceName } from '../../../utils/azure/az-validation';
 import { K8S_DNS_LABEL_PATTERN } from '../../../utils/kubernetes/k8sNames';
 import { getServiceAccountName } from '../../../utils/kubernetes/serviceAccountNames';
 import { CONTAINER_STEPS } from '../hooks/useContainerConfiguration';

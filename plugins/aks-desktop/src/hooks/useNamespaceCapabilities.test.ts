@@ -6,7 +6,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../utils/azure/az-cli', () => ({
+vi.mock('../utils/azure/az-clusters', () => ({
   getClusterCapabilities: vi.fn(),
 }));
 
@@ -14,7 +14,7 @@ vi.mock('../utils/azure/az-identity', () => ({
   getManagedNamespaceResourceId: vi.fn(),
 }));
 
-import { getClusterCapabilities } from '../utils/azure/az-cli';
+import { getClusterCapabilities } from '../utils/azure/az-clusters';
 import { getManagedNamespaceResourceId } from '../utils/azure/az-identity';
 import { useNamespaceCapabilities } from './useNamespaceCapabilities';
 
