@@ -226,7 +226,7 @@ You can add a cluster by selecting 'Add Cluster from Azure' using 'Add Cluster' 
 
 
 
-## Project Updates
+Projects are detailed [here](https://learn.microsoft.com/en-us/azure/aks/aks-desktop-app?tabs=azure-subscription%2Caks-managed-project%2Ccontainer-image#create-a-new-project-in-aks-desktop).
 Projects are detailed [here](https://learn.microsoft.com/azure/aks/aks-desktop-app#create-a-new-project-in-aks-desktop).
 
 ### Project Type updates
