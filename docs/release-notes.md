@@ -7,9 +7,10 @@
 4. Support for importing managed namespace into a project work when user doesn't have access to the cluster itself.
 
 ## Alpha Preview features
-1. AI Assistant with Natural Language Support 
-2. Insights
-3. Automating app deployment from AKS desktop with a GitHub Actions Pipeline (docs inflight, ETA 27th March)
+For all these new features, please provide feedback in the GitHub issues, we want to learn from you and improve! As these are preview features only run on test clusters.
+1. AI Assistant with Natural Language Support - in context troubleshooting through asking with natural language!
+2. Insights - identify what DNS has done now, identify top resources consumers, find networking issues with network traces, all back with a powerful UI!
+3. Automating app deployment from AKS desktop with a GitHub Actions Pipeline - just a simple click through and edit what you need to!
 
 
 ## AI Assistant with Natural Language Support (Preview)
@@ -198,7 +199,12 @@ kubectl delete ns gadget
 - [AKS Desktop Cluster Requirements](./cluster-requirements.md)
 
 ## Automating app deployment from AKS desktop with a GitHub Actions Pipeline 
-Docs inflight ETA 27th March 2026
+Configure a GitHub-based CI/CD pipeline for your AKS project using AKS Desktop. The pipeline uses GitHub Copilot Coding Agent to analyze your repository to provide you with a Dockerfile, K8s manifests (if required) based on your app, containerize your application, and deploy it to Azure Kubernetes Service — all from within AKS Desktop.
+
+
+This [article](deployment-pipeline-create.md) walks you through the end to end. We are working supporting additional pipelines too, stay tuned and let us know any requests you have throuugh GitHub issues on the repo.
+
+
 
 ## Awareness / updates
 ## Opening the app for the first time
