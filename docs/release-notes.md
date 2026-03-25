@@ -31,7 +31,7 @@ The AKS Desktop Troubleshooting Assistant is built into AKS Desktop and provides
 * Use your own language models or connect to Azure managed options.
 * Work alongside existing dashboards in AKS Desktop for a cohesive troubleshooting experience.
 
-> Note! This plugin is in early development and is not yet ready for production use. Using it may incur in costs from the AI provider! Use at your own risk.
+> Note! This plugin is in early development and is not yet ready for production use. Using it may incur costs from the AI provider! Use at your own risk.
 
 ### Options
 There are two options for enabling this functionality:
