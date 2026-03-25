@@ -209,7 +209,7 @@ This [article](deployment-pipeline-create.md) walks you through the end to end. 
 
 
 ## Awareness / updates
-## Opening the app for the first time
+### Opening the app for the first time
 When you download the app and open it for the first time it will open the 'clusters' view, you will see clusters here that are in your kubeconfig. You can click on the clusters and explore them, note, it is your existing identity and permissions that are used to interact with the clusters, so if you don't have the correct permissions to access clusters and their resources you will see these errors surface in AKS desktop.
 
 ![alt text](image.png)
