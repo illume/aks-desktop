@@ -32,7 +32,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { getClusterResourceIdAndGroup } from '../../utils/azure/az-cli';
+import { getClusterResourceIdAndGroup } from '../../utils/azure/az-clusters';
 import { RESOURCE_GROUP_LABEL, SUBSCRIPTION_LABEL } from '../../utils/constants/projectLabels';
 import { DeploymentSelector } from '../shared/DeploymentSelector';
 import { getPrometheusEndpoint } from './getPrometheusEndpoint';

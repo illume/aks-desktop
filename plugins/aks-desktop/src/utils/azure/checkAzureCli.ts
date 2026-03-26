@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { runCommandAsync } from './az-cli';
+import { runCommandAsync } from './az-cli-core';
 
 /**
  * Checks Azure CLI version and aks-preview extension status.

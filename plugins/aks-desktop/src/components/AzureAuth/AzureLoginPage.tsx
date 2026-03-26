@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { getLoginStatus, initiateLogin } from '../../utils/azure/az-cli';
+import { getLoginStatus, initiateLogin } from '../../utils/azure/az-auth';
 
 interface AzureLoginPageProps {
   redirectTo?: string;

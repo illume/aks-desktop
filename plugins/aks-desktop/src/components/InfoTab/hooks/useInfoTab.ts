@@ -7,7 +7,7 @@ import {
   getManagedNamespaceDetails,
   getManagedNamespaces,
   updateManagedNamespace,
-} from '../../../utils/azure/az-cli';
+} from '../../../utils/azure/az-namespaces';
 import { RESOURCE_GROUP_LABEL, SUBSCRIPTION_LABEL } from '../../../utils/constants/projectLabels';
 import {
   DEFAULT_FORM_DATA,

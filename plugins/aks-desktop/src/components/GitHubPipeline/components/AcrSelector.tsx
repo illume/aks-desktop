@@ -19,14 +19,12 @@ import React, { useEffect, useState } from 'react';
 import {
   ACR_NAME_ERROR,
   ACR_NAME_PATTERN,
-  createContainerRegistry,
-} from '../../../utils/azure/az-acr';
-import {
   type AcrInfo,
   type AcrSku,
+  createContainerRegistry,
   getContainerRegistries,
-  getResourceGroupLocation,
-} from '../../../utils/azure/az-cli';
+} from '../../../utils/azure/az-acr';
+import { getResourceGroupLocation } from '../../../utils/azure/az-subscriptions';
 
 export interface AcrSelection {
   acrResourceId: string;

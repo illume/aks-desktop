@@ -29,11 +29,14 @@ vi.mock('react-router-dom', () => ({
   useHistory: () => ({ push: vi.fn() }),
 }));
 
-vi.mock('../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-namespace-access', () => ({
   checkNamespaceExists: vi.fn(),
-  createManagedNamespace: vi.fn(),
   createNamespaceRoleAssignment: vi.fn(),
   verifyNamespaceAccess: vi.fn(),
+}));
+
+vi.mock('../../../utils/azure/az-namespaces', () => ({
+  createManagedNamespace: vi.fn(),
 }));
 
 vi.mock('../../../utils/azure/checkAzureCli', () => ({
@@ -112,10 +115,10 @@ vi.mock('./useValidation', () => ({
 
 import {
   checkNamespaceExists,
-  createManagedNamespace,
   createNamespaceRoleAssignment,
   verifyNamespaceAccess,
-} from '../../../utils/azure/az-cli';
+} from '../../../utils/azure/az-namespace-access';
+import { createManagedNamespace } from '../../../utils/azure/az-namespaces';
 import { useCreateAKSProjectWizard } from './useCreateAKSProjectWizard';
 import { useFormData } from './useFormData';
 

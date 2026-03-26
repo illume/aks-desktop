@@ -23,7 +23,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   useTranslation: () => ({ t: mockT }),
 }));
 
-vi.mock('../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-namespaces', () => ({
   getManagedNamespaces: mockGetManagedNamespaces,
   getManagedNamespaceDetails: mockGetManagedNamespaceDetails,
   updateManagedNamespace: mockUpdateManagedNamespace,

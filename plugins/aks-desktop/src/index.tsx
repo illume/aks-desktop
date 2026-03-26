@@ -42,7 +42,7 @@ import { previewFeaturesStore } from './components/PluginSettings/previewFeature
 import ScalingCard from './components/Scaling/ScalingCard';
 import ScalingTab from './components/Scaling/ScalingTab';
 import type { ProjectDefinition } from './types/project';
-import { getLoginStatus } from './utils/azure/az-cli';
+import { getLoginStatus } from './utils/azure/az-auth';
 import { isAksProject } from './utils/shared/isAksProject';
 import { azureTheme } from './utils/shared/theme';
 

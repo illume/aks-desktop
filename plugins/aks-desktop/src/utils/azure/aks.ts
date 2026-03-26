@@ -1,4 +1,5 @@
-import { getClusters, getSubscriptions as getAzSubscriptions } from './az-cli';
+import { getClusters } from './az-clusters';
+import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 
 export interface Subscription {
   id: string;

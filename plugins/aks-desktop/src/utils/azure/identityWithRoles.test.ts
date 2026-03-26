@@ -13,7 +13,7 @@ const mockCreateManagedIdentity = vi.fn();
 const mockAssignRolesToIdentity = vi.fn();
 const mockGetManagedNamespaceResourceId = vi.fn();
 
-vi.mock('./az-cli', () => ({
+vi.mock('./az-subscriptions', () => ({
   resourceGroupExists: (...args: any[]) => mockResourceGroupExists(...args),
   getResourceGroupLocation: (...args: any[]) => mockGetResourceGroupLocation(...args),
   createResourceGroup: (...args: any[]) => mockCreateResourceGroup(...args),

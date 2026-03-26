@@ -22,7 +22,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
 
 // Mock the Azure CLI
 const mockRunCommandAsync = vi.fn();
-vi.mock('../azure/az-cli', () => ({
+vi.mock('../azure/az-cli-core', () => ({
   runCommandAsync: (...args: any[]) => mockRunCommandAsync(...args),
 }));
 

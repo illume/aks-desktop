@@ -3,7 +3,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { ClusterCapabilities } from '../../../types/ClusterCapabilities';
-import { getClusterCapabilities } from '../../../utils/azure/az-cli';
+import { getClusterCapabilities } from '../../../utils/azure/az-clusters';
 
 interface ClusterCapabilitiesState {
   capabilities: ClusterCapabilities | null;

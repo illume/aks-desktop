@@ -18,7 +18,7 @@ vi.mock('../shared/quoteForPlatform', () => ({
   quoteForPlatform: (value: string) => value,
 }));
 
-import { searchAzureADUsers } from '../azure/az-cli';
+import { searchAzureADUsers } from '../azure/az-ad';
 
 describe('searchAzureADUsers', () => {
   beforeEach(() => {

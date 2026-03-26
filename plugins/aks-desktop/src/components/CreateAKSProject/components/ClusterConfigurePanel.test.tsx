@@ -15,12 +15,12 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => {
 });
 
 // Mock the az-cli functions, import more afterwards
-vi.mock('../../../utils/azure/az-cli', () => ({
+vi.mock('../../../utils/azure/az-clusters', () => ({
   enableClusterAddon: vi.fn(),
   getClusterCapabilities: vi.fn(),
 }));
 
-import { enableClusterAddon, getClusterCapabilities } from '../../../utils/azure/az-cli';
+import { enableClusterAddon, getClusterCapabilities } from '../../../utils/azure/az-clusters';
 import { ClusterConfigurePanel } from './ClusterConfigurePanel';
 
 const mockEnableClusterAddon = vi.mocked(enableClusterAddon);

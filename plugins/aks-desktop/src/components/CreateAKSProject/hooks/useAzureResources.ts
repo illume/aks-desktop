@@ -2,7 +2,9 @@
 // Licensed under the Apache 2.0.
 
 import { useCallback, useState } from 'react';
-import { getClusterCount, getClusters, getSubscriptions } from '../../../utils/azure/az-cli';
+import { getClusters } from '../../../utils/azure/az-clusters';
+import { getClusterCount } from '../../../utils/azure/az-resource-graph';
+import { getSubscriptions } from '../../../utils/azure/az-subscriptions';
 import type { AzureResourceState } from '../types';
 
 /**

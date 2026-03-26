@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { mapUIRoleToAzureRole, UserAssignment } from '../../components/CreateAKSProject/types';
-import { createNamespaceRoleAssignment, verifyNamespaceAccess } from './az-cli';
+import { createNamespaceRoleAssignment, verifyNamespaceAccess } from './az-namespace-access';
 
 const AKS_NAMESPACE_USER_ROLE = 'Azure Kubernetes Service Namespace User';
 const AKS_NAMESPACE_CONTRIBUTOR_ROLE = 'Azure Kubernetes Service Namespace Contributor';
