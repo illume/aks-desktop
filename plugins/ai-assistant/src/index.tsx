@@ -161,7 +161,7 @@ function HeadlampAIPrompt() {
 
   const previewEnabled = savedConfigs?.previewEnabled ?? false;
   const hasShownPopover = savedConfigs?.configPopoverShown || false;
-  const hasDetectionBeenDismissed = savedConfigs?.autoDetectDismissed || false;
+  const dismissedProviderIds: string[] = savedConfigs?.autoDetectDismissedProviders || [];
 
   const savedConfigData = React.useMemo(() => {
     return getSavedConfigurations(savedConfigs);
@@ -170,22 +170,24 @@ function HeadlampAIPrompt() {
   const hasAnyValidConfig = savedConfigData.providers && savedConfigData.providers.length > 0;
 
   // Auto-detect AI providers when preview is enabled.
-  // Runs once per session unless the user has already dismissed the dialog.
-  // `detectProviders` skips provider types that are already configured,
-  // so existing configs are respected without blocking new detections.
+  // Runs once per app session. `detectProviders` skips provider types
+  // that are already configured, and we further filter out providers
+  // the user has explicitly dismissed in a previous session.
   React.useEffect(() => {
-    if (hasRunAutoDetect || hasDetectionBeenDismissed || !previewEnabled) {
+    if (hasRunAutoDetect || !previewEnabled) {
       return;
     }
     setHasRunAutoDetect(true);
 
     detectProviders(savedConfigData.providers).then(detected => {
-      if (detected.length > 0) {
-        setDetectedProviders(detected);
+      // Filter out providers the user previously declined
+      const newProviders = detected.filter(p => !dismissedProviderIds.includes(p.providerId));
+      if (newProviders.length > 0) {
+        setDetectedProviders(newProviders);
         setShowDetectedDialog(true);
       }
     });
-  }, [hasRunAutoDetect, hasDetectionBeenDismissed, previewEnabled, savedConfigData.providers]);
+  }, [hasRunAutoDetect, previewEnabled, savedConfigData.providers, dismissedProviderIds]);
 
   const handleDetectedConfirm = (selected: DetectedProvider[]) => {
     setShowDetectedDialog(false);
@@ -199,21 +201,33 @@ function HeadlampAIPrompt() {
         provider.displayName
       );
     }
+    // Mark unselected providers as dismissed so they aren't offered again
+    const selectedIds = new Set(selected.map(p => p.providerId));
+    const newlyDismissed = detectedProviders
+      .filter(p => !selectedIds.has(p.providerId))
+      .map(p => p.providerId);
+    const allDismissed = [...new Set([...dismissedProviderIds, ...newlyDismissed])];
+
     // Merge into the current config to avoid overwriting unrelated settings
     const currentConf = pluginStore.get() || {};
     pluginStore.update({
       ...currentConf,
       ...configs,
-      autoDetectDismissed: true,
+      autoDetectDismissedProviders: allDismissed,
     });
   };
 
   const handleDetectedDismiss = () => {
     setShowDetectedDialog(false);
+    // Record all currently-offered providers as dismissed so they
+    // aren't re-offered next session. Newly available providers will
+    // still be shown because their IDs aren't in this list.
+    const newlyDismissed = detectedProviders.map(p => p.providerId);
+    const allDismissed = [...new Set([...dismissedProviderIds, ...newlyDismissed])];
     const currentConf = pluginStore.get() || {};
     pluginStore.update({
       ...currentConf,
-      autoDetectDismissed: true,
+      autoDetectDismissedProviders: allDismissed,
     });
   };
 
