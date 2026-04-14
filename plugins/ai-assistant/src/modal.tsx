@@ -31,14 +31,6 @@ import { getSettingsURL, useGlobalState } from './utils';
 import { generateContextDescription } from './utils/contextGenerator';
 import { getProviderModels, parseSuggestionsFromResponse } from './utils/modalUtils';
 import { useDynamicPrompts } from './utils/promptGenerator';
-
-// Operation type constants for translation
-const OPERATION_TYPES = {
-  CREATION: 'creation',
-  UPDATE: 'update',
-  DELETION: 'deletion',
-  GENERIC: 'operation',
-} as const;
 import {
   AZ_CLI_AUTH_SENTINEL,
   GH_CLI_AUTH_SENTINEL,
@@ -51,6 +43,14 @@ import {
   StoredProviderConfig,
 } from './utils/ProviderConfigManager';
 import { getEnabledToolIds } from './utils/ToolConfigManager';
+
+// Operation type constants for translation
+const OPERATION_TYPES = {
+  CREATION: 'creation',
+  UPDATE: 'update',
+  DELETION: 'deletion',
+  GENERIC: 'operation',
+} as const;
 
 export default function AIPrompt(props: {
   openPopup: boolean;

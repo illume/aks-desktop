@@ -169,9 +169,12 @@ function HeadlampAIPrompt() {
 
   const hasAnyValidConfig = savedConfigData.providers && savedConfigData.providers.length > 0;
 
-  // Auto-detect AI providers when preview is enabled and no providers are configured
+  // Auto-detect AI providers when preview is enabled.
+  // Runs once per session unless the user has already dismissed the dialog.
+  // `detectProviders` skips provider types that are already configured,
+  // so existing configs are respected without blocking new detections.
   React.useEffect(() => {
-    if (hasRunAutoDetect || hasDetectionBeenDismissed || hasAnyValidConfig || !previewEnabled) {
+    if (hasRunAutoDetect || hasDetectionBeenDismissed || !previewEnabled) {
       return;
     }
     setHasRunAutoDetect(true);
@@ -182,13 +185,7 @@ function HeadlampAIPrompt() {
         setShowDetectedDialog(true);
       }
     });
-  }, [
-    hasRunAutoDetect,
-    hasDetectionBeenDismissed,
-    hasAnyValidConfig,
-    previewEnabled,
-    savedConfigData.providers,
-  ]);
+  }, [hasRunAutoDetect, hasDetectionBeenDismissed, previewEnabled, savedConfigData.providers]);
 
   const handleDetectedConfirm = (selected: DetectedProvider[]) => {
     setShowDetectedDialog(false);
