@@ -107,6 +107,7 @@ function runDetectCommand(
       const cmd = pluginRunCommand(command, args, {});
 
       let stdout = '';
+      let stderr = '';
       let resolved = false;
 
       const done = (result: { stdout: string; exitCode: number }) => {
@@ -127,15 +128,30 @@ function runDetectCommand(
       }, DETECT_COMMAND_TIMEOUT_MS);
 
       cmd.stdout.on('data', (data: string) => (stdout += data));
-      // stderr is intentionally ignored — many CLIs (notably `az`) emit
-      // warnings on stderr even on success. We key off exitCode instead.
-      cmd.stderr.on('data', () => {});
+      // stderr is captured for debugging but not used for success/failure
+      // decisions — many CLIs (notably `az`) emit warnings on stderr even
+      // on success. We key off exitCode instead.
+      cmd.stderr.on('data', (data: string) => (stderr += data));
       cmd.on('exit', (code: number) => {
         clearTimeout(timer);
+        // Negative exit codes come from the Headlamp Electron layer, not the CLI:
+        //   -1 = command not in validCommands (validateCommandData failed)
+        //   -2 = permission secret mismatch (runCmd-<cmd> secret missing)
+        //   -3 = user denied consent dialog
+        const codeHint =
+          code === -1
+            ? ' (Electron: command not in validCommands — is the headlamp diff applied?)'
+            : code === -2
+            ? ' (Electron: permission secret mismatch — runCmd-' + command + ' missing)'
+            : code === -3
+            ? ' (Electron: user denied consent)'
+            : '';
         console.debug(
           `[ai-assistant auto-detect] ${command} ${args.join(
             ' '
-          )} exited with code ${code}, stdout length ${stdout.length}`
+          )} exited with code ${code}${codeHint}, stdout length ${stdout.length}${
+            stderr ? ', stderr: ' + stderr.slice(0, 200) : ''
+          }`
         );
         done({ stdout, exitCode: code });
       });

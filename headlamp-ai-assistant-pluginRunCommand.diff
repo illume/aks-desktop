@@ -1,3 +1,13 @@
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index XXXXXXX..XXXXXXX 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -1483,6 +1483,7 @@ async function startElectron() {
+   // add run cmd consent for aks-desktop to avoid consent dialogs for the aks-desktop plugin
+   addRunCmdConsent({ name: 'aks-desktop' });
++  addRunCmdConsent({ name: 'ai-assistant' });
+ 
+   // Increase max listeners to prevent false positive warnings
 diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
 index 990ed043b..b7c88ec82 100644
 --- a/app/electron/runCmd.ts
@@ -44,6 +54,37 @@ index 990ed043b..b7c88ec82 100644
    };
  
    ipcMain.on('request-plugin-permission-secrets', function giveSecrets() {
+@@ -540,7 +554,7 @@ export function validateCommandData(eventData: CommandDataPartial): [boolean, str
+   }
+ 
+   // Added 'kubectl' for AKS desktop downstream integration (aks-desktop patch)
+-  const validCommands = ['minikube', 'az', 'kubectl', 'scriptjs', 'kubelogin'];
++  const validCommands = ['minikube', 'az', 'kubectl', 'scriptjs', 'kubelogin', 'gh'];
+ 
+   if (!validCommands.includes(eventData.command)) {
+     return [
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index XXXXXXX..XXXXXXX 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -216,6 +216,17 @@ describe('validateCommandData', () => {
+     ).toBe(true);
+   });
+ 
++  it('returns true for valid gh command', () => {
++    expect(
++      validateCommandData({
++        command: 'gh',
++        args: ['auth', 'token'],
++        options: {},
++        permissionSecrets: {},
++      })[0]
++    ).toBe(true);
++  });
++
+   it('returns true for valid scriptjs command', () => {
+     expect(
+       validateCommandData({
 diff --git a/frontend/src/plugin/index.ts b/frontend/src/plugin/index.ts
 index 7654a9525..6b0c6ee33 100644
 --- a/frontend/src/plugin/index.ts
