@@ -183,6 +183,30 @@ export const modelProviders: ModelProvider[] = [
     ],
   },
   {
+    id: 'copilot',
+    name: 'GitHub Copilot',
+    icon: 'ai-providers:copilot',
+    description: 'Integration with GitHub Copilot via GitHub Models API',
+    fields: [
+      {
+        name: 'apiKey',
+        label: 'GitHub Personal Access Token',
+        type: 'text',
+        required: true,
+        placeholder: 'ghp_...',
+        description: 'A GitHub PAT with Copilot access',
+      },
+      {
+        name: 'model',
+        label: 'Model',
+        type: 'select',
+        required: true,
+        options: ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o1', 'o1-mini'],
+        default: 'gpt-4o',
+      },
+    ],
+  },
+  {
     id: 'local',
     name: 'Local Models',
     icon: 'ai-providers:local',

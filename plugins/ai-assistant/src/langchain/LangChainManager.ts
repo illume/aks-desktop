@@ -170,6 +170,19 @@ export default class LangChainManager extends AIManager {
             verbose: true,
           });
         }
+        case 'copilot': {
+          if (!sanitizedConfig.apiKey) {
+            throw new Error('GitHub Personal Access Token is required for GitHub Copilot');
+          }
+          return new ChatOpenAI({
+            apiKey: sanitizedConfig.apiKey,
+            modelName: sanitizedConfig.model,
+            verbose: true,
+            configuration: {
+              baseURL: 'https://models.inference.ai.azure.com',
+            },
+          });
+        }
         case 'local': {
           if (!sanitizedConfig.baseUrl) {
             throw new Error('Base URL is required for local models');
