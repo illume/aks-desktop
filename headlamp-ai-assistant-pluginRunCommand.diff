@@ -1,15 +1,39 @@
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index XXXXXXX..XXXXXXX 100644
+index 58fcab681..5faae0c02 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
-@@ -1483,6 +1483,7 @@ async function startElectron() {
+@@ -1482,6 +1482,7 @@ async function startElectron() {
+   console.info('App starting...');
    // add run cmd consent for aks-desktop to avoid consent dialogs for the aks-desktop plugin
    addRunCmdConsent({ name: 'aks-desktop' });
 +  addRunCmdConsent({ name: 'ai-assistant' });
  
    // Increase max listeners to prevent false positive warnings
+   // The app legitimately needs multiple IPC listeners (currently 11)
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index cb358786f..a89b626dd 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -215,6 +215,17 @@ describe('validateCommandData', () => {
+     ).toBe(true);
+   });
+ 
++  it('returns true for valid gh command', () => {
++    expect(
++      validateCommandData({
++        command: 'gh',
++        args: ['auth', 'token'],
++        options: {},
++        permissionSecrets: {},
++      })[0]
++    ).toBe(true);
++  });
++
+   it('returns true for valid scriptjs command', () => {
+     expect(
+       validateCommandData({
 diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
-index 990ed043b..b7c88ec82 100644
+index 990ed043b..49eacac92 100644
 --- a/app/electron/runCmd.ts
 +++ b/app/electron/runCmd.ts
 @@ -165,6 +165,11 @@ const COMMANDS_WITH_CONSENT = {
@@ -54,7 +78,7 @@ index 990ed043b..b7c88ec82 100644
    };
  
    ipcMain.on('request-plugin-permission-secrets', function giveSecrets() {
-@@ -540,7 +554,7 @@ export function validateCommandData(eventData: CommandDataPartial): [boolean, str
+@@ -540,7 +554,7 @@ export function validateCommandData(eventData: CommandDataPartial): [boolean, st
    }
  
    // Added 'kubectl' for AKS desktop downstream integration (aks-desktop patch)
@@ -63,28 +87,6 @@ index 990ed043b..b7c88ec82 100644
  
    if (!validCommands.includes(eventData.command)) {
      return [
-diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
-index XXXXXXX..XXXXXXX 100644
---- a/app/electron/runCmd.test.ts
-+++ b/app/electron/runCmd.test.ts
-@@ -216,6 +216,17 @@ describe('validateCommandData', () => {
-     ).toBe(true);
-   });
- 
-+  it('returns true for valid gh command', () => {
-+    expect(
-+      validateCommandData({
-+        command: 'gh',
-+        args: ['auth', 'token'],
-+        options: {},
-+        permissionSecrets: {},
-+      })[0]
-+    ).toBe(true);
-+  });
-+
-   it('returns true for valid scriptjs command', () => {
-     expect(
-       validateCommandData({
 diff --git a/frontend/src/plugin/index.ts b/frontend/src/plugin/index.ts
 index 7654a9525..6b0c6ee33 100644
 --- a/frontend/src/plugin/index.ts
