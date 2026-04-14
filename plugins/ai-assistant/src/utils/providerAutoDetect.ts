@@ -2,6 +2,14 @@ import { getDefaultConfig } from '../config/modelConfig';
 import type { StoredProviderConfig } from './ProviderConfigManager';
 
 /**
+ * Sentinel value stored in config.apiKey for the copilot provider
+ * when it was auto-detected via `gh auth token`. The actual token
+ * is never persisted — it is fetched fresh from the CLI at model
+ * creation time via {@link refreshGitHubToken}.
+ */
+export const GH_CLI_AUTH_SENTINEL = '__gh_cli__';
+
+/**
  * Represents a detected AI provider that can be auto-configured.
  */
 export interface DetectedProvider {
@@ -116,6 +124,11 @@ export async function validateGitHubToken(token: string): Promise<string | null>
 /**
  * Detects whether the GitHub CLI is authenticated and returns a
  * provider config for GitHub Copilot (GitHub Models API) if so.
+ *
+ * **Security:** The actual token is NOT stored in the returned config.
+ * Instead, a sentinel value ({@link GH_CLI_AUTH_SENTINEL}) is stored,
+ * and the real token is fetched fresh via {@link refreshGitHubToken}
+ * each time the model is created.
  */
 export async function detectCopilotProvider(): Promise<DetectedProvider | null> {
   const token = await detectGitHubToken();
@@ -134,10 +147,21 @@ export async function detectCopilotProvider(): Promise<DetectedProvider | null> 
     source: 'GitHub CLI',
     config: {
       ...defaults,
-      apiKey: token,
+      // Store a sentinel — never persist the real token to disk.
+      apiKey: GH_CLI_AUTH_SENTINEL,
     },
     displayName: `GitHub Copilot (${username})`,
   };
+}
+
+/**
+ * Fetch a fresh GitHub CLI token for the copilot provider.
+ *
+ * Call this at model creation time instead of using a stored token.
+ * Returns the token string, or null if `gh` is unavailable / not logged in.
+ */
+export async function refreshGitHubToken(): Promise<string | null> {
+  return detectGitHubToken();
 }
 
 // ---------------------------------------------------------------------------

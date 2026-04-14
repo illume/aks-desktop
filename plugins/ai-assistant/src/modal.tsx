@@ -39,6 +39,7 @@ const OPERATION_TYPES = {
   DELETION: 'deletion',
   GENERIC: 'operation',
 } as const;
+import { GH_CLI_AUTH_SENTINEL, refreshGitHubToken } from './utils/providerAutoDetect';
 import {
   getActiveConfig,
   getSavedConfigurations,
@@ -303,24 +304,45 @@ export default function AIPrompt(props: {
   React.useEffect(() => {
     // Recreate the manager whenever pluginSettings change (including tool settings)
     // or when activeConfig/selectedModel changes
-    if (activeConfig) {
+    if (!activeConfig) return;
+
+    const initManager = async () => {
       try {
         // Create config with selected model
-        const configWithModel = {
+        const configWithModel: Record<string, any> = {
           ...activeConfig.config,
           model: selectedModel,
         };
+
+        // If the copilot provider was auto-detected via `gh` CLI, the persisted
+        // config holds a sentinel instead of the real token. Resolve it once
+        // from `gh auth token` — the token stays in memory only.
+        if (
+          activeConfig.providerId === 'copilot' &&
+          configWithModel.apiKey === GH_CLI_AUTH_SENTINEL
+        ) {
+          const freshToken = await refreshGitHubToken();
+          if (!freshToken) {
+            setApiError(
+              'GitHub CLI token could not be retrieved. Run `gh auth login` or set a PAT in settings.'
+            );
+            return;
+          }
+          configWithModel.apiKey = freshToken;
+        }
+
         const newManager = new LangChainManager(
           activeConfig.providerId,
           configWithModel,
           enabledTools
         );
         setAiManager(newManager);
-        return;
       } catch (error) {
         setApiError(`Failed to initialize AI model: ${error.message}`);
       }
-    }
+    };
+
+    initManager();
   }, [enabledTools, activeConfig, selectedModel]);
 
   React.useEffect(() => {

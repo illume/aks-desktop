@@ -172,7 +172,9 @@ export default class LangChainManager extends AIManager {
         }
         case 'copilot': {
           if (!sanitizedConfig.apiKey) {
-            throw new Error('GitHub Personal Access Token is required for GitHub Copilot');
+            throw new Error(
+              'GitHub token is required for GitHub Copilot. Use a PAT or log in with `gh auth login`.'
+            );
           }
           return new ChatOpenAI({
             apiKey: sanitizedConfig.apiKey,

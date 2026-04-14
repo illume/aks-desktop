@@ -99,6 +99,57 @@ describe('providerAutoDetect', () => {
     });
   });
 
+  describe('detectCopilotProvider — token security', () => {
+    it('stores sentinel instead of real token in config', async () => {
+      const fakeToken = 'ghp_' + 'a'.repeat(36);
+      mockPluginRunCommand.mockReturnValue({
+        stdout: {
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken),
+        },
+        stderr: { on: vi.fn() },
+        on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
+      });
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ login: 'testuser' }),
+      } as Response);
+
+      const { detectCopilotProvider, GH_CLI_AUTH_SENTINEL } = await import('./providerAutoDetect');
+      const provider = await detectCopilotProvider();
+
+      expect(provider).not.toBeNull();
+      expect(provider!.config.apiKey).toBe(GH_CLI_AUTH_SENTINEL);
+      // The real token must NOT appear in the persisted config
+      expect(provider!.config.apiKey).not.toBe(fakeToken);
+    });
+  });
+
+  describe('refreshGitHubToken', () => {
+    it('returns a fresh token from gh CLI', async () => {
+      const fakeToken = 'ghp_' + 'b'.repeat(36);
+      mockPluginRunCommand.mockReturnValue({
+        stdout: {
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken),
+        },
+        stderr: { on: vi.fn() },
+        on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
+      });
+
+      const { refreshGitHubToken } = await import('./providerAutoDetect');
+      const token = await refreshGitHubToken();
+      expect(token).toBe(fakeToken);
+    });
+
+    it('returns null when gh is not available', async () => {
+      (globalThis as any).pluginRunCommand = undefined;
+
+      const { refreshGitHubToken } = await import('./providerAutoDetect');
+      const token = await refreshGitHubToken();
+      expect(token).toBeNull();
+    });
+  });
+
   describe('detectOllamaProvider', () => {
     it('returns provider when Ollama is running with models', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
