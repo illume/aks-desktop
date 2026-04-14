@@ -98,11 +98,14 @@ This document compares the available approaches for integrating GitHub Copilot c
 
 ---
 
-## Option 5: Azure OpenAI via `az` CLI (Azure AI detection)
+## Option 5: Azure OpenAI via `az` CLI (Azure AI detection) ✅ Implemented
+
+**Status:** Implemented as auto-detection in `providerAutoDetect.ts`
 
 **How it works:**
 - Detect Azure CLI (`az`) and check for existing Azure OpenAI deployments
 - Query `az cognitiveservices account list` to find Azure OpenAI resources
+- For each resource, query deployments and retrieve API keys automatically
 - Auto-populate the Azure OpenAI provider config with detected endpoints and deployments
 
 **Pros:**
@@ -114,11 +117,14 @@ This document compares the available approaches for integrating GitHub Copilot c
 - Requires Azure CLI installed and logged in
 - Only works for Azure OpenAI, not other providers
 - Requires listing and selecting from potentially many Azure resources
+- Uses the first resource/deployment found (user can change in settings)
 
-**Detection:**
-- Run `az account show` to check login status
-- Run `az cognitiveservices account list --query "[?kind=='OpenAI']"` to find OpenAI resources
-- For each resource, run `az cognitiveservices account deployment list` to find model deployments
+**Detection Flow:**
+1. Run `az account show` to check login status
+2. Run `az cognitiveservices account list --query "[?kind=='OpenAI']"` to find OpenAI resources
+3. For each resource, run `az cognitiveservices account deployment list` to find model deployments
+4. Run `az cognitiveservices account keys list` to retrieve an API key
+5. Pre-fill the Azure OpenAI provider with detected endpoint, deployment name, model, and API key
 
 ---
 
@@ -147,11 +153,21 @@ This document compares the available approaches for integrating GitHub Copilot c
 
 The implemented approach detects providers in this priority order:
 
-1. **GitHub CLI (`gh auth token`)** → Auto-detect GitHub Models API access
-2. **Ollama (`localhost:11434`)** → Auto-detect local models
-3. **(Future) Azure CLI (`az`)** → Auto-detect Azure OpenAI deployments
+1. **GitHub CLI (`gh auth token`)** → Auto-detect GitHub Models API access ✅
+2. **Azure CLI (`az cognitiveservices`)** → Auto-detect Azure OpenAI deployments ✅
+3. **Ollama (`localhost:11434`)** → Auto-detect local models ✅
 
 When detected, a dialog shows the user what was found and lets them confirm with a single click, adding the detected configuration to their saved providers.
+
+### Using `gh auth token` for the GitHub Models API
+
+The `gh` CLI token obtained via `gh auth token` works directly with the GitHub Models API (`https://models.inference.ai.azure.com`). This is how the copilot provider auto-detection works:
+
+1. Run `gh auth token` to get the user's GitHub CLI session token
+2. Validate the token against `https://api.github.com/user`
+3. Use the same token as the API key for `ChatOpenAI` with `baseURL: 'https://models.inference.ai.azure.com'`
+
+The GitHub Models API accepts standard GitHub PATs (Personal Access Tokens) and CLI tokens for authentication. The token from `gh auth token` is the same format and works identically — no special scopes or permissions beyond the user's existing Copilot subscription are needed.
 
 ### Detection Flow
 
@@ -163,6 +179,11 @@ App Launch
   │     │     │     ├── Valid → Show "GitHub Copilot detected" dialog
   │     │     │     └── Invalid → Skip
   │     │     └── No token → Skip
+  │     ├── Try `az account show`
+  │     │     ├── Logged in → List Azure OpenAI resources
+  │     │     │     ├── Resources found → Get deployments + keys → Show "Azure OpenAI detected"
+  │     │     │     └── No resources → Skip
+  │     │     └── Not logged in → Skip
   │     └── No → Try Ollama HTTP check only
   ├── Try Ollama at localhost:11434
   │     ├── Running → Show "Local models detected" dialog

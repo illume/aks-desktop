@@ -18,7 +18,9 @@ describe('providerAutoDetect', () => {
     it('returns token when gh auth token succeeds', async () => {
       const fakeToken = 'ghp_' + 'a'.repeat(36);
       mockPluginRunCommand.mockReturnValue({
-        stdout: { on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken) },
+        stdout: {
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken),
+        },
         stderr: { on: vi.fn() },
         on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
       });
@@ -41,8 +43,7 @@ describe('providerAutoDetect', () => {
       mockPluginRunCommand.mockReturnValue({
         stdout: { on: vi.fn() },
         stderr: {
-          on: (evt: string, cb: (data: string) => void) =>
-            evt === 'data' && cb('not logged in'),
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb('not logged in'),
         },
         on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(1),
       });
@@ -140,7 +141,9 @@ describe('providerAutoDetect', () => {
       // Mock that gh auth succeeds
       const fakeToken = 'ghp_' + 'a'.repeat(36);
       mockPluginRunCommand.mockReturnValue({
-        stdout: { on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken) },
+        stdout: {
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken),
+        },
         stderr: { on: vi.fn() },
         on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
       });
@@ -178,6 +181,163 @@ describe('providerAutoDetect', () => {
       const result = await detectProviders([]);
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('detectAzureOpenAIProvider', () => {
+    /**
+     * Helper: set up mockPluginRunCommand to respond differently
+     * depending on the command/args it receives.
+     */
+    function setupAzMock(responses: Record<string, { stdout: string; stderr: string }>) {
+      mockPluginRunCommand.mockImplementation((command: string, args: string[]) => {
+        const key = [command, ...args].join(' ');
+        // Find the first registered key that appears as a prefix of the actual key
+        const match = Object.keys(responses).find(k => key.startsWith(k));
+        const resp = match ? responses[match] : { stdout: '', stderr: 'unknown command' };
+        return {
+          stdout: {
+            on: (evt: string, cb: (data: string) => void) => {
+              if (evt === 'data' && resp.stdout) cb(resp.stdout);
+            },
+          },
+          stderr: {
+            on: (evt: string, cb: (data: string) => void) => {
+              if (evt === 'data' && resp.stderr) cb(resp.stderr);
+            },
+          },
+          on: (evt: string, cb: (code: number) => void) => {
+            if (evt === 'exit') cb(resp.stderr ? 1 : 0);
+          },
+        };
+      });
+    }
+
+    it('returns provider when Azure CLI is logged in with OpenAI resources', async () => {
+      const accountJson = JSON.stringify({
+        name: 'My Subscription',
+        user: { name: 'user@example.com' },
+      });
+      const resourcesJson = JSON.stringify([
+        {
+          name: 'my-openai',
+          kind: 'OpenAI',
+          resourceGroup: 'my-rg',
+          properties: { endpoint: 'https://my-openai.openai.azure.com/' },
+        },
+      ]);
+      const deploymentsJson = JSON.stringify([
+        {
+          name: 'gpt4-deploy',
+          properties: { model: { name: 'gpt-4' } },
+        },
+      ]);
+      const keysJson = JSON.stringify({ key1: 'azure-key-123', key2: 'azure-key-456' });
+
+      setupAzMock({
+        'az account show': { stdout: accountJson, stderr: '' },
+        'az cognitiveservices account list': { stdout: resourcesJson, stderr: '' },
+        'az cognitiveservices account deployment list': { stdout: deploymentsJson, stderr: '' },
+        'az cognitiveservices account keys list': { stdout: keysJson, stderr: '' },
+      });
+
+      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const provider = await detectAzureOpenAIProvider();
+
+      expect(provider).not.toBeNull();
+      expect(provider!.providerId).toBe('azure');
+      expect(provider!.source).toBe('Azure CLI');
+      expect(provider!.config.apiKey).toBe('azure-key-123');
+      expect(provider!.config.endpoint).toBe('https://my-openai.openai.azure.com/');
+      expect(provider!.config.deploymentName).toBe('gpt4-deploy');
+      expect(provider!.config.model).toBe('gpt-4');
+      expect(provider!.displayName).toBe('Azure OpenAI (my-openai)');
+    });
+
+    it('returns null when Azure CLI is not logged in', async () => {
+      setupAzMock({
+        'az account show': { stdout: '', stderr: 'Please run az login' },
+      });
+
+      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const provider = await detectAzureOpenAIProvider();
+      expect(provider).toBeNull();
+    });
+
+    it('returns null when no Azure OpenAI resources exist', async () => {
+      const accountJson = JSON.stringify({ name: 'Sub' });
+
+      setupAzMock({
+        'az account show': { stdout: accountJson, stderr: '' },
+        'az cognitiveservices account list': { stdout: '[]', stderr: '' },
+      });
+
+      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const provider = await detectAzureOpenAIProvider();
+      expect(provider).toBeNull();
+    });
+
+    it('returns null when no deployments exist', async () => {
+      const accountJson = JSON.stringify({ name: 'Sub' });
+      const resourcesJson = JSON.stringify([
+        {
+          name: 'my-openai',
+          kind: 'OpenAI',
+          resourceGroup: 'my-rg',
+          properties: { endpoint: 'https://my-openai.openai.azure.com/' },
+        },
+      ]);
+
+      setupAzMock({
+        'az account show': { stdout: accountJson, stderr: '' },
+        'az cognitiveservices account list': { stdout: resourcesJson, stderr: '' },
+        'az cognitiveservices account deployment list': { stdout: '[]', stderr: '' },
+      });
+
+      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const provider = await detectAzureOpenAIProvider();
+      expect(provider).toBeNull();
+    });
+
+    it('returns null when key retrieval fails', async () => {
+      const accountJson = JSON.stringify({ name: 'Sub' });
+      const resourcesJson = JSON.stringify([
+        {
+          name: 'my-openai',
+          kind: 'OpenAI',
+          resourceGroup: 'my-rg',
+          properties: { endpoint: 'https://my-openai.openai.azure.com/' },
+        },
+      ]);
+      const deploymentsJson = JSON.stringify([
+        { name: 'deploy', properties: { model: { name: 'gpt-4' } } },
+      ]);
+
+      setupAzMock({
+        'az account show': { stdout: accountJson, stderr: '' },
+        'az cognitiveservices account list': { stdout: resourcesJson, stderr: '' },
+        'az cognitiveservices account deployment list': { stdout: deploymentsJson, stderr: '' },
+        'az cognitiveservices account keys list': { stdout: '', stderr: 'Access denied' },
+      });
+
+      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const provider = await detectAzureOpenAIProvider();
+      expect(provider).toBeNull();
+    });
+
+    it('skips resources without endpoint or resourceGroup', async () => {
+      const accountJson = JSON.stringify({ name: 'Sub' });
+      // Resource missing endpoint
+      const resourcesJson = JSON.stringify([{ name: 'bad-resource', kind: 'OpenAI' }]);
+
+      setupAzMock({
+        'az account show': { stdout: accountJson, stderr: '' },
+        'az cognitiveservices account list': { stdout: resourcesJson, stderr: '' },
+      });
+
+      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const provider = await detectAzureOpenAIProvider();
+      expect(provider).toBeNull();
     });
   });
 });

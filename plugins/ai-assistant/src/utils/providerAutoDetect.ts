@@ -189,6 +189,186 @@ export async function detectOllamaProvider(): Promise<DetectedProvider | null> {
 }
 
 // ---------------------------------------------------------------------------
+// Azure OpenAI detection via `az` CLI
+// ---------------------------------------------------------------------------
+
+interface AzureOpenAIAccount {
+  name: string;
+  properties?: {
+    endpoint?: string;
+  };
+  resourceGroup?: string;
+}
+
+interface AzureOpenAIDeployment {
+  name: string;
+  properties?: {
+    model?: {
+      name?: string;
+    };
+  };
+}
+
+/**
+ * Check whether the Azure CLI is logged in by running `az account show`.
+ * Returns the subscription display name, or null if not logged in.
+ */
+async function checkAzureLogin(): Promise<string | null> {
+  const { stdout, stderr } = await runDetectCommand('az', ['account', 'show', '-o', 'json']);
+  if (stderr || !stdout) {
+    return null;
+  }
+  try {
+    const account = JSON.parse(stdout);
+    return account.name || account.user?.name || 'Azure';
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * List Azure OpenAI (Cognitive Services) accounts in the current subscription.
+ * Uses `az cognitiveservices account list` filtered to `kind == OpenAI`.
+ */
+async function listAzureOpenAIAccounts(): Promise<AzureOpenAIAccount[]> {
+  const { stdout, stderr } = await runDetectCommand('az', [
+    'cognitiveservices',
+    'account',
+    'list',
+    '--query',
+    "[?kind=='OpenAI']",
+    '-o',
+    'json',
+  ]);
+  if (stderr || !stdout) {
+    return [];
+  }
+  try {
+    const accounts: AzureOpenAIAccount[] = JSON.parse(stdout);
+    return Array.isArray(accounts) ? accounts : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * List model deployments for a specific Azure OpenAI resource.
+ */
+async function listAzureOpenAIDeployments(
+  resourceGroup: string,
+  accountName: string
+): Promise<AzureOpenAIDeployment[]> {
+  const { stdout, stderr } = await runDetectCommand('az', [
+    'cognitiveservices',
+    'account',
+    'deployment',
+    'list',
+    '-g',
+    resourceGroup,
+    '-n',
+    accountName,
+    '-o',
+    'json',
+  ]);
+  if (stderr || !stdout) {
+    return [];
+  }
+  try {
+    const deployments: AzureOpenAIDeployment[] = JSON.parse(stdout);
+    return Array.isArray(deployments) ? deployments : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Retrieve an API key for an Azure OpenAI resource.
+ */
+async function getAzureOpenAIKey(
+  resourceGroup: string,
+  accountName: string
+): Promise<string | null> {
+  const { stdout, stderr } = await runDetectCommand('az', [
+    'cognitiveservices',
+    'account',
+    'keys',
+    'list',
+    '-g',
+    resourceGroup,
+    '-n',
+    accountName,
+    '-o',
+    'json',
+  ]);
+  if (stderr || !stdout) {
+    return null;
+  }
+  try {
+    const keys = JSON.parse(stdout);
+    return keys.key1 || keys.key2 || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Detects whether the Azure CLI is logged in and finds Azure OpenAI
+ * resources with deployments. Returns a provider config for the first
+ * resource found, or null if none available.
+ */
+export async function detectAzureOpenAIProvider(): Promise<DetectedProvider | null> {
+  const subscriptionName = await checkAzureLogin();
+  if (!subscriptionName) {
+    return null;
+  }
+
+  const accounts = await listAzureOpenAIAccounts();
+  if (accounts.length === 0) {
+    return null;
+  }
+
+  // Use the first account that has an endpoint and a resource group
+  for (const account of accounts) {
+    const endpoint = account.properties?.endpoint;
+    const resourceGroup = account.resourceGroup;
+    if (!endpoint || !resourceGroup) {
+      continue;
+    }
+
+    // Get deployments for this account
+    const deployments = await listAzureOpenAIDeployments(resourceGroup, account.name);
+    if (deployments.length === 0) {
+      continue;
+    }
+
+    // Pick the first deployment
+    const deployment = deployments[0];
+    const deploymentName = deployment.name;
+    const modelName = deployment.properties?.model?.name || 'gpt-4';
+
+    // Get an API key
+    const apiKey = await getAzureOpenAIKey(resourceGroup, account.name);
+    if (!apiKey) {
+      continue;
+    }
+
+    return {
+      providerId: 'azure',
+      source: 'Azure CLI',
+      config: {
+        apiKey,
+        endpoint,
+        deploymentName,
+        model: modelName,
+      },
+      displayName: `Azure OpenAI (${account.name})`,
+    };
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -206,12 +386,14 @@ export async function detectProviders(
     existingProviders.some(p => p.providerId === providerId);
 
   // Run detections in parallel
-  const [copilot, ollama] = await Promise.all([
+  const [copilot, ollama, azure] = await Promise.all([
     hasProvider('copilot') ? Promise.resolve(null) : detectCopilotProvider(),
     hasProvider('local') ? Promise.resolve(null) : detectOllamaProvider(),
+    hasProvider('azure') ? Promise.resolve(null) : detectAzureOpenAIProvider(),
   ]);
 
   if (copilot) detected.push(copilot);
+  if (azure) detected.push(azure);
   if (ollama) detected.push(ollama);
 
   return detected;
