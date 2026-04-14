@@ -38,7 +38,10 @@ export interface DetectedProvider {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Commands and first-subcommand allowlist for runDetectCommand. */
+/**
+ * Allowlist of commands and their permitted first subcommands.
+ * Prevents arbitrary command execution via the pluginRunCommand bridge.
+ */
 const ALLOWED_COMMANDS: Record<string, string[]> = {
   gh: ['auth'],
   az: ['account', 'cognitiveservices'],

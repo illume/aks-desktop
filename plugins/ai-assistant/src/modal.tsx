@@ -343,15 +343,15 @@ export default function AIPrompt(props: {
           activeConfig.providerId === 'azure' &&
           configWithModel.apiKey === AZ_CLI_AUTH_SENTINEL
         ) {
-          const rg = configWithModel.azResourceGroup;
-          const acct = configWithModel.azAccountName;
-          if (!rg || !acct) {
+          const resourceGroup = configWithModel.azResourceGroup;
+          const accountName = configWithModel.azAccountName;
+          if (!resourceGroup || !accountName) {
             setApiError(
               'Azure OpenAI resource metadata missing. Re-run auto-detection or configure manually.'
             );
             return;
           }
-          const freshKey = await refreshAzureOpenAIKey(rg, acct);
+          const freshKey = await refreshAzureOpenAIKey(resourceGroup, accountName);
           if (!freshKey) {
             setApiError(
               'Azure OpenAI API key could not be retrieved. Run `az login` or set the key in settings.'
