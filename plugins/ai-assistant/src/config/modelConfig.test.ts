@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getDefaultConfig, getProviderById, getProviderFields, modelProviders } from './modelConfig';
+import {
+  getDefaultConfig,
+  getProviderById,
+  getProviderFields,
+  modelProviders,
+} from './modelConfig';
 
 describe('modelConfig', () => {
   describe('copilot provider', () => {

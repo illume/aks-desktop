@@ -31,6 +31,7 @@ import {
   getClustersFromHeadlampConfig,
 } from './agent/aksAgentManager';
 import { ModelSelector } from './components';
+import DetectedProvidersDialog from './components/settings/DetectedProvidersDialog';
 import { getDefaultConfig } from './config/modelConfig';
 import { isTestModeCheck } from './helper';
 import AIPrompt from './modal';
@@ -42,10 +43,13 @@ import {
   useGlobalState,
   usePluginConfig,
 } from './utils';
+import type { DetectedProvider } from './utils/providerAutoDetect';
+import { detectProviders } from './utils/providerAutoDetect';
 import {
   getActiveConfig,
   getSavedConfigurations,
   SavedConfigurations,
+  saveProviderConfig,
 } from './utils/ProviderConfigManager';
 import { getAllAvailableTools, isToolEnabled, toggleTool } from './utils/ToolConfigManager';
 
@@ -150,14 +154,69 @@ function HeadlampAIPrompt() {
   const [showPopover, setShowPopover] = React.useState(false);
   const theme = useTheme();
 
+  // Auto-detection state
+  const [detectedProviders, setDetectedProviders] = React.useState<DetectedProvider[]>([]);
+  const [showDetectedDialog, setShowDetectedDialog] = React.useState(false);
+  const [hasRunAutoDetect, setHasRunAutoDetect] = React.useState(false);
+
   const previewEnabled = savedConfigs?.previewEnabled ?? false;
   const hasShownPopover = savedConfigs?.configPopoverShown || false;
+  const hasDetectionBeenDismissed = savedConfigs?.autoDetectDismissed || false;
 
   const savedConfigData = React.useMemo(() => {
     return getSavedConfigurations(savedConfigs);
   }, [savedConfigs]);
 
   const hasAnyValidConfig = savedConfigData.providers && savedConfigData.providers.length > 0;
+
+  // Auto-detect AI providers when preview is enabled and no providers are configured
+  React.useEffect(() => {
+    if (hasRunAutoDetect || hasDetectionBeenDismissed || hasAnyValidConfig || !previewEnabled) {
+      return;
+    }
+    setHasRunAutoDetect(true);
+
+    detectProviders(savedConfigData.providers).then(detected => {
+      if (detected.length > 0) {
+        setDetectedProviders(detected);
+        setShowDetectedDialog(true);
+      }
+    });
+  }, [
+    hasRunAutoDetect,
+    hasDetectionBeenDismissed,
+    hasAnyValidConfig,
+    previewEnabled,
+    savedConfigData.providers,
+  ]);
+
+  const handleDetectedConfirm = (selected: DetectedProvider[]) => {
+    setShowDetectedDialog(false);
+    let configs: SavedConfigurations = getSavedConfigurations(savedConfigs);
+    for (const provider of selected) {
+      configs = saveProviderConfig(
+        configs,
+        provider.providerId,
+        provider.config,
+        configs.providers.length === 0, // Make first one default
+        provider.displayName
+      );
+    }
+    // Mark terms as needing acceptance separately — just save the providers
+    pluginStore.update({
+      ...configs,
+      autoDetectDismissed: true,
+    });
+  };
+
+  const handleDetectedDismiss = () => {
+    setShowDetectedDialog(false);
+    const currentConf = pluginStore.get() || {};
+    pluginStore.update({
+      ...currentConf,
+      autoDetectDismissed: true,
+    });
+  };
 
   // Run AKS cluster check once on mount so results are ready before the panel opens
   React.useEffect(() => {
@@ -309,6 +368,13 @@ function HeadlampAIPrompt() {
           </Button>
         </Paper>
       </Popper>
+
+      <DetectedProvidersDialog
+        open={showDetectedDialog}
+        detectedProviders={detectedProviders}
+        onConfirm={handleDetectedConfirm}
+        onDismiss={handleDetectedDismiss}
+      />
     </Box>
   );
 }
