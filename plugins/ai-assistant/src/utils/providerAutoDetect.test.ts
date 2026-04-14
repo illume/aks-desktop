@@ -292,13 +292,20 @@ describe('providerAutoDetect', () => {
         'az cognitiveservices account keys list': { stdout: keysJson, stderr: '' },
       });
 
-      const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
+      const { detectAzureOpenAIProvider, AZ_CLI_AUTH_SENTINEL } = await import(
+        './providerAutoDetect'
+      );
       const provider = await detectAzureOpenAIProvider();
 
       expect(provider).not.toBeNull();
       expect(provider!.providerId).toBe('azure');
       expect(provider!.source).toBe('Azure CLI');
-      expect(provider!.config.apiKey).toBe('azure-key-123');
+      // Sentinel stored instead of real key
+      expect(provider!.config.apiKey).toBe(AZ_CLI_AUTH_SENTINEL);
+      expect(provider!.config.apiKey).not.toBe('azure-key-123');
+      // Metadata for re-fetching the key
+      expect(provider!.config.azResourceGroup).toBe('my-rg');
+      expect(provider!.config.azAccountName).toBe('my-openai');
       expect(provider!.config.endpoint).toBe('https://my-openai.openai.azure.com/');
       expect(provider!.config.deploymentName).toBe('gpt4-deploy');
       expect(provider!.config.model).toBe('gpt-4');
@@ -389,6 +396,37 @@ describe('providerAutoDetect', () => {
       const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
       const provider = await detectAzureOpenAIProvider();
       expect(provider).toBeNull();
+    });
+  });
+
+  describe('refreshAzureOpenAIKey', () => {
+    it('returns a fresh key from az CLI', async () => {
+      const keysJson = JSON.stringify({ key1: 'fresh-azure-key', key2: 'key2' });
+      mockPluginRunCommand.mockImplementation(() => ({
+        stdout: {
+          on: (evt: string, cb: (d: string) => void) => evt === 'data' && cb(keysJson),
+        },
+        stderr: { on: vi.fn() },
+        on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
+      }));
+
+      const { refreshAzureOpenAIKey } = await import('./providerAutoDetect');
+      const key = await refreshAzureOpenAIKey('my-rg', 'my-openai');
+      expect(key).toBe('fresh-azure-key');
+    });
+
+    it('returns null when az CLI fails', async () => {
+      mockPluginRunCommand.mockImplementation(() => ({
+        stdout: { on: vi.fn() },
+        stderr: {
+          on: (evt: string, cb: (d: string) => void) => evt === 'data' && cb('Access denied'),
+        },
+        on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(1),
+      }));
+
+      const { refreshAzureOpenAIKey } = await import('./providerAutoDetect');
+      const key = await refreshAzureOpenAIKey('my-rg', 'my-openai');
+      expect(key).toBeNull();
     });
   });
 });

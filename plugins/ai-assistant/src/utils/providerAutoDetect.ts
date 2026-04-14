@@ -10,6 +10,17 @@ import type { StoredProviderConfig } from './ProviderConfigManager';
 export const GH_CLI_AUTH_SENTINEL = '__gh_cli__';
 
 /**
+ * Sentinel value stored in config.apiKey for the azure provider
+ * when it was auto-detected via `az cognitiveservices account keys list`.
+ * The actual key is never persisted — it is fetched fresh from the CLI
+ * at model creation time via {@link refreshAzureOpenAIKey}.
+ *
+ * When this sentinel is used, `config.azResourceGroup` and
+ * `config.azAccountName` are also stored so the key can be re-fetched.
+ */
+export const AZ_CLI_AUTH_SENTINEL = '__az_cli__';
+
+/**
  * Represents a detected AI provider that can be auto-configured.
  */
 export interface DetectedProvider {
@@ -27,14 +38,37 @@ export interface DetectedProvider {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** Commands and first-subcommand allowlist for runDetectCommand. */
+const ALLOWED_COMMANDS: Record<string, string[]> = {
+  gh: ['auth'],
+  az: ['account', 'cognitiveservices'],
+};
+
+/** Maximum time (ms) to wait for a CLI command before timing out. */
+const DETECT_COMMAND_TIMEOUT_MS = 15_000;
+
 /**
- * Run a command via pluginRunCommand (Headlamp's Electron bridge).
- * Returns stdout/stderr. Always resolves — never rejects.
+ * Run an allow-listed command via pluginRunCommand (Headlamp's Electron
+ * bridge). Returns { stdout, exitCode }. Always resolves — never rejects.
+ *
+ * Only commands registered in {@link ALLOWED_COMMANDS} are executed; any
+ * other command resolves immediately with an error. A hard timeout ensures
+ * hung processes don't stall auto-detection indefinitely.
  */
 function runDetectCommand(
   command: string,
   args: string[]
-): Promise<{ stdout: string; stderr: string }> {
+): Promise<{ stdout: string; exitCode: number }> {
+  // Validate against allowlist
+  const allowedSubs = ALLOWED_COMMANDS[command];
+  if (!allowedSubs) {
+    return Promise.resolve({ stdout: '', exitCode: 1 });
+  }
+  const firstSub = args[0];
+  if (firstSub && !allowedSubs.includes(firstSub)) {
+    return Promise.resolve({ stdout: '', exitCode: 1 });
+  }
+
   // pluginRunCommand is a runtime global injected by Headlamp desktop.
   // eslint-disable-next-line no-undef
   const pluginRunCommand: any = (globalThis as any).pluginRunCommand;
@@ -42,38 +76,41 @@ function runDetectCommand(
   return new Promise(resolve => {
     try {
       if (typeof pluginRunCommand !== 'function') {
-        resolve({ stdout: '', stderr: 'pluginRunCommand is not available.' });
+        resolve({ stdout: '', exitCode: 1 });
         return;
       }
 
       const cmd = pluginRunCommand(command, args, {});
 
       let stdout = '';
-      let stderr = '';
       let resolved = false;
 
-      const done = (result: { stdout: string; stderr: string }) => {
+      const done = (result: { stdout: string; exitCode: number }) => {
         if (!resolved) {
           resolved = true;
           resolve(result);
         }
       };
 
+      // Hard timeout so a hanging CLI never stalls detection.
+      const timer = setTimeout(() => {
+        done({ stdout: '', exitCode: 1 });
+      }, DETECT_COMMAND_TIMEOUT_MS);
+
       cmd.stdout.on('data', (data: string) => (stdout += data));
-      cmd.stderr.on('data', (data: string) => (stderr += data));
+      // stderr is intentionally ignored — many CLIs (notably `az`) emit
+      // warnings on stderr even on success. We key off exitCode instead.
+      cmd.stderr.on('data', () => {});
       cmd.on('exit', (code: number) => {
-        if (code !== 0 && !stderr) {
-          stderr = `Command exited with code ${code}`;
-        }
-        done({ stdout, stderr });
+        clearTimeout(timer);
+        done({ stdout, exitCode: code });
       });
-      cmd.on('error', (errOrCode: unknown) => {
-        const msg = errOrCode instanceof Error ? errOrCode.message : String(errOrCode);
-        done({ stdout: '', stderr: `Command execution error: ${msg}` });
+      cmd.on('error', () => {
+        clearTimeout(timer);
+        done({ stdout: '', exitCode: 1 });
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      resolve({ stdout: '', stderr: `Failed to execute command: ${message}` });
+    } catch {
+      resolve({ stdout: '', exitCode: 1 });
     }
   });
 }
@@ -87,8 +124,8 @@ function runDetectCommand(
  * Returns the token string if available, or null.
  */
 export async function detectGitHubToken(): Promise<string | null> {
-  const { stdout, stderr } = await runDetectCommand('gh', ['auth', 'token']);
-  if (stderr || !stdout) {
+  const { stdout, exitCode } = await runDetectCommand('gh', ['auth', 'token']);
+  if (exitCode !== 0 || !stdout) {
     return null;
   }
   const token = stdout.trim();
@@ -176,14 +213,13 @@ interface OllamaModel {
  * Detects whether Ollama is running locally and returns available models.
  */
 export async function detectOllamaProvider(): Promise<DetectedProvider | null> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2000);
 
+  try {
     const response = await fetch('http://localhost:11434/api/tags', {
       signal: controller.signal,
     });
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       return null;
@@ -209,6 +245,8 @@ export async function detectOllamaProvider(): Promise<DetectedProvider | null> {
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -238,8 +276,8 @@ interface AzureOpenAIDeployment {
  * Returns the subscription display name, or null if not logged in.
  */
 async function checkAzureLogin(): Promise<string | null> {
-  const { stdout, stderr } = await runDetectCommand('az', ['account', 'show', '-o', 'json']);
-  if (stderr || !stdout) {
+  const { stdout, exitCode } = await runDetectCommand('az', ['account', 'show', '-o', 'json']);
+  if (exitCode !== 0 || !stdout) {
     return null;
   }
   try {
@@ -255,7 +293,7 @@ async function checkAzureLogin(): Promise<string | null> {
  * Uses `az cognitiveservices account list` filtered to `kind == OpenAI`.
  */
 async function listAzureOpenAIAccounts(): Promise<AzureOpenAIAccount[]> {
-  const { stdout, stderr } = await runDetectCommand('az', [
+  const { stdout, exitCode } = await runDetectCommand('az', [
     'cognitiveservices',
     'account',
     'list',
@@ -264,7 +302,7 @@ async function listAzureOpenAIAccounts(): Promise<AzureOpenAIAccount[]> {
     '-o',
     'json',
   ]);
-  if (stderr || !stdout) {
+  if (exitCode !== 0 || !stdout) {
     return [];
   }
   try {
@@ -282,7 +320,7 @@ async function listAzureOpenAIDeployments(
   resourceGroup: string,
   accountName: string
 ): Promise<AzureOpenAIDeployment[]> {
-  const { stdout, stderr } = await runDetectCommand('az', [
+  const { stdout, exitCode } = await runDetectCommand('az', [
     'cognitiveservices',
     'account',
     'deployment',
@@ -294,7 +332,7 @@ async function listAzureOpenAIDeployments(
     '-o',
     'json',
   ]);
-  if (stderr || !stdout) {
+  if (exitCode !== 0 || !stdout) {
     return [];
   }
   try {
@@ -312,7 +350,7 @@ async function getAzureOpenAIKey(
   resourceGroup: string,
   accountName: string
 ): Promise<string | null> {
-  const { stdout, stderr } = await runDetectCommand('az', [
+  const { stdout, exitCode } = await runDetectCommand('az', [
     'cognitiveservices',
     'account',
     'keys',
@@ -324,7 +362,7 @@ async function getAzureOpenAIKey(
     '-o',
     'json',
   ]);
-  if (stderr || !stdout) {
+  if (exitCode !== 0 || !stdout) {
     return null;
   }
   try {
@@ -339,6 +377,12 @@ async function getAzureOpenAIKey(
  * Detects whether the Azure CLI is logged in and finds Azure OpenAI
  * resources with deployments. Returns a provider config for the first
  * resource found, or null if none available.
+ *
+ * **Security:** The actual API key is NOT stored in the returned config.
+ * Instead, a sentinel value ({@link AZ_CLI_AUTH_SENTINEL}) is stored,
+ * together with `azResourceGroup` and `azAccountName` so the real key
+ * can be fetched fresh via {@link refreshAzureOpenAIKey} at model
+ * creation time.
  */
 export async function detectAzureOpenAIProvider(): Promise<DetectedProvider | null> {
   const subscriptionName = await checkAzureLogin();
@@ -370,7 +414,7 @@ export async function detectAzureOpenAIProvider(): Promise<DetectedProvider | nu
     const deploymentName = deployment.name;
     const modelName = deployment.properties?.model?.name || 'gpt-4';
 
-    // Get an API key
+    // Verify we can actually get an API key (validates permissions)
     const apiKey = await getAzureOpenAIKey(resourceGroup, account.name);
     if (!apiKey) {
       continue;
@@ -380,7 +424,11 @@ export async function detectAzureOpenAIProvider(): Promise<DetectedProvider | nu
       providerId: 'azure',
       source: 'Azure CLI',
       config: {
-        apiKey,
+        // Store sentinel — never persist the real key to disk.
+        apiKey: AZ_CLI_AUTH_SENTINEL,
+        // Metadata needed to re-fetch the key at model creation time.
+        azResourceGroup: resourceGroup,
+        azAccountName: account.name,
         endpoint,
         deploymentName,
         model: modelName,
@@ -390,6 +438,20 @@ export async function detectAzureOpenAIProvider(): Promise<DetectedProvider | nu
   }
 
   return null;
+}
+
+/**
+ * Fetch a fresh Azure OpenAI API key from the `az` CLI.
+ *
+ * Call this at model creation time when config.apiKey is
+ * {@link AZ_CLI_AUTH_SENTINEL}. Returns the key string, or null
+ * if `az` is unavailable / permissions are insufficient.
+ */
+export async function refreshAzureOpenAIKey(
+  resourceGroup: string,
+  accountName: string
+): Promise<string | null> {
+  return getAzureOpenAIKey(resourceGroup, accountName);
 }
 
 // ---------------------------------------------------------------------------

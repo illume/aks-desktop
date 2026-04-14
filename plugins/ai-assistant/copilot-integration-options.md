@@ -194,6 +194,6 @@ App Launch
 ### Security Considerations
 
 - **GitHub CLI tokens are never written to disk.** When the copilot provider is auto-detected via `gh auth token`, a sentinel value (`__gh_cli__`) is stored in the plugin configuration instead of the real token. At model creation time the token is fetched once from `gh auth token` and kept in memory for the session. If the session is restarted, the token is re-fetched from the CLI.
-- **Manual PATs** — users can alternatively paste a GitHub Personal Access Token in the settings UI. PATs are stored in plugin configuration like other provider API keys.
+- **Azure OpenAI API keys are never written to disk.** When the Azure provider is auto-detected via `az cognitiveservices account keys list`, a sentinel value (`__az_cli__`) is stored along with the resource group and account name. At model creation time the key is fetched fresh from `az cognitiveservices account keys list` and kept in memory for the session.
+- **Manual PATs / API keys** — users can alternatively paste credentials in the settings UI. Manually entered keys are stored in plugin configuration like other provider API keys.
 - **Ollama detection** is a simple HTTP health check to localhost — no credentials involved.
-- **Azure OpenAI keys** are stored in plugin configuration after confirmation, same as other provider API keys.

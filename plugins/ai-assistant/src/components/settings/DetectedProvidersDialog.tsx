@@ -11,7 +11,7 @@ import {
   FormControlLabel,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getProviderById } from '../../config/modelConfig';
 import type { DetectedProvider } from '../../utils/providerAutoDetect';
 
@@ -32,6 +32,13 @@ export default function DetectedProvidersDialog({
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(detectedProviders.map((_, i) => i))
   );
+
+  // Reset selection whenever the dialog opens or detectedProviders changes
+  useEffect(() => {
+    if (open) {
+      setSelected(new Set(detectedProviders.map((_, i) => i)));
+    }
+  }, [open, detectedProviders]);
 
   const handleToggle = (index: number) => {
     setSelected(prev => {
@@ -68,52 +75,49 @@ export default function DetectedProvidersDialog({
         {detectedProviders.map((provider, index) => {
           const providerDef = getProviderById(provider.providerId);
           return (
-            <Box
+            <FormControlLabel
               key={`${provider.providerId}-${index}`}
+              control={
+                <Checkbox checked={selected.has(index)} onChange={() => handleToggle(index)} />
+              }
+              label={
+                <Box display="flex" alignItems="center">
+                  {providerDef && (
+                    <Icon
+                      icon={providerDef.icon}
+                      width="28px"
+                      height="28px"
+                      style={{ marginRight: 12, flexShrink: 0 }}
+                    />
+                  )}
+                  <Box>
+                    <Typography variant="body1" fontWeight="medium">
+                      {provider.displayName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('Detected via {{source}}', { source: provider.source })}
+                    </Typography>
+                  </Box>
+                </Box>
+              }
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                p: 1.5,
+                m: 0,
                 mb: 1,
+                p: 1.5,
                 border: '1px solid',
                 borderColor: selected.has(index) ? 'primary.main' : 'divider',
                 borderRadius: 1,
-                cursor: 'pointer',
                 transition: 'border-color 0.2s',
                 '&:hover': {
                   borderColor: 'primary.light',
                 },
+                '& .MuiFormControlLabel-label': {
+                  flex: 1,
+                },
               }}
-              onClick={() => handleToggle(index)}
-            >
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={selected.has(index)}
-                    onChange={() => handleToggle(index)}
-                    onClick={e => e.stopPropagation()}
-                  />
-                }
-                label=""
-                sx={{ mr: 0 }}
-              />
-              {providerDef && (
-                <Icon
-                  icon={providerDef.icon}
-                  width="28px"
-                  height="28px"
-                  style={{ marginRight: 12, flexShrink: 0 }}
-                />
-              )}
-              <Box>
-                <Typography variant="body1" fontWeight="medium">
-                  {provider.displayName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {t('Detected via {{source}}', { source: provider.source })}
-                </Typography>
-              </Box>
-            </Box>
+            />
           );
         })}
       </DialogContent>

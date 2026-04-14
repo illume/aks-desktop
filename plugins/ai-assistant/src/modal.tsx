@@ -39,7 +39,12 @@ const OPERATION_TYPES = {
   DELETION: 'deletion',
   GENERIC: 'operation',
 } as const;
-import { GH_CLI_AUTH_SENTINEL, refreshGitHubToken } from './utils/providerAutoDetect';
+import {
+  AZ_CLI_AUTH_SENTINEL,
+  GH_CLI_AUTH_SENTINEL,
+  refreshAzureOpenAIKey,
+  refreshGitHubToken,
+} from './utils/providerAutoDetect';
 import {
   getActiveConfig,
   getSavedConfigurations,
@@ -329,6 +334,31 @@ export default function AIPrompt(props: {
             return;
           }
           configWithModel.apiKey = freshToken;
+        }
+
+        // If the Azure provider was auto-detected via `az` CLI, the persisted
+        // config holds a sentinel instead of the real API key. Resolve it once
+        // from `az cognitiveservices account keys list` — the key stays in memory only.
+        if (
+          activeConfig.providerId === 'azure' &&
+          configWithModel.apiKey === AZ_CLI_AUTH_SENTINEL
+        ) {
+          const rg = configWithModel.azResourceGroup;
+          const acct = configWithModel.azAccountName;
+          if (!rg || !acct) {
+            setApiError(
+              'Azure OpenAI resource metadata missing. Re-run auto-detection or configure manually.'
+            );
+            return;
+          }
+          const freshKey = await refreshAzureOpenAIKey(rg, acct);
+          if (!freshKey) {
+            setApiError(
+              'Azure OpenAI API key could not be retrieved. Run `az login` or set the key in settings.'
+            );
+            return;
+          }
+          configWithModel.apiKey = freshKey;
         }
 
         const newManager = new LangChainManager(
