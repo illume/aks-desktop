@@ -20,8 +20,24 @@ export interface DetectedProvider {
 // ---------------------------------------------------------------------------
 
 /**
+ * Allowed commands for provider auto-detection.
+ * Only `gh` (GitHub CLI) and `az` (Azure CLI) are permitted.
+ */
+const ALLOWED_DETECT_COMMANDS = new Set(['gh', 'az']);
+
+/**
+ * Allowed first-level subcommands for each CLI.
+ */
+const ALLOWED_SUBCOMMANDS: Record<string, Set<string>> = {
+  gh: new Set(['auth']),
+  az: new Set(['account', 'cognitiveservices']),
+};
+
+/**
  * Run a command via pluginRunCommand (Headlamp's Electron bridge).
  * Returns stdout/stderr. Always resolves — never rejects.
+ * Restricted to an allowlist of commands and subcommands to prevent
+ * arbitrary execution.
  */
 function runDetectCommand(
   command: string,
@@ -33,6 +49,20 @@ function runDetectCommand(
 
   return new Promise(resolve => {
     try {
+      if (!ALLOWED_DETECT_COMMANDS.has(command)) {
+        resolve({ stdout: '', stderr: `Command not allowed: ${command}` });
+        return;
+      }
+
+      const allowedSubs = ALLOWED_SUBCOMMANDS[command];
+      if (allowedSubs && (args.length === 0 || !allowedSubs.has(args[0]))) {
+        resolve({
+          stdout: '',
+          stderr: `Subcommand not allowed: ${command} ${args[0] ?? '(none)'}`,
+        });
+        return;
+      }
+
       if (typeof pluginRunCommand !== 'function') {
         resolve({ stdout: '', stderr: 'pluginRunCommand is not available.' });
         return;
@@ -114,8 +144,28 @@ export async function validateGitHubToken(token: string): Promise<string | null>
 }
 
 /**
+ * Probe the GitHub Models inference endpoint to verify the token
+ * can actually call the Models API (not just authenticate to GitHub).
+ * Returns true if accessible, false otherwise.
+ */
+export async function probeGitHubModelsAccess(token: string): Promise<boolean> {
+  try {
+    const response = await fetch('https://models.inference.ai.azure.com/models', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Detects whether the GitHub CLI is authenticated and returns a
  * provider config for GitHub Copilot (GitHub Models API) if so.
+ * Validates both GitHub authentication and Models API access.
  */
 export async function detectCopilotProvider(): Promise<DetectedProvider | null> {
   const token = await detectGitHubToken();
@@ -125,6 +175,12 @@ export async function detectCopilotProvider(): Promise<DetectedProvider | null> 
 
   const username = await validateGitHubToken(token);
   if (!username) {
+    return null;
+  }
+
+  // Verify the token can actually access the GitHub Models API
+  const hasModelsAccess = await probeGitHubModelsAccess(token);
+  if (!hasModelsAccess) {
     return null;
   }
 

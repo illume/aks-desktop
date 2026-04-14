@@ -11,7 +11,7 @@ import {
   FormControlLabel,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getProviderById } from '../../config/modelConfig';
 import type { DetectedProvider } from '../../utils/providerAutoDetect';
 
@@ -32,6 +32,14 @@ export default function DetectedProvidersDialog({
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(detectedProviders.map((_, i) => i))
   );
+
+  // Sync selected indices when detectedProviders changes or dialog opens,
+  // since the component is mounted even when closed and providers start empty.
+  useEffect(() => {
+    if (open && detectedProviders.length > 0) {
+      setSelected(new Set(detectedProviders.map((_, i) => i)));
+    }
+  }, [open, detectedProviders]);
 
   const handleToggle = (index: number) => {
     setSelected(prev => {
@@ -92,6 +100,7 @@ export default function DetectedProvidersDialog({
                     checked={selected.has(index)}
                     onChange={() => handleToggle(index)}
                     onClick={e => e.stopPropagation()}
+                    inputProps={{ 'aria-label': provider.displayName }}
                   />
                 }
                 label=""
