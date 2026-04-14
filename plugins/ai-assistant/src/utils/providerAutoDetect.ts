@@ -1,5 +1,16 @@
+import { runCommand } from '@kinvolk/headlamp-plugin/lib';
 import { getDefaultConfig } from '../config/modelConfig';
 import type { StoredProviderConfig } from './ProviderConfigManager';
+
+/**
+ * pluginRunCommand is injected by Headlamp's plugin runner as a function-scope
+ * variable (via `new Function('pluginRunCommand', ..., pluginCode)`). Using
+ * `declare const` lets TypeScript + Webpack reference it as a free variable
+ * that resolves from the scope chain — NOT from globalThis.
+ *
+ * This must match the pattern used in aksAgentManager.ts.
+ */
+declare const pluginRunCommand: typeof runCommand;
 
 /**
  * Sentinel value stored in config.apiKey for the copilot provider
@@ -65,24 +76,34 @@ function runDetectCommand(
   // Validate against allowlist
   const allowedSubs = ALLOWED_COMMANDS[command];
   if (!allowedSubs) {
+    console.debug(`[ai-assistant auto-detect] command "${command}" not in allowlist, skipping`);
     return Promise.resolve({ stdout: '', exitCode: 1 });
   }
   const firstSub = args[0];
   if (firstSub && !allowedSubs.includes(firstSub)) {
+    console.debug(
+      `[ai-assistant auto-detect] subcommand "${firstSub}" not allowed for "${command}", skipping`
+    );
     return Promise.resolve({ stdout: '', exitCode: 1 });
   }
 
-  // pluginRunCommand is a runtime global injected by Headlamp desktop.
-  // eslint-disable-next-line no-undef
-  const pluginRunCommand: any = (globalThis as any).pluginRunCommand;
-
   return new Promise(resolve => {
     try {
-      if (typeof pluginRunCommand !== 'function') {
+      if (typeof pluginRunCommand === 'undefined') {
+        console.debug(
+          '[ai-assistant auto-detect] pluginRunCommand is undefined — not running in desktop mode'
+        );
         resolve({ stdout: '', exitCode: 1 });
         return;
       }
 
+      console.debug(
+        `[ai-assistant auto-detect] running: ${command} ${args.join(
+          ' '
+        )} (pluginRunCommand type: ${typeof pluginRunCommand})`
+      );
+
+      // @ts-ignore — pluginRunCommand type is narrower than what we call
       const cmd = pluginRunCommand(command, args, {});
 
       let stdout = '';
@@ -97,6 +118,11 @@ function runDetectCommand(
 
       // Hard timeout so a hanging CLI never stalls detection.
       const timer = setTimeout(() => {
+        console.debug(
+          `[ai-assistant auto-detect] timeout (${DETECT_COMMAND_TIMEOUT_MS}ms) for: ${command} ${args.join(
+            ' '
+          )}`
+        );
         done({ stdout: '', exitCode: 1 });
       }, DETECT_COMMAND_TIMEOUT_MS);
 
@@ -106,13 +132,20 @@ function runDetectCommand(
       cmd.stderr.on('data', () => {});
       cmd.on('exit', (code: number) => {
         clearTimeout(timer);
+        console.debug(
+          `[ai-assistant auto-detect] ${command} ${args.join(
+            ' '
+          )} exited with code ${code}, stdout length ${stdout.length}`
+        );
         done({ stdout, exitCode: code });
       });
-      cmd.on('error', () => {
+      cmd.on('error', (err: unknown) => {
         clearTimeout(timer);
+        console.debug(`[ai-assistant auto-detect] ${command} error:`, err);
         done({ stdout: '', exitCode: 1 });
       });
-    } catch {
+    } catch (e) {
+      console.debug('[ai-assistant auto-detect] runDetectCommand exception:', e);
       resolve({ stdout: '', exitCode: 1 });
     }
   });
@@ -127,15 +160,21 @@ function runDetectCommand(
  * Returns the token string if available, or null.
  */
 export async function detectGitHubToken(): Promise<string | null> {
+  console.debug('[ai-assistant auto-detect] checking GitHub CLI (gh auth token)...');
   const { stdout, exitCode } = await runDetectCommand('gh', ['auth', 'token']);
   if (exitCode !== 0 || !stdout) {
+    console.debug(
+      `[ai-assistant auto-detect] gh auth token failed: exitCode=${exitCode}, stdout="${stdout}"`
+    );
     return null;
   }
   const token = stdout.trim();
   // Basic sanity check — GitHub tokens are at least 30 characters
   if (token.length < 30) {
+    console.debug(`[ai-assistant auto-detect] gh token too short (${token.length} chars)`);
     return null;
   }
+  console.debug('[ai-assistant auto-detect] gh auth token succeeded');
   return token;
 }
 
@@ -171,15 +210,20 @@ export async function validateGitHubToken(token: string): Promise<string | null>
  * each time the model is created.
  */
 export async function detectCopilotProvider(): Promise<DetectedProvider | null> {
+  console.debug('[ai-assistant auto-detect] starting copilot provider detection...');
   const token = await detectGitHubToken();
   if (!token) {
+    console.debug('[ai-assistant auto-detect] no GitHub token — skipping copilot provider');
     return null;
   }
 
+  console.debug('[ai-assistant auto-detect] validating GitHub token...');
   const username = await validateGitHubToken(token);
   if (!username) {
+    console.debug('[ai-assistant auto-detect] GitHub token validation failed');
     return null;
   }
+  console.debug(`[ai-assistant auto-detect] GitHub token valid for user: ${username}`);
 
   const defaults = getDefaultConfig('copilot');
   return {
@@ -216,6 +260,7 @@ interface OllamaModel {
  * Detects whether Ollama is running locally and returns available models.
  */
 export async function detectOllamaProvider(): Promise<DetectedProvider | null> {
+  console.debug('[ai-assistant auto-detect] checking Ollama at localhost:11434...');
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 2000);
 
@@ -225,17 +270,22 @@ export async function detectOllamaProvider(): Promise<DetectedProvider | null> {
     });
 
     if (!response.ok) {
+      console.debug(`[ai-assistant auto-detect] Ollama returned status ${response.status}`);
       return null;
     }
 
     const data = await response.json();
     const models: OllamaModel[] = data.models || [];
     if (models.length === 0) {
+      console.debug('[ai-assistant auto-detect] Ollama running but no models found');
       return null;
     }
 
     // Pick the first available model as default
     const firstModel = models[0].name;
+    console.debug(
+      `[ai-assistant auto-detect] Ollama detected with ${models.length} model(s), using: ${firstModel}`
+    );
 
     return {
       providerId: 'local',
@@ -246,7 +296,8 @@ export async function detectOllamaProvider(): Promise<DetectedProvider | null> {
       },
       displayName: `Ollama (${firstModel})`,
     };
-  } catch {
+  } catch (e) {
+    console.debug('[ai-assistant auto-detect] Ollama not reachable:', e);
     return null;
   } finally {
     clearTimeout(timeoutId);
@@ -279,14 +330,21 @@ interface AzureOpenAIDeployment {
  * Returns the subscription display name, or null if not logged in.
  */
 async function checkAzureLogin(): Promise<string | null> {
+  console.debug('[ai-assistant auto-detect] checking Azure CLI login (az account show)...');
   const { stdout, exitCode } = await runDetectCommand('az', ['account', 'show', '-o', 'json']);
   if (exitCode !== 0 || !stdout) {
+    console.debug(
+      `[ai-assistant auto-detect] az account show failed: exitCode=${exitCode}, stdout="${stdout}"`
+    );
     return null;
   }
   try {
     const account = JSON.parse(stdout);
-    return account.name || account.user?.name || 'Azure';
-  } catch {
+    const name = account.name || account.user?.name || 'Azure';
+    console.debug(`[ai-assistant auto-detect] Azure CLI logged in: ${name}`);
+    return name;
+  } catch (e) {
+    console.debug('[ai-assistant auto-detect] az account show JSON parse error:', e);
     return null;
   }
 }
@@ -388,15 +446,19 @@ async function getAzureOpenAIKey(
  * creation time.
  */
 export async function detectAzureOpenAIProvider(): Promise<DetectedProvider | null> {
+  console.debug('[ai-assistant auto-detect] starting Azure OpenAI provider detection...');
   const subscriptionName = await checkAzureLogin();
   if (!subscriptionName) {
+    console.debug('[ai-assistant auto-detect] Azure CLI not logged in — skipping Azure provider');
     return null;
   }
 
   const accounts = await listAzureOpenAIAccounts();
   if (accounts.length === 0) {
+    console.debug('[ai-assistant auto-detect] no Azure OpenAI accounts found');
     return null;
   }
+  console.debug(`[ai-assistant auto-detect] found ${accounts.length} Azure OpenAI account(s)`);
 
   // Use the first account that has an endpoint and a resource group
   for (const account of accounts) {
@@ -468,22 +530,42 @@ export async function refreshAzureOpenAIKey(
 export async function detectProviders(
   existingProviders: StoredProviderConfig[]
 ): Promise<DetectedProvider[]> {
+  console.debug(
+    `[ai-assistant auto-detect] detectProviders called with ${existingProviders.length} existing provider(s):`,
+    existingProviders.map(p => p.providerId)
+  );
+  console.debug(
+    `[ai-assistant auto-detect] pluginRunCommand availability: ${typeof pluginRunCommand}`
+  );
+
   const detected: DetectedProvider[] = [];
 
   // Check if a provider type is already configured
   const hasProvider = (providerId: string) =>
     existingProviders.some(p => p.providerId === providerId);
 
+  const skipCopilot = hasProvider('copilot');
+  const skipLocal = hasProvider('local');
+  const skipAzure = hasProvider('azure');
+  console.debug(
+    `[ai-assistant auto-detect] skipping: copilot=${skipCopilot}, local=${skipLocal}, azure=${skipAzure}`
+  );
+
   // Run detections in parallel
   const [copilot, ollama, azure] = await Promise.all([
-    hasProvider('copilot') ? Promise.resolve(null) : detectCopilotProvider(),
-    hasProvider('local') ? Promise.resolve(null) : detectOllamaProvider(),
-    hasProvider('azure') ? Promise.resolve(null) : detectAzureOpenAIProvider(),
+    skipCopilot ? Promise.resolve(null) : detectCopilotProvider(),
+    skipLocal ? Promise.resolve(null) : detectOllamaProvider(),
+    skipAzure ? Promise.resolve(null) : detectAzureOpenAIProvider(),
   ]);
 
   if (copilot) detected.push(copilot);
   if (azure) detected.push(azure);
   if (ollama) detected.push(ollama);
+
+  console.debug(
+    `[ai-assistant auto-detect] detection complete: ${detected.length} provider(s) found`,
+    detected.map(p => `${p.providerId} (${p.source})`)
+  );
 
   return detected;
 }

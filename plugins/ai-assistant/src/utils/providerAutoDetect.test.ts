@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DetectedProvider } from './providerAutoDetect';
 
-// Mock globals before importing the module
+// Mock globals before importing the module.
+// `vi.stubGlobal` sets the variable on globalThis AND in the module scope
+// (via the test environment). This is needed because providerAutoDetect.ts
+// uses `declare const pluginRunCommand` which resolves from the scope chain.
 const mockPluginRunCommand = vi.fn();
 
 beforeEach(() => {
-  (globalThis as any).pluginRunCommand = mockPluginRunCommand;
+  vi.stubGlobal('pluginRunCommand', mockPluginRunCommand);
 });
 
 afterEach(() => {
-  delete (globalThis as any).pluginRunCommand;
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -31,8 +34,8 @@ describe('providerAutoDetect', () => {
     });
 
     it('returns null when gh is not available', async () => {
-      // pluginRunCommand not a function
-      (globalThis as any).pluginRunCommand = undefined;
+      // pluginRunCommand not available
+      vi.stubGlobal('pluginRunCommand', undefined);
 
       const { detectGitHubToken } = await import('./providerAutoDetect');
       const token = await detectGitHubToken();
@@ -142,7 +145,7 @@ describe('providerAutoDetect', () => {
     });
 
     it('returns null when gh is not available', async () => {
-      (globalThis as any).pluginRunCommand = undefined;
+      vi.stubGlobal('pluginRunCommand', undefined);
 
       const { refreshGitHubToken } = await import('./providerAutoDetect');
       const token = await refreshGitHubToken();

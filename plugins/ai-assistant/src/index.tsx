@@ -175,13 +175,24 @@ function HeadlampAIPrompt() {
   // the user has explicitly dismissed in a previous session.
   React.useEffect(() => {
     if (hasRunAutoDetect || !previewEnabled) {
+      console.debug(
+        `[ai-assistant auto-detect] useEffect skipped: hasRunAutoDetect=${hasRunAutoDetect}, previewEnabled=${previewEnabled}`
+      );
       return;
     }
+    console.debug(
+      `[ai-assistant auto-detect] starting auto-detection (${savedConfigData.providers.length} existing providers, ${dismissedProviderIds.length} dismissed)`
+    );
     setHasRunAutoDetect(true);
 
     detectProviders(savedConfigData.providers).then(detected => {
       // Filter out providers the user previously declined
       const newProviders = detected.filter(p => !dismissedProviderIds.includes(p.providerId));
+      console.debug(
+        `[ai-assistant auto-detect] ${detected.length} detected, ${
+          newProviders.length
+        } new (after filtering dismissed: ${dismissedProviderIds.join(', ') || 'none'})`
+      );
       if (newProviders.length > 0) {
         setDetectedProviders(newProviders);
         setShowDetectedDialog(true);
