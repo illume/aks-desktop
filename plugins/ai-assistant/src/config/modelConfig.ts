@@ -190,11 +190,12 @@ export const modelProviders: ModelProvider[] = [
     fields: [
       {
         name: 'apiKey',
-        label: 'GitHub Personal Access Token',
+        label: 'GitHub Token',
         type: 'text',
         required: true,
-        placeholder: 'ghp_...',
-        description: 'A GitHub PAT with Copilot access',
+        placeholder: 'GitHub token or output from gh auth token',
+        description:
+          'Use a GitHub Personal Access Token or a GitHub CLI token from `gh auth token` with Copilot access',
       },
       {
         name: 'model',

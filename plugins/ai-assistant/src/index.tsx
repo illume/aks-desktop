@@ -202,8 +202,10 @@ function HeadlampAIPrompt() {
         provider.displayName
       );
     }
-    // Mark terms as needing acceptance separately — just save the providers
+    // Merge with the current store value to avoid dropping other persisted settings
+    const currentConf = pluginStore.get() || {};
     pluginStore.update({
+      ...currentConf,
       ...configs,
       autoDetectDismissed: true,
     });

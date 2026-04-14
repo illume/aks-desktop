@@ -194,5 +194,6 @@ App Launch
 ### Security Considerations
 
 - **GitHub tokens** retrieved via `gh auth token` are the user's existing CLI tokens. We display a confirmation dialog before using them.
-- **No secrets are stored permanently** — the token is retrieved fresh from `gh` each time, or the user can paste a PAT manually.
+- **Token handling** — during auto-detection, the token is retrieved from `gh auth token`. If the user confirms the detected GitHub Models provider, the resulting provider configuration (including the API key) is saved in the plugin's local configuration/storage so the provider remains configured across sessions. Alternatively, the user can paste a PAT manually.
+- **Removing saved credentials** — users can delete or replace the saved provider configuration from the plugin's settings, or by clearing the plugin's local storage if needed.
 - **Ollama detection** is a simple HTTP health check to localhost — no credentials involved.

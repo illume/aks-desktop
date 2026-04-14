@@ -148,10 +148,13 @@ describe('providerAutoDetect', () => {
         on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
       });
 
-      // Mock fetch for both GitHub API validation and Ollama
+      // Mock fetch for GitHub API validation, Models API probe, and Ollama
       vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
         if (String(url) === 'https://api.github.com/user') {
           return { ok: true, json: async () => ({ login: 'testuser' }) } as Response;
+        }
+        if (String(url) === 'https://models.inference.ai.azure.com/models') {
+          return { ok: true, json: async () => ({ data: [] }) } as Response;
         }
         // Ollama not running
         throw new Error('ECONNREFUSED');
@@ -338,6 +341,60 @@ describe('providerAutoDetect', () => {
       const { detectAzureOpenAIProvider } = await import('./providerAutoDetect');
       const provider = await detectAzureOpenAIProvider();
       expect(provider).toBeNull();
+    });
+  });
+
+  describe('detectCopilotProvider', () => {
+    it('returns null when Models API probe fails', async () => {
+      const fakeToken = 'ghp_' + 'a'.repeat(36);
+      mockPluginRunCommand.mockReturnValue({
+        stdout: {
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken),
+        },
+        stderr: { on: vi.fn() },
+        on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
+      });
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        if (String(url) === 'https://api.github.com/user') {
+          return { ok: true, json: async () => ({ login: 'testuser' }) } as Response;
+        }
+        if (String(url) === 'https://models.inference.ai.azure.com/models') {
+          return { ok: false, status: 403 } as Response;
+        }
+        throw new Error('unexpected');
+      });
+
+      const { detectCopilotProvider } = await import('./providerAutoDetect');
+      const provider = await detectCopilotProvider();
+      expect(provider).toBeNull();
+    });
+
+    it('returns provider when all checks pass including Models API', async () => {
+      const fakeToken = 'ghp_' + 'a'.repeat(36);
+      mockPluginRunCommand.mockReturnValue({
+        stdout: {
+          on: (evt: string, cb: (data: string) => void) => evt === 'data' && cb(fakeToken),
+        },
+        stderr: { on: vi.fn() },
+        on: (evt: string, cb: (code: number) => void) => evt === 'exit' && cb(0),
+      });
+
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        if (String(url) === 'https://api.github.com/user') {
+          return { ok: true, json: async () => ({ login: 'testuser' }) } as Response;
+        }
+        if (String(url) === 'https://models.inference.ai.azure.com/models') {
+          return { ok: true, json: async () => ({ data: [] }) } as Response;
+        }
+        throw new Error('unexpected');
+      });
+
+      const { detectCopilotProvider } = await import('./providerAutoDetect');
+      const provider = await detectCopilotProvider();
+      expect(provider).not.toBeNull();
+      expect(provider!.providerId).toBe('copilot');
+      expect(provider!.displayName).toContain('testuser');
     });
   });
 });

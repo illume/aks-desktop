@@ -19,14 +19,42 @@ export interface DetectedProvider {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** Allowlisted commands for provider auto-detection. */
+const ALLOWED_COMMANDS: Record<string, string[]> = {
+  gh: ['auth'],
+  az: ['account', 'cognitiveservices'],
+};
+
+/** Default timeout in milliseconds for command execution. */
+const COMMAND_TIMEOUT_MS = 15_000;
+
 /**
  * Run a command via pluginRunCommand (Headlamp's Electron bridge).
+ * Only allowlisted commands are permitted.
  * Returns stdout/stderr. Always resolves — never rejects.
  */
 function runDetectCommand(
   command: string,
   args: string[]
 ): Promise<{ stdout: string; stderr: string }> {
+  // Validate command against allowlist
+  const allowedSubcommands = ALLOWED_COMMANDS[command];
+  if (!allowedSubcommands) {
+    return Promise.resolve({
+      stdout: '',
+      stderr: `Command "${command}" is not in the auto-detection allowlist.`,
+    });
+  }
+  const firstArg = args[0] || '';
+  if (!allowedSubcommands.includes(firstArg)) {
+    return Promise.resolve({
+      stdout: '',
+      stderr: `Subcommand "${firstArg}" is not allowed for "${command}". Allowed: ${allowedSubcommands.join(
+        ', '
+      )}`,
+    });
+  }
+
   // pluginRunCommand is a runtime global injected by Headlamp desktop.
   // eslint-disable-next-line no-undef
   const pluginRunCommand: any = (globalThis as any).pluginRunCommand;
@@ -51,15 +79,25 @@ function runDetectCommand(
         }
       };
 
+      // Timeout to prevent indefinite hangs
+      const timeoutId = setTimeout(() => {
+        done({
+          stdout: '',
+          stderr: `Command "${command}" timed out after ${COMMAND_TIMEOUT_MS}ms`,
+        });
+      }, COMMAND_TIMEOUT_MS);
+
       cmd.stdout.on('data', (data: string) => (stdout += data));
       cmd.stderr.on('data', (data: string) => (stderr += data));
       cmd.on('exit', (code: number) => {
+        clearTimeout(timeoutId);
         if (code !== 0 && !stderr) {
           stderr = `Command exited with code ${code}`;
         }
         done({ stdout, stderr });
       });
       cmd.on('error', (errOrCode: unknown) => {
+        clearTimeout(timeoutId);
         const msg = errOrCode instanceof Error ? errOrCode.message : String(errOrCode);
         done({ stdout: '', stderr: `Command execution error: ${msg}` });
       });
@@ -114,8 +152,32 @@ export async function validateGitHubToken(token: string): Promise<string | null>
 }
 
 /**
+ * Probe the GitHub Models inference endpoint to verify the token has
+ * access to the Models API. Returns true if the endpoint responds
+ * successfully, false otherwise.
+ */
+async function probeGitHubModelsAccess(token: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch('https://models.inference.ai.azure.com/models', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Detects whether the GitHub CLI is authenticated and returns a
  * provider config for GitHub Copilot (GitHub Models API) if so.
+ * Validates both user authentication and Models API access.
  */
 export async function detectCopilotProvider(): Promise<DetectedProvider | null> {
   const token = await detectGitHubToken();
@@ -125,6 +187,12 @@ export async function detectCopilotProvider(): Promise<DetectedProvider | null> 
 
   const username = await validateGitHubToken(token);
   if (!username) {
+    return null;
+  }
+
+  // Verify the token can access the GitHub Models inference endpoint
+  const hasModelsAccess = await probeGitHubModelsAccess(token);
+  if (!hasModelsAccess) {
     return null;
   }
 
