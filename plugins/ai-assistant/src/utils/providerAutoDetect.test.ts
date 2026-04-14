@@ -147,7 +147,7 @@ describe('providerAutoDetect', () => {
 
       // Mock fetch for both GitHub API validation and Ollama
       vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
-        if (String(url).includes('api.github.com')) {
+        if (String(url) === 'https://api.github.com/user') {
           return { ok: true, json: async () => ({ login: 'testuser' }) } as Response;
         }
         // Ollama not running
