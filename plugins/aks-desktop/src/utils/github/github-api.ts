@@ -117,19 +117,40 @@ export async function checkRepoReadiness(
   defaultBranch?: string
 ): Promise<RepoReadiness> {
   try {
-    const [hasSetupWorkflow, hasAgentConfig, hasDeployWorkflow] = await Promise.all([
-      fileExists(octokit, owner, repo, COPILOT_SETUP_STEPS_PATH, defaultBranch),
-      fileExists(octokit, owner, repo, AGENT_CONFIG_PATH, defaultBranch),
-      fileExists(
-        octokit,
-        owner,
-        repo,
-        `.github/workflows/${PIPELINE_WORKFLOW_FILENAME}`,
-        defaultBranch
-      ),
-    ]);
+    const dockerfileDiscovery = defaultBranch
+      ? findDockerfiles(octokit, owner, repo, defaultBranch).then(
+          ({ paths, truncated }) => ({
+            paths,
+            error: truncated ? ('truncated' as const) : undefined,
+          }),
+          err => {
+            console.warn('Dockerfile discovery failed, continuing without:', err);
+            return { paths: [] as string[], error: 'failed' as const };
+          }
+        )
+      : Promise.resolve({ paths: null as string[] | null, error: undefined });
 
-    return { hasSetupWorkflow, hasAgentConfig, hasDeployWorkflow };
+    const [hasSetupWorkflow, hasAgentConfig, hasDeployWorkflow, dockerfileResult] =
+      await Promise.all([
+        fileExists(octokit, owner, repo, COPILOT_SETUP_STEPS_PATH, defaultBranch),
+        fileExists(octokit, owner, repo, AGENT_CONFIG_PATH, defaultBranch),
+        fileExists(
+          octokit,
+          owner,
+          repo,
+          `.github/workflows/${PIPELINE_WORKFLOW_FILENAME}`,
+          defaultBranch
+        ),
+        dockerfileDiscovery,
+      ]);
+
+    return {
+      hasSetupWorkflow,
+      hasAgentConfig,
+      hasDeployWorkflow,
+      dockerfilePaths: dockerfileResult.paths,
+      ...(dockerfileResult.error && { dockerfilesError: dockerfileResult.error }),
+    };
   } catch (error) {
     throw apiError(`Failed to check repo readiness for ${owner}/${repo}`, error);
   }
@@ -193,6 +214,65 @@ export async function checkAppInstallation(
   }
 }
 
+/**
+ * Returns true if the filename matches any standard Dockerfile naming convention:
+ * - `Dockerfile` (exact, case-insensitive)
+ * - `*.Dockerfile` — e.g. dev.Dockerfile, test.Dockerfile
+ * - `Dockerfile.<stage>` — e.g. Dockerfile.build, Dockerfile.prod (Docker multi-stage convention).
+ *   Intentionally broad: any extension after the dot is accepted so custom stage names are not
+ *   excluded. Files like `Dockerfile.bak` are accepted — the repo owner placed them there.
+ */
+function isDockerfileName(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower === 'dockerfile' || lower.endsWith('.dockerfile') || lower.startsWith('dockerfile.');
+}
+
+/**
+ * Result of a Dockerfile tree search.
+ */
+export interface FindDockerfilesResult {
+  /** Sorted repo-relative paths to all matching files. */
+  paths: string[];
+  /**
+   * `true` when the GitHub Git Trees API truncated the response (repos with >100k files).
+   * The `paths` list is partial — results may be incomplete.
+   */
+  truncated: boolean;
+}
+
+/**
+ * Searches the repo tree for files matching Dockerfile naming conventions (case-insensitive),
+ * including `Dockerfile`, `*.Dockerfile`, and `Dockerfile.*` variants.
+ * Returns `{ paths, truncated }`.
+ */
+export async function findDockerfiles(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  ref: string
+): Promise<FindDockerfilesResult> {
+  try {
+    const { data } = await octokit.git.getTree({
+      owner,
+      repo,
+      tree_sha: ref,
+      recursive: '1',
+    });
+    const paths = data.tree
+      .filter(
+        entry =>
+          entry.type === 'blob' &&
+          entry.path !== undefined &&
+          isDockerfileName(entry.path.split('/').pop() ?? '')
+      )
+      .map(entry => entry.path as string)
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    return { paths, truncated: data.truncated ?? false };
+  } catch (err) {
+    throw apiError(`Failed to search repo tree for Dockerfiles in ${owner}/${repo}`, err);
+  }
+}
+
 /** Returns the SHA of the tip commit on the given branch. */
 export async function getDefaultBranchSha(
   octokit: Octokit,
@@ -229,6 +309,24 @@ export async function createBranch(
     });
   } catch (error) {
     throw apiError(`Failed to create branch ${branchName} in ${owner}/${repo}`, error);
+  }
+}
+
+/** Deletes a branch from the repository. */
+export async function deleteBranch(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  branchName: string
+): Promise<void> {
+  try {
+    await octokit.request('DELETE /repos/{owner}/{repo}/git/refs/{ref}', {
+      owner,
+      repo,
+      ref: `heads/${branchName}`,
+    });
+  } catch (error) {
+    throw apiError(`Failed to delete branch ${branchName} in ${owner}/${repo}`, error);
   }
 }
 
@@ -472,6 +570,23 @@ export async function assignIssueToCopilot(
       error
     );
   }
+}
+
+/**
+ * Creates an issue and assigns it to the Copilot Coding Agent in one step.
+ * Combines createIssue + assignIssueToCopilot for callers that always pair them.
+ */
+export async function createCopilotAssignedIssue(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  title: string,
+  body: string,
+  baseBranch: string
+): Promise<{ number: number; url: string }> {
+  const issue = await createIssue(octokit, owner, repo, title, body, []);
+  await assignIssueToCopilot(octokit, owner, repo, issue.number, baseBranch);
+  return issue;
 }
 
 /** Fetches an issue's current state by number. */

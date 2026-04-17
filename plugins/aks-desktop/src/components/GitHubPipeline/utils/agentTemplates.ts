@@ -1,9 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
+import type { Octokit } from '@octokit/rest';
+import { createOrUpdateFile } from '../../../utils/github/github-api';
 import { getServiceAccountName } from '../../../utils/kubernetes/serviceAccountNames';
 import {
+  AGENT_CONFIG_PATH,
   CONTAINERIZATION_MCP_VERSION,
+  COPILOT_SETUP_STEPS_PATH,
   DEFAULT_IMAGE_TAG,
   KUBELOGIN_VERSION,
   PIPELINE_WORKFLOW_FILENAME,
@@ -341,18 +345,63 @@ Generate \`.github/workflows/${PIPELINE_WORKFLOW_FILENAME}\` with the following:
 };
 
 /**
- * Generates a branch name for the setup PR.
- * Sanitizes appName to produce a valid git branch name.
+ * Pushes both agent config files (copilot-setup-steps.yml and containerization.agent.md)
+ * to the given branch. Used by both the standard setup flow and the fast-path async review.
  */
-export const generateBranchName = (appName: string): string => {
-  const sanitized = appName
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  const timestamp = Date.now();
-  return `aks-project/setup-${sanitized || 'app'}-${timestamp}`;
-};
+export async function pushAgentConfigFiles(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  branchName: string,
+  config: PipelineConfig
+): Promise<void> {
+  const agentConfig = generateAgentConfig(config);
+  await Promise.all([
+    createOrUpdateFile(
+      octokit,
+      owner,
+      repo,
+      COPILOT_SETUP_STEPS_PATH,
+      SETUP_WORKFLOW_CONTENT,
+      'Add Copilot setup workflow',
+      branchName
+    ),
+    createOrUpdateFile(
+      octokit,
+      owner,
+      repo,
+      AGENT_CONFIG_PATH,
+      agentConfig,
+      `Add containerization agent config for ${config.appName}`,
+      branchName
+    ),
+  ]);
+}
+
+/**
+ * Sanitizes an app name into a branch-name-safe slug: lowercases, replaces any
+ * non-`[a-z0-9-]` character with `-`, collapses repeated dashes, and trims leading/trailing
+ * dashes. Returns `'app'` if the input collapses to an empty string.
+ *
+ * Shared by both the agent-path setup branch and fast-path deploy branch so there is a
+ * single definition of "what makes appName safe in a git ref".
+ */
+export function sanitizeAppNameForBranch(appName: string): string {
+  return (
+    appName
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'app'
+  );
+}
+
+/**
+ * Generates a branch name for the setup PR.
+ * Sanitizes appName via {@link sanitizeAppNameForBranch} to produce a valid git branch name.
+ */
+export const generateBranchName = (appName: string): string =>
+  `aks-project/setup-${sanitizeAppNameForBranch(appName)}-${Date.now()}`;
 
 const NAMESPACE_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 

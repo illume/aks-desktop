@@ -3,11 +3,10 @@
 
 import type { Octokit } from '@octokit/rest';
 import {
-  assignIssueToCopilot,
   createBranch,
-  createIssue,
-  createOrUpdateFile,
+  createCopilotAssignedIssue,
   createPullRequest,
+  deleteBranch,
   getDefaultBranchSha,
   setRepoSecrets,
 } from '../../../utils/github/github-api';
@@ -18,12 +17,12 @@ import {
 } from '../constants';
 import type { IssueTracking, PipelineConfig, PRTracking } from '../types';
 import {
-  generateAgentConfig,
   generateBranchName,
   getActiveEnvVars,
-  SETUP_WORKFLOW_CONTENT,
+  pushAgentConfigFiles,
   validatePipelineConfig,
 } from './agentTemplates';
+import { deriveAcrName } from './deriveAcrName';
 import { getProbeConfigs, renderProbeYaml } from './probeHelpers';
 import { escapeYamlValue } from './yamlUtils';
 
@@ -44,27 +43,7 @@ export const createSetupPR = async (
   await createBranch(octokit, owner, repo, branchName, sha);
 
   try {
-    const agentConfig = generateAgentConfig(config);
-
-    await createOrUpdateFile(
-      octokit,
-      owner,
-      repo,
-      COPILOT_SETUP_STEPS_PATH,
-      SETUP_WORKFLOW_CONTENT,
-      'Add Copilot setup workflow for containerization agent',
-      branchName
-    );
-
-    await createOrUpdateFile(
-      octokit,
-      owner,
-      repo,
-      AGENT_CONFIG_PATH,
-      agentConfig,
-      `Add containerization agent config for ${config.appName}`,
-      branchName
-    );
+    await pushAgentConfigFiles(octokit, owner, repo, branchName, config);
 
     const pr = await createPullRequest(
       octokit,
@@ -101,13 +80,8 @@ export const createSetupPR = async (
 
     return { url: pr.url, number: pr.number, merged: false };
   } catch (err) {
-    // Best-effort cleanup: delete the branch we just created to avoid dangling refs
     try {
-      await octokit.request('DELETE /repos/{owner}/{repo}/git/refs/{ref}', {
-        owner,
-        repo,
-        ref: `heads/${branchName}`,
-      });
+      await deleteBranch(octokit, owner, repo, branchName);
     } catch (cleanupErr) {
       console.warn(`Failed to clean up branch ${branchName}:`, cleanupErr);
     }
@@ -143,31 +117,8 @@ export const createPipelineSecrets = async (
     AZURE_SUBSCRIPTION_ID: config.subscriptionId,
   };
 
-  if (config.acrLoginServer) {
-    // Prefer deriving from login server (e.g., "myregistry.azurecr.io" → "myregistry")
-    const acrName = config.acrLoginServer.split('.')[0];
-    if (acrName) {
-      secrets.AZURE_ACR_NAME = acrName;
-    } else {
-      throw new Error(
-        `Could not derive ACR name from login server: "${config.acrLoginServer}". Expected format: <name>.azurecr.io`
-      );
-    }
-  } else if (config.acrResourceId) {
-    // Parse ACR name from resource ID by locating the segment after "registries"
-    const segments = config.acrResourceId.split('/');
-    const registriesIdx = segments.findIndex(s => s.toLowerCase() === 'registries');
-    if (
-      registriesIdx !== -1 &&
-      registriesIdx + 1 < segments.length &&
-      segments[registriesIdx + 1]
-    ) {
-      secrets.AZURE_ACR_NAME = segments[registriesIdx + 1];
-    } else {
-      throw new Error(
-        `Could not derive ACR name from resource ID: "${config.acrResourceId}". Expected "/registries/<name>" segment.`
-      );
-    }
+  if (config.acrLoginServer || config.acrResourceId) {
+    secrets.AZURE_ACR_NAME = deriveAcrName(config);
   }
 
   const envVars = getActiveEnvVars(config);
@@ -293,16 +244,14 @@ export const triggerCopilotAgent = async (
     .filter(line => line !== null)
     .join('\n');
 
-  const issue = await createIssue(
+  const issue = await createCopilotAssignedIssue(
     octokit,
     owner,
     repo,
     'Generate AKS deployment pipeline',
     issueBody,
-    []
+    defaultBranch
   );
-
-  await assignIssueToCopilot(octokit, owner, repo, issue.number, defaultBranch);
 
   return { url: issue.url, number: issue.number };
 };
