@@ -150,7 +150,7 @@ export async function getManagedNamespaceDetails(options: {
   if (stderr && isAzError(stderr)) {
     console.error('Failed to get managed namespace details');
     if (DEBUG) console.debug('  stderr:', stderr);
-    throw new Error(`Failed to get managed namespace details: ${stderr}`);
+    throw new Error('Failed to get managed namespace details');
   }
 
   try {

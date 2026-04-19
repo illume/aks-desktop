@@ -17,7 +17,10 @@ None of that should leave the browser.
 
 ## What We Disable
 
-`analyticsSetup.ts` configures the SDK to stop auto-collecting:
+`analyticsSetup.ts` configures the SDK to stop auto-collecting, but in this
+repo that configuration takes effect only after applying
+`headlamp-appinsights-sanitization.patch` to the `headlamp` submodule (or
+after updating the submodule to a revision that already includes the change):
 
 ```typescript
 {

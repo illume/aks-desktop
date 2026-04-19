@@ -147,7 +147,7 @@ export async function getAksClusterStatus(options: {
   if (stderr && isAzError(stderr)) {
     console.error('Failed to get cluster status');
     if (DEBUG) console.debug('  stderr:', stderr);
-    throw new Error(`Failed to get cluster status: ${stderr}`);
+    throw new Error('Failed to get cluster status');
   }
 
   try {
