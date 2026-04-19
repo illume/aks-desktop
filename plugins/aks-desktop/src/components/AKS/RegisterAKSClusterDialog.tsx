@@ -2,9 +2,6 @@
 // Licensed under the Apache 2.0.
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-
-/** Flip to `true` locally when debugging AKS cluster registration. */
-const DEBUG = false;
 import React, { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
@@ -13,6 +10,9 @@ import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../util
 import { getClusterCapabilities } from '../../utils/azure/az-clusters';
 import type { AKSCluster, Subscription } from './RegisterAKSClusterDialogPure';
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
+
+/** Flip to `true` locally when debugging AKS cluster registration. */
+const DEBUG = false;
 
 interface RegisterAKSClusterDialogProps {
   open: boolean;
