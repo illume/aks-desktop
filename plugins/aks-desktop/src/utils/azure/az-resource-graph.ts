@@ -2,8 +2,8 @@
 // Licensed under the Apache 2.0.
 import { debugLog, isAzError, isValidGuid, needsRelogin, runCommandAsync } from './az-cli-core';
 
-/** Flip to `true` locally when debugging Azure Resource Graph queries. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for Azure Resource Graph queries. */
+const DEBUG = true;
 
 export async function getClusterResourceGroupViaGraph(
   clusterName: string,

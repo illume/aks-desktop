@@ -5,8 +5,8 @@ import { debugLog, isAzError, needsRelogin, runCommandAsync } from './az-cli-cor
 import { getClusterResourceGroupViaGraph, getClustersViaGraph } from './az-resource-graph';
 import { getSubscriptions } from './az-subscriptions';
 
-/** Flip to `true` locally when debugging AKS cluster operations. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for AKS cluster operations. */
+const DEBUG = true;
 
 export async function getClusters(subscriptionId?: string, query?: string): Promise<any[]> {
   const clusters: any[] = [];

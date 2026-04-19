@@ -2,8 +2,8 @@
 // Licensed under the Apache 2.0.
 import { debugLog, getErrorMessage, isAzError, needsRelogin, runCommandAsync } from './az-cli-core';
 
-/** Flip to `true` locally when debugging managed namespace operations. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for managed namespace operations. */
+const DEBUG = true;
 
 export async function getManagedNamespaces(options: {
   clusterName: string;

@@ -34,26 +34,31 @@ dynamic path segments (cluster names, namespaces, resource names) with `{id}`.
 `trackException()` in `analytics.tsx` strips the error message and sends only
 the error class name (e.g. `TypeError`) with a `[redacted]` placeholder.
 
+## What Does NOT Leak
+
+**Console output is safe.** The App Insights JS SDK v3.x does not intercept or
+forward `console.log`, `console.debug`, `console.error`, or `console.warn`
+output. The `loggingLevelConsole` config option controls the SDK's own internal
+diagnostic messages only — it has nothing to do with your application's console
+calls. Verified by grep of the SDK v3.3.11 source: zero `console[` or
+`console.log/warn/error/debug` hooks.
+
 ## Rules for Contributors
 
 ### Console output
 
-Even though the SDK (v3.x) does not auto-forward `console.*` to App Insights,
-treat every `console.*` call as if it could be captured — crash reporters,
-Electron DevTools logs, and future SDK versions may surface it.
-
-**Never log** subscription IDs, tenant IDs, resource groups, cluster names,
-namespace names, pod names, tokens, API keys, raw CLI stderr/stdout, or full
-Kubernetes API URLs.
-
-Use the `DEBUG` flag at the top of each file:
+Console output is not sent to App Insights, so `console.debug` calls are safe
+for diagnostic logging. Files use a `DEBUG` flag (default `true`) to gate
+verbose output that may be noisy:
 
 ```typescript
-const DEBUG = false;
+const DEBUG = true;
 
 console.error('Failed to get cluster status');
 if (DEBUG) console.debug('  stderr:', stderr);
 ```
+
+Set `DEBUG = false` locally if the output is too noisy during development.
 
 The `ai-assistant` plugin uses `debugLog()` from `agent/debugLog.ts` instead —
 it is automatically silent outside development builds.

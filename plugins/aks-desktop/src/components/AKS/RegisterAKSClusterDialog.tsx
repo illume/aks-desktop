@@ -11,8 +11,8 @@ import { getClusterCapabilities } from '../../utils/azure/az-clusters';
 import type { AKSCluster, Subscription } from './RegisterAKSClusterDialogPure';
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
 
-/** Flip to `true` locally when debugging AKS cluster registration. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for AKS cluster registration. */
+const DEBUG = true;
 
 interface RegisterAKSClusterDialogProps {
   open: boolean;

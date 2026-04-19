@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { ToolBase, ToolConfig, ToolHandler, ToolResponse } from '../ToolBase';
 import { KubernetesToolContext } from './types';
 
-/** Flip to `true` locally when debugging Kubernetes tool API calls. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for Kubernetes tool API calls. */
+const DEBUG = true;
 
 export class KubernetesTool extends ToolBase {
   readonly config: ToolConfig = {

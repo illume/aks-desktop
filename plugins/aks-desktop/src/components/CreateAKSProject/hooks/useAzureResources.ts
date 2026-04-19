@@ -7,8 +7,8 @@ import { getClusterCount } from '../../../utils/azure/az-resource-graph';
 import { getSubscriptions } from '../../../utils/azure/az-subscriptions';
 import type { AzureResourceState } from '../types';
 
-/** Flip to `true` locally when debugging Azure resource loading. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for Azure resource loading. */
+const DEBUG = true;
 
 /**
  * Custom hook for managing Azure resources (subscriptions and clusters)

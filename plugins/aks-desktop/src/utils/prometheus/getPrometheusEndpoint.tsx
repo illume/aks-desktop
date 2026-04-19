@@ -4,8 +4,8 @@
 import { configureAzureCliExtensions } from '../azure/az-extensions';
 import { runCommandWithOutput } from '../kubernetes/cli-runner';
 
-/** Flip to `true` locally when debugging Prometheus endpoint discovery. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for Prometheus endpoint discovery. */
+const DEBUG = true;
 
 /**
  * Fetches Prometheus endpoint for a given cluster

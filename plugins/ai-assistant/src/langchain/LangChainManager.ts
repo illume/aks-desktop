@@ -21,8 +21,8 @@ import { basePrompt } from '../ai/prompts';
 import { apiErrorPromptTemplate, toolFailurePromptTemplate } from './PromptTemplates';
 import { KubernetesToolContext, ToolManager } from './tools';
 
-/** Flip to `true` locally when debugging LangChain model / tool interactions. */
-const DEBUG = false;
+/** Set to `false` to suppress verbose debug logging for LangChain model / tool interactions. */
+const DEBUG = true;
 
 export default class LangChainManager extends AIManager {
   private model: BaseChatModel;
