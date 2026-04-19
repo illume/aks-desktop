@@ -1,0 +1,200 @@
+diff --git a/frontend/src/analyticsSetup.ts b/frontend/src/analyticsSetup.ts
+index 4718cf399..260c3cae4 100644
+--- a/frontend/src/analyticsSetup.ts
++++ b/frontend/src/analyticsSetup.ts
+@@ -16,6 +16,7 @@
+ 
+ import { ReactPlugin } from '@microsoft/applicationinsights-react-js';
+ import { ApplicationInsights } from '@microsoft/applicationinsights-web';
++import { sanitizeUrl } from './lib/analytics';
+ 
+ if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
+   const reactPlugin = new ReactPlugin();
+@@ -23,8 +24,30 @@ if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
+     config: {
+       connectionString: import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING,
+       extensions: [reactPlugin],
++      // Disable auto-collection of outgoing HTTP requests to prevent leaking
++      // Kubernetes API server URLs, resource names, and other sensitive data.
++      disableAjaxTracking: true,
++      disableFetchTracking: true,
++      // Disable automatic collection of unhandled exceptions — we handle
++      // exception tracking explicitly via trackException() with sanitization.
++      disableExceptionTracking: true,
+     },
+   });
+   window.appInsights.loadAppInsights();
++
++  // Sanitize URLs in all telemetry items before they are sent to App Insights.
++  // This removes resource names, namespaces, cluster names, and other
++  // potentially sensitive identifiers from page view URLs.
++  window.appInsights.addTelemetryInitializer(envelope => {
++    if (envelope.baseData) {
++      if (envelope.baseData.uri) {
++        envelope.baseData.uri = sanitizeUrl(envelope.baseData.uri);
++      }
++      if (envelope.baseData.refUri) {
++        envelope.baseData.refUri = sanitizeUrl(envelope.baseData.refUri);
++      }
++    }
++  });
++
+   window.appInsights.trackPageView();
+ }
+diff --git a/frontend/src/lib/analytics.tsx b/frontend/src/lib/analytics.tsx
+index 68e015383..57ee866b8 100644
+--- a/frontend/src/lib/analytics.tsx
++++ b/frontend/src/lib/analytics.tsx
+@@ -22,6 +22,132 @@ declare global {
+   }
+ }
+ 
++/**
++ * Known static path segments that are safe to include in telemetry.
++ * Any segment not in this set is treated as a potentially sensitive
++ * dynamic value (cluster name, namespace, resource name) and replaced
++ * with a placeholder.
++ */
++const KNOWN_ROUTE_SEGMENTS = new Set([
++  // Cluster prefix
++  'c',
++  // Workloads
++  'pods',
++  'deployments',
++  'daemonsets',
++  'statefulsets',
++  'replicasets',
++  'jobs',
++  'cronjobs',
++  // Network
++  'services',
++  'endpoints',
++  'endpointslices',
++  'ingresses',
++  'ingressclasses',
++  'networkpolicies',
++  // Gateway API
++  'gateways',
++  'gatewayclasses',
++  'httproutes',
++  'grpcroutes',
++  'referencegrant',
++  'backendtlspolicy',
++  'backendtrafficpolicy',
++  // Storage
++  'storage',
++  'persistentvolumes',
++  'persistentvolumeclaims',
++  'storageclasses',
++  'volumeattachments',
++  'csidrivers',
++  'csinodes',
++  // Config & secrets
++  'configmaps',
++  'secrets',
++  'resourcequotas',
++  'limitranges',
++  'leases',
++  // RBAC
++  'serviceaccounts',
++  'roles',
++  'rolebindings',
++  'clusterroles',
++  'clusterrolebindings',
++  // Cluster-level
++  'namespaces',
++  'nodes',
++  'events',
++  'horizontalpodautoscalers',
++  'poddisruptionbudgets',
++  'priorityclasses',
++  'runtimeclasses',
++  // Webhooks
++  'mutatingwebhookconfigurations',
++  'validatingwebhookconfigurations',
++  // CRDs
++  'customresources',
++  'crds',
++  // Navigation & auth
++  'settings',
++  'notifications',
++  'login',
++  'token',
++  'auth',
++  'plugins',
++  'create',
++  // AKS Desktop plugin routes
++  'azure',
++  'profile',
++  'projects',
++  'create-aks-project',
++  'import-aks-projects',
++  'create-namespace',
++  'add-cluster-aks',
++]);
++
++/**
++ * Sanitize a URL path by replacing dynamic segments (resource names, namespaces,
++ * cluster names) with generic placeholders to prevent leaking sensitive
++ * identifiers to Application Insights.
++ *
++ * @example
++ * sanitizeUrl('/c/my-cluster/pods/production/my-pod')
++ * // → '/c/{id}/pods/{id}/{id}'
++ *
++ * sanitizeUrl('/secrets/kube-system/my-secret')
++ * // → '/secrets/{id}/{id}'
++ *
++ * sanitizeUrl('https://host/c/cluster/deployments')
++ * // → '/c/{id}/deployments'
++ */
++export function sanitizeUrl(url: string): string {
++  try {
++    const urlObj = new URL(url, 'http://localhost');
++    const segments = urlObj.pathname.split('/').filter(Boolean);
++    const sanitized = segments.map(segment =>
++      KNOWN_ROUTE_SEGMENTS.has(segment.toLowerCase()) ? segment : '{id}'
++    );
++    // Return only the sanitized path — strip query params and hash
++    // which may also contain sensitive data.
++    return '/' + sanitized.join('/');
++  } catch {
++    return '/{sanitized}';
++  }
++}
++
++/**
++ * Create a sanitized copy of an Error that is safe to send to telemetry.
++ * Keeps the error name (e.g. "TypeError") and a generic message, but
++ * strips the original message which may contain resource names, API
++ * server URLs, or other sensitive information.
++ */
++export function sanitizeException(error: Error): Error {
++  const sanitized = new Error('[redacted]');
++  sanitized.name = error.name;
++  return sanitized;
++}
++
+ /**
+  * Track a single event. Only works if app insights is initialized
+  *
+@@ -40,7 +166,9 @@ export const trackEvent = (name: string, properties?: Record<string, string>) =>
+ };
+ 
+ /**
+- * Track error. Only works if app insights is initialized
++ * Track error. Only works if app insights is initialized.
++ * The error is sanitized before sending to remove potentially
++ * sensitive information from the error message.
+  *
+  * @param error - Error object
+  * @param properties - any custom properties
+@@ -50,7 +178,7 @@ export const trackException = (error: Error, properties?: Record<string, string>
+   const appInsights = window.appInsights;
+   if (!appInsights) return;
+   try {
+-    appInsights.trackException({ exception: error, properties });
++    appInsights.trackException({ exception: sanitizeException(error), properties });
+   } catch (e) {
+     console.error('Failed to track exception', e);
+   }
