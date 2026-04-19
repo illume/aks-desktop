@@ -1,5 +1,39 @@
+diff --git a/app/electron/aks-cluster.ts b/app/electron/aks-cluster.ts
+index 50b8e7e67..1671845fb 100644
+--- a/app/electron/aks-cluster.ts
++++ b/app/electron/aks-cluster.ts
+@@ -104,7 +104,7 @@ function addAzKubeloginToKubeconfig(
+   // Add exec configuration to each user
+   for (const user of kubeconfig.users) {
+     if (user.user) {
+-      console.log('[AKS] Configuring authentication for user:', user.name);
++      console.log('[AKS] Configuring authentication for user');
+ 
+       // IMPORTANT: Remove ALL old Azure authentication methods
+       // These conflict with our exec configuration
+@@ -256,10 +256,7 @@ export async function registerAKSCluster(
+ 
+     if (managedNamespace) {
+       console.log(
+-        '[AKS] Getting namespace credentials for cluster:',
+-        clusterName,
+-        'namespace:',
+-        managedNamespace
++        '[AKS] Getting namespace credentials for cluster'
+       );
+       args.push(
+         'namespace',
+@@ -274,7 +271,7 @@ export async function registerAKSCluster(
+         subscriptionId
+       );
+     } else {
+-      console.log('[AKS] Getting credentials for cluster:', clusterName);
++      console.log('[AKS] Getting credentials for cluster');
+       args.push(
+         'get-credentials',
+         '--subscription',
 diff --git a/frontend/src/analyticsSetup.ts b/frontend/src/analyticsSetup.ts
-index 4718cf399..260c3cae4 100644
+index 4718cf399..71f4c1fbb 100644
 --- a/frontend/src/analyticsSetup.ts
 +++ b/frontend/src/analyticsSetup.ts
 @@ -16,6 +16,7 @@
@@ -10,7 +44,7 @@ index 4718cf399..260c3cae4 100644
  
  if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
    const reactPlugin = new ReactPlugin();
-@@ -23,8 +24,30 @@ if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
+@@ -23,8 +24,35 @@ if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
      config: {
        connectionString: import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING,
        extensions: [reactPlugin],
@@ -21,6 +55,11 @@ index 4718cf399..260c3cae4 100644
 +      // Disable automatic collection of unhandled exceptions — we handle
 +      // exception tracking explicitly via trackException() with sanitization.
 +      disableExceptionTracking: true,
++      // Disable automatic forwarding of console.log/debug/error/warn output
++      // to App Insights. Console output may contain sensitive identifiers
++      // (cluster names, namespaces, subscription IDs, CLI stderr).
++      loggingLevelConsole: 0,
++      enableAutoRouteTracking: false,
      },
    });
    window.appInsights.loadAppInsights();
@@ -42,14 +81,13 @@ index 4718cf399..260c3cae4 100644
    window.appInsights.trackPageView();
  }
 diff --git a/frontend/src/lib/analytics.tsx b/frontend/src/lib/analytics.tsx
-index 68e015383..57ee866b8 100644
+index 68e015383..66ac243b2 100644
 --- a/frontend/src/lib/analytics.tsx
 +++ b/frontend/src/lib/analytics.tsx
-@@ -22,6 +22,132 @@ declare global {
-   }
+@@ -23,6 +23,130 @@ declare global {
  }
  
-+/**
+ /**
 + * Known static path segments that are safe to include in telemetry.
 + * Any segment not in this set is treated as a potentially sensitive
 + * dynamic value (cluster name, namespace, resource name) and replaced
@@ -174,11 +212,10 @@ index 68e015383..57ee866b8 100644
 +  sanitized.name = error.name;
 +  return sanitized;
 +}
-+
- /**
   * Track a single event. Only works if app insights is initialized
   *
-@@ -40,7 +166,9 @@ export const trackEvent = (name: string, properties?: Record<string, string>) =>
+  * @param name - unique name for the event
+@@ -40,7 +164,9 @@ export const trackEvent = (name: string, properties?: Record<string, string>) =>
  };
  
  /**
@@ -189,7 +226,7 @@ index 68e015383..57ee866b8 100644
   *
   * @param error - Error object
   * @param properties - any custom properties
-@@ -50,7 +178,7 @@ export const trackException = (error: Error, properties?: Record<string, string>
+@@ -50,7 +176,7 @@ export const trackException = (error: Error, properties?: Record<string, string>
    const appInsights = window.appInsights;
    if (!appInsights) return;
    try {
@@ -198,3 +235,30 @@ index 68e015383..57ee866b8 100644
    } catch (e) {
      console.error('Failed to track exception', e);
    }
+diff --git a/frontend/src/lib/k8s/api/v1/clusterRequests.ts b/frontend/src/lib/k8s/api/v1/clusterRequests.ts
+index ff471965f..023c8507f 100644
+--- a/frontend/src/lib/k8s/api/v1/clusterRequests.ts
++++ b/frontend/src/lib/k8s/api/v1/clusterRequests.ts
+@@ -216,13 +216,7 @@ export async function clusterRequest(
+         }
+       }
+     } catch (err) {
+-      console.error(
+-        'Unable to parse error json at url:',
+-        url,
+-        { err },
+-        'with request data:',
+-        requestData
+-      );
++      console.error('Unable to parse error json');
+     }
+ 
+     const error = new Error(message) as ApiError;
+@@ -327,7 +321,6 @@ export function put(
+ }
+ 
+ export function remove(url: string, requestOptions: ClusterRequestParams = {}) {
+-  console.log(url, requestOptions);
+   const { cluster: clusterName, ...restOptions } = requestOptions;
+   const cluster = clusterName || getCluster() || '';
+   const opts = { method: 'DELETE', headers: JSON_HEADERS, cluster, ...restOptions };

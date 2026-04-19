@@ -2,6 +2,9 @@
 // Licensed under the Apache 2.0.
 import { debugLog, getErrorMessage, isAzError, needsRelogin, runCommandAsync } from './az-cli-core';
 
+/** Flip to `true` locally when debugging managed namespace operations. */
+const DEBUG = false;
+
 export async function getManagedNamespaces(options: {
   clusterName: string;
   resourceGroup: string;
@@ -145,7 +148,8 @@ export async function getManagedNamespaceDetails(options: {
   }
 
   if (stderr && isAzError(stderr)) {
-    console.error('Failed to get managed namespace details:', stderr);
+    console.error('Failed to get managed namespace details');
+    if (DEBUG) console.debug('  stderr:', stderr);
     throw new Error(`Failed to get managed namespace details: ${stderr}`);
   }
 

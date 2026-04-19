@@ -4,6 +4,9 @@
 import { configureAzureCliExtensions } from '../azure/az-extensions';
 import { runCommandWithOutput } from '../kubernetes/cli-runner';
 
+/** Flip to `true` locally when debugging Prometheus endpoint discovery. */
+const DEBUG = false;
+
 /**
  * Fetches Prometheus endpoint for a given cluster
  *
@@ -23,7 +26,13 @@ export async function getPrometheusEndpoint(
     console.debug('Configuring Azure CLI for automatic extension installation...');
     await configureAzureCliExtensions();
 
-    console.debug('[getPrometheusEndpoint] Querying prometheus rule groups...');
+    if (DEBUG) console.debug('[getPrometheusEndpoint] Querying prometheus rule groups...');
+    if (DEBUG)
+      console.debug('[getPrometheusEndpoint] Parameters:', {
+        resourceGroup,
+        clusterName,
+        subscription,
+      });
     console.debug('[getPrometheusEndpoint] Parameters:', {
       resourceGroup,
       clusterName,
@@ -44,9 +53,11 @@ export async function getPrometheusEndpoint(
       subscription,
     ]);
 
-    console.debug('[getPrometheusEndpoint] All rule groups query result:');
-    console.debug('[getPrometheusEndpoint]   stdout length:', allGroupsStdout.length);
-    console.debug('[getPrometheusEndpoint]   stderr:', allGroupsStderr);
+    if (DEBUG) {
+      console.debug('[getPrometheusEndpoint] All rule groups query result:');
+      console.debug('[getPrometheusEndpoint]   stdout length:', allGroupsStdout.length);
+      console.debug('[getPrometheusEndpoint]   stderr present:', !!allGroupsStderr);
+    }
 
     if (!allGroupsStdout.trim()) {
       throw new Error(
@@ -59,14 +70,7 @@ export async function getPrometheusEndpoint(
     let ruleGroups;
     try {
       ruleGroups = JSON.parse(allGroupsStdout);
-      console.debug('[getPrometheusEndpoint] Found', ruleGroups.length, 'rule groups');
-      console.debug(
-        '[getPrometheusEndpoint] Rule group names:',
-        ruleGroups.map((rg: any) => ({
-          name: rg.name,
-          clusterName: rg.clusterName,
-        }))
-      );
+      if (DEBUG) console.debug('[getPrometheusEndpoint] Found', ruleGroups.length, 'rule groups');
     } catch (parseError) {
       console.error('[getPrometheusEndpoint] Failed to parse rule groups JSON:', parseError);
       throw new Error('Failed to parse prometheus rule groups response');
@@ -76,10 +80,10 @@ export async function getPrometheusEndpoint(
     const matchingGroup = ruleGroups.find((rg: any) => rg.clusterName === clusterName);
 
     if (!matchingGroup) {
-      console.error('[getPrometheusEndpoint] No rule group found for cluster:', clusterName);
+      console.error('[getPrometheusEndpoint] No rule group found for the specified cluster');
       console.error(
-        '[getPrometheusEndpoint] Available clusters:',
-        ruleGroups.map((rg: any) => rg.clusterName)
+        '[getPrometheusEndpoint] Available clusters count:',
+        ruleGroups.length
       );
       throw new Error(
         `No Prometheus workspace found for cluster '${clusterName}'. ` +
@@ -89,7 +93,7 @@ export async function getPrometheusEndpoint(
       );
     }
 
-    console.debug('[getPrometheusEndpoint] Found matching rule group:', matchingGroup.name);
+    if (DEBUG) console.debug('[getPrometheusEndpoint] Found matching rule group:', matchingGroup.name);
 
     // Get the workspace scope from the first scope
     const workspaceScope = matchingGroup.scopes?.[0];
@@ -97,7 +101,7 @@ export async function getPrometheusEndpoint(
       throw new Error('Rule group has no scopes defined');
     }
 
-    console.debug('[getPrometheusEndpoint] Found workspace scope:', workspaceScope);
+    if (DEBUG) console.debug('[getPrometheusEndpoint] Found workspace scope:', workspaceScope);
 
     const { stdout: endpointStdout } = await runCommandWithOutput('az', [
       'monitor',
@@ -113,7 +117,7 @@ export async function getPrometheusEndpoint(
       subscription,
     ]);
 
-    console.debug('[getPrometheusEndpoint] Prometheus endpoint:', endpointStdout.trim());
+    if (DEBUG) console.debug('[getPrometheusEndpoint] Prometheus endpoint:', endpointStdout.trim());
 
     return endpointStdout.trim();
   } catch (error) {
