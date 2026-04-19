@@ -21,6 +21,9 @@ import { basePrompt } from '../ai/prompts';
 import { apiErrorPromptTemplate, toolFailurePromptTemplate } from './PromptTemplates';
 import { KubernetesToolContext, ToolManager } from './tools';
 
+/** Set to `false` to suppress verbose debug logging for LangChain model / tool interactions. */
+const DEBUG = true;
+
 export default class LangChainManager extends AIManager {
   private model: BaseChatModel;
   private boundModel: BaseChatModel | null = null;
@@ -34,9 +37,10 @@ export default class LangChainManager extends AIManager {
     super();
     this.providerId = providerId;
     const enabledToolIds = enabledTools ?? [];
-    console.log(
-      'AI Assistant: Initializing with enabled tools:',
-      enabledToolIds || 'all tools enabled'
+    if (DEBUG)
+      console.log(
+        'AI Assistant: Initializing with enabled tools:',
+        enabledToolIds || 'all tools enabled'
     );
     this.toolManager = new ToolManager(enabledToolIds); // Only enabled tools
     this.model = this.createModel(providerId, config);
@@ -195,11 +199,10 @@ export default class LangChainManager extends AIManager {
   }
 
   configureTools(tools: any[], kubernetesContext: KubernetesToolContext): void {
-    console.log('🔧 Configuring tools for LangChain with context:', {
-      toolCount: tools.length,
-      selectedClusters: kubernetesContext.selectedClusters,
-      providerId: this.providerId,
-    });
+    if (DEBUG)
+      console.log('🔧 Configuring tools for LangChain with context:', {
+        toolCount: tools.length,
+      });
 
     // Configure the Kubernetes context for the KubernetesTool
     this.toolManager.configureKubernetesContext(kubernetesContext);
@@ -207,7 +210,7 @@ export default class LangChainManager extends AIManager {
     // Bind all tools to the model for compatible providers (OpenAI, Azure, etc.)
     this.boundModel = this.toolManager.bindToModel(this.model, this.providerId);
 
-    console.log('🔧 Tools bound to model successfully, boundModel exists:', !!this.boundModel);
+    if (DEBUG) console.log('🔧 Tools bound to model successfully, boundModel exists:', !!this.boundModel);
   }
 
   // Helper method to prepare chat history for prompt template
@@ -332,11 +335,12 @@ export default class LangChainManager extends AIManager {
 
     // IMPORTANT: Use the boundModel (which has tools) instead of the original model
     const modelToUse = this.boundModel || model;
-    console.log('🔧 Using model for tool-enabled request:', {
-      usingBoundModel: !!this.boundModel,
-      modelHasBindTools: typeof modelToUse.bindTools === 'function',
-      toolsAvailable: this.toolManager.getToolNames(),
-    });
+    if (DEBUG)
+      console.log('🔧 Using model for tool-enabled request:', {
+        usingBoundModel: !!this.boundModel,
+        modelHasBindTools: typeof modelToUse.bindTools === 'function',
+        toolsAvailable: this.toolManager.getToolNames(),
+      });
 
     const response = await modelToUse.invoke(messages, {
       signal: this.currentAbortController.signal,
@@ -346,17 +350,15 @@ export default class LangChainManager extends AIManager {
 
     // Handle tool calls if present
     if (response.tool_calls?.length) {
-      console.log(
-        '🔧 Tool calls detected:',
-        response.tool_calls.length,
-        response.tool_calls.map(tc => ({
-          name: tc.name,
-          args: tc.args,
-        }))
-      );
+      if (DEBUG)
+        console.log(
+          '🔧 Tool calls detected:',
+          response.tool_calls.length,
+          response.tool_calls.map(tc => tc.name)
+        );
       return await this.handleToolCalls(response);
     } else {
-      console.log('💬 No tool calls detected in response, treating as regular message');
+      if (DEBUG) console.log('💬 No tool calls detected in response, treating as regular message');
     }
 
     // Handle regular response
@@ -917,7 +919,7 @@ Format your response to make the errors prominent and actionable.`,
         })) || [],
     };
 
-    console.log('Assistant prompt created from response');
+    if (DEBUG) console.log('Assistant prompt created from response');
 
     // Clean up history to prevent message order issues
     const lastAssistantWithToolsIndex = this.findLastAssistantWithTools();
@@ -953,7 +955,7 @@ Format your response to make the errors prominent and actionable.`,
         break;
     }
 
-    console.log(`${providerName} - Estimated tokens: ${estimatedTokens}`);
+    if (DEBUG) console.log(`${providerName} - Estimated tokens: ${estimatedTokens}`);
   }
 
   // Analyze response and correct kubectl suggestions

@@ -5,6 +5,9 @@ import { debugLog, isAzError, needsRelogin, runCommandAsync } from './az-cli-cor
 import { getClusterResourceGroupViaGraph, getClustersViaGraph } from './az-resource-graph';
 import { getSubscriptions } from './az-subscriptions';
 
+/** Set to `false` to suppress verbose debug logging for AKS cluster operations. */
+const DEBUG = true;
+
 export async function getClusters(subscriptionId?: string, query?: string): Promise<any[]> {
   const clusters: any[] = [];
 
@@ -99,7 +102,8 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
             });
           });
         } catch (parseError) {
-          console.warn(`Failed to parse AKS cluster list for subscription ${sub.id}:`, parseError);
+          console.warn('Failed to parse AKS cluster list');
+          if (DEBUG) console.debug('  parseError:', parseError);
         }
       }
     }
@@ -141,8 +145,9 @@ export async function getAksClusterStatus(options: {
   }
 
   if (stderr && isAzError(stderr)) {
-    console.error('Failed to get cluster status:', stderr);
-    throw new Error(`Failed to get cluster status: ${stderr}`);
+    console.error('Failed to get cluster status');
+    if (DEBUG) console.debug('  stderr:', stderr);
+    throw new Error('Failed to get cluster status');
   }
 
   try {
@@ -197,7 +202,8 @@ export async function getClusterCapabilities(options: {
   }
 
   if (stderr && isAzError(stderr)) {
-    console.error('Failed to get cluster capabilities:', stderr);
+    console.error('Failed to get cluster capabilities');
+    if (DEBUG) console.debug('  stderr:', stderr);
     throw new Error(`Failed to get cluster capabilities: ${stderr}`);
   }
 
@@ -317,7 +323,8 @@ export async function getAksKubeconfig(options: {
   }
 
   if (stderr && isAzError(stderr)) {
-    console.error('Failed to get kubeconfig:', stderr);
+    console.error('Failed to get kubeconfig');
+    if (DEBUG) console.debug('  stderr:', stderr);
     throw new Error(`Failed to get kubeconfig: ${stderr}`);
   }
 

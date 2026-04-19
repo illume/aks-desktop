@@ -1,0 +1,399 @@
+diff --git a/app/electron/aks-cluster.ts b/app/electron/aks-cluster.ts
+index 50b8e7e67..1671845fb 100644
+--- a/app/electron/aks-cluster.ts
++++ b/app/electron/aks-cluster.ts
+@@ -104,7 +104,7 @@ function addAzKubeloginToKubeconfig(
+   // Add exec configuration to each user
+   for (const user of kubeconfig.users) {
+     if (user.user) {
+-      console.log('[AKS] Configuring authentication for user:', user.name);
++      console.log('[AKS] Configuring authentication for user');
+ 
+       // IMPORTANT: Remove ALL old Azure authentication methods
+       // These conflict with our exec configuration
+@@ -256,10 +256,7 @@ export async function registerAKSCluster(
+ 
+     if (managedNamespace) {
+       console.log(
+-        '[AKS] Getting namespace credentials for cluster:',
+-        clusterName,
+-        'namespace:',
+-        managedNamespace
++        '[AKS] Getting namespace credentials for cluster'
+       );
+       args.push(
+         'namespace',
+@@ -274,7 +271,7 @@ export async function registerAKSCluster(
+         subscriptionId
+       );
+     } else {
+-      console.log('[AKS] Getting credentials for cluster:', clusterName);
++      console.log('[AKS] Getting credentials for cluster');
+       args.push(
+         'get-credentials',
+         '--subscription',
+diff --git a/frontend/src/analyticsSetup.ts b/frontend/src/analyticsSetup.ts
+index 4718cf399..70d1c0d6d 100644
+--- a/frontend/src/analyticsSetup.ts
++++ b/frontend/src/analyticsSetup.ts
+@@ -16,6 +16,7 @@
+ 
+ import { ReactPlugin } from '@microsoft/applicationinsights-react-js';
+ import { ApplicationInsights } from '@microsoft/applicationinsights-web';
++import { sanitizeUrl } from './lib/analytics';
+ 
+ if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
+   const reactPlugin = new ReactPlugin();
+@@ -23,8 +24,35 @@ if (import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING) {
+     config: {
+       connectionString: import.meta.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING,
+       extensions: [reactPlugin],
++      // Disable auto-collection of outgoing HTTP requests to prevent leaking
++      // Kubernetes API server URLs, resource names, and other sensitive data.
++      disableAjaxTracking: true,
++      disableFetchTracking: true,
++      // Disable automatic collection of unhandled exceptions — we handle
++      // exception tracking explicitly via trackException() with sanitization.
++      disableExceptionTracking: true,
++      // Suppress internal SDK diagnostic output from the browser console.
++      loggingLevelConsole: 0,
++      // Don't auto-track SPA route changes as page views; we call
++      // trackPageView() explicitly with sanitized URLs.
++      enableAutoRouteTracking: false,
+     },
+   });
+   window.appInsights.loadAppInsights();
++
++  // Sanitize URLs in all telemetry items before they are sent to App Insights.
++  // This removes resource names, namespaces, cluster names, and other
++  // potentially sensitive identifiers from page view URLs.
++  window.appInsights.addTelemetryInitializer(envelope => {
++    if (envelope.baseData) {
++      if (envelope.baseData.uri) {
++        envelope.baseData.uri = sanitizeUrl(envelope.baseData.uri);
++      }
++      if (envelope.baseData.refUri) {
++        envelope.baseData.refUri = sanitizeUrl(envelope.baseData.refUri);
++      }
++    }
++  });
++
+   window.appInsights.trackPageView();
+ }
+diff --git a/frontend/src/lib/analytics.tsx b/frontend/src/lib/analytics.tsx
+index 68e015383..57ee866b8 100644
+--- a/frontend/src/lib/analytics.tsx
++++ b/frontend/src/lib/analytics.tsx
+@@ -22,6 +22,132 @@ declare global {
+   }
+ }
+ 
++/**
++ * Known static path segments that are safe to include in telemetry.
++ * Any segment not in this set is treated as a potentially sensitive
++ * dynamic value (cluster name, namespace, resource name) and replaced
++ * with a placeholder.
++ */
++const KNOWN_ROUTE_SEGMENTS = new Set([
++  // Cluster prefix
++  'c',
++  // Workloads
++  'pods',
++  'deployments',
++  'daemonsets',
++  'statefulsets',
++  'replicasets',
++  'jobs',
++  'cronjobs',
++  // Network
++  'services',
++  'endpoints',
++  'endpointslices',
++  'ingresses',
++  'ingressclasses',
++  'networkpolicies',
++  // Gateway API
++  'gateways',
++  'gatewayclasses',
++  'httproutes',
++  'grpcroutes',
++  'referencegrant',
++  'backendtlspolicy',
++  'backendtrafficpolicy',
++  // Storage
++  'storage',
++  'persistentvolumes',
++  'persistentvolumeclaims',
++  'storageclasses',
++  'volumeattachments',
++  'csidrivers',
++  'csinodes',
++  // Config & secrets
++  'configmaps',
++  'secrets',
++  'resourcequotas',
++  'limitranges',
++  'leases',
++  // RBAC
++  'serviceaccounts',
++  'roles',
++  'rolebindings',
++  'clusterroles',
++  'clusterrolebindings',
++  // Cluster-level
++  'namespaces',
++  'nodes',
++  'events',
++  'horizontalpodautoscalers',
++  'poddisruptionbudgets',
++  'priorityclasses',
++  'runtimeclasses',
++  // Webhooks
++  'mutatingwebhookconfigurations',
++  'validatingwebhookconfigurations',
++  // CRDs
++  'customresources',
++  'crds',
++  // Navigation & auth
++  'settings',
++  'notifications',
++  'login',
++  'token',
++  'auth',
++  'plugins',
++  'create',
++  // AKS Desktop plugin routes
++  'azure',
++  'profile',
++  'projects',
++  'create-aks-project',
++  'import-aks-projects',
++  'create-namespace',
++  'add-cluster-aks',
++]);
++
++/**
++ * Sanitize a URL path by replacing dynamic segments (resource names, namespaces,
++ * cluster names) with generic placeholders to prevent leaking sensitive
++ * identifiers to Application Insights.
++ *
++ * @example
++ * sanitizeUrl('/c/my-cluster/pods/production/my-pod')
++ * // → '/c/{id}/pods/{id}/{id}'
++ *
++ * sanitizeUrl('/secrets/kube-system/my-secret')
++ * // → '/secrets/{id}/{id}'
++ *
++ * sanitizeUrl('https://host/c/cluster/deployments')
++ * // → '/c/{id}/deployments'
++ */
++export function sanitizeUrl(url: string): string {
++  try {
++    const urlObj = new URL(url, 'http://localhost');
++    const segments = urlObj.pathname.split('/').filter(Boolean);
++    const sanitized = segments.map(segment =>
++      KNOWN_ROUTE_SEGMENTS.has(segment.toLowerCase()) ? segment : '{id}'
++    );
++    // Return only the sanitized path — strip query params and hash
++    // which may also contain sensitive data.
++    return '/' + sanitized.join('/');
++  } catch {
++    return '/{sanitized}';
++  }
++}
++
++/**
++ * Create a sanitized copy of an Error that is safe to send to telemetry.
++ * Keeps the error name (e.g. "TypeError") and a generic message, but
++ * strips the original message which may contain resource names, API
++ * server URLs, or other sensitive information.
++ */
++export function sanitizeException(error: Error): Error {
++  const sanitized = new Error('[redacted]');
++  sanitized.name = error.name;
++  return sanitized;
++}
++
+ /**
+  * Track a single event. Only works if app insights is initialized
+  *
+@@ -40,7 +166,9 @@ export const trackEvent = (name: string, properties?: Record<string, string>) =>
+ };
+ 
+ /**
+- * Track error. Only works if app insights is initialized
++ * Track error. Only works if app insights is initialized.
++ * The error is sanitized before sending to remove potentially
++ * sensitive information from the error message.
+  *
+  * @param error - Error object
+  * @param properties - any custom properties
+@@ -50,7 +178,7 @@ export const trackException = (error: Error, properties?: Record<string, string>
+   const appInsights = window.appInsights;
+   if (!appInsights) return;
+   try {
+-    appInsights.trackException({ exception: error, properties });
++    appInsights.trackException({ exception: sanitizeException(error), properties });
+   } catch (e) {
+     console.error('Failed to track exception', e);
+   }
+diff --git a/frontend/src/lib/k8s/api/v1/clusterRequests.ts b/frontend/src/lib/k8s/api/v1/clusterRequests.ts
+index ff471965f..023c8507f 100644
+--- a/frontend/src/lib/k8s/api/v1/clusterRequests.ts
++++ b/frontend/src/lib/k8s/api/v1/clusterRequests.ts
+@@ -216,13 +216,7 @@ export async function clusterRequest(
+         }
+       }
+     } catch (err) {
+-      console.error(
+-        'Unable to parse error json at url:',
+-        url,
+-        { err },
+-        'with request data:',
+-        requestData
+-      );
++      console.error('Unable to parse error json');
+     }
+ 
+     const error = new Error(message) as ApiError;
+@@ -327,7 +321,6 @@ export function put(
+ }
+ 
+ export function remove(url: string, requestOptions: ClusterRequestParams = {}) {
+-  console.log(url, requestOptions);
+   const { cluster: clusterName, ...restOptions } = requestOptions;
+   const cluster = clusterName || getCluster() || '';
+   const opts = { method: 'DELETE', headers: JSON_HEADERS, cluster, ...restOptions };
+diff --git a/frontend/src/lib/analytics.test.tsx b/frontend/src/lib/analytics.test.tsx
+new file mode 100644
+index 000000000..f1d7dc40f
+--- /dev/null
++++ b/frontend/src/lib/analytics.test.tsx
+@@ -0,0 +1,127 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import { sanitizeException, sanitizeUrl } from './analytics';
++
++describe('sanitizeUrl', () => {
++  it('replaces cluster name after /c/', () => {
++    expect(sanitizeUrl('/c/my-cluster/pods')).toBe('/c/{id}/pods');
++  });
++
++  it('replaces namespace and resource name', () => {
++    expect(sanitizeUrl('/c/my-cluster/pods/production/nginx-abc123')).toBe(
++      '/c/{id}/pods/{id}/{id}'
++    );
++  });
++
++  it('replaces secret namespace and name', () => {
++    expect(sanitizeUrl('/secrets/kube-system/my-secret')).toBe('/secrets/{id}/{id}');
++  });
++
++  it('keeps known resource types intact', () => {
++    expect(sanitizeUrl('/deployments')).toBe('/deployments');
++    expect(sanitizeUrl('/services')).toBe('/services');
++    expect(sanitizeUrl('/configmaps')).toBe('/configmaps');
++  });
++
++  it('handles full URLs and strips query params', () => {
++    expect(sanitizeUrl('https://localhost:4466/c/cluster1/nodes')).toBe('/c/{id}/nodes');
++  });
++
++  it('strips query parameters that may contain sensitive data', () => {
++    expect(sanitizeUrl('/pods?namespace=secret-ns&token=abc')).toBe('/pods');
++  });
++
++  it('strips hash fragments', () => {
++    expect(sanitizeUrl('/pods#some-anchor')).toBe('/pods');
++  });
++
++  it('handles empty path', () => {
++    expect(sanitizeUrl('/')).toBe('/');
++  });
++
++  it('returns placeholder for malformed input', () => {
++    // Test that it at least doesn't throw and returns something safe
++    const result = sanitizeUrl('');
++    expect(result).toBe('/');
++  });
++
++  it('handles AKS Desktop plugin routes', () => {
++    expect(sanitizeUrl('/azure/login')).toBe('/azure/login');
++    expect(sanitizeUrl('/projects/create-aks-project')).toBe('/projects/create-aks-project');
++    expect(sanitizeUrl('/add-cluster-aks')).toBe('/add-cluster-aks');
++  });
++
++  it('replaces unknown path segments with {id}', () => {
++    expect(sanitizeUrl('/c/prod-cluster/customresources/my-crd-group/default/my-resource')).toBe(
++      '/c/{id}/customresources/{id}/{id}/{id}'
++    );
++  });
++
++  it('is case-insensitive for known segments', () => {
++    expect(sanitizeUrl('/Pods')).toBe('/Pods');
++    expect(sanitizeUrl('/DEPLOYMENTS')).toBe('/DEPLOYMENTS');
++  });
++
++  it('never leaks cluster names', () => {
++    const urls = [
++      '/c/production-cluster/pods',
++      '/c/my-company-aks-eastus/deployments/kube-system/coredns',
++      'https://app.example.com/c/staging-us-west-2/secrets/default/db-credentials',
++    ];
++    for (const url of urls) {
++      const sanitized = sanitizeUrl(url);
++      expect(sanitized).not.toContain('production-cluster');
++      expect(sanitized).not.toContain('my-company-aks-eastus');
++      expect(sanitized).not.toContain('staging-us-west-2');
++      expect(sanitized).not.toContain('kube-system');
++      expect(sanitized).not.toContain('coredns');
++      expect(sanitized).not.toContain('db-credentials');
++      expect(sanitized).not.toContain('app.example.com');
++    }
++  });
++});
++
++describe('sanitizeException', () => {
++  it('keeps the error name', () => {
++    const err = new TypeError('secret value was xyz');
++    const sanitized = sanitizeException(err);
++    expect(sanitized.name).toBe('TypeError');
++  });
++
++  it('redacts the error message', () => {
++    const err = new Error('Failed to connect to https://api.my-cluster.com:6443');
++    const sanitized = sanitizeException(err);
++    expect(sanitized.message).toBe('[redacted]');
++    expect(sanitized.message).not.toContain('my-cluster');
++    expect(sanitized.message).not.toContain('6443');
++  });
++
++  it('does not include the original stack trace', () => {
++    const err = new Error('subscription 12345-abcde not found');
++    err.stack = `Error: subscription 12345-abcde not found\n    at Object.<anonymous> (/app/src/utils.ts:42:11)`;
++    const sanitized = sanitizeException(err);
++    expect(sanitized.stack || '').not.toContain('12345-abcde');
++  });
++
++  it('handles errors with no message', () => {
++    const err = new Error();
++    const sanitized = sanitizeException(err);
++    expect(sanitized.name).toBe('Error');
++    expect(sanitized.message).toBe('[redacted]');
++  });
++});

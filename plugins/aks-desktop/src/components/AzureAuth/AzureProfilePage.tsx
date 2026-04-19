@@ -41,7 +41,7 @@ export default function AzureProfilePage() {
       const result = await runCommandAsync('az', ['logout']);
 
       if (result.stderr && result.stderr.includes('ERROR:')) {
-        console.error('Azure CLI logout error:', result.stderr);
+        console.error('Azure CLI logout error');
         setLoggingOut(false);
         return;
       }

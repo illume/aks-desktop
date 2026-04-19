@@ -2,6 +2,9 @@
 // Licensed under the Apache 2.0.
 import { debugLog, isAzError, isValidGuid, needsRelogin, runCommandAsync } from './az-cli-core';
 
+/** Set to `false` to suppress verbose debug logging for Azure Resource Graph queries. */
+const DEBUG = true;
+
 export async function getClusterResourceGroupViaGraph(
   clusterName: string,
   subscription: string
@@ -188,7 +191,8 @@ export async function getClusterCount(subscriptionId: string): Promise<number> {
   try {
     // Validate subscriptionId is a GUID to prevent KQL injection
     if (!isValidGuid(subscriptionId)) {
-      console.error('Invalid subscription ID format:', subscriptionId);
+      console.error('Invalid subscription ID format');
+      if (DEBUG) console.debug('  subscriptionId:', subscriptionId);
       return -1;
     }
 
@@ -203,7 +207,8 @@ export async function getClusterCount(subscriptionId: string): Promise<number> {
     ]);
 
     if (stderr && isAzError(stderr)) {
-      console.error('getClusterCount: Azure CLI error:', stderr);
+      console.error('getClusterCount: Azure CLI error');
+      if (DEBUG) console.debug('  stderr:', stderr);
       return -1;
     }
 

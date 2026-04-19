@@ -11,6 +11,9 @@ import { getClusterCapabilities } from '../../utils/azure/az-clusters';
 import type { AKSCluster, Subscription } from './RegisterAKSClusterDialogPure';
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
 
+/** Set to `false` to suppress verbose debug logging for AKS cluster registration. */
+const DEBUG = true;
+
 interface RegisterAKSClusterDialogProps {
   open: boolean;
   onClose: () => void;
@@ -103,7 +106,8 @@ export default function RegisterAKSClusterDialog({
         setSubscriptionInputValue(`${sub.name}${sub.state !== 'Enabled' ? ` (${sub.state})` : ''}`);
       }
     } catch (err) {
-      console.error('Error loading subscriptions:', err);
+      console.error('Error loading subscriptions');
+      if (DEBUG) console.debug('  err:', err);
       setError(t('Failed to load subscriptions'));
     } finally {
       setLoadingSubscriptions(false);
@@ -127,7 +131,8 @@ export default function RegisterAKSClusterDialog({
 
       setClusters(result.clusters || []);
     } catch (err) {
-      console.error('Error loading AKS clusters:', err);
+      console.error('Error loading AKS clusters');
+      if (DEBUG) console.debug('  err:', err);
       setError(t('Failed to load AKS clusters'));
     } finally {
       setLoadingClusters(false);
@@ -236,7 +241,8 @@ export default function RegisterAKSClusterDialog({
         }
       }
     } catch (err) {
-      console.error('Error registering AKS cluster:', err);
+      console.error('Error registering AKS cluster');
+      if (DEBUG) console.debug('  err:', err);
       setError(
         t('Failed to register cluster: {{message}}', {
           message: err instanceof Error ? err.message : t('Unknown error'),

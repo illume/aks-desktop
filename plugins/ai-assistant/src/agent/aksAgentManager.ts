@@ -202,7 +202,8 @@ export async function getClustersFromHeadlampConfig(): Promise<
     }
     return [];
   } catch (error) {
-    console.error('[AKS Agent] Failed to fetch clusters from headlamp config:', error);
+    console.error('[AKS Agent] Failed to fetch clusters from headlamp config');
+    debugLog('[AKS Agent Data]', 'error:', error);
     return [];
   }
 }
@@ -243,7 +244,8 @@ export async function checkAksAgentInstalled(clusterName: string): Promise<AksAg
 
     return null;
   } catch (error) {
-    console.error(`[AKS Agent] Failed to check AKS agent on cluster "${clusterName}":`, error);
+    console.error('[AKS Agent] Failed to check AKS agent on cluster');
+    debugLog('[AKS Agent Data]', 'error:', error);
     return null;
   }
 }
@@ -273,7 +275,8 @@ export async function getClusterResourceGroup(
     const { stdout, stderr } = await runCommandAsync('az', ['aks', 'list', '-o', 'json']);
 
     if (!stdout) {
-      console.error('[AKS Agent] az aks list returned no output. stderr:', stderr);
+      console.error('[AKS Agent] az aks list returned no output');
+      debugLog('[AKS Agent Data]', 'stderr:', stderr);
       return null;
     }
 
@@ -281,7 +284,8 @@ export async function getClusterResourceGroup(
     try {
       allClusters = JSON.parse(stdout);
     } catch {
-      console.error('[AKS Agent] Failed to parse az aks list output:', stdout);
+      console.error('[AKS Agent] Failed to parse az aks list output');
+      debugLog('[AKS Agent Data]', 'stdout length:', stdout.length);
       return null;
     }
 
@@ -308,19 +312,22 @@ export async function getClusterResourceGroup(
 
     // 3. Only one AKS cluster in the subscription — use it directly
     if (allClusters.length === 1) {
-      console.info(
-        `[AKS Agent] No name/FQDN match for "${clusterName}", using the only available cluster: ${allClusters[0].name}`
-      );
+      debugLog('[AKS Agent Data]', 'No name/FQDN match, using the only available cluster');
       return { resourceGroup: allClusters[0].resourceGroup, aksClusterName: allClusters[0].name };
     }
 
     console.warn(
-      `[AKS Agent] Could not match cluster "${clusterName}" (fqdn: ${fqdn}) among ${allClusters.length} clusters:`,
+      `[AKS Agent] Could not match cluster among ${allClusters.length} clusters`
+    );
+    debugLog(
+      '[AKS Agent Data]',
+      'cluster candidates:',
       allClusters.map(c => ({ name: c.name, fqdn: c.fqdn }))
     );
     return null;
   } catch (error) {
-    console.error('[AKS Agent] Failed to get cluster resource group:', error);
+    console.error('[AKS Agent] Failed to get cluster resource group');
+    debugLog('[AKS Agent Data]', 'error:', error);
     return null;
   }
 }
@@ -4495,7 +4502,7 @@ class AgentSession {
       containerName
     )}${commandStr}&stdin=1&stderr=1&stdout=1&tty=1`;
 
-    console.log(`[AKS Agent] Session exec URL: ${url}`);
+    debugLog('[AKS Agent Data]', 'Session exec URL created');
 
     const additionalProtocols = [
       'v4.channel.k8s.io',
@@ -4605,7 +4612,7 @@ class AgentSession {
     } else {
       // Plain string data (base64 protocol)
       debugLog('[AKS Agent Data] handleData: string data length:', data.length);
-      console.log('[AKS Agent] string data from exec:', data);
+      debugLog('[AKS Agent Data]', 'string data from exec, length:', data.length);
       this.output += data;
     }
   }
@@ -4720,14 +4727,15 @@ class AgentSession {
     this.resetIdleTimer();
     this.errorOutput += text;
     debugLog('[AKS Agent Data] handleStderr: stderr chunk length:', text.length, 'text:', text);
-    console.warn(`[AKS Agent] exec stderr: ${text}`);
+    debugLog('[AKS Agent Data]', `exec stderr chunk length: ${text.length}`);
   }
 
   private handleStatusChannel(): void {
     // Status channel — the exec process exited (bash terminated).
     // The session is no longer usable.
-    console.log(
-      `[AKS Agent] Exec completed via status channel. stdout length: ${this.output.length}, stderr length: ${this.errorOutput.length}`
+    debugLog(
+      '[AKS Agent Data]',
+      `Exec completed via status channel. stdout length: ${this.output.length}, stderr length: ${this.errorOutput.length}`
     );
     this._alive = false;
 

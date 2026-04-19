@@ -2,6 +2,9 @@ import { z } from 'zod';
 import { ToolBase, ToolConfig, ToolHandler, ToolResponse } from '../ToolBase';
 import { KubernetesToolContext } from './types';
 
+/** Set to `false` to suppress verbose debug logging for Kubernetes tool API calls. */
+const DEBUG = true;
+
 export class KubernetesTool extends ToolBase {
   readonly config: ToolConfig = {
     name: 'kubernetes_api_request',
@@ -98,11 +101,11 @@ LOG HANDLING FOR MULTI-CONTAINER PODS:
       throw new Error('Kubernetes tool context not configured');
     }
 
-    console.log(`Processing kubernetes_api_request tool: ${method} ${url}`, {
-      hasContext: !!this.context,
-      toolCallId,
-      selectedClusters: this.context?.selectedClusters,
-    });
+    if (DEBUG)
+      console.log(`Processing kubernetes_api_request tool: ${method}`, {
+        hasContext: !!this.context,
+        toolCallId,
+      });
 
     // For GET requests, we can execute them immediately using the API helper
     if (method.toUpperCase() === 'GET') {
