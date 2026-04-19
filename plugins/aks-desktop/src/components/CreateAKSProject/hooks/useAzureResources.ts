@@ -7,6 +7,9 @@ import { getClusterCount } from '../../../utils/azure/az-resource-graph';
 import { getSubscriptions } from '../../../utils/azure/az-subscriptions';
 import type { AzureResourceState } from '../types';
 
+/** Flip to `true` locally when debugging Azure resource loading. */
+const DEBUG = false;
+
 /**
  * Custom hook for managing Azure resources (subscriptions and clusters)
  */
@@ -28,7 +31,8 @@ export const useAzureResources = () => {
       setState(prev => ({ ...prev, subscriptions: subs, loading: false }));
       return subs;
     } catch (err) {
-      console.error('Failed to fetch subscriptions:', err);
+      console.error('Failed to fetch subscriptions');
+      if (DEBUG) console.debug('  err:', err);
       let errorMessage = err.message || 'Failed to fetch subscriptions';
 
       // Provide more specific error messages
@@ -65,7 +69,8 @@ export const useAzureResources = () => {
       }));
       return clusterList;
     } catch (err) {
-      console.error('Failed to fetch clusters:', err);
+      console.error('Failed to fetch clusters');
+      if (DEBUG) console.debug('  err:', err);
       let errorMessage = err.message || 'Failed to fetch clusters';
 
       // Provide more specific error messages

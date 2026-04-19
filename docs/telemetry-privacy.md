@@ -1,143 +1,102 @@
-# Telemetry & Privacy: Preventing Sensitive Data Leaks
+# Telemetry Privacy
 
-This document describes how AKS Desktop prevents sensitive information from
-leaking to Application Insights and other telemetry channels, and provides
-guidance for contributors adding new telemetry or logging.
+How we prevent sensitive data from reaching Application Insights.
 
-## Why This Matters
+## The Problem
 
-Azure Application Insights auto-collects several categories of data by default.
-Without explicit configuration, the following can be sent to App Insights:
+The App Insights JavaScript SDK ships with defaults that would send cluster
+names, namespace names, resource names, subscription IDs, and API server URLs
+to Azure telemetry. Out of the box it auto-collects:
 
-| Data category | Default SDK behaviour | Risk |
-|---|---|---|
-| **Page view URLs** | Full URL including path | Cluster names, namespace names, resource names in URL path |
-| **AJAX / Fetch requests** | Tracked automatically | K8s API server URLs containing resource identifiers |
-| **Unhandled exceptions** | Captured with full message | Error messages may contain subscription IDs, secrets, API URLs |
-| **Console output** | `console.log/debug/error/warn` forwarded as Trace telemetry | ALL console output is sent, including debug logs with stderr, cluster topology, exec output |
-| **Route changes** | Auto-tracked | Same as page views |
+- **Page view URLs** — paths like `/c/my-cluster/secrets/production/db-creds`
+- **AJAX / Fetch calls** — every outgoing HTTP request, including K8s API calls
+- **Unhandled exceptions** — full error messages that may embed resource identifiers
+- **Route changes** — same URL exposure as page views
+
+None of that should leave the browser.
 
 ## What We Disable
 
-In `analyticsSetup.ts` the Application Insights JavaScript SDK is configured
-with these privacy-critical flags:
+`analyticsSetup.ts` configures the SDK to stop auto-collecting:
 
 ```typescript
 {
-  disableAjaxTracking: true,       // No outgoing HTTP request tracking
-  disableFetchTracking: true,      // No Fetch API request tracking
-  disableExceptionTracking: true,  // No auto-captured unhandled exceptions
-  loggingLevelConsole: 0,          // No console output forwarded as traces
-  enableAutoRouteTracking: false,  // No automatic page-view on route change
+  disableAjaxTracking: true,
+  disableFetchTracking: true,
+  disableExceptionTracking: true,
+  enableAutoRouteTracking: false,
 }
 ```
 
-Additionally a **telemetry initializer** sanitizes any remaining page-view URLs
-by replacing dynamic path segments (cluster names, namespaces, resource names)
-with `{id}` placeholders before they leave the browser.
+A **telemetry initializer** rewrites any remaining page-view URLs, replacing
+dynamic path segments (cluster names, namespaces, resource names) with `{id}`.
 
-The `trackException()` helper in `analytics.tsx` strips the original error
-message and sends only the error *name* (e.g. `TypeError`) with a `[redacted]`
-placeholder.
+`trackException()` in `analytics.tsx` strips the error message and sends only
+the error class name (e.g. `TypeError`) with a `[redacted]` placeholder.
 
-## Guidelines for Contributors
+## Rules for Contributors
 
-### 1. Never log sensitive data with `console.*`
+### Console output
 
-Because the App Insights SDK **can** forward `console.log`, `console.debug`,
-`console.error`, and `console.warn` output as Trace telemetry, treat every
-`console.*` call as potentially public. Even with `loggingLevelConsole: 0`
-set today, a future configuration change could re-enable it.
+Even though the SDK (v3.x) does not auto-forward `console.*` to App Insights,
+treat every `console.*` call as if it could be captured — crash reporters,
+Electron DevTools logs, and future SDK versions may surface it.
 
-**Do not log:**
-- Subscription IDs, tenant IDs, client IDs
-- Resource group names, cluster names, namespace names, pod names
-- Azure CLI stderr (may contain all of the above)
-- Tokens, API keys, passwords, connection strings
-- Full Kubernetes API URLs (contain namespace and resource names)
-- Raw command output (stdout/stderr) from `az`, `kubectl`, etc.
+**Never log** subscription IDs, tenant IDs, resource groups, cluster names,
+namespace names, pod names, tokens, API keys, raw CLI stderr/stdout, or full
+Kubernetes API URLs.
 
-**Instead, use the `DEBUG` flag pattern:**
+Use the `DEBUG` flag at the top of each file:
 
 ```typescript
-/** Flip to `true` locally when debugging this module. */
 const DEBUG = false;
 
-// Always-on: generic message only
 console.error('Failed to get cluster status');
-// Debug-only: full details available when needed
 if (DEBUG) console.debug('  stderr:', stderr);
 ```
 
-For the `ai-assistant` plugin, use the existing `debugLog()` / `detailLog()`
-functions from `agent/debugLog.ts` — they are automatically silent in
-production builds and tests.
+The `ai-assistant` plugin uses `debugLog()` from `agent/debugLog.ts` instead —
+it is automatically silent outside development builds.
 
-### 2. Sanitize data sent to App Insights
+### trackEvent / trackException
 
-When calling `trackEvent()` or `trackException()`:
+- `trackEvent(name)` — use static event names only (`headlamp.delete-resource`).
+  No resource names, cluster names, or user identifiers in the name or properties.
+- `trackException(error)` — sanitized automatically. Do not attach sensitive
+  custom properties.
 
-- **`trackEvent(name, properties)`** — The `name` should be a static event
-  type string (e.g. `headlamp.delete-resource`). Never include resource names,
-  cluster names, or user identifiers in the name or properties.
-- **`trackException(error)`** — The error is automatically sanitized by
-  `analytics.tsx`. Do not pass custom properties containing sensitive data.
+### Adding a new route
 
-### 3. URL sanitization
+If you add a new static route path, add its segment to `KNOWN_ROUTE_SEGMENTS`
+in `analytics.tsx` so the URL sanitizer keeps it readable in telemetry.
 
-The `sanitizeUrl()` function in `analytics.tsx` replaces any URL path segment
-that is not in the `KNOWN_ROUTE_SEGMENTS` set with `{id}`. If you add a new
-static route, add its path segment to the set so that telemetry correctly
-identifies the page type.
+### Token storage
 
-### 4. localStorage and token storage
+Never persist tokens or API keys in `localStorage` in production. Use Electron
+`safeStorage`. The `localStorage` fallback in `github-auth.ts` is gated behind
+`NODE_ENV === 'development'`.
 
-- Never store tokens, API keys, or credentials in `localStorage` in production.
-- Use Electron `safeStorage` (OS-level encryption) for persisting secrets.
-- The `localStorage` fallback in `github-auth.ts` is gated behind
-  `NODE_ENV === 'development'` only.
+## Azure / Microsoft References
 
-## Official Microsoft / Azure References
+- [App Insights JS SDK Configuration](https://learn.microsoft.com/en-us/azure/azure-monitor/app/javascript-sdk-configuration) —
+  `disableAjaxTracking`, `disableFetchTracking`, `addTelemetryInitializer`, etc.
+- [Filtering and Preprocessing Telemetry](https://learn.microsoft.com/en-us/azure/azure-monitor/app/api-filtering-sampling) —
+  telemetry initializers and processors for stripping sensitive fields.
+- [Managing Personal Data in Azure Monitor Logs](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/personal-data-mgmt) —
+  filtering, obfuscating, and deleting personal data (GDPR).
+- [Azure Security Benchmark — Data Protection](https://learn.microsoft.com/en-us/security/benchmark/azure/security-controls-v2-data-protection) —
+  never log passwords, tokens, or PII.
+- [App Insights Telemetry Data Model](https://learn.microsoft.com/en-us/azure/azure-monitor/app/data-model-complete) —
+  what fields are collected per telemetry type.
 
-The practices above follow guidance from these official Microsoft sources:
+## Applying the Headlamp Patch
 
-- **[Application Insights JavaScript SDK Configuration](https://learn.microsoft.com/en-us/azure/azure-monitor/app/javascript-sdk-configuration)**
-  Documents `disableAjaxTracking`, `disableFetchTracking`,
-  `disableExceptionTracking`, `loggingLevelConsole`,
-  `addTelemetryInitializer`, and other privacy-relevant config options.
-
-- **[Filtering and Preprocessing Telemetry (API)](https://learn.microsoft.com/en-us/azure/azure-monitor/app/api-filtering-sampling)**
-  How to use telemetry initializers and processors to modify or drop telemetry
-  items before they are sent. Includes guidance on stripping sensitive fields.
-
-- **[Managing Personal Data in Azure Monitor Logs](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/personal-data-mgmt)**
-  Azure's guidance on filtering, obfuscating, and anonymizing personal data
-  before ingestion, and how to handle data deletion requests (GDPR).
-
-- **[Azure Security Benchmark — Data Protection](https://learn.microsoft.com/en-us/security/benchmark/azure/security-controls-v2-data-protection)**
-  Covers data discovery/classification, access control, encryption, and the
-  principle of not logging passwords, tokens, or PII.
-
-- **[Application Insights Telemetry Data Model](https://learn.microsoft.com/en-us/azure/azure-monitor/app/data-model-complete)**
-  Describes exactly what fields are collected for each telemetry type
-  (requests, dependencies, exceptions, traces, page views, etc.).
-
-- **[Architecture Best Practices for Application Insights (Well-Architected Framework)](https://learn.microsoft.com/en-us/azure/well-architected/service-guides/application-insights)**
-  Security, reliability, and cost-optimization best practices including
-  keeping instrumentation up-to-date and minimizing data collection.
-
-- **[Data Privacy in the Trusted Cloud](https://azure.microsoft.com/en-us/explore/trusted-cloud/privacy/)**
-  Microsoft's high-level privacy commitments for Azure services.
-
-## Applying the Headlamp Submodule Patch
-
-The App Insights SDK configuration lives in the `headlamp` submodule. Changes
-are stored as `headlamp-appinsights-sanitization.patch` in the repo root.
-To apply:
+The SDK configuration lives in the `headlamp` submodule. Changes are stored as
+`headlamp-appinsights-sanitization.patch` in the repo root:
 
 ```bash
 cd headlamp
 git apply ../headlamp-appinsights-sanitization.patch
 ```
 
-See [MAINTENANCE.md](../MAINTENANCE.md) for the full fork rebase workflow.
+See [MAINTENANCE.md](../MAINTENANCE.md) for the fork rebase workflow.

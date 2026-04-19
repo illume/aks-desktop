@@ -543,7 +543,8 @@ function RegisterCluster({
       setSuccess(t("Cluster '{{cluster}}' successfully merged in kubeconfig", { cluster }));
       setLoading(false);
     } catch (err) {
-      console.error('Error registering AKS cluster:', err);
+      console.error('Error registering AKS cluster');
+      if (DEBUG) console.debug('  err:', err);
       setError(
         t('Failed to register cluster: {{message}}', {
           message: err instanceof Error ? err.message : t('Unknown error'),

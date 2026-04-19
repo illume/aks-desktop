@@ -202,7 +202,8 @@ export async function getClustersFromHeadlampConfig(): Promise<
     }
     return [];
   } catch (error) {
-    console.error('[AKS Agent] Failed to fetch clusters from headlamp config:', error);
+    console.error('[AKS Agent] Failed to fetch clusters from headlamp config');
+    debugLog('[AKS Agent Data]', 'error:', error);
     return [];
   }
 }
@@ -243,7 +244,8 @@ export async function checkAksAgentInstalled(clusterName: string): Promise<AksAg
 
     return null;
   } catch (error) {
-    console.error(`[AKS Agent] Failed to check AKS agent on cluster "${clusterName}":`, error);
+    console.error('[AKS Agent] Failed to check AKS agent on cluster');
+    debugLog('[AKS Agent Data]', 'error:', error);
     return null;
   }
 }
@@ -4725,14 +4727,15 @@ class AgentSession {
     this.resetIdleTimer();
     this.errorOutput += text;
     debugLog('[AKS Agent Data] handleStderr: stderr chunk length:', text.length, 'text:', text);
-    console.warn(`[AKS Agent] exec stderr: ${text}`);
+    debugLog('[AKS Agent Data]', `exec stderr chunk length: ${text.length}`);
   }
 
   private handleStatusChannel(): void {
     // Status channel — the exec process exited (bash terminated).
     // The session is no longer usable.
-    console.log(
-      `[AKS Agent] Exec completed via status channel. stdout length: ${this.output.length}, stderr length: ${this.errorOutput.length}`
+    debugLog(
+      '[AKS Agent Data]',
+      `Exec completed via status channel. stdout length: ${this.output.length}, stderr length: ${this.errorOutput.length}`
     );
     this._alive = false;
 

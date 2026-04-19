@@ -23,21 +23,17 @@ export async function getPrometheusEndpoint(
   try {
     // Configure Azure CLI to auto-install extensions without prompts
     // This allows the az alerts-management command to automatically install the extension if needed
-    console.debug('Configuring Azure CLI for automatic extension installation...');
+    if (DEBUG) console.debug('Configuring Azure CLI for automatic extension installation...');
     await configureAzureCliExtensions();
 
-    if (DEBUG) console.debug('[getPrometheusEndpoint] Querying prometheus rule groups...');
-    if (DEBUG)
+    if (DEBUG) {
+      console.debug('[getPrometheusEndpoint] Querying prometheus rule groups...');
       console.debug('[getPrometheusEndpoint] Parameters:', {
         resourceGroup,
         clusterName,
         subscription,
       });
-    console.debug('[getPrometheusEndpoint] Parameters:', {
-      resourceGroup,
-      clusterName,
-      subscription,
-    });
+    }
 
     // First, get all rule groups as JSON and filter in JavaScript
     // This avoids shell escaping issues with JMESPath queries
