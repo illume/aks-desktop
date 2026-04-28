@@ -77,7 +77,7 @@ These features depend **only** on the Headlamp plugin API and the Kubernetes API
 
 | | |
 |---|---|
-| **Files** | `src/utils/kubernetes/cli-runner.ts` (K8s API wrappers), `src/utils/kubernetes/k8sNames.ts`, `src/utils/kubernetes/namespaceUtils.ts`, `src/utils/kubernetes/serviceAccountNames.ts`, `src/utils/shared/isAksProject.ts`, `src/utils/shared/resourceUnits.ts`, `src/utils/shared/formatTime.ts` |
+| **Files** | `src/utils/kubernetes/cli-runner.ts` (K8s API wrappers via `K8s.ResourceClasses` + `az` CLI runner via `pluginRunCommand`), `src/utils/kubernetes/k8sNames.ts`, `src/utils/kubernetes/namespaceUtils.ts`, `src/utils/kubernetes/serviceAccountNames.ts`, `src/utils/shared/isAksProject.ts`, `src/utils/shared/resourceUnits.ts`, `src/utils/shared/formatTime.ts` |
 | **Notes** | These are shared dependencies used across features. Any extracted plugin that needs K8s operations will need copies of or references to these utilities. |
 
 ---
@@ -109,7 +109,7 @@ These features require the `az` CLI to be installed locally and the user to be a
 | | |
 |---|---|
 | **What it does** | Multi-step wizard: select subscription → cluster → create ARM-managed namespace with RBAC, Azure AD user lookup, extension/feature validation. |
-| **Files** | `src/components/CreateAKSProject/CreateAKSProject.tsx`, `src/components/CreateAKSProject/components/` (`BasicsStep.tsx`, `AccessStep.tsx`, `NetworkingStep.tsx`, `ComputeStep.tsx`, `ReviewStep.tsx`), `src/components/CreateAKSProject/hooks/` (`useAzureResources.ts`, `useExtensionCheck.ts`, `useFeatureCheck.ts`, `useValidation.ts`), `src/components/CreateAKSProject/validators.ts` |
+| **Files** | `src/components/CreateAKSProject/CreateAKSProject.tsx`, `src/components/CreateAKSProject/components/` (`BasicsStep.tsx`, `AccessStep.tsx`, `NetworkingStep.tsx`, `ComputeStep.tsx`, `ReviewStep.tsx`), `src/components/CreateAKSProject/hooks/` (`useAzureResources.ts`, `useExtensionCheck.ts`, `useFeatureCheck.ts`, `useValidation.ts`), `src/components/CreateAKSProject/validators.ts` (co-located with the wizard per project conventions) |
 | **CLI commands** | `az aks namespace create`, `az aks list`, `az aks show`, `az account show`, `az provider register`, `az extension add`, `az extension list`, `az role assignment create`, `az ad user list --filter` |
 | **Online API alternative** | **Partial** — ARM REST API can create managed namespaces (`PUT /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.ContainerService/managedClusters/{cluster}/managedNamespaces/{ns}`). Role assignments use [Authorization REST API](https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/create). Azure AD user search uses [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/api/user-list) (`GET /users?$filter=startswith(displayName,'...')`). Extension checks have no direct REST equivalent outside ARM. |
 
@@ -234,7 +234,7 @@ These features combine multiple external dependencies and represent the most com
 | | |
 |---|---|
 | **What it does** | End-to-end GitHub Actions pipeline: connect GitHub repo → detect Dockerfiles → create ACR → set up Workload Identity (managed identity + federated credential + role assignments) → generate workflow YAML → create PR → monitor deployment. |
-| **Files** | `src/components/GitHubPipeline/GitHubPipelineWizard.tsx`, `src/components/GitHubPipeline/components/` (`ConnectSourceStep.tsx`, `DockerfileConfirmation.tsx`, `PathSelectionStep.tsx`, `AcrSelector.tsx`, `WorkloadIdentitySetup.tsx`, `ReviewAndMergeStep.tsx`, `RepoSelector.tsx`, etc.), `src/components/GitHubPipeline/hooks/` (`useGitHubPipelineOrchestration.ts`, `useFastPathOrchestration.ts`, `useDockerfileDiscovery.ts`, `useWorkloadIdentitySetup.ts`, `usePipelineAnnotationSync.ts`), `src/components/GitHubPipeline/utils/` (`pipelineOrchestration.ts`, `fastPathTemplates.ts`, `agentTemplates.ts`), `src/components/ConfigurePipeline/ConfigurePipelineButton.tsx` |
+| **Files** | `src/components/GitHubPipeline/GitHubPipelineWizard.tsx`, `src/components/GitHubPipeline/components/` (`ConnectSourceStep.tsx`, `DockerfileConfirmation.tsx`, `PathSelectionStep.tsx`, `AcrSelector.tsx`, `WorkloadIdentitySetup.tsx`, `ReviewAndMergeStep.tsx`, `RepoSelector.tsx`, etc.), `src/components/GitHubPipeline/hooks/` (`useGitHubPipelineOrchestration.ts`, `useFastPathOrchestration.ts`, `useDockerfileDiscovery.ts`, `useWorkloadIdentitySetup.ts`, `usePipelineAnnotationSync.ts`), `src/components/GitHubPipeline/utils/` (`pipelineOrchestration.ts`, `fastPathTemplates.ts`, `agentTemplates.ts`), `src/components/ConfigurePipeline/ConfigurePipelineButton.tsx` (currently in a separate directory; could be moved into `GitHubPipeline/components/` to co-locate with the feature) |
 | **CLI commands (Azure)** | `az identity create`, `az identity federated-credential create`, `az role assignment create`, `az aks show`, `az acr create`, `az acr list` |
 | **GitHub API** | Octokit: list repos, search files (Dockerfiles), create branches, push commits, create PRs, list workflow runs |
 | **K8s APIs** | `Deployment` (apply, patch annotations), `ServiceAccount` |
