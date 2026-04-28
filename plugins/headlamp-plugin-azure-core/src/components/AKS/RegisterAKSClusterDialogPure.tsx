@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import React from 'react';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
-import { ClusterConfigurePanel } from '../CreateAKSProject/components/ClusterConfigurePanel';
+import { ClusterConfigurePanel } from '../shared/ClusterConfigurePanel';
 
 export interface Subscription {
   id: string;

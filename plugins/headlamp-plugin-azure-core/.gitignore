@@ -1,4 +1,1 @@
-dist
-node_modules
-out
-node_modules/
+dist\nnode_modules\nout
