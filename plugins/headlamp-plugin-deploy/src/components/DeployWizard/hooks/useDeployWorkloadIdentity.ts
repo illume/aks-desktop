@@ -4,10 +4,7 @@
 import { useCallback, useState } from 'react';
 import { sanitizeDnsName } from '../../../utils/kubernetes/k8sNames';
 
-type DeployWorkloadIdentityStatus =
-  | 'idle'
-  | 'done'
-  | 'error';
+type DeployWorkloadIdentityStatus = 'idle' | 'done' | 'error';
 
 interface DeployWorkloadIdentityResult {
   clientId: string;
@@ -48,8 +45,11 @@ export const useDeployWorkloadIdentity = (): UseDeployWorkloadIdentityReturn => 
   const [error] = useState<string | null>(null);
   const [result] = useState<DeployWorkloadIdentityResult | null>(null);
 
+  // eslint-disable-next-line no-unused-vars
   const setupWorkloadIdentity = useCallback(async (_config: DeployWorkloadIdentityConfig) => {
-    console.warn('[headlamp-plugin-deploy] Workload identity setup is not available in this plugin.');
+    console.warn(
+      '[headlamp-plugin-deploy] Workload identity setup is not available in this plugin.'
+    );
   }, []);
 
   const reset = useCallback(() => {}, []);

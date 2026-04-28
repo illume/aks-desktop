@@ -1,1 +1,5 @@
-dist\nnode_modules\nout
+dist
+node_modules
+out
+*.tar.gz
+.eslintcache

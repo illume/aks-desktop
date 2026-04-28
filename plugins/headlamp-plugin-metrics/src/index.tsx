@@ -1,7 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { registerProjectDetailsTab, registerProjectOverviewSection } from '@kinvolk/headlamp-plugin/lib';
+import {
+  registerProjectDetailsTab,
+  registerProjectOverviewSection,
+} from '@kinvolk/headlamp-plugin/lib';
 import React from 'react';
 import MetricsCard from './components/Metrics/MetricsCard';
 import MetricsTab from './components/Metrics/MetricsTab';

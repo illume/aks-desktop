@@ -42,6 +42,7 @@ export interface UseChartDataResult {
  * @param _step - Query resolution step in seconds (unused without Prometheus).
  * @returns Object containing chartData array, loading state, and error state.
  */
+/* eslint-disable no-unused-vars */
 export const useChartData = (
   selectedDeployment: string,
   _namespace: string,
@@ -51,6 +52,7 @@ export const useChartData = (
   _timeRangeSecs: number,
   _step: number
 ): UseChartDataResult => {
+  /* eslint-enable no-unused-vars */
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

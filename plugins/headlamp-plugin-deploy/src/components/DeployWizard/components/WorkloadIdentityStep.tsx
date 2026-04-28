@@ -17,9 +17,7 @@ interface WorkloadIdentityStepProps {
  * Stub for Workload Identity step.
  * Azure Workload Identity configuration is not available in this plugin.
  */
-export default function WorkloadIdentityStep({
-  containerConfig,
-}: WorkloadIdentityStepProps) {
+export default function WorkloadIdentityStep({ containerConfig }: WorkloadIdentityStepProps) {
   const { t } = useTranslation();
 
   return (

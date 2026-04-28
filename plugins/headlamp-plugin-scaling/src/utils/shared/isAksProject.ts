@@ -4,10 +4,7 @@
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import type { ApiClient } from '@kinvolk/headlamp-plugin/lib/lib/k8s/api/v1/factories';
 import type { KubeNamespace } from '@kinvolk/headlamp-plugin/lib/lib/k8s/namespace';
-import {
-  PROJECT_MANAGED_BY_LABEL,
-  PROJECT_MANAGED_BY_VALUE,
-} from '../constants/projectLabels';
+import { PROJECT_MANAGED_BY_LABEL, PROJECT_MANAGED_BY_VALUE } from '../constants/projectLabels';
 
 /** Checks if the given project is an AKS Desktop project (managed-by: aks-desktop). */
 export const isAksProject = ({
