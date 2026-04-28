@@ -19,7 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        plugin: [aks-desktop, ai-assistant, insights-plugin]
+        plugin:
+          - aks-desktop
+          - ai-assistant
+          - insights-plugin
+          - headlamp-plugin-logs
+          - headlamp-plugin-deploy
+          - headlamp-plugin-scaling
+          - headlamp-plugin-metrics
+          - headlamp-plugin-github-pipelines
+          - headlamp-plugin-azure-core
+          - headlamp-plugin-azure-namespaces
+          - headlamp-plugin-azure-identity
     defaults:
       run:
         working-directory: plugins/${{ matrix.plugin }}
@@ -52,7 +63,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        plugin: [aks-desktop, ai-assistant, insights-plugin]
+        plugin:
+          - aks-desktop
+          - ai-assistant
+          - insights-plugin
+          - headlamp-plugin-logs
+          - headlamp-plugin-deploy
+          - headlamp-plugin-scaling
+          - headlamp-plugin-metrics
+          - headlamp-plugin-github-pipelines
+          - headlamp-plugin-azure-core
+          - headlamp-plugin-azure-namespaces
+          - headlamp-plugin-azure-identity
     defaults:
       run:
         working-directory: plugins/${{ matrix.plugin }}
@@ -83,7 +105,18 @@ jobs:
     needs: [test, lint]
     strategy:
       matrix:
-        plugin: [aks-desktop, ai-assistant, insights-plugin]
+        plugin:
+          - aks-desktop
+          - ai-assistant
+          - insights-plugin
+          - headlamp-plugin-logs
+          - headlamp-plugin-deploy
+          - headlamp-plugin-scaling
+          - headlamp-plugin-metrics
+          - headlamp-plugin-github-pipelines
+          - headlamp-plugin-azure-core
+          - headlamp-plugin-azure-namespaces
+          - headlamp-plugin-azure-identity
     defaults:
       run:
         working-directory: plugins/${{ matrix.plugin }}
@@ -167,7 +200,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        plugin: [aks-desktop, ai-assistant, insights-plugin]
+        plugin:
+          - aks-desktop
+          - ai-assistant
+          - insights-plugin
+          - headlamp-plugin-logs
+          - headlamp-plugin-deploy
+          - headlamp-plugin-scaling
+          - headlamp-plugin-metrics
+          - headlamp-plugin-github-pipelines
+          - headlamp-plugin-azure-core
+          - headlamp-plugin-azure-namespaces
+          - headlamp-plugin-azure-identity
     defaults:
       run:
         working-directory: plugins/${{ matrix.plugin }}

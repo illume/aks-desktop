@@ -44,7 +44,19 @@ if (!fs.existsSync(path.join(ROOT_DIR, 'headlamp'))) {
 }
 
 // List of plugins to build and bundle
-const PLUGINS = ['aks-desktop', 'ai-assistant', 'insights-plugin'];
+const PLUGINS = [
+  'aks-desktop',
+  'ai-assistant',
+  'insights-plugin',
+  'headlamp-plugin-logs',
+  'headlamp-plugin-deploy',
+  'headlamp-plugin-scaling',
+  'headlamp-plugin-metrics',
+  'headlamp-plugin-github-pipelines',
+  'headlamp-plugin-azure-core',
+  'headlamp-plugin-azure-namespaces',
+  'headlamp-plugin-azure-identity',
+];
 
 for (const plugin of PLUGINS) {
   const pluginDir = path.join(ROOT_DIR, 'plugins', plugin);

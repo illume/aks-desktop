@@ -1,0 +1,9 @@
+out
+dist
+node_modules
+.DS_Store
+*.env
+coverage/
+.eslintcache
+node_modules/
+*.tar.gz
