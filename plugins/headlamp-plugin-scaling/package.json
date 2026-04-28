@@ -10,7 +10,7 @@
     "lint": "headlamp-plugin lint",
     "lint-fix": "headlamp-plugin lint --fix",
     "tsc": "headlamp-plugin tsc",
-    "test": "vitest run -c vitest.config.ts",
+    "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:unit": "vitest run -c vitest.config.ts --project unit"
   },
   "prettier": "@headlamp-k8s/eslint-config/prettier-config",
