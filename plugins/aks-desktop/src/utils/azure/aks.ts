@@ -8,41 +8,73 @@ declare const pluginRunCommand: (
   options: Record<string, unknown>
 ) => ReturnType<typeof import('@kinvolk/headlamp-plugin/lib').runCommand>;
 
+/** An Azure subscription returned by the Azure CLI. */
 export interface Subscription {
+  /** The subscription GUID. */
   id: string;
+  /** Human-readable subscription display name. */
   name: string;
+  /** Subscription state, e.g. `"Enabled"`. */
   state: string;
+  /** The Azure AD tenant that owns this subscription. */
   tenantId: string;
+  /** Whether this is the CLI's currently-active default subscription. */
   isDefault: boolean;
 }
 
+/** A unified representation of an AKS managed cluster or an AKS Arc (connected) cluster. */
 export interface AKSCluster {
+  /** Cluster resource name. */
   name: string;
+  /** Azure resource group containing the cluster. */
   resourceGroup: string;
+  /** Azure region / location. */
   location: string;
+  /** Kubernetes version running on the cluster. */
   kubernetesVersion: string;
+  /** Current provisioning state, e.g. `"Succeeded"`. */
   provisioningState: string;
+  /** Fully-qualified domain name (empty for Arc clusters). */
   fqdn: string;
+  /** Whether Azure RBAC is enabled on the cluster's AAD profile. */
   isAzureRBACEnabled: boolean;
+  /** Discriminator: `'aks'` for managed clusters, `'aksarc'` for Arc-connected clusters. */
   clusterType: 'aks' | 'aksarc';
 }
 
+/** Status snapshot returned by Arc proxy lifecycle functions. */
 export interface ArcProxyStatus {
+  /** Whether the operation itself succeeded. */
   success: boolean;
+  /** Current proxy state. */
   status: 'stopped' | 'starting' | 'running' | 'error';
+  /** Most recent error message, if any. */
   lastError?: string;
+  /** OS process ID of the running proxy, when available. */
   pid?: number;
 }
 
+/** Internal bookkeeping for a running `az connectedk8s proxy` process. */
 interface ArcProxySession {
+  /** The child-process handle; `undefined` after the process exits. */
   cmd?: ReturnType<typeof import('@kinvolk/headlamp-plugin/lib').runCommand>;
+  /** Mirrors {@link ArcProxyStatus.status}. */
   status: ArcProxyStatus['status'];
+  /** Most recent error message, if any. */
   lastError?: string;
+  /** OS process ID, when available. */
   pid?: number;
 }
 
+/** In-memory map of active Arc proxy sessions, keyed by `subscription/resourceGroup/cluster`. */
 const arcProxySessions = new Map<string, ArcProxySession>();
 
+/**
+ * Probes whether a cluster is reachable by listing its Kubernetes namespaces.
+ *
+ * @param clusterName - The cluster name to probe.
+ * @returns A result indicating reachability plus any error detail.
+ */
 function checkClusterReachable(clusterName: string): Promise<{ success: boolean; error?: string }> {
   return new Promise(resolve => {
     let settled = false;
@@ -81,6 +113,17 @@ function checkClusterReachable(clusterName: string): Promise<{ success: boolean;
   });
 }
 
+/**
+ * Reconciles the in-memory proxy session with actual cluster reachability.
+ *
+ * After a page reload the process handle is lost, so this function probes
+ * the cluster and updates the session map accordingly.
+ *
+ * @param subscriptionId - Azure subscription GUID.
+ * @param resourceGroup - Resource group containing the cluster.
+ * @param clusterName - Name of the Arc cluster.
+ * @returns The reconciled proxy status.
+ */
 async function reconcileArcProxyStatus(
   subscriptionId: string,
   resourceGroup: string,
@@ -117,6 +160,7 @@ async function reconcileArcProxyStatus(
   };
 }
 
+/** Builds the composite map key for an Arc proxy session. */
 function arcProxyKey(subscriptionId: string, resourceGroup: string, clusterName: string): string {
   return `${subscriptionId}/${resourceGroup}/${clusterName}`;
 }
@@ -243,6 +287,16 @@ export async function registerAKSCluster(
   }
 }
 
+/**
+ * Returns the current status of an Arc proxy session.
+ *
+ * If no in-memory session exists (e.g. after a page reload), the cluster is
+ * probed for reachability and the status is reconciled automatically.
+ *
+ * @param subscriptionId - Azure subscription GUID.
+ * @param resourceGroup - Resource group containing the cluster.
+ * @param clusterName - Name of the Arc cluster.
+ */
 export async function getArcProxyStatus(
   subscriptionId: string,
   resourceGroup: string,
@@ -264,6 +318,16 @@ export async function getArcProxyStatus(
   };
 }
 
+/**
+ * Starts an `az connectedk8s proxy` process for the given Arc cluster.
+ *
+ * If a proxy is already running (or the cluster is already reachable after a
+ * page reload), the existing status is returned without spawning a duplicate.
+ *
+ * @param subscriptionId - Azure subscription GUID.
+ * @param resourceGroup - Resource group containing the cluster.
+ * @param clusterName - Name of the Arc cluster.
+ */
 export async function startArcProxy(
   subscriptionId: string,
   resourceGroup: string,
@@ -379,6 +443,15 @@ export async function startArcProxy(
   }
 }
 
+/**
+ * Stops a running `az connectedk8s proxy` process for the given Arc cluster.
+ *
+ * If no proxy session exists the call is a no-op and returns `'stopped'`.
+ *
+ * @param subscriptionId - Azure subscription GUID.
+ * @param resourceGroup - Resource group containing the cluster.
+ * @param clusterName - Name of the Arc cluster.
+ */
 export async function stopArcProxy(
   subscriptionId: string,
   resourceGroup: string,
@@ -420,6 +493,13 @@ export async function stopArcProxy(
   }
 }
 
+/**
+ * Restarts the Arc proxy by stopping and then starting it again.
+ *
+ * @param subscriptionId - Azure subscription GUID.
+ * @param resourceGroup - Resource group containing the cluster.
+ * @param clusterName - Name of the Arc cluster.
+ */
 export async function restartArcProxy(
   subscriptionId: string,
   resourceGroup: string,
