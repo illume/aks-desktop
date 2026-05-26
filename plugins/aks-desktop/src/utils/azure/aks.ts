@@ -175,7 +175,7 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
         kubernetesVersion: cluster.version || '',
         provisioningState: cluster.status,
         fqdn: '', // Not returned by getClusters
-        isAzureRBACEnabled: cluster.aadProfile != null && cluster.aadProfile.enableAzureRbac === true,
+        isAzureRBACEnabled: cluster.aadProfile?.enableAzureRbac ?? false,
         clusterType: cluster.clusterType || 'aks',
       })),
     };
