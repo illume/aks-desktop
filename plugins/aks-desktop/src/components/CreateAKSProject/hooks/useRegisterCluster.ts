@@ -72,9 +72,7 @@ export function useRegisterCluster(
       const result = await registerAKSCluster(
         subscription,
         resourceGroup,
-        cluster,
-        undefined,
-        tenantId
+        cluster
       );
       if (DEBUG) console.debug('[AKS] Register cluster result:', result.success);
 

@@ -175,7 +175,7 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
         kubernetesVersion: cluster.version || '',
         provisioningState: cluster.status,
         fqdn: '', // Not returned by getClusters
-        isAzureRBACEnabled: cluster.aadProfile !== null,
+        isAzureRBACEnabled: cluster.aadProfile != null && cluster.aadProfile.enableAzureRbac === true,
         clusterType: cluster.clusterType || 'aks',
       })),
     };
@@ -199,7 +199,6 @@ export async function registerAKSCluster(
   resourceGroup: string,
   clusterName: string,
   managedNamespace?: string,
-  tenantId?: string,
   clusterType: 'aks' | 'aksarc' = 'aks'
 ): Promise<{
   success: boolean;
