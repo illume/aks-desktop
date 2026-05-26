@@ -1,18 +1,53 @@
-# Baremetal Support
+# AKS Arc / Baremetal Cluster Support
 
-AKS desktop can connect to baremetal-style Kubernetes environments such as AKS Arc, AKS local, and AKS edge clusters that are represented as Azure Arc connected Kubernetes resources. These clusters differ from regular AKS clusters because they usually require a local proxy before the Kubernetes API server is reachable from AKS desktop.
+AKS Desktop supports Azure Arc-connected Kubernetes clusters (AKS Arc, AKS local, AKS edge) in addition to standard AKS managed clusters. These clusters appear alongside regular AKS clusters in the registration dialog and can be managed directly from the UI.
 
-## Requirements
+## Prerequisites
 
-| Requirement | Why it is needed | How to check |
-| --- | --- | --- |
-| Azure CLI | Used to discover clusters, get kubeconfig credentials, and start the proxy. | `az version` |
-| Azure CLI login | Required to read Arc cluster resources and obtain credentials. | `az account show` |
-| connectedk8s CLI command | Required for baremetal cluster discovery and proxy access. | `az connectedk8s -h` |
-| aksarc CLI command | Required to get credentials for AKS Arc/local/edge clusters. | `az aksarc -h` |
-If a command is missing, install or update the relevant Azure CLI extension before connecting the cluster.
+Before connecting an Arc cluster in AKS Desktop, ensure that:
 
-## Getting Started
+- **Azure CLI** is installed and you are signed in (`az login`).
+- The **connectedk8s** CLI extension is installed — AKS Desktop uses it to discover Arc clusters and start the connectivity proxy.
+- The **aksarc** CLI extension is installed — AKS Desktop uses it to fetch kubeconfig credentials for Arc clusters.
+
+If any extension is missing, install it via `az extension add --name <name>`.
+
+## Registering an Arc Cluster
+
+1. Open the **Register AKS/Arc Cluster** dialog from the sidebar or cluster list.
+2. Select your Azure subscription — AKS Desktop loads both managed AKS and Arc clusters.
+3. Each cluster entry shows its type (**AKS** or **AKSARC**) so you can identify Arc clusters at a glance.
+4. Select the Arc cluster and click **Register**. AKS Desktop runs the appropriate credential command automatically and merges the kubeconfig.
+
+## Managing the Arc Proxy
+
+Arc clusters are typically not directly reachable from the local machine. AKS Desktop provides built-in proxy controls that appear automatically when an Arc cluster is selected.
+
+### Proxy Controls
+
+| Button | What it does |
+| --- | --- |
+| **Start** | Launches the connectivity proxy in the background so AKS Desktop can reach the cluster API. |
+| **Stop** | Stops the proxy process that was started by AKS Desktop. |
+| **Restart** | Stops and re-starts the proxy — useful after credential refreshes or transient failures. |
+| **Refresh** | Checks whether the cluster API is currently reachable and updates the displayed status. |
+
+### Status Indicators
+
+- **Running** — The proxy is active and the cluster API is reachable.
+- **Starting** — The proxy process has been launched and is initialising.
+- **Stopped** — No proxy is running; start one before interacting with the cluster.
+- **Error** — The proxy encountered a problem; the error detail is shown below the status.
+
+### Automatic Polling
+
+While the registration dialog is open and an Arc cluster is selected, AKS Desktop polls the proxy status every five seconds so the display stays current.
+
+### After a Reload
+
+If AKS Desktop is reloaded or restarted, the in-memory proxy process handle is lost. AKS Desktop automatically probes the cluster to determine whether an external proxy is still running and updates the status accordingly.
+
+## Getting Started with a Test Environment
 
 For a test environment, the AKS Arc jumpstart project can create a baremetal-style AKS Arc environment on an Azure VM:
 
@@ -20,90 +55,20 @@ For a test environment, the AKS Arc jumpstart project can create a baremetal-sty
 
 A shared lab environment can also be used, provided the user has permission to read the connected cluster resource and obtain kubeconfig credentials.
 
-## Registration Flow
-
-When a baremetal cluster is selected in AKS desktop, registration uses the Arc-specific credential command:
-
-```bash
-az aksarc get-credentials \
-  --subscription <subscription-id> \
-  --resource-group <resource-group> \
-  --name <cluster-name>
-```
-
-For regular AKS clusters, AKS desktop continues to use:
-
-```bash
-az aks get-credentials \
-  --subscription <subscription-id> \
-  --resource-group <resource-group> \
-  --name <cluster-name>
-```
-
-AKS desktop stores the resulting kubeconfig entry in the same kubeconfig merge flow used for regular AKS clusters.
-
-## Proxy Management
-
-Baremetal clusters may not be reachable directly from the local machine. In that case, start the proxy from the proxy controls in the cluster registration dialog.
-
-The proxy command is:
-
-```bash
-az connectedk8s proxy \
-  --subscription <subscription-id> \
-  --resource-group <resource-group> \
-  --name <cluster-name>
-```
-
-AKS desktop exposes these proxy actions for baremetal clusters:
-
-| Action | Behavior |
-| --- | --- |
-| Start Proxy | Starts `az connectedk8s proxy` through the existing run-command permission path. |
-| Stop Proxy | Stops the proxy process started by AKS desktop in the current plugin session. |
-| Restart Proxy | Stops the tracked proxy process and starts it again. |
-| Refresh Status | Checks whether the cluster API is reachable through the proxy. |
-
-Proxy commands go through the existing Headlamp run-command permission and consent flow. AKS desktop does not expose separate privileged IPC methods for proxy control.
-
-## Status Reconciliation
-
-Proxy status is tracked while AKS desktop is running. If the plugin reloads or the app restarts, the in-memory proxy process handle is lost. To reconcile status, AKS desktop uses Headlamp's normal frontend Kubernetes API path to make a lightweight namespace list request against the selected cluster.
-
-If the probe succeeds, AKS desktop treats the proxy as available. If it fails, the proxy is shown as stopped and the last error is displayed when available.
-
 ## Troubleshooting
 
 ### Cluster appears but does not connect
 
-Start or restart the proxy from the registration dialog. If the proxy is already running outside AKS desktop, use Refresh Status to verify that the Kubernetes API is reachable.
+Start or restart the proxy from the registration dialog. If the proxy is already running outside AKS Desktop, click **Refresh** to verify that the cluster API is reachable.
 
-### Credentials fail to merge
+### Registration fails
 
-Run the credential command manually to inspect the Azure CLI error:
-
-```bash
-az aksarc get-credentials \
-  --subscription <subscription-id> \
-  --resource-group <resource-group> \
-  --name <cluster-name>
-```
-
-Common causes include missing Azure login, insufficient permissions, missing CLI extensions, or a mismatched subscription.
+Ensure you are signed in to Azure and have the required CLI extensions installed. The error message in the dialog will show details from the underlying credential command.
 
 ### Proxy fails to start
 
-Run the proxy command manually to inspect the Azure CLI error:
-
-```bash
-az connectedk8s proxy \
-  --subscription <subscription-id> \
-  --resource-group <resource-group> \
-  --name <cluster-name>
-```
-
-Common causes include expired Azure credentials, missing connectedk8s support, local port conflicts, or network restrictions between the local machine and the Arc endpoint.
+Check the error message shown in the proxy panel. Common causes include expired Azure credentials, missing CLI extensions, local port conflicts, or network restrictions.
 
 ### Status shows stopped after restart
 
-This can happen if AKS desktop cannot reach the Kubernetes API during reconciliation. Start the proxy again from AKS desktop, or verify that the selected cluster can load namespaces in Headlamp after the proxy is running.
+This can happen if AKS Desktop cannot reach the cluster API during its automatic probe. Click **Start** to launch a new proxy session, or **Refresh** after confirming that an external proxy is running.

@@ -116,6 +116,7 @@ index 990ed043b..2b5441d83 100644
      'az config',
      'az aks',
 +    'az connectedk8s',
++    'az aksarc',
      'az extension',
      'az feature',
      'az provider',
