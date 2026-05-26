@@ -304,6 +304,7 @@ export default function RegisterAKSClusterDialog({
         selectedCluster.resourceGroup,
         selectedCluster.name,
         undefined, // managedNamespace
+        selectedSubscription.tenantId,
         selectedCluster.clusterType || 'aks'
       );
 

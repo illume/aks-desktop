@@ -119,7 +119,7 @@ describe('useRegisterCluster', () => {
     expect(result.current.error).toContain('Unknown error');
   });
 
-  test('handleRegister passes subscription, resourceGroup, and cluster to registerAKSCluster', async () => {
+  test('handleRegister passes subscription, resourceGroup, cluster, and tenantId to registerAKSCluster', async () => {
     mockRegisterAKSCluster.mockResolvedValue({ success: true, message: '' });
     const { result } = renderHook(() =>
       useRegisterCluster('aks-prod', 'rg-prod', 'sub-123', 'tenant-abc')
@@ -132,7 +132,9 @@ describe('useRegisterCluster', () => {
     expect(mockRegisterAKSCluster).toHaveBeenCalledWith(
       'sub-123',
       'rg-prod',
-      'aks-prod'
+      'aks-prod',
+      undefined,
+      'tenant-abc'
     );
   });
 
