@@ -6,7 +6,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
-import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../utils/azure/aks';
+import {
+  type ArcProxyStatus,
+  getAKSClusters,
+  getArcProxyStatus,
+  getSubscriptions,
+  registerAKSCluster,
+  restartArcProxy,
+  startArcProxy,
+  stopArcProxy,
+} from '../../utils/azure/aks';
 import { getClusterCapabilities } from '../../utils/azure/az-clusters';
 import type { AKSCluster, Subscription } from './RegisterAKSClusterDialogPure';
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
@@ -38,6 +47,9 @@ export default function RegisterAKSClusterDialog({
   const [clusterInputValue, setClusterInputValue] = useState('');
   const [capabilities, setCapabilities] = useState<ClusterCapabilities | null>(null);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
+  const [proxyStatus, setProxyStatus] = useState<ArcProxyStatus | null>(null);
+  const [proxyActionLoading, setProxyActionLoading] = useState(false);
+  const [proxyUiError, setProxyUiError] = useState('');
   const isMountedRef = useRef(true);
 
   /** Helper function to filter options by name substring match, ranking prefix matches first. */
@@ -59,6 +71,78 @@ export default function RegisterAKSClusterDialog({
     setClusterInputValue('');
     setCapabilities(null);
     setCapabilitiesLoading(false);
+    setProxyStatus(null);
+    setProxyUiError('');
+  };
+
+  const refreshProxyStatus = async () => {
+    if (
+      !selectedSubscription ||
+      !selectedCluster ||
+      (selectedCluster.clusterType || 'aks') !== 'aksarc'
+    ) {
+      return;
+    }
+
+    try {
+      const status = await getArcProxyStatus(
+        selectedSubscription.id,
+        selectedCluster.resourceGroup,
+        selectedCluster.name
+      );
+      if (isMountedRef.current) {
+        setProxyStatus(status);
+      }
+    } catch (err) {
+      if (isMountedRef.current) {
+        setProxyUiError(
+          t('Failed to fetch proxy status: {{message}}', {
+            message: err instanceof Error ? err.message : t('Unknown error'),
+          })
+        );
+      }
+    }
+  };
+
+  const runProxyAction = async (
+    action: (
+      subscriptionId: string,
+      resourceGroup: string,
+      clusterName: string
+    ) => Promise<ArcProxyStatus>
+  ) => {
+    if (!selectedSubscription || !selectedCluster) {
+      return;
+    }
+
+    setProxyActionLoading(true);
+    setProxyUiError('');
+    try {
+      const result = await action(
+        selectedSubscription.id,
+        selectedCluster.resourceGroup,
+        selectedCluster.name
+      );
+      if (isMountedRef.current) {
+        setProxyStatus(result);
+        if (!result.success && result.lastError) {
+          setProxyUiError(result.lastError);
+        }
+      }
+      await refreshProxyStatus();
+    } catch (err) {
+      if (isMountedRef.current) {
+        setProxyUiError(
+          t('Failed to manage Arc proxy: {{message}}', {
+            message: err instanceof Error ? err.message : t('Unknown error'),
+          })
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setProxyActionLoading(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -81,6 +165,29 @@ export default function RegisterAKSClusterDialog({
       setSelectedCluster(null);
     }
   }, [selectedSubscription]);
+
+  useEffect(() => {
+    if (!open || !selectedSubscription || !selectedCluster) {
+      setProxyStatus(null);
+      setProxyUiError('');
+      return;
+    }
+
+    if ((selectedCluster.clusterType || 'aks') !== 'aksarc') {
+      setProxyStatus(null);
+      setProxyUiError('');
+      return;
+    }
+
+    refreshProxyStatus();
+    const id = window.setInterval(() => {
+      refreshProxyStatus();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [open, selectedSubscription, selectedCluster]);
 
   const loadSubscriptions = async () => {
     setLoadingSubscriptions(true);
@@ -197,7 +304,8 @@ export default function RegisterAKSClusterDialog({
         selectedCluster.resourceGroup,
         selectedCluster.name,
         undefined, // managedNamespace
-        selectedSubscription.tenantId
+        selectedSubscription.tenantId,
+        selectedCluster.clusterType || 'aks'
       );
 
       if (!result.success) {
@@ -217,22 +325,28 @@ export default function RegisterAKSClusterDialog({
 
       onClusterRegistered?.();
 
-      // Check cluster capabilities (non-blocking)
-      setCapabilitiesLoading(true);
-      try {
-        const caps = await getClusterCapabilities({
-          subscriptionId: selectedSubscription.id,
-          resourceGroup: selectedCluster.resourceGroup,
-          clusterName: selectedCluster.name,
-        });
-        if (isMountedRef.current) {
-          setCapabilities(caps);
-        }
-      } catch {
-        // Non-critical — just don't show capabilities
-      } finally {
-        if (isMountedRef.current) {
-          setCapabilitiesLoading(false);
+      if ((selectedCluster.clusterType || 'aks') === 'aksarc') {
+        await refreshProxyStatus();
+      }
+
+      // Cluster capabilities are only available for AKS managed clusters.
+      if ((selectedCluster.clusterType || 'aks') === 'aks') {
+        setCapabilitiesLoading(true);
+        try {
+          const caps = await getClusterCapabilities({
+            subscriptionId: selectedSubscription.id,
+            resourceGroup: selectedCluster.resourceGroup,
+            clusterName: selectedCluster.name,
+          });
+          if (isMountedRef.current) {
+            setCapabilities(caps);
+          }
+        } catch {
+          // Non-critical — just don't show capabilities
+        } finally {
+          if (isMountedRef.current) {
+            setCapabilitiesLoading(false);
+          }
         }
       }
     } catch (err) {
@@ -259,7 +373,11 @@ export default function RegisterAKSClusterDialog({
   };
 
   const handleConfigured = () => {
-    if (selectedSubscription && selectedCluster) {
+    if (
+      selectedSubscription &&
+      selectedCluster &&
+      (selectedCluster.clusterType || 'aks') === 'aks'
+    ) {
       getClusterCapabilities({
         subscriptionId: selectedSubscription.id,
         resourceGroup: selectedCluster.resourceGroup,
@@ -303,6 +421,13 @@ export default function RegisterAKSClusterDialog({
       onDismissError={() => setError('')}
       onDismissSuccess={() => setSuccess('')}
       onConfigured={handleConfigured}
+      proxyStatus={proxyStatus}
+      proxyActionLoading={proxyActionLoading}
+      proxyUiError={proxyUiError}
+      onProxyRefresh={refreshProxyStatus}
+      onProxyStart={() => runProxyAction(startArcProxy)}
+      onProxyStop={() => runProxyAction(stopArcProxy)}
+      onProxyRestart={() => runProxyAction(restartArcProxy)}
     />
   );
 }

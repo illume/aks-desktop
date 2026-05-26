@@ -1,5 +1,12 @@
-import { getClusters } from './az-clusters';
+import { K8s } from '@kinvolk/headlamp-plugin/lib';
+import { getClusters, getConnectedClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
+
+declare const pluginRunCommand: (
+  command: string,
+  args: string[],
+  options: Record<string, unknown>
+) => ReturnType<typeof import('@kinvolk/headlamp-plugin/lib').runCommand>;
 
 export interface Subscription {
   id: string;
@@ -17,6 +24,101 @@ export interface AKSCluster {
   provisioningState: string;
   fqdn: string;
   isAzureRBACEnabled: boolean;
+  clusterType: 'aks' | 'aksarc';
+}
+
+export interface ArcProxyStatus {
+  success: boolean;
+  status: 'stopped' | 'starting' | 'running' | 'error';
+  lastError?: string;
+  pid?: number;
+}
+
+interface ArcProxySession {
+  cmd?: ReturnType<typeof import('@kinvolk/headlamp-plugin/lib').runCommand>;
+  status: ArcProxyStatus['status'];
+  lastError?: string;
+  pid?: number;
+}
+
+const arcProxySessions = new Map<string, ArcProxySession>();
+
+function checkClusterReachable(clusterName: string): Promise<{ success: boolean; error?: string }> {
+  return new Promise(resolve => {
+    let settled = false;
+    let cancel: (() => void) | undefined;
+
+    const finish = (result: { success: boolean; error?: string }) => {
+      if (!settled) {
+        settled = true;
+        if (cancel) {
+          cancel();
+        }
+        resolve(result);
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      finish({ success: false, error: 'Timed out checking cluster reachability' });
+    }, 5000);
+
+    try {
+      cancel = K8s.ResourceClasses.Namespace.apiList(
+        () => {
+          clearTimeout(timeout);
+          finish({ success: true });
+        },
+        (error: unknown) => {
+          clearTimeout(timeout);
+          finish({ success: false, error: error instanceof Error ? error.message : String(error) });
+        },
+        { cluster: clusterName }
+      );
+    } catch (error) {
+      clearTimeout(timeout);
+      finish({ success: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+}
+
+async function reconcileArcProxyStatus(
+  subscriptionId: string,
+  resourceGroup: string,
+  clusterName: string
+): Promise<ArcProxyStatus> {
+  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
+
+  const probe = await checkClusterReachable(clusterName);
+
+  if (probe.success) {
+    const reconciled: ArcProxySession = {
+      status: 'running',
+      lastError: undefined,
+      pid: undefined,
+    };
+    arcProxySessions.set(key, reconciled);
+    return {
+      success: true,
+      status: 'running',
+    };
+  }
+
+  const previous = arcProxySessions.get(key);
+  const stopped: ArcProxySession = {
+    status: 'stopped',
+    lastError: probe.error || previous?.lastError,
+    pid: undefined,
+  };
+  arcProxySessions.set(key, stopped);
+  return {
+    success: true,
+    status: 'stopped',
+    lastError: stopped.lastError,
+  };
+}
+
+function arcProxyKey(subscriptionId: string, resourceGroup: string, clusterName: string): string {
+  return `${subscriptionId}/${resourceGroup}/${clusterName}`;
 }
 
 /**
@@ -59,19 +161,22 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
   clusters?: AKSCluster[];
 }> {
   try {
-    const clusters = await getClusters(subscriptionId);
+    const aksClusters = await getClusters(subscriptionId);
+    const arcClusters = await getConnectedClusters(subscriptionId);
+    const clusters = [...aksClusters, ...arcClusters];
 
     return {
       success: true,
-      message: 'AKS clusters retrieved successfully',
+      message: 'AKS/Arc clusters retrieved successfully',
       clusters: clusters.map((cluster: any) => ({
         name: cluster.name,
         resourceGroup: cluster.resourceGroup,
         location: cluster.location,
-        kubernetesVersion: cluster.version,
+        kubernetesVersion: cluster.version || '',
         provisioningState: cluster.status,
         fqdn: '', // Not returned by getClusters
         isAzureRBACEnabled: cluster.aadProfile !== null,
+        clusterType: cluster.clusterType || 'aks',
       })),
     };
   } catch (error) {
@@ -94,7 +199,8 @@ export async function registerAKSCluster(
   resourceGroup: string,
   clusterName: string,
   managedNamespace?: string,
-  tenantId?: string
+  tenantId?: string,
+  clusterType: 'aks' | 'aksarc' = 'aks'
 ): Promise<{
   success: boolean;
   message: string;
@@ -121,9 +227,9 @@ export async function registerAKSCluster(
       subscriptionId,
       resourceGroup,
       clusterName,
-      false, // isAzureRBACEnabled
+      false, // isAzureRBACEnabled retained for backwards compatibility
       managedNamespace,
-      tenantId
+      clusterType
     );
 
     console.debug('[AKS] Registration result:', result);
@@ -135,4 +241,190 @@ export async function registerAKSCluster(
       message: error instanceof Error ? error.message : 'Unknown error',
     };
   }
+}
+
+export async function getArcProxyStatus(
+  subscriptionId: string,
+  resourceGroup: string,
+  clusterName: string
+): Promise<ArcProxyStatus> {
+  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
+  const session = arcProxySessions.get(key);
+
+  // Reconcile after reload/restart where in-memory process handle may be gone.
+  if (!session || !session.cmd) {
+    return reconcileArcProxyStatus(subscriptionId, resourceGroup, clusterName);
+  }
+
+  return {
+    success: true,
+    status: session.status,
+    lastError: session.lastError,
+    pid: session.pid,
+  };
+}
+
+export async function startArcProxy(
+  subscriptionId: string,
+  resourceGroup: string,
+  clusterName: string
+): Promise<ArcProxyStatus> {
+  if (typeof pluginRunCommand === 'undefined') {
+    return {
+      success: false,
+      status: 'error',
+      lastError: 'pluginRunCommand is not available.',
+    };
+  }
+
+  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
+  const existing = arcProxySessions.get(key);
+
+  // If process handle is gone (after reload), reconcile first so we don't start duplicates.
+  if (!existing || !existing.cmd) {
+    const reconciled = await reconcileArcProxyStatus(subscriptionId, resourceGroup, clusterName);
+    if (reconciled.status === 'running') {
+      return reconciled;
+    }
+  }
+
+  if (existing && (existing.status === 'running' || existing.status === 'starting')) {
+    return {
+      success: true,
+      status: existing.status,
+      lastError: existing.lastError,
+      pid: existing.pid,
+    };
+  }
+
+  try {
+    const cmd = pluginRunCommand(
+      'az',
+      [
+        'connectedk8s',
+        'proxy',
+        '--subscription',
+        subscriptionId,
+        '--resource-group',
+        resourceGroup,
+        '--name',
+        clusterName,
+      ],
+      {}
+    );
+
+    const session: ArcProxySession = {
+      cmd,
+      status: 'starting',
+      pid: (cmd as any).pid,
+    };
+    arcProxySessions.set(key, session);
+
+    cmd.stdout.on('data', () => {
+      const latest = arcProxySessions.get(key);
+      if (latest) {
+        latest.status = 'running';
+        latest.lastError = undefined;
+        arcProxySessions.set(key, latest);
+      }
+    });
+
+    cmd.stderr.on('data', (data: string) => {
+      const latest = arcProxySessions.get(key);
+      if (latest) {
+        latest.lastError = data.toString().trim();
+        if (latest.status !== 'running') {
+          latest.status = 'error';
+        }
+        arcProxySessions.set(key, latest);
+      }
+    });
+
+    cmd.on('exit', (code: number | null) => {
+      const latest = arcProxySessions.get(key);
+      if (!latest) {
+        return;
+      }
+      latest.status = code === 0 ? 'stopped' : 'error';
+      if (code !== 0 && !latest.lastError) {
+        latest.lastError = `Proxy exited with code ${code}`;
+      }
+      latest.cmd = undefined;
+      arcProxySessions.set(key, latest);
+    });
+
+    cmd.on('error', (errOrCode: unknown) => {
+      const latest = arcProxySessions.get(key);
+      if (!latest) {
+        return;
+      }
+      latest.status = 'error';
+      latest.cmd = undefined;
+      latest.lastError =
+        errOrCode instanceof Error ? errOrCode.message : `Proxy failed: ${String(errOrCode)}`;
+      arcProxySessions.set(key, latest);
+    });
+
+    return {
+      success: true,
+      status: 'starting',
+      pid: session.pid,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      status: 'error',
+      lastError: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+export async function stopArcProxy(
+  subscriptionId: string,
+  resourceGroup: string,
+  clusterName: string
+): Promise<ArcProxyStatus> {
+  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
+  const session = arcProxySessions.get(key);
+
+  if (!session || !session.cmd) {
+    return {
+      success: true,
+      status: 'stopped',
+    };
+  }
+
+  try {
+    if (typeof (session.cmd as any).kill === 'function') {
+      (session.cmd as any).kill();
+    }
+    session.status = 'stopped';
+    session.cmd = undefined;
+    arcProxySessions.set(key, session);
+    return {
+      success: true,
+      status: 'stopped',
+      lastError: session.lastError,
+      pid: session.pid,
+    };
+  } catch (error) {
+    session.status = 'error';
+    session.lastError = error instanceof Error ? error.message : 'Unknown error';
+    arcProxySessions.set(key, session);
+    return {
+      success: false,
+      status: 'error',
+      lastError: session.lastError,
+      pid: session.pid,
+    };
+  }
+}
+
+export async function restartArcProxy(
+  subscriptionId: string,
+  resourceGroup: string,
+  clusterName: string
+): Promise<ArcProxyStatus> {
+  await stopArcProxy(subscriptionId, resourceGroup, clusterName);
+  return startArcProxy(subscriptionId, resourceGroup, clusterName);
 }

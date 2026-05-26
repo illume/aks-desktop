@@ -22,6 +22,7 @@ const SAMPLE_CLUSTERS = [
     location: 'eastus',
     kubernetesVersion: '1.28.5',
     provisioningState: 'Succeeded',
+    clusterType: 'aks' as const,
   },
   {
     name: 'dev-aks-cluster',
@@ -29,8 +30,18 @@ const SAMPLE_CLUSTERS = [
     location: 'westus2',
     kubernetesVersion: '1.29.0',
     provisioningState: 'Succeeded',
+    clusterType: 'aks' as const,
   },
 ];
+
+const SAMPLE_ARC_CLUSTER = {
+  name: 'edge-arc-cluster',
+  resourceGroup: 'edge-rg',
+  location: 'westus3',
+  kubernetesVersion: '',
+  provisioningState: 'Connected',
+  clusterType: 'aksarc' as const,
+};
 
 const baseArgs: RegisterAKSClusterDialogPureProps = {
   open: true,
@@ -60,6 +71,13 @@ const baseArgs: RegisterAKSClusterDialogPureProps = {
   onDismissError: noOp,
   onDismissSuccess: noOp,
   onConfigured: noOp,
+  proxyStatus: { success: true, status: 'stopped' },
+  proxyActionLoading: false,
+  proxyUiError: '',
+  onProxyRefresh: noOp,
+  onProxyStart: noOp,
+  onProxyStop: noOp,
+  onProxyRestart: noOp,
 };
 
 export default {
@@ -134,6 +152,43 @@ ClusterSelected.args = {
   filteredClusters: SAMPLE_CLUSTERS,
   selectedCluster: SAMPLE_CLUSTERS[0],
   clusterInputValue: SAMPLE_CLUSTERS[0].name,
+};
+
+/** Arc cluster selected — proxy controls visible with stopped status. */
+export const ArcProxyStopped = Template.bind({});
+ArcProxyStopped.args = {
+  ...baseArgs,
+  selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
+  clusters: [...SAMPLE_CLUSTERS, SAMPLE_ARC_CLUSTER],
+  filteredClusters: [...SAMPLE_CLUSTERS, SAMPLE_ARC_CLUSTER],
+  selectedCluster: SAMPLE_ARC_CLUSTER,
+  clusterInputValue: SAMPLE_ARC_CLUSTER.name,
+  proxyStatus: { success: true, status: 'stopped' },
+};
+
+/** Arc cluster selected — proxy is running and shows process metadata. */
+export const ArcProxyRunning = Template.bind({});
+ArcProxyRunning.args = {
+  ...ArcProxyStopped.args,
+  proxyStatus: { success: true, status: 'running', pid: 4242 },
+};
+
+/** Arc cluster selected — proxy failed and last error is visible. */
+export const ArcProxyError = Template.bind({});
+ArcProxyError.args = {
+  ...ArcProxyStopped.args,
+  proxyStatus: {
+    success: true,
+    status: 'error',
+    lastError: 'Unable to reach Arc proxy endpoint. Start the proxy and try again.',
+  },
+};
+
+/** Arc cluster selected — proxy action buttons disabled while action runs. */
+export const ArcProxyActionLoading = Template.bind({});
+ArcProxyActionLoading.args = {
+  ...ArcProxyStopped.args,
+  proxyActionLoading: true,
 };
 
 /** Registration in progress — Register button shows spinner and "Registering...". */

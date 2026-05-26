@@ -67,6 +67,10 @@ import type { RegisterAKSClusterDialogPureProps } from './RegisterAKSClusterDial
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
 import {
   AllCapabilitiesEnabled,
+  ArcProxyActionLoading,
+  ArcProxyError,
+  ArcProxyRunning,
+  ArcProxyStopped,
   CheckingAuth,
   CheckingCapabilities,
   ClusterSelected,
@@ -194,19 +198,39 @@ describe('Axe: RegisterAKSClusterDialogPure', () => {
     const violations = await runAxe();
     expect(violations).toEqual([]);
   });
+
+  it('ArcProxyStopped has no axe violations', async () => {
+    renderStory(ArcProxyStopped.args as RegisterAKSClusterDialogPureProps);
+    const violations = await runAxe();
+    expect(violations).toEqual([]);
+  });
+
+  it('ArcProxyRunning has no axe violations', async () => {
+    renderStory(ArcProxyRunning.args as RegisterAKSClusterDialogPureProps);
+    const violations = await runAxe();
+    expect(violations).toEqual([]);
+  });
+
+  it('ArcProxyError has no axe violations', async () => {
+    renderStory(ArcProxyError.args as RegisterAKSClusterDialogPureProps);
+    const violations = await runAxe();
+    expect(violations).toEqual([]);
+  });
 });
 
 describe('SR: Default — dialog structure', () => {
   it('announces the dialog landmark', async () => {
     await mount();
     const ps = await phrases();
-    expect(ps.some(p => p.includes('dialog') && p.includes('Register AKS Cluster'))).toBe(true);
+    expect(ps.some(p => p.includes('dialog') && p.includes('Register AKS/Arc Cluster'))).toBe(true);
   });
 
-  it('announces the dialog heading "Register AKS Cluster"', async () => {
+  it('announces the dialog heading "Register AKS/Arc Cluster"', async () => {
     await mount();
     const ps = await phrases();
-    expect(ps.some(p => p.includes('heading') && p.includes('Register AKS Cluster'))).toBe(true);
+    expect(ps.some(p => p.includes('heading') && p.includes('Register AKS/Arc Cluster'))).toBe(
+      true
+    );
   });
 
   it('announces the Subscription combobox', async () => {
@@ -302,7 +326,7 @@ describe('SR: LoadingClusters — loading status', () => {
   it('announces the status region with loading clusters text', async () => {
     await mount(LoadingClusters.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
-    expect(ps.some(p => p.includes('Loading AKS clusters'))).toBe(true);
+    expect(ps.some(p => p.includes('Loading AKS/Arc clusters'))).toBe(true);
   });
 });
 
@@ -311,16 +335,49 @@ describe('SR: NoClusters — info alert', () => {
     await mount(NoClusters.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
     expect(ps).toContain('alert');
-    expect(ps.some(p => p.includes('No AKS clusters found'))).toBe(true);
+    expect(ps.some(p => p.includes('No AKS or Arc clusters found'))).toBe(true);
   });
 });
 
 describe('SR: WithClusters — both comboboxes', () => {
-  it('announces both Subscription and AKS Cluster comboboxes', async () => {
+  it('announces both Subscription and AKS/Arc Cluster comboboxes', async () => {
     await mount(WithClusters.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
     expect(ps.some(p => p.includes('combobox') && p.includes('Subscription'))).toBe(true);
-    expect(ps.some(p => p.includes('combobox') && p.includes('AKS Cluster'))).toBe(true);
+    expect(ps.some(p => p.includes('combobox') && p.includes('AKS/Arc Cluster'))).toBe(true);
+  });
+});
+
+describe('SR: ArcProxy — proxy controls', () => {
+  it('announces proxy status and controls for a stopped Arc proxy', async () => {
+    await mount(ArcProxyStopped.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('Arc Proxy'))).toBe(true);
+    expect(ps.some(p => p.includes('STOPPED'))).toBe(true);
+    expect(ps.some(p => p.includes('button') && p.includes('Start Proxy'))).toBe(true);
+    expect(ps.some(p => p.includes('button') && p.includes('Stop Proxy'))).toBe(true);
+    expect(ps.some(p => p.includes('button') && p.includes('Restart Proxy'))).toBe(true);
+  });
+
+  it('announces running proxy process metadata', async () => {
+    await mount(ArcProxyRunning.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('RUNNING'))).toBe(true);
+    expect(ps.some(p => p.includes('PID 4242'))).toBe(true);
+  });
+
+  it('announces the proxy last error', async () => {
+    await mount(ArcProxyError.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps).toContain('alert');
+    expect(ps.some(p => p.includes('Unable to reach Arc proxy endpoint'))).toBe(true);
+  });
+
+  it('announces proxy buttons as disabled while a proxy action is loading', async () => {
+    await mount(ArcProxyActionLoading.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('Start Proxy') && p.includes('disabled'))).toBe(true);
+    expect(ps.some(p => p.includes('Stop Proxy') && p.includes('disabled'))).toBe(true);
   });
 });
 

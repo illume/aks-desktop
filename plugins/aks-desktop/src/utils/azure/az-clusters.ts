@@ -107,6 +107,58 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
   return clusters;
 }
 
+export async function getConnectedClusters(subscriptionId: string): Promise<any[]> {
+  const clusters: any[] = [];
+
+  const args = ['connectedk8s', 'list', '--subscription', subscriptionId, '-o', 'json'];
+  const { stdout, stderr } = await runCommandAsync('az', args);
+
+  if (stderr) {
+    // If the extension is unavailable, fall back to returning no Arc clusters.
+    const commandNotFound =
+      stderr.includes("'connectedk8s'") ||
+      stderr.includes('az extension add --name connectedk8s') ||
+      stderr.includes('unrecognized arguments: connectedk8s');
+    if (commandNotFound) {
+      debugLog('connectedk8s extension not available; skipping Arc cluster discovery');
+      return clusters;
+    }
+
+    // Check if stderr contains only warnings (not actual errors)
+    const isWarningOnly =
+      stderr.includes('WARNING:') &&
+      !isAzError(stderr) &&
+      !stderr.includes('error:') &&
+      !stderr.includes('failed') &&
+      !stderr.includes('Failed');
+
+    if (!isWarningOnly) {
+      throw new Error(stderr);
+    }
+  }
+
+  if (!stdout) {
+    return clusters;
+  }
+
+  const parsed = JSON.parse(stdout);
+  parsed.forEach((cluster: any) => {
+    clusters.push({
+      name: cluster.name,
+      subscription: subscriptionId,
+      resourceGroup: cluster.resourceGroup,
+      location: cluster.location,
+      version: cluster.kubernetesVersion || cluster.agentVersion || '',
+      status: cluster.provisioningState || cluster.connectivityStatus || 'Unknown',
+      powerState: cluster.connectivityStatus || 'Unknown',
+      nodeCount: 0,
+      clusterType: 'aksarc',
+    });
+  });
+
+  return clusters;
+}
+
 export async function getAksClusterStatus(options: {
   subscriptionId: string;
   resourceGroup: string;

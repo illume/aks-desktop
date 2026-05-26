@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import React from 'react';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
+import type { ArcProxyStatus } from '../../utils/azure/aks';
 import { ClusterConfigurePanel } from '../CreateAKSProject/components/ClusterConfigurePanel';
 
 export interface Subscription {
@@ -33,6 +34,7 @@ export interface AKSCluster {
   location: string;
   kubernetesVersion: string;
   provisioningState: string;
+  clusterType?: 'aks' | 'aksarc';
 }
 
 export interface RegisterAKSClusterDialogPureProps {
@@ -63,6 +65,13 @@ export interface RegisterAKSClusterDialogPureProps {
   onDismissError: () => void;
   onDismissSuccess: () => void;
   onConfigured?: () => void;
+  proxyStatus: ArcProxyStatus | null;
+  proxyActionLoading: boolean;
+  proxyUiError: string;
+  onProxyRefresh: () => void;
+  onProxyStart: () => void;
+  onProxyStop: () => void;
+  onProxyRestart: () => void;
 }
 
 export default function RegisterAKSClusterDialogPure({
@@ -93,8 +102,16 @@ export default function RegisterAKSClusterDialogPure({
   onDismissError,
   onDismissSuccess,
   onConfigured,
+  proxyStatus,
+  proxyActionLoading,
+  proxyUiError,
+  onProxyRefresh,
+  onProxyStart,
+  onProxyStop,
+  onProxyRestart,
 }: RegisterAKSClusterDialogPureProps) {
   const { t } = useTranslation();
+  const isArcCluster = (selectedCluster?.clusterType || 'aks') === 'aksarc';
 
   return (
     <Dialog
@@ -108,7 +125,7 @@ export default function RegisterAKSClusterDialogPure({
         <Box display="flex" alignItems="center" gap={1}>
           <Icon icon="logos:microsoft-azure" style={{ fontSize: '24px' }} aria-hidden="true" />
           <Typography variant="h6" component="span">
-            {t('Register AKS Cluster')}
+            {t('Register AKS/Arc Cluster')}
           </Typography>
         </Box>
       </DialogTitle>
@@ -126,6 +143,8 @@ export default function RegisterAKSClusterDialogPure({
               {success}
             </Alert>
           )}
+
+          {proxyUiError && <Alert severity="error">{proxyUiError}</Alert>}
 
           {capabilitiesLoading && (
             <Box display="flex" alignItems="center" gap={1}>
@@ -254,13 +273,15 @@ export default function RegisterAKSClusterDialogPure({
                 <Box display="flex" alignItems="center" gap={1}>
                   <CircularProgress size={20} aria-hidden="true" />
                   <Typography variant="body2" color="textSecondary">
-                    {t('Loading AKS clusters')}...
+                    {t('Loading AKS/Arc clusters')}...
                   </Typography>
                 </Box>
               )}
 
               {!loadingClusters && selectedSubscription && clusters.length === 0 && (
-                <Alert severity="info">{t('No AKS clusters found in this subscription.')}</Alert>
+                <Alert severity="info">
+                  {t('No AKS or Arc clusters found in this subscription.')}
+                </Alert>
               )}
 
               {!loadingClusters && selectedSubscription && clusters.length > 0 && (
@@ -280,8 +301,8 @@ export default function RegisterAKSClusterDialogPure({
                   renderInput={params => (
                     <TextField
                       {...params}
-                      label={t('AKS Cluster')}
-                      placeholder={t('Select an AKS cluster')}
+                      label={t('AKS/Arc Cluster')}
+                      placeholder={t('Select an AKS or Arc cluster')}
                     />
                   )}
                   renderOption={(props, option) => (
@@ -289,7 +310,8 @@ export default function RegisterAKSClusterDialogPure({
                       <Box width="100%">
                         <Typography variant="body1">{option.name}</Typography>
                         <Typography variant="caption" color="textSecondary">
-                          {option.location} • v{option.kubernetesVersion} •{' '}
+                          {(option.clusterType || 'aks').toUpperCase()} • {option.location} •{' '}
+                          {option.kubernetesVersion ? `v${option.kubernetesVersion} • ` : ''}
                           {option.provisioningState}
                         </Typography>
                       </Box>
@@ -323,6 +345,61 @@ export default function RegisterAKSClusterDialogPure({
                   </Typography>
                 </Box>
               )}
+
+              {selectedCluster && clusterInputValue === selectedCluster.name && isArcCluster && (
+                <Box p={2} border={1} borderColor="divider" borderRadius={1}>
+                  <Typography variant="subtitle2" component="p" gutterBottom>
+                    {t('Arc Proxy')}
+                  </Typography>
+
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>{t('Status')}:</strong>{' '}
+                    {proxyStatus?.status ? proxyStatus.status.toUpperCase() : t('Unknown')}
+                    {proxyStatus?.pid ? ` (PID ${proxyStatus.pid})` : ''}
+                  </Typography>
+
+                  {proxyStatus?.lastError && (
+                    <Alert severity="warning" sx={{ mb: 1 }}>
+                      {proxyStatus.lastError}
+                    </Alert>
+                  )}
+
+                  <Box display="flex" gap={1} flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      onClick={onProxyStart}
+                      disabled={proxyActionLoading || !selectedSubscription}
+                      startIcon={<Icon icon="mdi:play" aria-hidden="true" />}
+                    >
+                      {t('Start Proxy')}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={onProxyStop}
+                      disabled={proxyActionLoading || !selectedSubscription}
+                      startIcon={<Icon icon="mdi:stop" aria-hidden="true" />}
+                    >
+                      {t('Stop Proxy')}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={onProxyRestart}
+                      disabled={proxyActionLoading || !selectedSubscription}
+                      startIcon={<Icon icon="mdi:restart" aria-hidden="true" />}
+                    >
+                      {t('Restart Proxy')}
+                    </Button>
+                    <Button
+                      variant="text"
+                      onClick={onProxyRefresh}
+                      disabled={proxyActionLoading || !selectedSubscription}
+                      startIcon={<Icon icon="mdi:refresh" aria-hidden="true" />}
+                    >
+                      {t('Refresh Status')}
+                    </Button>
+                  </Box>
+                </Box>
+              )}
             </>
           )}
           {/* Persistent live region for loading status announcements.
@@ -349,7 +426,7 @@ export default function RegisterAKSClusterDialogPure({
               : loadingSubscriptions
               ? `${t('Loading subscriptions')}...`
               : loadingClusters
-              ? `${t('Loading AKS clusters')}...`
+              ? `${t('Loading AKS/Arc clusters')}...`
               : capabilitiesLoading
               ? 'Checking cluster capabilities...'
               : ''}
