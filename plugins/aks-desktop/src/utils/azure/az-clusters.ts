@@ -107,6 +107,19 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
   return clusters;
 }
 
+/**
+ * Discovers Azure Arc-connected Kubernetes clusters in the given subscription.
+ *
+ * Uses `az connectedk8s list` to enumerate clusters. If the `connectedk8s`
+ * CLI extension is not installed, the function gracefully returns an empty
+ * list instead of throwing.
+ *
+ * Each returned cluster object includes a `clusterType: 'aksarc'` discriminator
+ * so callers can distinguish Arc clusters from standard AKS managed clusters.
+ *
+ * @param subscriptionId - Azure subscription GUID to query.
+ * @returns An array of cluster objects, or an empty array when the extension is unavailable.
+ */
 export async function getConnectedClusters(subscriptionId: string): Promise<any[]> {
   const clusters: any[] = [];
 

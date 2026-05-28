@@ -4,13 +4,7 @@ AKS Desktop supports Azure Arc-connected Kubernetes clusters (AKS Arc, AKS local
 
 ## Prerequisites
 
-Before connecting an Arc cluster in AKS Desktop, ensure that:
-
-- **Azure CLI** is installed and you are signed in (`az login`).
-- The **connectedk8s** CLI extension is installed — AKS Desktop uses it to discover Arc clusters and start the connectivity proxy.
-- The **aksarc** CLI extension is installed — AKS Desktop uses it to fetch kubeconfig credentials for Arc clusters.
-
-If any extension is missing, install it via `az extension add --name <name>`.
+AKS Desktop bundles the Azure CLI, so no separate CLI installation is needed. When connecting an Arc cluster for the first time, AKS Desktop will prompt you to install the required CLI extensions (**connectedk8s** and **aksarc**) if they are not already present. Simply approve the installation when prompted — AKS Desktop handles the rest.
 
 ## Registering an Arc Cluster
 

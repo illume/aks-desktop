@@ -9,7 +9,7 @@ import {
   restartArcProxy,
   startArcProxy,
   stopArcProxy,
-} from '../utils/azure/aks';
+} from '../utils/azure/arc-proxy';
 
 /** Parameters identifying an Arc cluster for proxy management. */
 interface ArcProxyTarget {

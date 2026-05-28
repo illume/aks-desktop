@@ -17,15 +17,6 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   runCommand: mockRunCommand,
 }));
 
-vi.mock('../azure/az-clusters', () => ({
-  getClusters: vi.fn(),
-  getConnectedClusters: vi.fn(),
-}));
-
-vi.mock('../azure/az-subscriptions', () => ({
-  getSubscriptions: vi.fn(),
-}));
-
 type Handler = (...args: any[]) => void;
 
 function createCommandHandle(
@@ -69,10 +60,10 @@ function createCommandHandle(
   return handle;
 }
 
-async function loadAksModule() {
+async function loadArcProxyModule() {
   vi.resetModules();
   (globalThis as any).pluginRunCommand = mockRunCommand;
-  return import('../azure/aks');
+  return import('./arc-proxy');
 }
 
 function setupReachabilitySuccess() {
@@ -101,7 +92,7 @@ describe('Arc proxy lifecycle', () => {
   test('reconciles status to running when Headlamp namespace API succeeds after reload', async () => {
     setupReachabilitySuccess();
 
-    const { getArcProxyStatus } = await loadAksModule();
+    const { getArcProxyStatus } = await loadArcProxyModule();
     const result = await getArcProxyStatus('sub-1', 'rg-1', 'edge-arc-cluster');
 
     expect(result).toEqual({ success: true, status: 'running' });
@@ -114,7 +105,7 @@ describe('Arc proxy lifecycle', () => {
   test('reconciles status to stopped with last error when Headlamp namespace API fails', async () => {
     setupReachabilityFailure();
 
-    const { getArcProxyStatus } = await loadAksModule();
+    const { getArcProxyStatus } = await loadArcProxyModule();
     const result = await getArcProxyStatus('sub-1', 'rg-1', 'edge-arc-cluster');
 
     expect(result).toEqual({
@@ -129,7 +120,7 @@ describe('Arc proxy lifecycle', () => {
     const proxyCommand = createCommandHandle();
     mockRunCommand.mockReturnValueOnce(proxyCommand);
 
-    const { startArcProxy } = await loadAksModule();
+    const { startArcProxy } = await loadArcProxyModule();
     const result = await startArcProxy('sub-1', 'rg-1', 'edge-arc-cluster');
 
     expect(result).toEqual({ success: true, status: 'starting', pid: 1234 });
@@ -152,7 +143,7 @@ describe('Arc proxy lifecycle', () => {
   test('does not start a duplicate proxy when reconciliation reports running', async () => {
     setupReachabilitySuccess();
 
-    const { startArcProxy } = await loadAksModule();
+    const { startArcProxy } = await loadArcProxyModule();
     const result = await startArcProxy('sub-1', 'rg-1', 'edge-arc-cluster');
 
     expect(result).toEqual({ success: true, status: 'running' });
@@ -164,7 +155,7 @@ describe('Arc proxy lifecycle', () => {
     const proxyCommand = createCommandHandle();
     mockRunCommand.mockReturnValueOnce(proxyCommand);
 
-    const { startArcProxy, stopArcProxy } = await loadAksModule();
+    const { startArcProxy, stopArcProxy } = await loadArcProxyModule();
     await startArcProxy('sub-1', 'rg-1', 'edge-arc-cluster');
     const result = await stopArcProxy('sub-1', 'rg-1', 'edge-arc-cluster');
 
@@ -178,12 +169,61 @@ describe('Arc proxy lifecycle', () => {
     setupReachabilityFailure('connection refused');
     mockRunCommand.mockReturnValueOnce(firstProxy).mockReturnValueOnce(secondProxy);
 
-    const { startArcProxy, restartArcProxy } = await loadAksModule();
+    const { startArcProxy, restartArcProxy } = await loadArcProxyModule();
     await startArcProxy('sub-1', 'rg-1', 'edge-arc-cluster');
     const result = await restartArcProxy('sub-1', 'rg-1', 'edge-arc-cluster');
 
     expect(firstProxy.kill).toHaveBeenCalled();
     expect(result).toEqual({ success: true, status: 'starting', pid: 1234 });
     expect(mockRunCommand).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('arcProxyKey', () => {
+  test('builds composite key from subscription, resource group and cluster name', async () => {
+    const { arcProxyKey } = await loadArcProxyModule();
+    expect(arcProxyKey('sub-1', 'rg-1', 'cluster-1')).toBe('sub-1/rg-1/cluster-1');
+  });
+});
+
+describe('checkClusterReachable', () => {
+  beforeEach(() => {
+    mockNamespaceApiList.mockReset();
+  });
+
+  test('returns success when namespace API succeeds', async () => {
+    setupReachabilitySuccess();
+    const { checkClusterReachable } = await loadArcProxyModule();
+    const result = await checkClusterReachable('my-cluster');
+    expect(result).toEqual({ success: true });
+  });
+
+  test('returns failure with error message when namespace API fails', async () => {
+    setupReachabilityFailure('connection refused');
+    const { checkClusterReachable } = await loadArcProxyModule();
+    const result = await checkClusterReachable('my-cluster');
+    expect(result).toEqual({ success: false, error: 'connection refused' });
+  });
+
+  test('returns failure when namespace API throws', async () => {
+    mockNamespaceApiList.mockImplementation(() => {
+      throw new Error('API not available');
+    });
+    const { checkClusterReachable } = await loadArcProxyModule();
+    const result = await checkClusterReachable('my-cluster');
+    expect(result).toEqual({ success: false, error: 'API not available' });
+  });
+});
+
+describe('stopArcProxy', () => {
+  beforeEach(() => {
+    mockRunCommand.mockReset();
+    mockNamespaceApiList.mockReset();
+  });
+
+  test('returns stopped when no session exists', async () => {
+    const { stopArcProxy } = await loadArcProxyModule();
+    const result = await stopArcProxy('sub-1', 'rg-1', 'no-session-cluster');
+    expect(result).toEqual({ success: true, status: 'stopped' });
   });
 });
