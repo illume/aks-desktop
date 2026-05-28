@@ -41,7 +41,7 @@ export default function RegisterAKSClusterDialog({
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
   const isMountedRef = useRef(true);
 
-  // Derive the BareMetal proxy target from the selected cluster, if it is an BareMetal cluster.
+  // Derive the BareMetal proxy target from the selected cluster, if it is a BareMetal cluster.
   const bareMetalProxyTarget = useMemo(() => {
     if (
       !selectedSubscription ||
