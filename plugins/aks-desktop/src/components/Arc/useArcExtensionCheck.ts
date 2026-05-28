@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   installExtension as installAzExtension,
   isExtensionInstalled,
@@ -34,6 +34,15 @@ export function useArcExtensionCheck() {
     error: null,
     showSuccess: false,
   });
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const checkExtensions = useCallback(async () => {
     try {
@@ -86,7 +95,7 @@ export function useArcExtensionCheck() {
         showSuccess: true,
       }));
 
-      setTimeout(() => {
+      successTimeoutRef.current = setTimeout(() => {
         setStatus(prev => ({ ...prev, showSuccess: false }));
       }, 3000);
     } catch (error) {
