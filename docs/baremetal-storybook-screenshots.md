@@ -21,4 +21,15 @@ Use this markdown block in the PR description:
 
 #### Bare Metal Proxy Dropped
 ![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
+
+### Register AKS Cluster dialog (Storybook)
+
+#### Register AKS Cluster - Default
+![Register AKS Cluster - Default](docs/images/storybook/register-aks-cluster-default.png)
+
+#### Register AKS Cluster - Alternate capture
+https://github.com/user-attachments/assets/fddcdc44-3251-4457-8112-0e4d9aeec330
+
+#### Register AKS Cluster - Alternate capture 2
+https://github.com/user-attachments/assets/f4afb871-bd8c-44dc-adfc-154ac9752862
 ```
