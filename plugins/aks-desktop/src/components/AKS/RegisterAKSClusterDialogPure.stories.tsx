@@ -34,7 +34,7 @@ const SAMPLE_CLUSTERS = [
   },
 ];
 
-const SAMPLE_ARC_CLUSTER = {
+const SAMPLE_BAREMETAL_CLUSTER = {
   name: 'edge-arc-cluster',
   resourceGroup: 'edge-rg',
   location: 'westus3',
@@ -159,10 +159,10 @@ export const BareMetalProxyStopped = Template.bind({});
 BareMetalProxyStopped.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
-  clusters: [...SAMPLE_CLUSTERS, SAMPLE_ARC_CLUSTER],
-  filteredClusters: [...SAMPLE_CLUSTERS, SAMPLE_ARC_CLUSTER],
-  selectedCluster: SAMPLE_ARC_CLUSTER,
-  clusterInputValue: SAMPLE_ARC_CLUSTER.name,
+  clusters: [...SAMPLE_CLUSTERS, SAMPLE_BAREMETAL_CLUSTER],
+  filteredClusters: [...SAMPLE_CLUSTERS, SAMPLE_BAREMETAL_CLUSTER],
+  selectedCluster: SAMPLE_BAREMETAL_CLUSTER,
+  clusterInputValue: SAMPLE_BAREMETAL_CLUSTER.name,
   proxyStatus: { success: true, status: 'stopped' },
 };
 

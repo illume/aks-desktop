@@ -19,6 +19,7 @@ import {
 import React from 'react';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import type { BareMetalProxyStatus } from '../../utils/azure/aks';
+import BareMetalProxyPanel from '../BareMetal/BareMetalProxyPanel';
 import { ClusterConfigurePanel } from '../CreateAKSProject/components/ClusterConfigurePanel';
 
 export interface Subscription {
@@ -125,7 +126,7 @@ export default function RegisterAKSClusterDialogPure({
         <Box display="flex" alignItems="center" gap={1}>
           <Icon icon="logos:microsoft-azure" style={{ fontSize: '24px' }} aria-hidden="true" />
           <Typography variant="h6" component="span">
-            {t('Register AKS/BareMetal Cluster')}
+            {t('Register AKS Cluster')}
           </Typography>
         </Box>
       </DialogTitle>
@@ -301,8 +302,8 @@ export default function RegisterAKSClusterDialogPure({
                   renderInput={params => (
                     <TextField
                       {...params}
-                      label={t('AKS/BareMetal Cluster')}
-                      placeholder={t('Select an AKS or BareMetal cluster')}
+                      label={t('Cluster')}
+                      placeholder={t('Select a cluster')}
                     />
                   )}
                   renderOption={(props, option) => (
@@ -347,58 +348,15 @@ export default function RegisterAKSClusterDialogPure({
               )}
 
               {selectedCluster && clusterInputValue === selectedCluster.name && isBareMetalCluster && (
-                <Box p={2} border={1} borderColor="divider" borderRadius={1}>
-                  <Typography variant="subtitle2" component="p" gutterBottom>
-                    {t('BareMetal Proxy')}
-                  </Typography>
-
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    <strong>{t('Status')}:</strong>{' '}
-                    {proxyStatus?.status ? proxyStatus.status.toUpperCase() : t('Unknown')}
-                    {proxyStatus?.pid ? ` (PID ${proxyStatus.pid})` : ''}
-                  </Typography>
-
-                  {proxyStatus?.lastError && (
-                    <Alert severity="warning" sx={{ mb: 1 }}>
-                      {proxyStatus.lastError}
-                    </Alert>
-                  )}
-
-                  <Box display="flex" gap={1} flexWrap="wrap">
-                    <Button
-                      variant="outlined"
-                      onClick={onProxyStart}
-                      disabled={proxyActionLoading || !selectedSubscription}
-                      startIcon={<Icon icon="mdi:play" aria-hidden="true" />}
-                    >
-                      {t('Start Proxy')}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={onProxyStop}
-                      disabled={proxyActionLoading || !selectedSubscription}
-                      startIcon={<Icon icon="mdi:stop" aria-hidden="true" />}
-                    >
-                      {t('Stop Proxy')}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={onProxyRestart}
-                      disabled={proxyActionLoading || !selectedSubscription}
-                      startIcon={<Icon icon="mdi:restart" aria-hidden="true" />}
-                    >
-                      {t('Restart Proxy')}
-                    </Button>
-                    <Button
-                      variant="text"
-                      onClick={onProxyRefresh}
-                      disabled={proxyActionLoading || !selectedSubscription}
-                      startIcon={<Icon icon="mdi:refresh" aria-hidden="true" />}
-                    >
-                      {t('Refresh Status')}
-                    </Button>
-                  </Box>
-                </Box>
+                <BareMetalProxyPanel
+                  proxyStatus={proxyStatus}
+                  proxyActionLoading={proxyActionLoading}
+                  disabled={!selectedSubscription}
+                  onProxyStart={onProxyStart}
+                  onProxyStop={onProxyStop}
+                  onProxyRestart={onProxyRestart}
+                  onProxyRefresh={onProxyRefresh}
+                />
               )}
             </>
           )}
@@ -426,7 +384,7 @@ export default function RegisterAKSClusterDialogPure({
               : loadingSubscriptions
               ? `${t('Loading subscriptions')}...`
               : loadingClusters
-              ? `${t('Loading AKS/BareMetal clusters')}...`
+              ? `${t('Loading clusters')}...`
               : capabilitiesLoading
               ? 'Checking cluster capabilities...'
               : ''}
