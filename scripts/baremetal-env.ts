@@ -20,7 +20,7 @@
  *   --vm-name        VM name (default: jumpstartVM)
  */
 
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 
 // ---- Defaults (mirrored from baremetal-environment.ts) ----
 
@@ -43,24 +43,37 @@ const REQUIRED_PROVIDERS = [
 
 // ---- Helpers ----
 
+/** CLI flags whose following value is sensitive and must not appear in logs. */
+const SENSITIVE_FLAGS = new Set(['--admin-password', '--password']);
+
 /**
- * Executes a shell command synchronously and returns its stdout.
+ * Executes a command synchronously (without a shell) and returns its stdout.
  *
- * Logs the command before execution. If the command fails, throws an
- * `Error` with the stderr output (or the original error message).
+ * Logs the command before execution, redacting values that follow any flag
+ * listed in {@link SENSITIVE_FLAGS}. Using an args array instead of a shell
+ * string prevents shell injection and avoids leaking secrets via process lists.
  *
- * @param cmd - The shell command string to execute.
+ * @param args - The command and its arguments as an array, e.g.
+ *   `['az', 'group', 'create', '--name', 'my-rg']`.
  * @returns The stdout output of the command.
  * @throws {Error} If the command exits with a non-zero status.
  */
-function run(cmd: string): string {
-  console.log(`  $ ${cmd}`);
-  try {
-    return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-  } catch (err: any) {
-    const stderr = err.stderr?.toString() || err.message;
-    throw new Error(stderr);
+function run(args: string[]): string {
+  const [cmd, ...cmdArgs] = args;
+  const redacted = cmdArgs.map((arg, i) =>
+    i > 0 && SENSITIVE_FLAGS.has(cmdArgs[i - 1]) ? '***' : arg
+  );
+  console.log(`  $ ${cmd} ${redacted.join(' ')}`);
+
+  const result = spawnSync(cmd, cmdArgs, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+
+  if (result.error) {
+    throw result.error;
   }
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `Command exited with status ${result.status}`);
+  }
+  return result.stdout || '';
 }
 
 /**
@@ -131,65 +144,67 @@ function setup(args: Record<string, string>) {
   console.log('Step 1/5: Registering resource providers...');
   for (const provider of REQUIRED_PROVIDERS) {
     console.log(`  Registering ${provider}...`);
-    run(`az provider register --namespace ${provider} --wait --subscription ${subscription}`);
+    run(['az', 'provider', 'register', '--namespace', provider, '--wait', '--subscription', subscription]);
   }
   console.log('  ✓ All providers registered.\n');
 
   // Step 2: Create resource group
   console.log('Step 2/5: Creating resource group...');
-  run(
-    `az group create --name ${groupName} --location ${location} --subscription ${subscription}`
-  );
+  run(['az', 'group', 'create', '--name', groupName, '--location', location, '--subscription', subscription]);
   console.log(`  ✓ Resource group '${groupName}' created.\n`);
 
   // Step 3: Create VM
   console.log('Step 3/5: Creating VM...');
-  run(
-    [
-      'az vm create',
-      `--resource-group ${groupName}`,
-      `--name ${vmName}`,
-      '--image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest',
-      '--size Standard_E16s_v4',
-      `--admin-username ${username}`,
-      `--admin-password "${password}"`,
-      `--vnet-name ${vnetName}`,
-      `--subnet ${subnetName}`,
-      '--public-ip-sku Standard',
-      `--subscription ${subscription}`,
-      '--output json',
-    ].join(' ')
-  );
+  run([
+    'az', 'vm', 'create',
+    '--resource-group', groupName,
+    '--name', vmName,
+    '--image', 'MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest',
+    '--size', 'Standard_E16s_v4',
+    '--admin-username', username,
+    '--admin-password', password,
+    '--vnet-name', vnetName,
+    '--subnet', subnetName,
+    '--public-ip-sku', 'Standard',
+    '--subscription', subscription,
+    '--output', 'json',
+  ]);
   console.log(`  ✓ VM '${vmName}' created.\n`);
 
   // Step 4: Assign managed identity + Contributor role
   console.log('Step 4/5: Assigning managed identity...');
-  run(`az vm identity assign --resource-group ${groupName} --name ${vmName} --subscription ${subscription}`);
+  run(['az', 'vm', 'identity', 'assign', '--resource-group', groupName, '--name', vmName, '--subscription', subscription]);
 
-  const principalId = run(
-    `az vm show --resource-group ${groupName} --name ${vmName} --query identity.principalId -o tsv --subscription ${subscription}`
-  ).trim();
+  const principalId = run([
+    'az', 'vm', 'show',
+    '--resource-group', groupName,
+    '--name', vmName,
+    '--query', 'identity.principalId',
+    '-o', 'tsv',
+    '--subscription', subscription,
+  ]).trim();
 
   if (principalId) {
-    run(
-      `az role assignment create --assignee ${principalId} --role Contributor --scope /subscriptions/${subscription}`
-    );
+    run([
+      'az', 'role', 'assignment', 'create',
+      '--assignee', principalId,
+      '--role', 'Contributor',
+      '--scope', `/subscriptions/${subscription}`,
+    ]);
   }
   console.log('  ✓ Managed identity assigned with Contributor role.\n');
 
   // Step 5: Install Hyper-V on the VM (no RDP required)
   console.log('Step 5/5: Installing Hyper-V on VM (via run-command)...');
   try {
-    run(
-      [
-        'az vm run-command invoke',
-        `--resource-group ${groupName}`,
-        `--name ${vmName}`,
-        '--command-id RunPowerShellScript',
-        '--scripts "Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart"',
-        `--subscription ${subscription}`,
-      ].join(' ')
-    );
+    run([
+      'az', 'vm', 'run-command', 'invoke',
+      '--resource-group', groupName,
+      '--name', vmName,
+      '--command-id', 'RunPowerShellScript',
+      '--scripts', 'Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart',
+      '--subscription', subscription,
+    ]);
     console.log('  ✓ Hyper-V installation initiated.\n');
   } catch {
     console.log('  ⚠ Hyper-V install may require a VM restart (this is normal).\n');
@@ -223,9 +238,7 @@ function teardown(args: Record<string, string>) {
 
   console.log('\n=== AKS BareMetal Test Environment Teardown ===\n');
   console.log(`Deleting resource group '${groupName}'...`);
-  run(
-    `az group delete --name ${groupName} --subscription ${subscription} --yes --no-wait`
-  );
+  run(['az', 'group', 'delete', '--name', groupName, '--subscription', subscription, '--yes', '--no-wait']);
   console.log(`  ✓ Resource group '${groupName}' deletion initiated.`);
   console.log('  This may take several minutes to complete.\n');
 }
