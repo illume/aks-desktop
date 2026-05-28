@@ -3,13 +3,13 @@
 // Licensed under the Apache 2.0.
 
 /**
- * CLI script for setting up an AKS Arc test environment.
+ * CLI script for setting up an AKS BareMetal test environment.
  *
  * Uses the same setup/teardown logic as the AKS Desktop UI.
  *
  * Usage:
- *   npx tsx scripts/arc-env.ts setup   --subscription <id> --location <region> --username <user> --password <pass> [options]
- *   npx tsx scripts/arc-env.ts teardown --subscription <id> [--group-name <name>]
+ *   npx tsx scripts/baremetal-env.ts setup   --subscription <id> --location <region> --username <user> --password <pass> [options]
+ *   npx tsx scripts/baremetal-env.ts teardown --subscription <id> [--group-name <name>]
  *
  * Options:
  *   --subscription   Azure subscription ID (required)
@@ -22,9 +22,9 @@
 
 import { execSync } from 'child_process';
 
-// ---- Defaults (mirrored from arc-environment.ts) ----
+// ---- Defaults (mirrored from baremetal-environment.ts) ----
 
-const ARC_ENV_DEFAULTS = {
+const BAREMETAL_ENV_DEFAULTS = {
   groupName: 'jumpstart-rg',
   vmName: 'jumpstartVM',
   vnetName: 'jumpstartVNet',
@@ -79,12 +79,12 @@ function setup(args: Record<string, string>) {
   const location = required(args, 'location');
   const username = required(args, 'username');
   const password = required(args, 'password');
-  const groupName = args['group-name'] || ARC_ENV_DEFAULTS.groupName;
-  const vmName = args['vm-name'] || ARC_ENV_DEFAULTS.vmName;
-  const vnetName = args['vnet-name'] || ARC_ENV_DEFAULTS.vnetName;
-  const subnetName = args['subnet-name'] || ARC_ENV_DEFAULTS.subnetName;
+  const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
+  const vmName = args['vm-name'] || BAREMETAL_ENV_DEFAULTS.vmName;
+  const vnetName = args['vnet-name'] || BAREMETAL_ENV_DEFAULTS.vnetName;
+  const subnetName = args['subnet-name'] || BAREMETAL_ENV_DEFAULTS.subnetName;
 
-  console.log('\n=== AKS Arc Test Environment Setup ===\n');
+  console.log('\n=== AKS BareMetal Test Environment Setup ===\n');
 
   // Step 1: Register providers
   console.log('Step 1/5: Registering resource providers...');
@@ -168,9 +168,9 @@ function setup(args: Record<string, string>) {
 
 function teardown(args: Record<string, string>) {
   const subscription = required(args, 'subscription');
-  const groupName = args['group-name'] || ARC_ENV_DEFAULTS.groupName;
+  const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
 
-  console.log('\n=== AKS Arc Test Environment Teardown ===\n');
+  console.log('\n=== AKS BareMetal Test Environment Teardown ===\n');
   console.log(`Deleting resource group '${groupName}'...`);
   run(
     `az group delete --name ${groupName} --subscription ${subscription} --yes --no-wait`
@@ -194,10 +194,10 @@ switch (command) {
   default:
     console.log('Usage:');
     console.log(
-      '  npx tsx scripts/arc-env.ts setup   --subscription <id> --location <region> --username <user> --password <pass>'
+      '  npx tsx scripts/baremetal-env.ts setup   --subscription <id> --location <region> --username <user> --password <pass>'
     );
     console.log(
-      '  npx tsx scripts/arc-env.ts teardown --subscription <id> [--group-name <name>]'
+      '  npx tsx scripts/baremetal-env.ts teardown --subscription <id> [--group-name <name>]'
     );
     process.exit(command ? 1 : 0);
 }

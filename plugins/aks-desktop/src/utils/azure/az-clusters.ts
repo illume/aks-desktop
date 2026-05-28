@@ -108,14 +108,14 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
 }
 
 /**
- * Discovers Azure Arc-connected Kubernetes clusters in the given subscription.
+ * Discovers Azure BareMetal Kubernetes clusters in the given subscription.
  *
  * Uses `az connectedk8s list` to enumerate clusters. If the `connectedk8s`
  * CLI extension is not installed, the function gracefully returns an empty
  * list instead of throwing.
  *
  * Each returned cluster object includes a `clusterType: 'aksarc'` discriminator
- * so callers can distinguish Arc clusters from standard AKS managed clusters.
+ * so callers can distinguish BareMetal clusters from standard AKS managed clusters.
  *
  * @param subscriptionId - Azure subscription GUID to query.
  * @returns An array of cluster objects, or an empty array when the extension is unavailable.
@@ -127,13 +127,13 @@ export async function getConnectedClusters(subscriptionId: string): Promise<any[
   const { stdout, stderr } = await runCommandAsync('az', args);
 
   if (stderr) {
-    // If the extension is unavailable, fall back to returning no Arc clusters.
+    // If the extension is unavailable, fall back to returning no BareMetal clusters.
     const commandNotFound =
       stderr.includes("'connectedk8s'") ||
       stderr.includes('az extension add --name connectedk8s') ||
       stderr.includes('unrecognized arguments: connectedk8s');
     if (commandNotFound) {
-      debugLog('connectedk8s extension not available; skipping Arc cluster discovery');
+      debugLog('connectedk8s extension not available; skipping BareMetal cluster discovery');
       return clusters;
     }
 

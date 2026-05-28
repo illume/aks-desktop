@@ -9,8 +9,8 @@ declare const pluginRunCommand: (
   options: Record<string, unknown>
 ) => ReturnType<typeof import('@kinvolk/headlamp-plugin/lib').runCommand>;
 
-/** Status snapshot returned by Arc proxy lifecycle functions. */
-export interface ArcProxyStatus {
+/** Status snapshot returned by BareMetal proxy lifecycle functions. */
+export interface BareMetalProxyStatus {
   /** Whether the operation itself succeeded. */
   success: boolean;
   /** Current proxy state. */
@@ -22,19 +22,19 @@ export interface ArcProxyStatus {
 }
 
 /** Internal bookkeeping for a running `az connectedk8s proxy` process. */
-interface ArcProxySession {
+interface BareMetalProxySession {
   /** The child-process handle; `undefined` after the process exits. */
   cmd?: ReturnType<typeof import('@kinvolk/headlamp-plugin/lib').runCommand>;
-  /** Mirrors {@link ArcProxyStatus.status}. */
-  status: ArcProxyStatus['status'];
+  /** Mirrors {@link BareMetalProxyStatus.status}. */
+  status: BareMetalProxyStatus['status'];
   /** Most recent error message, if any. */
   lastError?: string;
   /** OS process ID, when available. */
   pid?: number;
 }
 
-/** In-memory map of active Arc proxy sessions, keyed by `subscription/resourceGroup/cluster`. */
-const arcProxySessions = new Map<string, ArcProxySession>();
+/** In-memory map of active BareMetal proxy sessions, keyed by `subscription/resourceGroup/cluster`. */
+const bareMetalProxySessions = new Map<string, BareMetalProxySession>();
 
 /**
  * Probes whether a cluster is reachable by listing its Kubernetes namespaces.
@@ -90,38 +90,38 @@ export function checkClusterReachable(
  *
  * @param subscriptionId - Azure subscription GUID.
  * @param resourceGroup - Resource group containing the cluster.
- * @param clusterName - Name of the Arc cluster.
+ * @param clusterName - Name of the BareMetal cluster.
  * @returns The reconciled proxy status.
  */
-async function reconcileArcProxyStatus(
+async function reconcileBareMetalProxyStatus(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string
-): Promise<ArcProxyStatus> {
-  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
+): Promise<BareMetalProxyStatus> {
+  const key = bareMetalProxyKey(subscriptionId, resourceGroup, clusterName);
 
   const probe = await checkClusterReachable(clusterName);
 
   if (probe.success) {
-    const reconciled: ArcProxySession = {
+    const reconciled: BareMetalProxySession = {
       status: 'running',
       lastError: undefined,
       pid: undefined,
     };
-    arcProxySessions.set(key, reconciled);
+    bareMetalProxySessions.set(key, reconciled);
     return {
       success: true,
       status: 'running',
     };
   }
 
-  const previous = arcProxySessions.get(key);
-  const stopped: ArcProxySession = {
+  const previous = bareMetalProxySessions.get(key);
+  const stopped: BareMetalProxySession = {
     status: 'stopped',
     lastError: probe.error || previous?.lastError,
     pid: undefined,
   };
-  arcProxySessions.set(key, stopped);
+  bareMetalProxySessions.set(key, stopped);
   return {
     success: true,
     status: 'stopped',
@@ -129,8 +129,8 @@ async function reconcileArcProxyStatus(
   };
 }
 
-/** Builds the composite map key for an Arc proxy session. */
-export function arcProxyKey(
+/** Builds the composite map key for an BareMetal proxy session. */
+export function bareMetalProxyKey(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string
@@ -139,26 +139,26 @@ export function arcProxyKey(
 }
 
 /**
- * Returns the current status of an Arc proxy session.
+ * Returns the current status of an BareMetal proxy session.
  *
  * If no in-memory session exists (e.g. after a page reload), the cluster is
  * probed for reachability and the status is reconciled automatically.
  *
  * @param subscriptionId - Azure subscription GUID.
  * @param resourceGroup - Resource group containing the cluster.
- * @param clusterName - Name of the Arc cluster.
+ * @param clusterName - Name of the BareMetal cluster.
  */
-export async function getArcProxyStatus(
+export async function getBareMetalProxyStatus(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string
-): Promise<ArcProxyStatus> {
-  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
-  const session = arcProxySessions.get(key);
+): Promise<BareMetalProxyStatus> {
+  const key = bareMetalProxyKey(subscriptionId, resourceGroup, clusterName);
+  const session = bareMetalProxySessions.get(key);
 
   // Reconcile after reload/restart where in-memory process handle may be gone.
   if (!session || !session.cmd) {
-    return reconcileArcProxyStatus(subscriptionId, resourceGroup, clusterName);
+    return reconcileBareMetalProxyStatus(subscriptionId, resourceGroup, clusterName);
   }
 
   return {
@@ -170,20 +170,20 @@ export async function getArcProxyStatus(
 }
 
 /**
- * Starts an `az connectedk8s proxy` process for the given Arc cluster.
+ * Starts an `az connectedk8s proxy` process for the given BareMetal cluster.
  *
  * If a proxy is already running (or the cluster is already reachable after a
  * page reload), the existing status is returned without spawning a duplicate.
  *
  * @param subscriptionId - Azure subscription GUID.
  * @param resourceGroup - Resource group containing the cluster.
- * @param clusterName - Name of the Arc cluster.
+ * @param clusterName - Name of the BareMetal cluster.
  */
-export async function startArcProxy(
+export async function startBareMetalProxy(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string
-): Promise<ArcProxyStatus> {
+): Promise<BareMetalProxyStatus> {
   if (typeof pluginRunCommand === 'undefined') {
     return {
       success: false,
@@ -192,12 +192,12 @@ export async function startArcProxy(
     };
   }
 
-  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
-  const existing = arcProxySessions.get(key);
+  const key = bareMetalProxyKey(subscriptionId, resourceGroup, clusterName);
+  const existing = bareMetalProxySessions.get(key);
 
   // If process handle is gone (after reload), reconcile first so we don't start duplicates.
   if (!existing || !existing.cmd) {
-    const reconciled = await reconcileArcProxyStatus(subscriptionId, resourceGroup, clusterName);
+    const reconciled = await reconcileBareMetalProxyStatus(subscriptionId, resourceGroup, clusterName);
     if (reconciled.status === 'running') {
       return reconciled;
     }
@@ -228,35 +228,35 @@ export async function startArcProxy(
       {}
     );
 
-    const session: ArcProxySession = {
+    const session: BareMetalProxySession = {
       cmd,
       status: 'starting',
       pid: (cmd as any).pid,
     };
-    arcProxySessions.set(key, session);
+    bareMetalProxySessions.set(key, session);
 
     cmd.stdout.on('data', () => {
-      const latest = arcProxySessions.get(key);
+      const latest = bareMetalProxySessions.get(key);
       if (latest) {
         latest.status = 'running';
         latest.lastError = undefined;
-        arcProxySessions.set(key, latest);
+        bareMetalProxySessions.set(key, latest);
       }
     });
 
     cmd.stderr.on('data', (data: string) => {
-      const latest = arcProxySessions.get(key);
+      const latest = bareMetalProxySessions.get(key);
       if (latest) {
         latest.lastError = data.toString().trim();
         if (latest.status !== 'running') {
           latest.status = 'error';
         }
-        arcProxySessions.set(key, latest);
+        bareMetalProxySessions.set(key, latest);
       }
     });
 
     cmd.on('exit', (code: number | null) => {
-      const latest = arcProxySessions.get(key);
+      const latest = bareMetalProxySessions.get(key);
       if (!latest) {
         return;
       }
@@ -265,11 +265,11 @@ export async function startArcProxy(
         latest.lastError = `Proxy exited with code ${code}`;
       }
       latest.cmd = undefined;
-      arcProxySessions.set(key, latest);
+      bareMetalProxySessions.set(key, latest);
     });
 
     cmd.on('error', (errOrCode: unknown) => {
-      const latest = arcProxySessions.get(key);
+      const latest = bareMetalProxySessions.get(key);
       if (!latest) {
         return;
       }
@@ -277,7 +277,7 @@ export async function startArcProxy(
       latest.cmd = undefined;
       latest.lastError =
         errOrCode instanceof Error ? errOrCode.message : `Proxy failed: ${String(errOrCode)}`;
-      arcProxySessions.set(key, latest);
+      bareMetalProxySessions.set(key, latest);
     });
 
     return {
@@ -295,21 +295,21 @@ export async function startArcProxy(
 }
 
 /**
- * Stops a running `az connectedk8s proxy` process for the given Arc cluster.
+ * Stops a running `az connectedk8s proxy` process for the given BareMetal cluster.
  *
  * If no proxy session exists the call is a no-op and returns `'stopped'`.
  *
  * @param subscriptionId - Azure subscription GUID.
  * @param resourceGroup - Resource group containing the cluster.
- * @param clusterName - Name of the Arc cluster.
+ * @param clusterName - Name of the BareMetal cluster.
  */
-export async function stopArcProxy(
+export async function stopBareMetalProxy(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string
-): Promise<ArcProxyStatus> {
-  const key = arcProxyKey(subscriptionId, resourceGroup, clusterName);
-  const session = arcProxySessions.get(key);
+): Promise<BareMetalProxyStatus> {
+  const key = bareMetalProxyKey(subscriptionId, resourceGroup, clusterName);
+  const session = bareMetalProxySessions.get(key);
 
   if (!session || !session.cmd) {
     return {
@@ -324,7 +324,7 @@ export async function stopArcProxy(
     }
     session.status = 'stopped';
     session.cmd = undefined;
-    arcProxySessions.set(key, session);
+    bareMetalProxySessions.set(key, session);
     return {
       success: true,
       status: 'stopped',
@@ -334,7 +334,7 @@ export async function stopArcProxy(
   } catch (error) {
     session.status = 'error';
     session.lastError = error instanceof Error ? error.message : 'Unknown error';
-    arcProxySessions.set(key, session);
+    bareMetalProxySessions.set(key, session);
     return {
       success: false,
       status: 'error',
@@ -345,17 +345,17 @@ export async function stopArcProxy(
 }
 
 /**
- * Restarts the Arc proxy by stopping and then starting it again.
+ * Restarts the BareMetal proxy by stopping and then starting it again.
  *
  * @param subscriptionId - Azure subscription GUID.
  * @param resourceGroup - Resource group containing the cluster.
- * @param clusterName - Name of the Arc cluster.
+ * @param clusterName - Name of the BareMetal cluster.
  */
-export async function restartArcProxy(
+export async function restartBareMetalProxy(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string
-): Promise<ArcProxyStatus> {
-  await stopArcProxy(subscriptionId, resourceGroup, clusterName);
-  return startArcProxy(subscriptionId, resourceGroup, clusterName);
+): Promise<BareMetalProxyStatus> {
+  await stopBareMetalProxy(subscriptionId, resourceGroup, clusterName);
+  return startBareMetalProxy(subscriptionId, resourceGroup, clusterName);
 }

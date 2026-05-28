@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import React from 'react';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
-import type { ArcProxyStatus } from '../../utils/azure/aks';
+import type { BareMetalProxyStatus } from '../../utils/azure/aks';
 import { ClusterConfigurePanel } from '../CreateAKSProject/components/ClusterConfigurePanel';
 
 export interface Subscription {
@@ -65,7 +65,7 @@ export interface RegisterAKSClusterDialogPureProps {
   onDismissError: () => void;
   onDismissSuccess: () => void;
   onConfigured?: () => void;
-  proxyStatus: ArcProxyStatus | null;
+  proxyStatus: BareMetalProxyStatus | null;
   proxyActionLoading: boolean;
   proxyUiError: string;
   onProxyRefresh: () => void;
@@ -111,7 +111,7 @@ export default function RegisterAKSClusterDialogPure({
   onProxyRestart,
 }: RegisterAKSClusterDialogPureProps) {
   const { t } = useTranslation();
-  const isArcCluster = (selectedCluster?.clusterType || 'aks') === 'aksarc';
+  const isBareMetalCluster = (selectedCluster?.clusterType || 'aks') === 'aksarc';
 
   return (
     <Dialog
@@ -125,7 +125,7 @@ export default function RegisterAKSClusterDialogPure({
         <Box display="flex" alignItems="center" gap={1}>
           <Icon icon="logos:microsoft-azure" style={{ fontSize: '24px' }} aria-hidden="true" />
           <Typography variant="h6" component="span">
-            {t('Register AKS/Arc Cluster')}
+            {t('Register AKS/BareMetal Cluster')}
           </Typography>
         </Box>
       </DialogTitle>
@@ -273,14 +273,14 @@ export default function RegisterAKSClusterDialogPure({
                 <Box display="flex" alignItems="center" gap={1}>
                   <CircularProgress size={20} aria-hidden="true" />
                   <Typography variant="body2" color="textSecondary">
-                    {t('Loading AKS/Arc clusters')}...
+                    {t('Loading AKS/BareMetal clusters')}...
                   </Typography>
                 </Box>
               )}
 
               {!loadingClusters && selectedSubscription && clusters.length === 0 && (
                 <Alert severity="info">
-                  {t('No AKS or Arc clusters found in this subscription.')}
+                  {t('No AKS or BareMetal clusters found in this subscription.')}
                 </Alert>
               )}
 
@@ -301,8 +301,8 @@ export default function RegisterAKSClusterDialogPure({
                   renderInput={params => (
                     <TextField
                       {...params}
-                      label={t('AKS/Arc Cluster')}
-                      placeholder={t('Select an AKS or Arc cluster')}
+                      label={t('AKS/BareMetal Cluster')}
+                      placeholder={t('Select an AKS or BareMetal cluster')}
                     />
                   )}
                   renderOption={(props, option) => (
@@ -346,10 +346,10 @@ export default function RegisterAKSClusterDialogPure({
                 </Box>
               )}
 
-              {selectedCluster && clusterInputValue === selectedCluster.name && isArcCluster && (
+              {selectedCluster && clusterInputValue === selectedCluster.name && isBareMetalCluster && (
                 <Box p={2} border={1} borderColor="divider" borderRadius={1}>
                   <Typography variant="subtitle2" component="p" gutterBottom>
-                    {t('Arc Proxy')}
+                    {t('BareMetal Proxy')}
                   </Typography>
 
                   <Typography variant="body2" sx={{ mb: 1 }}>
@@ -426,7 +426,7 @@ export default function RegisterAKSClusterDialogPure({
               : loadingSubscriptions
               ? `${t('Loading subscriptions')}...`
               : loadingClusters
-              ? `${t('Loading AKS/Arc clusters')}...`
+              ? `${t('Loading AKS/BareMetal clusters')}...`
               : capabilitiesLoading
               ? 'Checking cluster capabilities...'
               : ''}

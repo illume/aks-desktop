@@ -19,7 +19,7 @@ import {
 import React from 'react';
 import { Redirect } from 'react-router-dom';
 import AccessTab from './components/AccessTab/AccessTab';
-import ArcEnvironmentPage from './components/Arc/ArcEnvironmentPage';
+import BareMetalEnvironmentPage from './components/BareMetal/BareMetalEnvironmentPage';
 import RegisterAKSClusterPage from './components/AKS/RegisterAKSClusterPage';
 import AzureLoginPage from './components/AzureAuth/AzureLoginPage';
 import AzureProfilePage from './components/AzureAuth/AzureProfilePage';
@@ -302,21 +302,21 @@ if (Headlamp.isRunningAsApp()) {
     noAuthRequired: true,
   });
 
-  // Arc Test Environment — gated by preview feature flag
-  if (previewFeaturesStore.get()?.arcEnvironment) {
+  // BareMetal Test Environment — gated by preview feature flag
+  if (previewFeaturesStore.get()?.bareMetalEnvironment) {
     registerAddClusterProvider({
-      title: 'Arc Test Environment',
+      title: 'BareMetal Test Environment',
       // @ts-ignore todo fix registerAddClusterProvider icon to take string
       icon: 'logos:microsoft-azure',
       description:
-        'Set up or tear down an AKS Arc test environment for development. Creates a VM with nested Hyper-V and AKS Arc components.',
-      url: '/add-cluster-arc-env',
+        'Set up or tear down an AKS BareMetal test environment for development. Creates a VM with nested Hyper-V and AKS BareMetal components.',
+      url: '/add-cluster-baremetal-env',
     });
 
     registerRoute({
-      path: '/add-cluster-arc-env',
-      component: ArcEnvironmentPage,
-      name: 'Arc Test Environment',
+      path: '/add-cluster-baremetal-env',
+      component: BareMetalEnvironmentPage,
+      name: 'BareMetal Test Environment',
       sidebar: null,
       exact: true,
       useClusterURL: false,

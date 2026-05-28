@@ -7,8 +7,8 @@ import {
   isExtensionInstalled,
 } from '../../utils/azure/az-extensions';
 
-/** Status of required Arc CLI extensions (connectedk8s and aksarc). */
-export interface ArcExtensionStatus {
+/** Status of required BareMetal CLI extensions (connectedk8s and aksarc). */
+export interface BareMetalExtensionStatus {
   /** `null` while checking, `true` when both extensions are installed, `false` otherwise. */
   installed: boolean | null;
   /** Whether installation is currently in progress. */
@@ -23,12 +23,12 @@ const REQUIRED_EXTENSIONS = ['connectedk8s', 'aksarc'] as const;
 
 /**
  * Hook for checking and installing the Azure CLI extensions required for
- * AKS Arc cluster management (`connectedk8s` and `aksarc`).
+ * AKS BareMetal cluster management (`connectedk8s` and `aksarc`).
  *
  * Follows the same pattern as {@link useExtensionCheck} from CreateAKSProject.
  */
-export function useArcExtensionCheck() {
-  const [status, setStatus] = useState<ArcExtensionStatus>({
+export function useBareMetalExtensionCheck() {
+  const [status, setStatus] = useState<BareMetalExtensionStatus>({
     installed: null,
     installing: false,
     error: null,
@@ -59,7 +59,7 @@ export function useArcExtensionCheck() {
       }
       setStatus(prev => ({ ...prev, installed: true, error: null }));
     } catch (error) {
-      console.error('Failed to check Arc extensions:', error);
+      console.error('Failed to check BareMetal extensions:', error);
       setStatus(prev => ({
         ...prev,
         installed: false,
@@ -99,7 +99,7 @@ export function useArcExtensionCheck() {
         setStatus(prev => ({ ...prev, showSuccess: false }));
       }, 3000);
     } catch (error) {
-      console.error('Failed to install Arc extensions:', error);
+      console.error('Failed to install BareMetal extensions:', error);
       setStatus(prev => ({
         ...prev,
         error: 'Failed to install extensions',

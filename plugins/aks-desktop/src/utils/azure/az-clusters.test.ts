@@ -27,7 +27,7 @@ describe('getConnectedClusters', () => {
     vi.clearAllMocks();
   });
 
-  it('should return Arc clusters from az connectedk8s list', async () => {
+  it('should return BareMetal clusters from az connectedk8s list', async () => {
     const clusters = [
       {
         name: 'arc-cluster-1',

@@ -16,11 +16,11 @@ vi.mock('./az-subscriptions', () => ({
   getSubscriptions: (...args: unknown[]) => mockGetAzSubscriptions(...args),
 }));
 
-vi.mock('../../components/Arc/proxy', () => ({
-  getArcProxyStatus: vi.fn(),
-  startArcProxy: vi.fn(),
-  stopArcProxy: vi.fn(),
-  restartArcProxy: vi.fn(),
+vi.mock('../../components/BareMetal/proxy', () => ({
+  getBareMetalProxyStatus: vi.fn(),
+  startBareMetalProxy: vi.fn(),
+  stopBareMetalProxy: vi.fn(),
+  restartBareMetalProxy: vi.fn(),
 }));
 
 import { getAKSClusters, getSubscriptions, registerAKSCluster } from './aks';
@@ -73,7 +73,7 @@ describe('getAKSClusters', () => {
     vi.clearAllMocks();
   });
 
-  it('should merge AKS and Arc clusters', async () => {
+  it('should merge AKS and BareMetal clusters', async () => {
     mockGetClusters.mockResolvedValue([
       {
         name: 'aks-cluster',

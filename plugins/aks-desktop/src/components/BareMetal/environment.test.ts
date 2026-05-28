@@ -10,15 +10,15 @@ vi.mock('../../utils/azure/az-cli-core', () => ({
 }));
 
 import { runCommandAsync } from '../../utils/azure/az-cli-core';
-import { setupArcEnvironment, teardownArcEnvironment } from './environment';
+import { setupBareMetalEnvironment, teardownBareMetalEnvironment } from './environment';
 
 const mockRun = vi.mocked(runCommandAsync);
 
-describe('setupArcEnvironment', () => {
+describe('setupBareMetalEnvironment', () => {
   it('should succeed when all steps complete', async () => {
     mockRun.mockResolvedValue({ stdout: '{}', stderr: '' });
 
-    const result = await setupArcEnvironment({
+    const result = await setupBareMetalEnvironment({
       subscription: 'sub-1',
       location: 'eastus',
       username: 'admin',
@@ -35,7 +35,7 @@ describe('setupArcEnvironment', () => {
       stderr: 'ERROR: Provider registration failed',
     });
 
-    const result = await setupArcEnvironment({
+    const result = await setupBareMetalEnvironment({
       subscription: 'sub-1',
       location: 'eastus',
       username: 'admin',
@@ -59,7 +59,7 @@ describe('setupArcEnvironment', () => {
       return { stdout: '{}', stderr: '' };
     });
 
-    const result = await setupArcEnvironment({
+    const result = await setupBareMetalEnvironment({
       subscription: 'sub-1',
       location: 'eastus',
       username: 'admin',
@@ -71,11 +71,11 @@ describe('setupArcEnvironment', () => {
   });
 });
 
-describe('teardownArcEnvironment', () => {
+describe('teardownBareMetalEnvironment', () => {
   it('should succeed when resource group deletion initiates', async () => {
     mockRun.mockResolvedValue({ stdout: '', stderr: '' });
 
-    const result = await teardownArcEnvironment('sub-1', 'my-rg');
+    const result = await teardownBareMetalEnvironment('sub-1', 'my-rg');
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('deletion initiated');
@@ -84,7 +84,7 @@ describe('teardownArcEnvironment', () => {
   it('should use default group name', async () => {
     mockRun.mockResolvedValue({ stdout: '', stderr: '' });
 
-    const result = await teardownArcEnvironment('sub-1');
+    const result = await teardownBareMetalEnvironment('sub-1');
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('jumpstart-rg');
@@ -96,7 +96,7 @@ describe('teardownArcEnvironment', () => {
       stderr: 'ERROR: Resource group not found',
     });
 
-    const result = await teardownArcEnvironment('sub-1', 'bad-rg');
+    const result = await teardownBareMetalEnvironment('sub-1', 'bad-rg');
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('Failed to delete resource group');

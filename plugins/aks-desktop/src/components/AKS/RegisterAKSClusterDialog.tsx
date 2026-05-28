@@ -4,7 +4,7 @@
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useArcProxy } from '../Arc/useArcProxy';
+import { useBareMetalProxy } from '../BareMetal/useBareMetalProxy';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../utils/azure/aks';
@@ -41,8 +41,8 @@ export default function RegisterAKSClusterDialog({
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
   const isMountedRef = useRef(true);
 
-  // Derive the Arc proxy target from the selected cluster, if it is an Arc cluster.
-  const arcProxyTarget = useMemo(() => {
+  // Derive the BareMetal proxy target from the selected cluster, if it is an BareMetal cluster.
+  const bareMetalProxyTarget = useMemo(() => {
     if (
       !selectedSubscription ||
       !selectedCluster ||
@@ -66,7 +66,7 @@ export default function RegisterAKSClusterDialog({
     handleProxyStop,
     handleProxyRestart,
     resetProxyState,
-  } = useArcProxy(open, arcProxyTarget);
+  } = useBareMetalProxy(open, bareMetalProxyTarget);
 
   /** Helper function to filter options by name substring match, ranking prefix matches first. */
   function rankNameMatches<T extends { name: string }>(options: T[], inputValue: string): T[] {

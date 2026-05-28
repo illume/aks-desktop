@@ -45,16 +45,16 @@ export default function PreviewFeaturesSettings() {
       <FormControlLabel
         control={
           <Switch
-            checked={config.arcEnvironment}
-            onChange={(_e, checked) => handleToggle('arcEnvironment', checked)}
+            checked={config.bareMetalEnvironment}
+            onChange={(_e, checked) => handleToggle('bareMetalEnvironment', checked)}
           />
         }
         label={
           <Box>
-            <Typography variant="body1">{t('Arc Test Environment')}</Typography>
+            <Typography variant="body1">{t('BareMetal Test Environment')}</Typography>
             <Typography variant="body2" color="text.secondary">
               {t(
-                'Enable setup and teardown of AKS Arc test environments using the aksArc jumpstart scripts.'
+                'Enable setup and teardown of AKS BareMetal test environments using the aksArc jumpstart scripts.'
               )}
             </Typography>
           </Box>

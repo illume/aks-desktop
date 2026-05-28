@@ -2,18 +2,18 @@
 // Licensed under the Apache 2.0.
 
 /**
- * Arc test environment setup and teardown utilities.
+ * BareMetal test environment setup and teardown utilities.
  *
  * Wraps the aksArc jumpstart scripts to provision and destroy
- * Azure VM-based AKS Arc environments for development and testing.
+ * Azure VM-based AKS BareMetal environments for development and testing.
  *
  * @see https://github.com/Azure/aksArc/tree/main/aksarc_jumpstart
  */
 
 import { debugLog, getErrorMessage, runCommandAsync } from '../../utils/azure/az-cli-core';
 
-/** Parameters for provisioning an Arc test environment. */
-export interface ArcEnvironmentConfig {
+/** Parameters for provisioning an BareMetal test environment. */
+export interface BareMetalEnvironmentConfig {
   /** Azure subscription GUID. */
   subscription: string;
   /** Resource group name (default: `'jumpstart-rg'`). */
@@ -32,16 +32,16 @@ export interface ArcEnvironmentConfig {
   subnetName?: string;
 }
 
-/** Default values for optional Arc environment parameters. */
-export const ARC_ENV_DEFAULTS = {
+/** Default values for optional BareMetal environment parameters. */
+export const BAREMETAL_ENV_DEFAULTS = {
   groupName: 'jumpstart-rg',
   vnetName: 'jumpstartVNet',
   vmName: 'jumpstartVM',
   subnetName: 'jumpstartSubnet',
 } as const;
 
-/** Result from an Arc environment setup or teardown operation. */
-export interface ArcEnvironmentResult {
+/** Result from an BareMetal environment setup or teardown operation. */
+export interface BareMetalEnvironmentResult {
   /** Whether the operation succeeded. */
   success: boolean;
   /** Human-readable status or error message. */
@@ -49,7 +49,7 @@ export interface ArcEnvironmentResult {
 }
 
 /**
- * Required Azure resource providers for AKS Arc environments.
+ * Required Azure resource providers for AKS BareMetal environments.
  * These must be registered before setup.
  */
 const REQUIRED_PROVIDERS = [
@@ -63,13 +63,13 @@ const REQUIRED_PROVIDERS = [
 ] as const;
 
 /**
- * Registers the Azure resource providers required for AKS Arc.
+ * Registers the Azure resource providers required for AKS BareMetal.
  *
  * @returns A result indicating success or the first registration failure.
  */
-export async function registerArcProviders(): Promise<ArcEnvironmentResult> {
+export async function registerBareMetalProviders(): Promise<BareMetalEnvironmentResult> {
   for (const provider of REQUIRED_PROVIDERS) {
-    debugLog(`[ARC-ENV] Registering provider: ${provider}`);
+    debugLog(`[BAREMETAL-ENV] Registering provider: ${provider}`);
     const { stderr } = await runCommandAsync('az', [
       'provider',
       'register',
@@ -90,17 +90,17 @@ export async function registerArcProviders(): Promise<ArcEnvironmentResult> {
 }
 
 /**
- * Creates the Azure resource group for the Arc test environment.
+ * Creates the Azure resource group for the BareMetal test environment.
  *
  * @param config - Environment configuration.
  * @returns A result indicating success or failure.
  */
 export async function createResourceGroup(
-  config: ArcEnvironmentConfig
-): Promise<ArcEnvironmentResult> {
-  const groupName = config.groupName || ARC_ENV_DEFAULTS.groupName;
+  config: BareMetalEnvironmentConfig
+): Promise<BareMetalEnvironmentResult> {
+  const groupName = config.groupName || BAREMETAL_ENV_DEFAULTS.groupName;
 
-  debugLog(`[ARC-ENV] Creating resource group: ${groupName} in ${config.location}`);
+  debugLog(`[BAREMETAL-ENV] Creating resource group: ${groupName} in ${config.location}`);
   const { stderr } = await runCommandAsync('az', [
     'group',
     'create',
@@ -123,7 +123,7 @@ export async function createResourceGroup(
 }
 
 /**
- * Sets up an AKS Arc test environment.
+ * Sets up an AKS BareMetal test environment.
  *
  * This is a high-level orchestration function that:
  * 1. Registers required Azure resource providers.
@@ -139,31 +139,31 @@ export async function createResourceGroup(
  * @param config - Environment configuration.
  * @returns A result with success/failure and a status message.
  */
-export async function setupArcEnvironment(
-  config: ArcEnvironmentConfig
-): Promise<ArcEnvironmentResult> {
-  const groupName = config.groupName || ARC_ENV_DEFAULTS.groupName;
-  const vmName = config.vmName || ARC_ENV_DEFAULTS.vmName;
-  const vnetName = config.vnetName || ARC_ENV_DEFAULTS.vnetName;
-  const subnetName = config.subnetName || ARC_ENV_DEFAULTS.subnetName;
+export async function setupBareMetalEnvironment(
+  config: BareMetalEnvironmentConfig
+): Promise<BareMetalEnvironmentResult> {
+  const groupName = config.groupName || BAREMETAL_ENV_DEFAULTS.groupName;
+  const vmName = config.vmName || BAREMETAL_ENV_DEFAULTS.vmName;
+  const vnetName = config.vnetName || BAREMETAL_ENV_DEFAULTS.vnetName;
+  const subnetName = config.subnetName || BAREMETAL_ENV_DEFAULTS.subnetName;
 
   try {
     // Step 1: Register providers
-    debugLog('[ARC-ENV] Step 1/5: Registering resource providers...');
-    const providerResult = await registerArcProviders();
+    debugLog('[BAREMETAL-ENV] Step 1/5: Registering resource providers...');
+    const providerResult = await registerBareMetalProviders();
     if (!providerResult.success) {
       return providerResult;
     }
 
     // Step 2: Create resource group
-    debugLog('[ARC-ENV] Step 2/5: Creating resource group...');
+    debugLog('[BAREMETAL-ENV] Step 2/5: Creating resource group...');
     const rgResult = await createResourceGroup(config);
     if (!rgResult.success) {
       return rgResult;
     }
 
     // Step 3: Create VM
-    debugLog('[ARC-ENV] Step 3/5: Creating VM...');
+    debugLog('[BAREMETAL-ENV] Step 3/5: Creating VM...');
     const vmResult = await runCommandAsync('az', [
       'vm',
       'create',
@@ -198,10 +198,10 @@ export async function setupArcEnvironment(
       };
     }
 
-    debugLog('[ARC-ENV] VM created:', vmResult.stdout);
+    debugLog('[BAREMETAL-ENV] VM created:', vmResult.stdout);
 
     // Step 4: Assign managed identity + Contributor role
-    debugLog('[ARC-ENV] Step 4/5: Assigning managed identity...');
+    debugLog('[BAREMETAL-ENV] Step 4/5: Assigning managed identity...');
     const identityResult = await runCommandAsync('az', [
       'vm',
       'identity',
@@ -249,7 +249,7 @@ export async function setupArcEnvironment(
     }
 
     // Step 5: Run initialisation via VM run-command (no RDP required)
-    debugLog('[ARC-ENV] Step 5/5: Running initialisation scripts on VM...');
+    debugLog('[BAREMETAL-ENV] Step 5/5: Running initialisation scripts on VM...');
     const initResult = await runCommandAsync('az', [
       'vm',
       'run-command',
@@ -265,18 +265,18 @@ export async function setupArcEnvironment(
     ]);
 
     if (initResult.stderr && initResult.stderr.includes('ERROR:')) {
-      debugLog('[ARC-ENV] Hyper-V install warning (may require restart):', initResult.stderr);
+      debugLog('[BAREMETAL-ENV] Hyper-V install warning (may require restart):', initResult.stderr);
     }
 
     return {
       success: true,
       message:
-        `Arc test environment created successfully.\n` +
+        `BareMetal test environment created successfully.\n` +
         `Resource group: ${groupName}\n` +
         `VM: ${vmName}\n\n` +
         `The VM has been provisioned with a managed identity and Contributor role.\n` +
         `Hyper-V installation has been initiated on the VM.\n\n` +
-        `Next step: deploy AKS Arc components using the aksArc jumpstart scripts:\n` +
+        `Next step: deploy AKS BareMetal components using the aksArc jumpstart scripts:\n` +
         `https://github.com/Azure/aksArc/tree/main/aksarc_jumpstart`,
     };
   } catch (error) {
@@ -288,19 +288,19 @@ export async function setupArcEnvironment(
 }
 
 /**
- * Tears down an AKS Arc test environment by deleting the resource group
+ * Tears down an AKS BareMetal test environment by deleting the resource group
  * and all resources within it.
  *
  * @param subscription - Azure subscription GUID.
  * @param groupName - Resource group to delete (default: `'jumpstart-rg'`).
  * @returns A result with success/failure and a status message.
  */
-export async function teardownArcEnvironment(
+export async function teardownBareMetalEnvironment(
   subscription: string,
-  groupName: string = ARC_ENV_DEFAULTS.groupName
-): Promise<ArcEnvironmentResult> {
+  groupName: string = BAREMETAL_ENV_DEFAULTS.groupName
+): Promise<BareMetalEnvironmentResult> {
   try {
-    debugLog(`[ARC-ENV] Tearing down resource group: ${groupName}`);
+    debugLog(`[BAREMETAL-ENV] Tearing down resource group: ${groupName}`);
     const { stderr } = await runCommandAsync('az', [
       'group',
       'delete',

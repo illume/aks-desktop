@@ -154,9 +154,9 @@ ClusterSelected.args = {
   clusterInputValue: SAMPLE_CLUSTERS[0].name,
 };
 
-/** Arc cluster selected — proxy controls visible with stopped status. */
-export const ArcProxyStopped = Template.bind({});
-ArcProxyStopped.args = {
+/** BareMetal cluster selected — proxy controls visible with stopped status. */
+export const BareMetalProxyStopped = Template.bind({});
+BareMetalProxyStopped.args = {
   ...baseArgs,
   selectedSubscription: SAMPLE_SUBSCRIPTIONS[0],
   clusters: [...SAMPLE_CLUSTERS, SAMPLE_ARC_CLUSTER],
@@ -166,28 +166,28 @@ ArcProxyStopped.args = {
   proxyStatus: { success: true, status: 'stopped' },
 };
 
-/** Arc cluster selected — proxy is running and shows process metadata. */
-export const ArcProxyRunning = Template.bind({});
-ArcProxyRunning.args = {
-  ...ArcProxyStopped.args,
+/** BareMetal cluster selected — proxy is running and shows process metadata. */
+export const BareMetalProxyRunning = Template.bind({});
+BareMetalProxyRunning.args = {
+  ...BareMetalProxyStopped.args,
   proxyStatus: { success: true, status: 'running', pid: 4242 },
 };
 
-/** Arc cluster selected — proxy failed and last error is visible. */
-export const ArcProxyError = Template.bind({});
-ArcProxyError.args = {
-  ...ArcProxyStopped.args,
+/** BareMetal cluster selected — proxy failed and last error is visible. */
+export const BareMetalProxyError = Template.bind({});
+BareMetalProxyError.args = {
+  ...BareMetalProxyStopped.args,
   proxyStatus: {
     success: true,
     status: 'error',
-    lastError: 'Unable to reach Arc proxy endpoint. Start the proxy and try again.',
+    lastError: 'Unable to reach BareMetal proxy endpoint. Start the proxy and try again.',
   },
 };
 
-/** Arc cluster selected — proxy action buttons disabled while action runs. */
-export const ArcProxyActionLoading = Template.bind({});
-ArcProxyActionLoading.args = {
-  ...ArcProxyStopped.args,
+/** BareMetal cluster selected — proxy action buttons disabled while action runs. */
+export const BareMetalProxyActionLoading = Template.bind({});
+BareMetalProxyActionLoading.args = {
+  ...BareMetalProxyStopped.args,
   proxyActionLoading: true,
 };
 

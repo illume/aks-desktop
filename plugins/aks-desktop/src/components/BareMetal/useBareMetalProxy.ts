@@ -4,35 +4,35 @@
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  type ArcProxyStatus,
-  getArcProxyStatus,
-  restartArcProxy,
-  startArcProxy,
-  stopArcProxy,
+  type BareMetalProxyStatus,
+  getBareMetalProxyStatus,
+  restartBareMetalProxy,
+  startBareMetalProxy,
+  stopBareMetalProxy,
 } from './proxy';
 
-/** Parameters identifying an Arc cluster for proxy management. */
-interface ArcProxyTarget {
+/** Parameters identifying an BareMetal cluster for proxy management. */
+interface BareMetalProxyTarget {
   subscriptionId: string;
   resourceGroup: string;
   clusterName: string;
 }
 
-/** Return value of the {@link useArcProxy} hook. */
-export interface UseArcProxyResult {
-  /** Latest proxy status snapshot, or `null` when no Arc cluster is selected. */
-  proxyStatus: ArcProxyStatus | null;
+/** Return value of the {@link useBareMetalProxy} hook. */
+export interface UseBareMetalProxyResult {
+  /** Latest proxy status snapshot, or `null` when no BareMetal cluster is selected. */
+  proxyStatus: BareMetalProxyStatus | null;
   /** Whether a proxy action (start/stop/restart) is currently in flight. */
   proxyActionLoading: boolean;
   /** User-visible error from the most recent proxy operation. */
   proxyUiError: string;
   /** Refreshes proxy status by querying the backend. */
   refreshProxyStatus: () => Promise<void>;
-  /** Starts the Arc proxy for the current cluster. */
+  /** Starts the BareMetal proxy for the current cluster. */
   handleProxyStart: () => void;
-  /** Stops the Arc proxy for the current cluster. */
+  /** Stops the BareMetal proxy for the current cluster. */
   handleProxyStop: () => void;
-  /** Restarts the Arc proxy for the current cluster. */
+  /** Restarts the BareMetal proxy for the current cluster. */
   handleProxyRestart: () => void;
   /** Resets all proxy state (e.g. when the selected cluster changes). */
   resetProxyState: () => void;
@@ -40,19 +40,19 @@ export interface UseArcProxyResult {
 
 /**
  * Manages the lifecycle and polling of an `az connectedk8s proxy` session
- * for Arc-connected clusters.
+ * for BareMetal-connected clusters.
  *
  * @param open - Whether the parent dialog is open.
- * @param target - The Arc cluster to manage, or `null` when no Arc cluster is selected.
+ * @param target - The BareMetal cluster to manage, or `null` when no BareMetal cluster is selected.
  * @param pollIntervalMs - How often to poll status (default 5000 ms).
  */
-export function useArcProxy(
+export function useBareMetalProxy(
   open: boolean,
-  target: ArcProxyTarget | null,
+  target: BareMetalProxyTarget | null,
   pollIntervalMs = 5000
-): UseArcProxyResult {
+): UseBareMetalProxyResult {
   const { t } = useTranslation();
-  const [proxyStatus, setProxyStatus] = useState<ArcProxyStatus | null>(null);
+  const [proxyStatus, setProxyStatus] = useState<BareMetalProxyStatus | null>(null);
   const [proxyActionLoading, setProxyActionLoading] = useState(false);
   const [proxyUiError, setProxyUiError] = useState('');
   const isMountedRef = useRef(true);
@@ -69,7 +69,7 @@ export function useArcProxy(
     }
 
     try {
-      const status = await getArcProxyStatus(
+      const status = await getBareMetalProxyStatus(
         target.subscriptionId,
         target.resourceGroup,
         target.clusterName
@@ -94,7 +94,7 @@ export function useArcProxy(
         subscriptionId: string,
         resourceGroup: string,
         clusterName: string
-      ) => Promise<ArcProxyStatus>
+      ) => Promise<BareMetalProxyStatus>
     ) => {
       if (!target) {
         return;
@@ -118,7 +118,7 @@ export function useArcProxy(
       } catch (err) {
         if (isMountedRef.current) {
           setProxyUiError(
-            t('Failed to manage Arc proxy: {{message}}', {
+            t('Failed to manage BareMetal proxy: {{message}}', {
               message: err instanceof Error ? err.message : t('Unknown error'),
             })
           );
@@ -132,7 +132,7 @@ export function useArcProxy(
     [target, refreshProxyStatus, t]
   );
 
-  // Poll proxy status while dialog is open and an Arc cluster is targeted.
+  // Poll proxy status while dialog is open and an BareMetal cluster is targeted.
   useEffect(() => {
     if (!open || !target) {
       setProxyStatus(null);
@@ -151,15 +151,15 @@ export function useArcProxy(
   }, [open, target, refreshProxyStatus, pollIntervalMs]);
 
   const handleProxyStart = useCallback(() => {
-    runProxyAction(startArcProxy);
+    runProxyAction(startBareMetalProxy);
   }, [runProxyAction]);
 
   const handleProxyStop = useCallback(() => {
-    runProxyAction(stopArcProxy);
+    runProxyAction(stopBareMetalProxy);
   }, [runProxyAction]);
 
   const handleProxyRestart = useCallback(() => {
-    runProxyAction(restartArcProxy);
+    runProxyAction(restartBareMetalProxy);
   }, [runProxyAction]);
 
   const resetProxyState = useCallback(() => {

@@ -1,21 +1,21 @@
-# AKS Arc / Baremetal Cluster Support
+# AKS BareMetal Cluster Support
 
-AKS Desktop supports Azure Arc-connected Kubernetes clusters (AKS Arc, AKS local, AKS edge) in addition to standard AKS managed clusters. These clusters appear alongside regular AKS clusters in the registration dialog and can be managed directly from the UI.
+AKS Desktop supports Azure BareMetal Kubernetes clusters (AKS Arc/BareMetal, AKS local, AKS edge) in addition to standard AKS managed clusters. These clusters appear alongside regular AKS clusters in the registration dialog and can be managed directly from the UI.
 
 ## Prerequisites
 
-AKS Desktop bundles the Azure CLI, so no separate CLI installation is needed. When connecting an Arc cluster for the first time, AKS Desktop will prompt you to install the required CLI extensions (**connectedk8s** and **aksarc**) if they are not already present. Simply approve the installation when prompted — AKS Desktop handles the rest.
+AKS Desktop bundles the Azure CLI, so no separate CLI installation is needed. When connecting a BareMetal cluster for the first time, AKS Desktop will prompt you to install the required CLI extensions (**connectedk8s** and **aksarc**) if they are not already present. Simply approve the installation when prompted — AKS Desktop handles the rest.
 
-## Registering an Arc Cluster
+## Registering a BareMetal Cluster
 
-1. Open the **Register AKS/Arc Cluster** dialog from the sidebar or cluster list.
-2. Select your Azure subscription — AKS Desktop loads both managed AKS and Arc clusters.
-3. Each cluster entry shows its type (**AKS** or **AKSARC**) so you can identify Arc clusters at a glance.
-4. Select the Arc cluster and click **Register**. AKS Desktop runs the appropriate credential command automatically and merges the kubeconfig.
+1. Open the **Register AKS/BareMetal Cluster** dialog from the sidebar or cluster list.
+2. Select your Azure subscription — AKS Desktop loads both managed AKS and BareMetal clusters.
+3. Each cluster entry shows its type (**AKS** or **AKSARC**) so you can identify BareMetal clusters at a glance.
+4. Select the BareMetal cluster and click **Register**. AKS Desktop runs the appropriate credential command automatically and merges the kubeconfig.
 
-## Managing the Arc Proxy
+## Managing the BareMetal Proxy
 
-Arc clusters are typically not directly reachable from the local machine. AKS Desktop provides built-in proxy controls that appear automatically when an Arc cluster is selected.
+BareMetal clusters are typically not directly reachable from the local machine. AKS Desktop provides built-in proxy controls that appear automatically when a BareMetal cluster is selected.
 
 ### Proxy Controls
 
@@ -35,7 +35,7 @@ Arc clusters are typically not directly reachable from the local machine. AKS De
 
 ### Automatic Polling
 
-While the registration dialog is open and an Arc cluster is selected, AKS Desktop polls the proxy status every five seconds so the display stays current.
+While the registration dialog is open and a BareMetal cluster is selected, AKS Desktop polls the proxy status every five seconds so the display stays current.
 
 ### After a Reload
 
@@ -43,7 +43,7 @@ If AKS Desktop is reloaded or restarted, the in-memory proxy process handle is l
 
 ## Getting Started with a Test Environment
 
-For a test environment, the AKS Arc jumpstart project can create a baremetal-style AKS Arc environment on an Azure VM:
+For a test environment, the aksArc jumpstart project can create a baremetal-style AKS BareMetal environment on an Azure VM:
 
 <https://github.com/Azure/aksArc/tree/main/aksarc_jumpstart>
 

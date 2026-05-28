@@ -1,14 +1,14 @@
 import { getClusters, getConnectedClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 
-// Re-export Arc proxy types and functions from the dedicated module.
-export type { ArcProxyStatus } from '../../components/Arc/proxy';
+// Re-export BareMetal proxy types and functions from the dedicated module.
+export type { BareMetalProxyStatus } from '../../components/BareMetal/proxy';
 export {
-  getArcProxyStatus,
-  startArcProxy,
-  stopArcProxy,
-  restartArcProxy,
-} from '../../components/Arc/proxy';
+  getBareMetalProxyStatus,
+  startBareMetalProxy,
+  stopBareMetalProxy,
+  restartBareMetalProxy,
+} from '../../components/BareMetal/proxy';
 
 /** An Azure subscription returned by the Azure CLI. */
 export interface Subscription {
@@ -24,7 +24,7 @@ export interface Subscription {
   isDefault: boolean;
 }
 
-/** A unified representation of an AKS managed cluster or an AKS Arc (connected) cluster. */
+/** A unified representation of an AKS managed cluster or an AKS BareMetal (connected) cluster. */
 export interface AKSCluster {
   /** Cluster resource name. */
   name: string;
@@ -36,7 +36,7 @@ export interface AKSCluster {
   kubernetesVersion: string;
   /** Current provisioning state, e.g. `"Succeeded"`. */
   provisioningState: string;
-  /** Fully-qualified domain name (empty for Arc clusters). */
+  /** Fully-qualified domain name (empty for BareMetal clusters). */
   fqdn: string;
   /** Whether Azure RBAC is enabled on the cluster's AAD profile. */
   isAzureRBACEnabled: boolean;
@@ -90,7 +90,7 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
 
     return {
       success: true,
-      message: 'AKS/Arc clusters retrieved successfully',
+      message: 'AKS/BareMetal clusters retrieved successfully',
       clusters: clusters.map((cluster: any) => ({
         name: cluster.name,
         resourceGroup: cluster.resourceGroup,

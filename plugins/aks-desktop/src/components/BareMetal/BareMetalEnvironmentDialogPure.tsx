@@ -16,10 +16,10 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
-import type { ArcExtensionStatus } from './useArcExtensionCheck';
-import { ARC_ENV_DEFAULTS } from './environment';
+import type { BareMetalExtensionStatus } from './useBareMetalExtensionCheck';
+import { BAREMETAL_ENV_DEFAULTS } from './environment';
 
-export interface ArcEnvironmentDialogPureProps {
+export interface BareMetalEnvironmentDialogPureProps {
   open: boolean;
   isLoggedIn: boolean;
   isChecking: boolean;
@@ -41,7 +41,7 @@ export interface ArcEnvironmentDialogPureProps {
   /** Success message from the last operation. */
   success: string;
   /** Status of required CLI extensions. */
-  extensionStatus: ArcExtensionStatus;
+  extensionStatus: BareMetalExtensionStatus;
   onClose: () => void;
   onChange: (field: string, value: string) => void;
   onSetup: () => void;
@@ -51,7 +51,7 @@ export interface ArcEnvironmentDialogPureProps {
   onInstallExtensions: () => void;
 }
 
-export default function ArcEnvironmentDialogPure({
+export default function BareMetalEnvironmentDialogPure({
   open,
   isLoggedIn,
   isChecking,
@@ -68,7 +68,7 @@ export default function ArcEnvironmentDialogPure({
   onDismissError,
   onDismissSuccess,
   onInstallExtensions,
-}: ArcEnvironmentDialogPureProps) {
+}: BareMetalEnvironmentDialogPureProps) {
   const { t } = useTranslation();
 
   const isFormValid =
@@ -83,13 +83,13 @@ export default function ArcEnvironmentDialogPure({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      aria-labelledby="arc-env-dialog-title"
+      aria-labelledby="baremetal-env-dialog-title"
     >
-      <DialogTitle id="arc-env-dialog-title" component="h1">
+      <DialogTitle id="baremetal-env-dialog-title" component="h1">
         <Box display="flex" alignItems="center" gap={1}>
           <Icon icon="logos:microsoft-azure" style={{ fontSize: '24px' }} aria-hidden="true" />
           <Typography variant="h6" component="span">
-            {t('Arc Test Environment')}
+            {t('BareMetal Test Environment')}
           </Typography>
         </Box>
       </DialogTitle>
@@ -121,7 +121,7 @@ export default function ArcEnvironmentDialogPure({
 
           {!isChecking && !isLoggedIn && (
             <Alert severity="warning">
-              {t('You need to be logged in to Azure to manage Arc test environments.')}
+              {t('You need to be logged in to Azure to manage BareMetal test environments.')}
             </Alert>
           )}
 
@@ -151,7 +151,7 @@ export default function ArcEnvironmentDialogPure({
               <Typography variant="body2">
                 <strong>{t('CLI Extensions Required')}:</strong>{' '}
                 {t(
-                  'The connectedk8s and aksarc extensions are required for Arc cluster management.'
+                  'The connectedk8s and aksarc extensions are required for BareMetal cluster management.'
                 )}
               </Typography>
               {extensionStatus.error && (
@@ -164,7 +164,7 @@ export default function ArcEnvironmentDialogPure({
 
           {extensionStatus.showSuccess && (
             <Alert severity="success">
-              {'✓ ' + t('Arc CLI extensions installed successfully!')}
+              {'✓ ' + t('BareMetal CLI extensions installed successfully!')}
             </Alert>
           )}
 
@@ -172,8 +172,8 @@ export default function ArcEnvironmentDialogPure({
             <>
               <Typography variant="body2" color="textSecondary">
                 {t(
-                  'Set up or tear down an AKS Arc test environment using the aksArc jumpstart. ' +
-                    'This creates a Windows Server VM with nested Hyper-V for AKS Arc testing.'
+                  'Set up or tear down an AKS BareMetal test environment using the aksArc jumpstart. ' +
+                    'This creates a Windows Server VM with nested Hyper-V for AKS BareMetal testing.'
                 )}
               </Typography>
 
@@ -193,9 +193,9 @@ export default function ArcEnvironmentDialogPure({
                 onChange={e => onChange('groupName', e.target.value)}
                 fullWidth
                 disabled={loading}
-                placeholder={ARC_ENV_DEFAULTS.groupName}
+                placeholder={BAREMETAL_ENV_DEFAULTS.groupName}
                 helperText={t('Defaults to "{{default}}" if left empty', {
-                  default: ARC_ENV_DEFAULTS.groupName,
+                  default: BAREMETAL_ENV_DEFAULTS.groupName,
                 })}
               />
 
@@ -234,9 +234,9 @@ export default function ArcEnvironmentDialogPure({
                 onChange={e => onChange('vmName', e.target.value)}
                 fullWidth
                 disabled={loading}
-                placeholder={ARC_ENV_DEFAULTS.vmName}
+                placeholder={BAREMETAL_ENV_DEFAULTS.vmName}
                 helperText={t('Defaults to "{{default}}" if left empty', {
-                  default: ARC_ENV_DEFAULTS.vmName,
+                  default: BAREMETAL_ENV_DEFAULTS.vmName,
                 })}
               />
             </>

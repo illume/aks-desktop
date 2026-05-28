@@ -3,13 +3,13 @@
 
 import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
-import ArcEnvironmentDialog from './ArcEnvironmentDialog';
+import BareMetalEnvironmentDialog from './BareMetalEnvironmentDialog';
 
 /**
- * Page component for the Arc test environment setup/teardown flow.
- * Rendered when the user clicks "Add" on the Arc Test Environment cluster provider.
+ * Page component for the BareMetal test environment setup/teardown flow.
+ * Rendered when the user clicks "Add" on the BareMetal Test Environment cluster provider.
  */
-export default function ArcEnvironmentPage() {
+export default function BareMetalEnvironmentPage() {
   const [open, setOpen] = useState(true);
   const history = useHistory();
 
@@ -20,5 +20,5 @@ export default function ArcEnvironmentPage() {
     }, 100);
   };
 
-  return <ArcEnvironmentDialog open={open} onClose={handleClose} />;
+  return <BareMetalEnvironmentDialog open={open} onClose={handleClose} />;
 }

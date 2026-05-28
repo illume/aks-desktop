@@ -1,6 +1,6 @@
-# Testing with AKS Arc Clusters
+# Testing with AKS BareMetal Clusters
 
-This document describes how to set up, test, and tear down an AKS Arc
+This document describes how to set up, test, and tear down an AKS BareMetal
 (hybrid/edge) cluster environment for local development of AKS Desktop.
 
 ## Prerequisites
@@ -17,7 +17,7 @@ This document describes how to set up, test, and tear down an AKS Arc
 From the repository root:
 
 ```bash
-npm run setupArcEnv -- \
+npm run setupBareMetalEnv -- \
   --subscription <subscription-id> \
   --location eastus \
   --username azureuser \
@@ -37,9 +37,9 @@ This creates a Windows Server 2022 VM with nested Hyper-V, assigns a
 managed identity with Contributor role, and initiates Hyper-V installation
 on the VM — all automated via `az vm run-command` (no RDP required).
 
-### 2. Deploy AKS Arc components
+### 2. Deploy AKS BareMetal components
 
-After the VM is created, deploy AKS Arc components using the
+After the VM is created, deploy AKS BareMetal components using the
 [aksArc jumpstart](https://github.com/Azure/aksArc/tree/main/aksarc_jumpstart)
 scripts. These scripts run remotely via ARM template deployments and
 `az vm run-command invoke` — no RDP is required.
@@ -47,16 +47,16 @@ scripts. These scripts run remotely via ARM template deployments and
 ### 3. Register the cluster in AKS Desktop
 
 1. Open AKS Desktop and go to **Add Cluster → Azure Kubernetes Service**.
-2. Select your subscription — Arc clusters appear alongside standard AKS
+2. Select your subscription — BareMetal clusters appear alongside standard AKS
    clusters, labelled **AKSARC**.
-3. Select the Arc cluster and click **Register**.
+3. Select the BareMetal cluster and click **Register**.
 4. Use the proxy controls (Start / Stop / Restart / Refresh) to manage
    the `az connectedk8s proxy` connection.
 
 ### 4. Tear down the environment
 
 ```bash
-npm run teardownArcEnv -- \
+npm run teardownBareMetalEnv -- \
   --subscription <subscription-id> \
   --group-name jumpstart-rg
 ```
@@ -65,34 +65,34 @@ This deletes the resource group and all associated resources.
 
 ## UI-based Setup / Teardown
 
-If the **Arc Test Environment** preview feature is enabled in
+If the **BareMetal Test Environment** preview feature is enabled in
 **Settings → Preview Features**, AKS Desktop shows an additional
 cluster provider in the **Add Cluster** page that exposes the same
 setup and teardown operations through a dialog.
 
 ## Enabling / Disabling the Feature
 
-The Arc environment UI is gated by a preview feature flag. To toggle it:
+The BareMetal environment UI is gated by a preview feature flag. To toggle it:
 
 1. Open AKS Desktop → **Settings** → **Preview Features**.
-2. Toggle **Arc Test Environment** on or off.
+2. Toggle **BareMetal Test Environment** on or off.
 
 When disabled, the cluster provider and route are not registered and the
 UI is completely hidden.
 
-## Architecture
+## BareMetalhitecture
 
 | Layer | File | Purpose |
 | --- | --- | --- |
-| Utility | `plugins/aks-desktop/src/components/Arc/environment.ts` | Setup / teardown / provider registration logic |
-| Proxy | `plugins/aks-desktop/src/components/Arc/proxy.ts` | Arc proxy lifecycle management |
-| Hook | `plugins/aks-desktop/src/components/Arc/useArcExtensionCheck.ts` | Check & install `connectedk8s` + `aksarc` CLI extensions |
-| Hook | `plugins/aks-desktop/src/components/Arc/useArcProxy.ts` | Arc proxy status polling & action dispatch |
-| Dialog | `plugins/aks-desktop/src/components/Arc/ArcEnvironmentDialog.tsx` | Stateful dialog component |
-| Pure UI | `plugins/aks-desktop/src/components/Arc/ArcEnvironmentDialogPure.tsx` | Presentational dialog |
-| Page | `plugins/aks-desktop/src/components/Arc/ArcEnvironmentPage.tsx` | Route target wrapping the dialog |
-| Feature flag | `plugins/aks-desktop/src/components/PluginSettings/previewFeaturesStore.ts` | `arcEnvironment` toggle |
-| CLI script | `scripts/arc-env.ts` | Node CLI that mirrors the UI logic for `npm run setupArcEnv` / `teardownArcEnv` |
+| Utility | `plugins/aks-desktop/src/components/BareMetal/environment.ts` | Setup / teardown / provider registration logic |
+| Proxy | `plugins/aks-desktop/src/components/BareMetal/proxy.ts` | BareMetal proxy lifecycle management |
+| Hook | `plugins/aks-desktop/src/components/BareMetal/useBareMetalExtensionCheck.ts` | Check & install `connectedk8s` + `aksarc` CLI extensions |
+| Hook | `plugins/aks-desktop/src/components/BareMetal/useBareMetalProxy.ts` | BareMetal proxy status polling & action dispatch |
+| Dialog | `plugins/aks-desktop/src/components/BareMetal/BareMetalEnvironmentDialog.tsx` | Stateful dialog component |
+| Pure UI | `plugins/aks-desktop/src/components/BareMetal/BareMetalEnvironmentDialogPure.tsx` | Presentational dialog |
+| Page | `plugins/aks-desktop/src/components/BareMetal/BareMetalEnvironmentPage.tsx` | Route target wrapping the dialog |
+| Feature flag | `plugins/aks-desktop/src/components/PluginSettings/previewFeaturesStore.ts` | `bareMetalEnvironment` toggle |
+| CLI script | `scripts/baremetal-env.ts` | Node CLI that mirrors the UI logic for `npm run setupBareMetalEnv` / `teardownBareMetalEnv` |
 
 ## Troubleshooting
 
@@ -117,4 +117,4 @@ dialog to install them automatically.
 
 Make sure you have registered the cluster and that `az connectedk8s proxy`
 can reach the cluster. Common causes: expired credentials, port conflicts,
-or the Arc agent not running on the VM.
+or the BareMetal agent not running on the VM.

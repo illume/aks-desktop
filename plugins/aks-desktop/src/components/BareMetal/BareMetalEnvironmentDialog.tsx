@@ -3,25 +3,25 @@
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useArcExtensionCheck } from './useArcExtensionCheck';
+import { useBareMetalExtensionCheck } from './useBareMetalExtensionCheck';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
 import {
-  type ArcEnvironmentConfig,
-  ARC_ENV_DEFAULTS,
-  setupArcEnvironment,
-  teardownArcEnvironment,
+  type BareMetalEnvironmentConfig,
+  BAREMETAL_ENV_DEFAULTS,
+  setupBareMetalEnvironment,
+  teardownBareMetalEnvironment,
 } from './environment';
-import ArcEnvironmentDialogPure from './ArcEnvironmentDialogPure';
+import BareMetalEnvironmentDialogPure from './BareMetalEnvironmentDialogPure';
 
-interface ArcEnvironmentDialogProps {
+interface BareMetalEnvironmentDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
-export default function ArcEnvironmentDialog({ open, onClose }: ArcEnvironmentDialogProps) {
+export default function BareMetalEnvironmentDialog({ open, onClose }: BareMetalEnvironmentDialogProps) {
   const { t } = useTranslation();
   const authStatus = useAzureAuth();
-  const extensionCheck = useArcExtensionCheck();
+  const extensionCheck = useBareMetalExtensionCheck();
 
   const [formData, setFormData] = useState({
     subscription: '',
@@ -54,16 +54,16 @@ export default function ArcEnvironmentDialog({ open, onClose }: ArcEnvironmentDi
     setSuccess('');
 
     try {
-      const config: ArcEnvironmentConfig = {
+      const config: BareMetalEnvironmentConfig = {
         subscription: formData.subscription.trim(),
-        groupName: formData.groupName.trim() || ARC_ENV_DEFAULTS.groupName,
+        groupName: formData.groupName.trim() || BAREMETAL_ENV_DEFAULTS.groupName,
         location: formData.location.trim(),
         username: formData.username.trim(),
         password: formData.password,
-        vmName: formData.vmName.trim() || ARC_ENV_DEFAULTS.vmName,
+        vmName: formData.vmName.trim() || BAREMETAL_ENV_DEFAULTS.vmName,
       };
 
-      const result = await setupArcEnvironment(config);
+      const result = await setupBareMetalEnvironment(config);
       if (result.success) {
         setSuccess(result.message);
       } else {
@@ -88,8 +88,8 @@ export default function ArcEnvironmentDialog({ open, onClose }: ArcEnvironmentDi
     setSuccess('');
 
     try {
-      const groupName = formData.groupName.trim() || ARC_ENV_DEFAULTS.groupName;
-      const result = await teardownArcEnvironment(formData.subscription.trim(), groupName);
+      const groupName = formData.groupName.trim() || BAREMETAL_ENV_DEFAULTS.groupName;
+      const result = await teardownBareMetalEnvironment(formData.subscription.trim(), groupName);
 
       if (result.success) {
         setSuccess(result.message);
@@ -109,7 +109,7 @@ export default function ArcEnvironmentDialog({ open, onClose }: ArcEnvironmentDi
   }, [formData, t]);
 
   return (
-    <ArcEnvironmentDialogPure
+    <BareMetalEnvironmentDialogPure
       open={open}
       isLoggedIn={authStatus.isLoggedIn}
       isChecking={authStatus.isChecking}
