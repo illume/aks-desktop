@@ -16,7 +16,7 @@ vi.mock('./az-subscriptions', () => ({
   getSubscriptions: (...args: unknown[]) => mockGetAzSubscriptions(...args),
 }));
 
-vi.mock('./arc-proxy', () => ({
+vi.mock('../../components/Arc/proxy', () => ({
   getArcProxyStatus: vi.fn(),
   startArcProxy: vi.fn(),
   stopArcProxy: vi.fn(),

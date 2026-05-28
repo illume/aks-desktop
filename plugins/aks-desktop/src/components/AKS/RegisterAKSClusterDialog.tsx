@@ -4,7 +4,7 @@
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useArcProxy } from '../../hooks/useArcProxy';
+import { useArcProxy } from '../Arc/useArcProxy';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../utils/azure/aks';

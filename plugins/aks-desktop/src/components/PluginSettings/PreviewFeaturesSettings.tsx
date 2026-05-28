@@ -41,6 +41,26 @@ export default function PreviewFeaturesSettings() {
         }
         sx={{ alignItems: 'flex-start', ml: 0, mt: 1 }}
       />
+
+      <FormControlLabel
+        control={
+          <Switch
+            checked={config.arcEnvironment}
+            onChange={(_e, checked) => handleToggle('arcEnvironment', checked)}
+          />
+        }
+        label={
+          <Box>
+            <Typography variant="body1">{t('Arc Test Environment')}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t(
+                'Enable setup and teardown of AKS Arc test environments using the aksArc jumpstart scripts.'
+              )}
+            </Typography>
+          </Box>
+        }
+        sx={{ alignItems: 'flex-start', ml: 0, mt: 1 }}
+      />
     </Box>
   );
 }

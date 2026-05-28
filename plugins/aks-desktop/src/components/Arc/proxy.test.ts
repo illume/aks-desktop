@@ -63,7 +63,7 @@ function createCommandHandle(
 async function loadArcProxyModule() {
   vi.resetModules();
   (globalThis as any).pluginRunCommand = mockRunCommand;
-  return import('./arc-proxy');
+  return import('./proxy');
 }
 
 function setupReachabilitySuccess() {

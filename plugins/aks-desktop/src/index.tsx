@@ -19,6 +19,7 @@ import {
 import React from 'react';
 import { Redirect } from 'react-router-dom';
 import AccessTab from './components/AccessTab/AccessTab';
+import ArcEnvironmentPage from './components/Arc/ArcEnvironmentPage';
 import RegisterAKSClusterPage from './components/AKS/RegisterAKSClusterPage';
 import AzureLoginPage from './components/AzureAuth/AzureLoginPage';
 import AzureProfilePage from './components/AzureAuth/AzureProfilePage';
@@ -300,6 +301,28 @@ if (Headlamp.isRunningAsApp()) {
     useClusterURL: false,
     noAuthRequired: true,
   });
+
+  // Arc Test Environment — gated by preview feature flag
+  if (previewFeaturesStore.get()?.arcEnvironment) {
+    registerAddClusterProvider({
+      title: 'Arc Test Environment',
+      // @ts-ignore todo fix registerAddClusterProvider icon to take string
+      icon: 'logos:microsoft-azure',
+      description:
+        'Set up or tear down an AKS Arc test environment for development. Creates a VM with nested Hyper-V and AKS Arc components.',
+      url: '/add-cluster-arc-env',
+    });
+
+    registerRoute({
+      path: '/add-cluster-arc-env',
+      component: ArcEnvironmentPage,
+      name: 'Arc Test Environment',
+      sidebar: null,
+      exact: true,
+      useClusterURL: false,
+      noAuthRequired: true,
+    });
+  }
 }
 
 registerPluginSettings('aks-desktop', PreviewFeaturesSettings, false);

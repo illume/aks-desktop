@@ -36,6 +36,8 @@
     "dev": "concurrently --kill-others --names \"PLUGIN,AI-ASSISTANT,BACKEND,FRONTEND,APP\" -c \"cyan,blue,green,yellow,magenta\" \"npm run plugin:start\" \"npm run ai-assistant:start\" \"cd headlamp && make run-backend\" \"cd headlamp && make run-frontend\" \"cd headlamp && make run-only-app\"",
     "prepare": "husky",
     "knip": "knip",
+    "setupArcEnv": "npx --yes tsx scripts/arc-env.ts setup",
+    "teardownArcEnv": "npx --yes tsx scripts/arc-env.ts teardown",
     "i18n:collect": "node Localize/translation-manager.mjs collect",
     "i18n:distribute": "node Localize/translation-manager.mjs distribute"
   },

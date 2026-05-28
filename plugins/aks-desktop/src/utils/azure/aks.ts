@@ -2,13 +2,13 @@ import { getClusters, getConnectedClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 
 // Re-export Arc proxy types and functions from the dedicated module.
-export type { ArcProxyStatus } from './arc-proxy';
+export type { ArcProxyStatus } from '../../components/Arc/proxy';
 export {
   getArcProxyStatus,
   startArcProxy,
   stopArcProxy,
   restartArcProxy,
-} from './arc-proxy';
+} from '../../components/Arc/proxy';
 
 /** An Azure subscription returned by the Azure CLI. */
 export interface Subscription {
