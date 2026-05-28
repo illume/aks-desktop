@@ -11,7 +11,7 @@ import {
   stopBareMetalProxy,
 } from './proxy';
 
-/** Parameters identifying an BareMetal cluster for proxy management. */
+/** Parameters identifying a BareMetal cluster for proxy management. */
 interface BareMetalProxyTarget {
   subscriptionId: string;
   resourceGroup: string;
@@ -132,7 +132,7 @@ export function useBareMetalProxy(
     [target, refreshProxyStatus, t]
   );
 
-  // Poll proxy status while dialog is open and an BareMetal cluster is targeted.
+  // Poll proxy status while dialog is open and a BareMetal cluster is targeted.
   useEffect(() => {
     if (!open || !target) {
       setProxyStatus(null);

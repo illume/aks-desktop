@@ -12,7 +12,7 @@
 
 import { debugLog, getErrorMessage, runCommandAsync } from '../../utils/azure/az-cli-core';
 
-/** Parameters for provisioning an BareMetal test environment. */
+/** Parameters for provisioning a BareMetal test environment. */
 export interface BareMetalEnvironmentConfig {
   /** Azure subscription GUID. */
   subscription: string;
@@ -40,7 +40,7 @@ export const BAREMETAL_ENV_DEFAULTS = {
   subnetName: 'jumpstartSubnet',
 } as const;
 
-/** Result from an BareMetal environment setup or teardown operation. */
+/** Result from a BareMetal environment setup or teardown operation. */
 export interface BareMetalEnvironmentResult {
   /** Whether the operation succeeded. */
   success: boolean;
@@ -169,7 +169,7 @@ export async function setupBareMetalEnvironment(
 
     // Step 3: Create VM
     debugLog('[BAREMETAL-ENV] Step 3/5: Creating VM...');
-    const vmResult = await runCommandAsync('az', [
+    const vmCreateArgs = [
       'vm',
       'create',
       '--resource-group',
@@ -194,7 +194,13 @@ export async function setupBareMetalEnvironment(
       config.subscription,
       '--output',
       'json',
-    ]);
+    ];
+    const redactedVmCreateArgs = vmCreateArgs.map((arg, index) =>
+      index > 0 && vmCreateArgs[index - 1] === '--admin-password' ? '***' : arg
+    );
+    const vmResult = await runCommandAsync('az', vmCreateArgs, {
+      redactedArgs: redactedVmCreateArgs,
+    });
 
     if (vmResult.stderr && vmResult.stderr.includes('ERROR:')) {
       return {

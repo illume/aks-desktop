@@ -112,6 +112,17 @@ describe('getConnectedClusters', () => {
     expect(result).toEqual([]);
   });
 
+  it('should throw a descriptive error when stdout is invalid JSON', async () => {
+    mockRunCommandAsync.mockResolvedValue({
+      stdout: '{not-json',
+      stderr: '',
+    });
+
+    await expect(getConnectedClusters('sub-1')).rejects.toThrow(
+      'Failed to parse connectedk8s list response'
+    );
+  });
+
   it('should ignore warning-only stderr and process stdout normally', async () => {
     const clusters = [
       {

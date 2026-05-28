@@ -51,7 +51,7 @@ const SENSITIVE_FLAGS = new Set(['--admin-password', '--password']);
  *
  * Logs the command before execution, redacting values that follow any flag
  * listed in {@link SENSITIVE_FLAGS}. Using an args array instead of a shell
- * string prevents shell injection and avoids leaking secrets via process lists.
+ * string prevents shell injection and avoids shell-quoting pitfalls.
  *
  * @param args - The command and its arguments as an array, e.g.
  *   `['az', 'group', 'create', '--name', 'my-rg']`.

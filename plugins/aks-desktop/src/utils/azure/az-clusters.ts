@@ -46,7 +46,21 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
       // If it's just warnings, continue processing stdout
     }
     if (stdout) {
-      const parsed = JSON.parse(stdout);
+      let parsed: any[];
+      try {
+        parsed = JSON.parse(stdout);
+      } catch (error) {
+        throw new Error(
+          `Failed to parse connectedk8s list response: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+
+      if (!Array.isArray(parsed)) {
+        throw new Error('Failed to parse connectedk8s list response: expected a JSON array');
+      }
+
       parsed.forEach((cluster: any) => {
         clusters.push({
           name: cluster.name,
@@ -79,7 +93,21 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
       ]);
       if (stdout) {
         try {
-          const parsed = JSON.parse(stdout);
+          let parsed: any[];
+          try {
+            parsed = JSON.parse(stdout);
+          } catch (error) {
+            throw new Error(
+              `Failed to parse connectedk8s list response: ${
+                error instanceof Error ? error.message : String(error)
+              }`
+            );
+          }
+
+          if (!Array.isArray(parsed)) {
+            throw new Error('Failed to parse connectedk8s list response: expected a JSON array');
+          }
+
           parsed.forEach((cluster: any) => {
             clusters.push({
               id: cluster.id,
@@ -154,7 +182,21 @@ export async function getConnectedClusters(subscriptionId: string): Promise<any[
     return clusters;
   }
 
-  const parsed = JSON.parse(stdout);
+  let parsed: any[];
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse connectedk8s list response: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('Failed to parse connectedk8s list response: expected a JSON array');
+  }
+
   parsed.forEach((cluster: any) => {
     clusters.push({
       name: cluster.name,
