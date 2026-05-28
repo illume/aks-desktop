@@ -4,6 +4,17 @@ Use this markdown block in the PR description:
 
 ## Screenshots/Videos
 
+### Azure Account and BareMetal proxy entry points (Storybook)
+
+#### Azure Account settings screen
+![Azure Account settings screen](https://github.com/user-attachments/assets/a00a592c-daea-4403-9735-ad36b3b80808)
+
+#### BareMetal proxy controls route (running)
+![Bare Metal Proxy Running](docs/images/storybook/baremetal-proxy-running.png)
+
+#### BareMetal proxy recovery action shown (dropped)
+![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
+
 ### BareMetal proxy states (Storybook)
 
 #### Bare Metal Proxy Stopped
