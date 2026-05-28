@@ -80,7 +80,7 @@ The BareMetal environment UI is gated by a preview feature flag. To toggle it:
 When disabled, the cluster provider and route are not registered and the
 UI is completely hidden.
 
-## BareMetalhitecture
+## Architecture
 
 | Layer | File | Purpose |
 | --- | --- | --- |
