@@ -51,14 +51,14 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
         parsed = JSON.parse(stdout);
       } catch (error) {
         throw new Error(
-          `Failed to parse connectedk8s list response: ${
+          `Failed to parse az aks list response: ${
             error instanceof Error ? error.message : String(error)
           }`
         );
       }
 
       if (!Array.isArray(parsed)) {
-        throw new Error('Failed to parse connectedk8s list response: expected a JSON array');
+        throw new Error('Failed to parse az aks list response: expected a JSON array');
       }
 
       parsed.forEach((cluster: any) => {
@@ -98,14 +98,14 @@ export async function getClusters(subscriptionId?: string, query?: string): Prom
             parsed = JSON.parse(stdout);
           } catch (error) {
             throw new Error(
-              `Failed to parse connectedk8s list response: ${
+              `Failed to parse az aks list response: ${
                 error instanceof Error ? error.message : String(error)
               }`
             );
           }
 
           if (!Array.isArray(parsed)) {
-            throw new Error('Failed to parse connectedk8s list response: expected a JSON array');
+            throw new Error('Failed to parse az aks list response: expected a JSON array');
           }
 
           parsed.forEach((cluster: any) => {

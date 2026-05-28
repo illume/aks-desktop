@@ -157,14 +157,7 @@ describe('registerAKSCluster', () => {
     const mockRegister = vi.fn().mockResolvedValue({ success: true, message: 'ok' });
     (window as any).desktopApi = { registerAKSCluster: mockRegister };
 
-    const result = await registerAKSCluster(
-      'sub-1',
-      'rg-1',
-      'cluster-1',
-      undefined,
-      undefined,
-      'aksarc'
-    );
+    const result = await registerAKSCluster('sub-1', 'rg-1', 'cluster-1', undefined, 'aksarc');
 
     expect(result).toEqual({ success: true, message: 'ok' });
     expect(mockRegister).toHaveBeenCalledWith(

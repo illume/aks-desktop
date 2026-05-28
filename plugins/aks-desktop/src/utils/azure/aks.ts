@@ -113,7 +113,6 @@ export async function registerAKSCluster(
   resourceGroup: string,
   clusterName: string,
   managedNamespace?: string,
-  tenantId?: string,
   clusterType: 'aks' | 'aksarc' = 'aks'
 ): Promise<{
   success: boolean;
