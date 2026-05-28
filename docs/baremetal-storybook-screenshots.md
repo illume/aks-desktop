@@ -2,7 +2,6 @@
 
 Use this markdown block in the PR description:
 
-```md
 ## Screenshots/Videos
 
 ### BareMetal proxy states (Storybook)
@@ -32,4 +31,3 @@ Use this markdown block in the PR description:
 
 #### Register AKS Cluster - Alternate capture 2
 ![Register AKS Cluster - Alternate capture 2](https://github.com/user-attachments/assets/f4afb871-bd8c-44dc-adfc-154ac9752862)
-```
