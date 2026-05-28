@@ -18,4 +18,7 @@ Use this markdown block in the PR description:
 
 #### Bare Metal Proxy Action Loading
 ![Bare Metal Proxy Action Loading](docs/images/storybook/baremetal-proxy-action-loading.png)
+
+#### Bare Metal Proxy Dropped
+![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
 ```
