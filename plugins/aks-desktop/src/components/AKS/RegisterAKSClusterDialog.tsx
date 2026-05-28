@@ -3,7 +3,7 @@
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../utils/azure/aks';
@@ -24,6 +24,7 @@ export default function RegisterAKSClusterDialog({
   onClusterRegistered,
 }: RegisterAKSClusterDialogProps) {
   const history = useHistory();
+  const location = useLocation();
   const { t } = useTranslation();
   const authStatus = useAzureAuth();
   const [loading, setLoading] = useState(false);
@@ -40,6 +41,11 @@ export default function RegisterAKSClusterDialog({
   const [capabilities, setCapabilities] = useState<ClusterCapabilities | null>(null);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
   const isMountedRef = useRef(true);
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const proxyFocusRequested = searchParams.get('focus') === 'baremetal-proxy';
+  const proxySubscriptionId = searchParams.get('subscription');
+  const proxyClusterName = searchParams.get('cluster');
+  const proxyClusterResourceGroup = searchParams.get('resourceGroup');
 
   // Derive the BareMetal proxy target from the selected cluster, if it is a BareMetal cluster.
   const bareMetalProxyTarget = useMemo(() => {
@@ -61,11 +67,13 @@ export default function RegisterAKSClusterDialog({
     proxyStatus,
     proxyActionLoading,
     proxyUiError,
+    proxyDropped,
     refreshProxyStatus,
     handleProxyStart,
     handleProxyStop,
     handleProxyRestart,
     resetProxyState,
+    dismissProxyDropped,
   } = useBareMetalProxy(open, bareMetalProxyTarget);
 
   /** Helper function to filter options by name substring match, ranking prefix matches first. */
@@ -110,6 +118,69 @@ export default function RegisterAKSClusterDialog({
       setSelectedCluster(null);
     }
   }, [selectedSubscription]);
+
+  useEffect(() => {
+    if (!open || !proxyFocusRequested || !proxySubscriptionId) {
+      return;
+    }
+    if (selectedSubscription && selectedSubscription.id === proxySubscriptionId) {
+      return;
+    }
+    const preselected = subscriptions.find(sub => sub.id === proxySubscriptionId);
+    if (!preselected) {
+      return;
+    }
+    setSelectedSubscription(preselected);
+    setSubscriptionInputValue(
+      `${preselected.name}${preselected.state !== 'Enabled' ? ` (${preselected.state})` : ''}`
+    );
+  }, [open, proxyFocusRequested, proxySubscriptionId, selectedSubscription, subscriptions]);
+
+  useEffect(() => {
+    if (!open || !proxyFocusRequested || !selectedSubscription || selectedCluster) {
+      return;
+    }
+
+    const matchesTargetSubscription =
+      !proxySubscriptionId || selectedSubscription.id === proxySubscriptionId;
+
+    if (!matchesTargetSubscription) {
+      return;
+    }
+
+    if (proxyClusterName) {
+      const matchingCluster = clusters.find(
+        cluster =>
+          (cluster.clusterType || 'aks') === 'aksarc' &&
+          cluster.name === proxyClusterName &&
+          (!proxyClusterResourceGroup || cluster.resourceGroup === proxyClusterResourceGroup) &&
+          clusterInputValue !== cluster.name
+      );
+      if (matchingCluster) {
+        setSelectedCluster(matchingCluster);
+        setClusterInputValue(matchingCluster.name);
+        return;
+      }
+    }
+
+    const firstBareMetalCluster = clusters.find(
+      cluster => (cluster.clusterType || 'aks') === 'aksarc'
+    );
+    if (firstBareMetalCluster && clusterInputValue !== firstBareMetalCluster.name) {
+      setSelectedCluster(firstBareMetalCluster);
+      setClusterInputValue(firstBareMetalCluster.name);
+    }
+  }, [
+    open,
+    proxyFocusRequested,
+    selectedSubscription,
+    selectedCluster,
+    proxySubscriptionId,
+    proxyClusterName,
+    proxyClusterResourceGroup,
+    clusters,
+    clusterInputValue,
+  ]);
 
   const loadSubscriptions = async () => {
     setLoadingSubscriptions(true);
@@ -349,6 +420,8 @@ export default function RegisterAKSClusterDialog({
       onProxyStart={handleProxyStart}
       onProxyStop={handleProxyStop}
       onProxyRestart={handleProxyRestart}
+      proxyDropped={proxyDropped}
+      onDismissProxyDropped={dismissProxyDropped}
     />
   );
 }

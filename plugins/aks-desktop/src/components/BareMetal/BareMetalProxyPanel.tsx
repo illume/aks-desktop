@@ -8,6 +8,7 @@ import React from 'react';
 import type { BareMetalProxyStatus } from './proxy';
 
 export interface BareMetalProxyPanelProps {
+  panelId?: string;
   proxyStatus: BareMetalProxyStatus | null;
   proxyActionLoading: boolean;
   disabled: boolean;
@@ -18,6 +19,7 @@ export interface BareMetalProxyPanelProps {
 }
 
 export default function BareMetalProxyPanel({
+  panelId,
   proxyStatus,
   proxyActionLoading,
   disabled,
@@ -29,7 +31,14 @@ export default function BareMetalProxyPanel({
   const { t } = useTranslation();
 
   return (
-    <Box p={2} border={1} borderColor="divider" borderRadius={1}>
+    <Box
+      id={panelId}
+      tabIndex={panelId ? -1 : undefined}
+      p={2}
+      border={1}
+      borderColor="divider"
+      borderRadius={1}
+    >
       <Typography variant="subtitle2" component="p" gutterBottom>
         {t('Proxy')}
       </Typography>

@@ -23,6 +23,7 @@ import RegisterAKSClusterPage from './components/AKS/RegisterAKSClusterPage';
 import AzureLoginPage from './components/AzureAuth/AzureLoginPage';
 import AzureProfilePage from './components/AzureAuth/AzureProfilePage';
 import BareMetalEnvironmentPage from './components/BareMetal/BareMetalEnvironmentPage';
+import BareMetalProxySettingsPage from './components/BareMetal/BareMetalProxySettingsPage';
 import ClusterCapabilityCard from './components/ClusterCapabilityCard/ClusterCapabilityCard';
 import ConfigurePipelineButton from './components/ConfigurePipeline/ConfigurePipelineButton';
 import CreateAKSProject from './components/CreateAKSProject/CreateAKSProject';
@@ -208,6 +209,29 @@ if (Headlamp.isRunningAsApp()) {
     sidebar: {
       sidebar: 'HOME',
       item: 'azure-profile',
+    },
+    exact: true,
+    noAuthRequired: true,
+    useClusterURL: false,
+  });
+
+  registerSidebarEntry({
+    name: 'azure-baremetal-proxy',
+    url: '/azure/baremetal-proxy',
+    icon: 'mdi:lan-connect',
+    parent: 'azure-profile',
+    label: 'BareMetal Proxy',
+    useClusterURL: false,
+    sidebar: 'HOME',
+  });
+
+  registerRoute({
+    path: '/azure/baremetal-proxy',
+    component: BareMetalProxySettingsPage,
+    name: 'BareMetal Proxy',
+    sidebar: {
+      sidebar: 'HOME',
+      item: 'azure-baremetal-proxy',
     },
     exact: true,
     noAuthRequired: true,

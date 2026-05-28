@@ -18,6 +18,13 @@ interface BareMetalProxyTarget {
   clusterName: string;
 }
 
+export function didBareMetalProxyDrop(
+  previousStatus: BareMetalProxyStatus['status'] | null,
+  nextStatus: BareMetalProxyStatus['status']
+): boolean {
+  return previousStatus === 'running' && (nextStatus === 'stopped' || nextStatus === 'error');
+}
+
 /** Return value of the {@link useBareMetalProxy} hook. */
 export interface UseBareMetalProxyResult {
   /** Latest proxy status snapshot, or `null` when no BareMetal cluster is selected. */
@@ -26,6 +33,8 @@ export interface UseBareMetalProxyResult {
   proxyActionLoading: boolean;
   /** User-visible error from the most recent proxy operation. */
   proxyUiError: string;
+  /** Whether the proxy appears to have dropped after previously running. */
+  proxyDropped: boolean;
   /** Refreshes proxy status by querying the backend. */
   refreshProxyStatus: () => Promise<void>;
   /** Starts the BareMetal proxy for the current cluster. */
@@ -36,6 +45,8 @@ export interface UseBareMetalProxyResult {
   handleProxyRestart: () => void;
   /** Resets all proxy state (e.g. when the selected cluster changes). */
   resetProxyState: () => void;
+  /** Clears the dropped-proxy alert state. */
+  dismissProxyDropped: () => void;
 }
 
 /**
@@ -55,12 +66,25 @@ export function useBareMetalProxy(
   const [proxyStatus, setProxyStatus] = useState<BareMetalProxyStatus | null>(null);
   const [proxyActionLoading, setProxyActionLoading] = useState(false);
   const [proxyUiError, setProxyUiError] = useState('');
+  const [proxyDropped, setProxyDropped] = useState(false);
   const isMountedRef = useRef(true);
+  const previousProxyStatusRef = useRef<BareMetalProxyStatus['status'] | null>(null);
 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  const applyProxyStatus = useCallback((status: BareMetalProxyStatus) => {
+    if (didBareMetalProxyDrop(previousProxyStatusRef.current, status.status)) {
+      setProxyDropped(true);
+    }
+    if (status.status === 'running') {
+      setProxyDropped(false);
+    }
+    previousProxyStatusRef.current = status.status;
+    setProxyStatus(status);
   }, []);
 
   const refreshProxyStatus = useCallback(async () => {
@@ -75,7 +99,7 @@ export function useBareMetalProxy(
         target.clusterName
       );
       if (isMountedRef.current) {
-        setProxyStatus(status);
+        applyProxyStatus(status);
       }
     } catch (err) {
       if (isMountedRef.current) {
@@ -86,7 +110,7 @@ export function useBareMetalProxy(
         );
       }
     }
-  }, [target, t]);
+  }, [applyProxyStatus, target, t]);
 
   const runProxyAction = useCallback(
     async (
@@ -109,7 +133,7 @@ export function useBareMetalProxy(
           target.clusterName
         );
         if (isMountedRef.current) {
-          setProxyStatus(result);
+          applyProxyStatus(result);
           if (!result.success && result.lastError) {
             setProxyUiError(result.lastError);
           }
@@ -129,7 +153,7 @@ export function useBareMetalProxy(
         }
       }
     },
-    [target, refreshProxyStatus, t]
+    [applyProxyStatus, target, refreshProxyStatus, t]
   );
 
   // Poll proxy status while dialog is open and a BareMetal cluster is targeted.
@@ -137,6 +161,8 @@ export function useBareMetalProxy(
     if (!open || !target) {
       setProxyStatus(null);
       setProxyUiError('');
+      setProxyDropped(false);
+      previousProxyStatusRef.current = null;
       return;
     }
 
@@ -165,16 +191,24 @@ export function useBareMetalProxy(
   const resetProxyState = useCallback(() => {
     setProxyStatus(null);
     setProxyUiError('');
+    setProxyDropped(false);
+    previousProxyStatusRef.current = null;
+  }, []);
+
+  const dismissProxyDropped = useCallback(() => {
+    setProxyDropped(false);
   }, []);
 
   return {
     proxyStatus,
     proxyActionLoading,
     proxyUiError,
+    proxyDropped,
     refreshProxyStatus,
     handleProxyStart,
     handleProxyStop,
     handleProxyRestart,
     resetProxyState,
+    dismissProxyDropped,
   };
 }

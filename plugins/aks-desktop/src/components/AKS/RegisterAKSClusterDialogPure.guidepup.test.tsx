@@ -68,6 +68,7 @@ import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
 import {
   AllCapabilitiesEnabled,
   BareMetalProxyActionLoading,
+  BareMetalProxyDropped,
   BareMetalProxyError,
   BareMetalProxyRunning,
   BareMetalProxyStopped,
@@ -213,6 +214,12 @@ describe('Axe: RegisterAKSClusterDialogPure', () => {
 
   it('BareMetalProxyError has no axe violations', async () => {
     renderStory(BareMetalProxyError.args as RegisterAKSClusterDialogPureProps);
+    const violations = await runAxe();
+    expect(violations).toEqual([]);
+  });
+
+  it('BareMetalProxyDropped has no axe violations', async () => {
+    renderStory(BareMetalProxyDropped.args as RegisterAKSClusterDialogPureProps);
     const violations = await runAxe();
     expect(violations).toEqual([]);
   });
@@ -376,6 +383,14 @@ describe('SR: BareMetalProxy — proxy controls', () => {
     const ps = await phrases();
     expect(ps.some(p => p.includes('Start Proxy') && p.includes('disabled'))).toBe(true);
     expect(ps.some(p => p.includes('Stop Proxy') && p.includes('disabled'))).toBe(true);
+  });
+
+  it('announces dropped-proxy recovery actions', async () => {
+    await mount(BareMetalProxyDropped.args as Partial<RegisterAKSClusterDialogPureProps>);
+    const ps = await phrases();
+    expect(ps.some(p => p.includes('BareMetal proxy disconnected'))).toBe(true);
+    expect(ps.some(p => p.includes('button') && p.includes('Restart Proxy'))).toBe(true);
+    expect(ps.some(p => p.includes('button') && p.includes('Open Proxy Controls'))).toBe(true);
   });
 });
 

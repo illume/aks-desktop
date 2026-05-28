@@ -55,6 +55,7 @@ export default function AzureProfilePage() {
     loggingOut,
     handleBack,
     handleAddCluster,
+    handleBareMetalProxy,
     handleLogout,
   } = useAzureProfilePage();
 
@@ -139,6 +140,16 @@ export default function AzureProfilePage() {
               sx={{ p: 1.5, textTransform: 'none', fontSize: 16 }}
             >
               {t('Add Cluster from Azure')}
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={handleBareMetalProxy}
+              startIcon={<Icon icon="mdi:lan-connect" aria-hidden="true" />}
+              sx={{ p: 1.5, textTransform: 'none', fontSize: 16 }}
+            >
+              {t('BareMetal Proxy')}
             </Button>
 
             <Button

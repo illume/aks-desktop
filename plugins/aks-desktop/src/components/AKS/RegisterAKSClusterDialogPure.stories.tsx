@@ -74,10 +74,12 @@ const baseArgs: RegisterAKSClusterDialogPureProps = {
   proxyStatus: { success: true, status: 'stopped' },
   proxyActionLoading: false,
   proxyUiError: '',
+  proxyDropped: false,
   onProxyRefresh: noOp,
   onProxyStart: noOp,
   onProxyStop: noOp,
   onProxyRestart: noOp,
+  onDismissProxyDropped: noOp,
 };
 
 export default {
@@ -189,6 +191,14 @@ export const BareMetalProxyActionLoading = Template.bind({});
 BareMetalProxyActionLoading.args = {
   ...BareMetalProxyStopped.args,
   proxyActionLoading: true,
+};
+
+/** BareMetal cluster selected — proxy dropped warning with recovery actions. */
+export const BareMetalProxyDropped = Template.bind({});
+BareMetalProxyDropped.args = {
+  ...BareMetalProxyStopped.args,
+  proxyDropped: true,
+  proxyStatus: { success: true, status: 'stopped', lastError: 'Proxy disconnected unexpectedly.' },
 };
 
 /** Registration in progress — Register button shows spinner and "Registering...". */

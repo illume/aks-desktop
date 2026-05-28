@@ -69,10 +69,12 @@ export interface RegisterAKSClusterDialogPureProps {
   proxyStatus: BareMetalProxyStatus | null;
   proxyActionLoading: boolean;
   proxyUiError: string;
+  proxyDropped: boolean;
   onProxyRefresh: () => void;
   onProxyStart: () => void;
   onProxyStop: () => void;
   onProxyRestart: () => void;
+  onDismissProxyDropped: () => void;
 }
 
 export default function RegisterAKSClusterDialogPure({
@@ -106,13 +108,20 @@ export default function RegisterAKSClusterDialogPure({
   proxyStatus,
   proxyActionLoading,
   proxyUiError,
+  proxyDropped,
   onProxyRefresh,
   onProxyStart,
   onProxyStop,
   onProxyRestart,
+  onDismissProxyDropped,
 }: RegisterAKSClusterDialogPureProps) {
   const { t } = useTranslation();
   const isBareMetalCluster = (selectedCluster?.clusterType || 'aks') === 'aksarc';
+  const handleOpenProxyControls = () => {
+    const panel = document.getElementById('baremetal-proxy-controls');
+    panel?.scrollIntoView({ behavior: 'smooth' });
+    panel?.focus();
+  };
 
   return (
     <Dialog
@@ -146,6 +155,25 @@ export default function RegisterAKSClusterDialogPure({
           )}
 
           {proxyUiError && <Alert severity="error">{proxyUiError}</Alert>}
+
+          {proxyDropped && isBareMetalCluster && (
+            <Alert
+              severity="warning"
+              onClose={onDismissProxyDropped}
+              action={
+                <Box display="flex" gap={1}>
+                  <Button color="inherit" size="small" onClick={onProxyRestart}>
+                    {t('Restart Proxy')}
+                  </Button>
+                  <Button color="inherit" size="small" onClick={handleOpenProxyControls}>
+                    {t('Open Proxy Controls')}
+                  </Button>
+                </Box>
+              }
+            >
+              {t('BareMetal proxy disconnected')}
+            </Alert>
+          )}
 
           {capabilitiesLoading && (
             <Box display="flex" alignItems="center" gap={1}>
@@ -349,6 +377,7 @@ export default function RegisterAKSClusterDialogPure({
                 clusterInputValue === selectedCluster.name &&
                 isBareMetalCluster && (
                   <BareMetalProxyPanel
+                    panelId="baremetal-proxy-controls"
                     proxyStatus={proxyStatus}
                     proxyActionLoading={proxyActionLoading}
                     disabled={!selectedSubscription}
