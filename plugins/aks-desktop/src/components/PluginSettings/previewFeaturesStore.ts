@@ -10,7 +10,7 @@ export interface PreviewFeaturesConfig {
 
 export const PREVIEW_FEATURES_DEFAULTS: PreviewFeaturesConfig = {
   githubPipelines: false,
-  arcEnvironment: false,
+  arcEnvironment: true,
 };
 
 export const previewFeaturesStore = new ConfigStore<PreviewFeaturesConfig>('aks-desktop');
