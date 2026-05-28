@@ -120,6 +120,7 @@ export default function RegisterAKSClusterDialogPure({
 }: RegisterAKSClusterDialogPureProps) {
   const { t } = useTranslation();
   const isBareMetalCluster = (selectedCluster?.clusterType || 'aks') === 'aksarc';
+  const clusterActionsMenuLabel = `${t('Proxy')} actions menu`;
   const [clusterActionsAnchorEl, setClusterActionsAnchorEl] = useState<HTMLElement | null>(null);
   const clusterActionsOpen = Boolean(clusterActionsAnchorEl);
   const handleOpenProxyControls = () => {
@@ -369,7 +370,7 @@ export default function RegisterAKSClusterDialogPure({
                       <>
                         <IconButton
                           size="small"
-                          aria-label={t('Proxy')}
+                          aria-label={clusterActionsMenuLabel}
                           aria-controls={
                             clusterActionsOpen ? 'baremetal-cluster-actions-menu' : undefined
                           }
@@ -389,6 +390,7 @@ export default function RegisterAKSClusterDialogPure({
                           anchorEl={clusterActionsAnchorEl}
                           open={clusterActionsOpen}
                           onClose={closeClusterActions}
+                          MenuListProps={{ 'aria-label': clusterActionsMenuLabel }}
                         >
                           <MenuItem
                             onClick={() => {

@@ -201,7 +201,7 @@ BareMetalProxyDropped.args = {
   proxyStatus: { success: true, status: 'stopped', lastError: 'Proxy disconnected unexpectedly.' },
 };
 
-/** BareMetal cluster selected — cluster overview includes proxy actions menu trigger. */
+/** BareMetal cluster selected — selected-cluster overview shows the proxy actions menu trigger. */
 export const BareMetalProxyClusterActions = Template.bind({});
 BareMetalProxyClusterActions.args = {
   ...BareMetalProxyStopped.args,
