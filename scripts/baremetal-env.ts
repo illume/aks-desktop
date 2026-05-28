@@ -164,10 +164,10 @@ function setup(args: Record<string, string>) {
 
   // Step 4: Assign managed identity + Contributor role
   console.log('Step 4/5: Assigning managed identity...');
-  run(`az vm identity assign --resource-group ${groupName} --name ${vmName}`);
+  run(`az vm identity assign --resource-group ${groupName} --name ${vmName} --subscription ${subscription}`);
 
   const principalId = run(
-    `az vm show --resource-group ${groupName} --name ${vmName} --query identity.principalId -o tsv`
+    `az vm show --resource-group ${groupName} --name ${vmName} --query identity.principalId -o tsv --subscription ${subscription}`
   ).trim();
 
   if (principalId) {
@@ -187,6 +187,7 @@ function setup(args: Record<string, string>) {
         `--name ${vmName}`,
         '--command-id RunPowerShellScript',
         '--scripts "Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart"',
+        `--subscription ${subscription}`,
       ].join(' ')
     );
     console.log('  ✓ Hyper-V installation initiated.\n');
