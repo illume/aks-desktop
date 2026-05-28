@@ -62,6 +62,30 @@ import {
 } from './utils/shared/isAksProject';
 import { azureTheme } from './utils/shared/theme';
 
+/** Menu item shown in the cluster overview action menu for BareMetal (aksarc) clusters.
+ *  Navigates to the BareMetal Proxy Settings page. */
+function BareMetalProxySettingsMenuItem({
+  cluster,
+  handleMenuClose,
+}: {
+  cluster: any;
+  handleMenuClose: () => void;
+}) {
+  const history = useHistory();
+  const settings = getClusterSettings(cluster.name);
+  if (settings.clusterType !== 'aksarc') return null;
+  return (
+    <MenuItem
+      onClick={() => {
+        handleMenuClose();
+        history.push('/azure/baremetal-proxy');
+      }}
+    >
+      <ListItemText>BareMetal Proxy Settings</ListItemText>
+    </MenuItem>
+  );
+}
+
 Headlamp.setAppMenu(menus => {
   // Find the Help menu
   const helpMenu = menus?.find(menu => menu.id === 'original-help');
@@ -398,22 +422,7 @@ if (Headlamp.isRunningAsApp()) {
     });
   }
 
-  registerClusterProviderMenuItem(({ cluster, handleMenuClose }) => {
-    const history = useHistory();
-    const settings = getClusterSettings(cluster.name);
-    if (settings.clusterType !== 'aksarc') return null;
-
-    return (
-      <MenuItem
-        onClick={() => {
-          handleMenuClose();
-          history.push('/azure/baremetal-proxy');
-        }}
-      >
-        <ListItemText>BareMetal Proxy Settings</ListItemText>
-      </MenuItem>
-    );
-  });
+  registerClusterProviderMenuItem(BareMetalProxySettingsMenuItem);
 }
 
 registerPluginSettings('aks-desktop', PreviewFeaturesSettings, false);
