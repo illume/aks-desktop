@@ -3,6 +3,12 @@
 
 export interface ClusterSettings {
   allowedNamespaces?: string[];
+  /** Discriminator stored at registration time: `'aks'` for managed clusters, `'aksarc'` for Arc-connected clusters. */
+  clusterType?: 'aks' | 'aksarc';
+  /** Azure subscription ID owning the cluster. */
+  subscriptionId?: string;
+  /** Azure resource group containing the cluster. */
+  resourceGroup?: string;
   [key: string]: unknown;
 }
 

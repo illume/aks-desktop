@@ -6,6 +6,7 @@ import {
   registerAddClusterProvider,
   registerAppLogo,
   registerAppTheme,
+  registerClusterProviderMenuItem,
   registerCustomCreateProject,
   registerPluginSettings,
   registerProjectDeleteButton,
@@ -16,14 +17,20 @@ import {
   registerRoute,
   registerSidebarEntry,
 } from '@kinvolk/headlamp-plugin/lib';
+import { ListItemText, MenuItem } from '@mui/material';
 import React from 'react';
-import { Redirect } from 'react-router-dom';
+import { Redirect, useHistory } from 'react-router-dom';
 import AccessTab from './components/AccessTab/AccessTab';
 import RegisterAKSClusterPage from './components/AKS/RegisterAKSClusterPage';
 import AzureLoginPage from './components/AzureAuth/AzureLoginPage';
 import AzureProfilePage from './components/AzureAuth/AzureProfilePage';
 import BareMetalEnvironmentPage from './components/BareMetal/BareMetalEnvironmentPage';
 import BareMetalProxySettingsPage from './components/BareMetal/BareMetalProxySettingsPage';
+import {
+  restartBareMetalProxy,
+  startBareMetalProxy,
+  stopBareMetalProxy,
+} from './components/BareMetal/proxy';
 import ClusterCapabilityCard from './components/ClusterCapabilityCard/ClusterCapabilityCard';
 import ConfigurePipelineButton from './components/ConfigurePipeline/ConfigurePipelineButton';
 import CreateAKSProject from './components/CreateAKSProject/CreateAKSProject';
@@ -47,6 +54,7 @@ import ScalingTab from './components/Scaling/ScalingTab';
 import type { ProjectDefinition } from './types/project';
 import { getLoginStatus } from './utils/azure/az-auth';
 import { AZURE_ACCOUNT_POLL_INTERVAL_MS } from './utils/constants/timing';
+import { getClusterSettings } from './utils/shared/clusterSettings';
 import {
   isAksProject,
   isAksProjectWithResourceGroup,
@@ -347,6 +355,65 @@ if (Headlamp.isRunningAsApp()) {
       noAuthRequired: true,
     });
   }
+
+  // BareMetal proxy actions on the cluster overview page.
+  // Each registered cluster stores its clusterType/subscriptionId/resourceGroup in localStorage at
+  // registration time. Menu items are filtered to BareMetal (aksarc) clusters only.
+  const bareMetalProxyActions = [
+    {
+      label: 'Start BareMetal Proxy',
+      action: startBareMetalProxy,
+    },
+    {
+      label: 'Stop BareMetal Proxy',
+      action: stopBareMetalProxy,
+    },
+    {
+      label: 'Restart BareMetal Proxy',
+      action: restartBareMetalProxy,
+    },
+  ] as const;
+
+  for (const cmd of bareMetalProxyActions) {
+    registerClusterProviderMenuItem(({ cluster, handleMenuClose }) => {
+      const settings = getClusterSettings(cluster.name);
+      if (settings.clusterType !== 'aksarc') return null;
+
+      return (
+        <MenuItem
+          onClick={() => {
+            handleMenuClose();
+            if (settings.subscriptionId && settings.resourceGroup) {
+              cmd
+                .action(settings.subscriptionId, settings.resourceGroup, cluster.name)
+                .catch((err: unknown) =>
+                  console.error(`[AKS] BareMetal proxy action "${cmd.label}" failed:`, err)
+                );
+            }
+          }}
+        >
+          <ListItemText>{cmd.label}</ListItemText>
+        </MenuItem>
+      );
+    });
+  }
+
+  registerClusterProviderMenuItem(({ cluster, handleMenuClose }) => {
+    const history = useHistory();
+    const settings = getClusterSettings(cluster.name);
+    if (settings.clusterType !== 'aksarc') return null;
+
+    return (
+      <MenuItem
+        onClick={() => {
+          handleMenuClose();
+          history.push('/azure/baremetal-proxy');
+        }}
+      >
+        <ListItemText>BareMetal Proxy Settings</ListItemText>
+      </MenuItem>
+    );
+  });
 }
 
 registerPluginSettings('aks-desktop', PreviewFeaturesSettings, false);

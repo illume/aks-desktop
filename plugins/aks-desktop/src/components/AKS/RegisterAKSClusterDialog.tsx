@@ -8,6 +8,7 @@ import { useAzureAuth } from '../../hooks/useAzureAuth';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../utils/azure/aks';
 import { getClusterCapabilities } from '../../utils/azure/az-clusters';
+import { getClusterSettings, setClusterSettings } from '../../utils/shared/clusterSettings';
 import { useBareMetalProxy } from '../BareMetal/useBareMetalProxy';
 import type { AKSCluster, Subscription } from './RegisterAKSClusterDialogPure';
 import RegisterAKSClusterDialogPure from './RegisterAKSClusterDialogPure';
@@ -316,6 +317,15 @@ export default function RegisterAKSClusterDialog({
       );
 
       onClusterRegistered?.();
+
+      // Persist Azure metadata so cluster provider menu items can identify BareMetal clusters
+      // and retrieve the subscription / resource group for proxy management.
+      setClusterSettings(selectedCluster.name, {
+        ...getClusterSettings(selectedCluster.name),
+        clusterType: selectedCluster.clusterType || 'aks',
+        subscriptionId: selectedSubscription.id,
+        resourceGroup: selectedCluster.resourceGroup,
+      });
 
       if ((selectedCluster.clusterType || 'aks') === 'aksarc') {
         await refreshProxyStatus();
