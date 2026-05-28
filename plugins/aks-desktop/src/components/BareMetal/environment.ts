@@ -65,9 +65,12 @@ const REQUIRED_PROVIDERS = [
 /**
  * Registers the Azure resource providers required for AKS BareMetal.
  *
+ * @param subscription - Azure subscription GUID to register providers in.
  * @returns A result indicating success or the first registration failure.
  */
-export async function registerBareMetalProviders(): Promise<BareMetalEnvironmentResult> {
+export async function registerBareMetalProviders(
+  subscription: string
+): Promise<BareMetalEnvironmentResult> {
   for (const provider of REQUIRED_PROVIDERS) {
     debugLog(`[BAREMETAL-ENV] Registering provider: ${provider}`);
     const { stderr } = await runCommandAsync('az', [
@@ -75,6 +78,8 @@ export async function registerBareMetalProviders(): Promise<BareMetalEnvironment
       'register',
       '--namespace',
       provider,
+      '--subscription',
+      subscription,
       '--wait',
     ]);
 
@@ -150,7 +155,7 @@ export async function setupBareMetalEnvironment(
   try {
     // Step 1: Register providers
     debugLog('[BAREMETAL-ENV] Step 1/5: Registering resource providers...');
-    const providerResult = await registerBareMetalProviders();
+    const providerResult = await registerBareMetalProviders(config.subscription);
     if (!providerResult.success) {
       return providerResult;
     }
