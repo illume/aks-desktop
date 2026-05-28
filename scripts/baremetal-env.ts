@@ -43,6 +43,16 @@ const REQUIRED_PROVIDERS = [
 
 // ---- Helpers ----
 
+/**
+ * Executes a shell command synchronously and returns its stdout.
+ *
+ * Logs the command before execution. If the command fails, throws an
+ * `Error` with the stderr output (or the original error message).
+ *
+ * @param cmd - The shell command string to execute.
+ * @returns The stdout output of the command.
+ * @throws {Error} If the command exits with a non-zero status.
+ */
 function run(cmd: string): string {
   console.log(`  $ ${cmd}`);
   try {
@@ -53,6 +63,15 @@ function run(cmd: string): string {
   }
 }
 
+/**
+ * Parses CLI arguments into a key-value map.
+ *
+ * Expects `--key value` pairs. Flags without a following value
+ * (or followed by another flag) are ignored.
+ *
+ * @param argv - The argument array (typically `process.argv.slice(2)`).
+ * @returns A record mapping argument names (without `--` prefix) to their values.
+ */
 function parseArgs(argv: string[]): Record<string, string> {
   const args: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -64,6 +83,14 @@ function parseArgs(argv: string[]): Record<string, string> {
   return args;
 }
 
+/**
+ * Returns the value for a required CLI argument, or exits the process with
+ * an error message if the argument is missing.
+ *
+ * @param args - The parsed argument map from {@link parseArgs}.
+ * @param key - The argument name to look up (without `--` prefix).
+ * @returns The argument value.
+ */
 function required(args: Record<string, string>, key: string): string {
   if (!args[key]) {
     console.error(`Error: --${key} is required.`);
@@ -74,6 +101,20 @@ function required(args: Record<string, string>, key: string): string {
 
 // ---- Commands ----
 
+/**
+ * Provisions an AKS BareMetal test environment in Azure.
+ *
+ * Performs the following steps:
+ * 1. Registers required Azure resource providers.
+ * 2. Creates a resource group.
+ * 3. Creates a Windows Server 2022 VM with nested virtualisation support.
+ * 4. Assigns a managed identity with Contributor role to the VM.
+ * 5. Installs Hyper-V on the VM via `az vm run-command` (no RDP required).
+ *
+ * @param args - Parsed CLI arguments. Required: `subscription`, `location`,
+ *   `username`, `password`. Optional: `group-name`, `vm-name`, `vnet-name`,
+ *   `subnet-name`.
+ */
 function setup(args: Record<string, string>) {
   const subscription = required(args, 'subscription');
   const location = required(args, 'location');
@@ -166,6 +207,15 @@ function setup(args: Record<string, string>) {
   );
 }
 
+/**
+ * Tears down an AKS BareMetal test environment by deleting its resource group.
+ *
+ * The deletion runs asynchronously (`--no-wait`) so this function returns
+ * quickly while Azure removes the resources in the background.
+ *
+ * @param args - Parsed CLI arguments. Required: `subscription`.
+ *   Optional: `group-name` (defaults to `jumpstart-rg`).
+ */
 function teardown(args: Record<string, string>) {
   const subscription = required(args, 'subscription');
   const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
