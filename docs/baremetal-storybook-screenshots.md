@@ -15,6 +15,10 @@ Use this markdown block in the PR description:
 #### BareMetal proxy recovery action shown (dropped)
 ![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
 
+#### Register AKS Cluster overview cluster-action menu (BareMetal)
+![Register AKS Cluster - BareMetal Cluster Actions](docs/images/storybook/register-aks-cluster-baremetal-cluster-actions.png)
+![Register AKS Cluster - BareMetal Cluster Actions (alternate)](https://github.com/user-attachments/assets/2997f43b-fed6-480e-bff6-ef33e604f1f4)
+
 ### BareMetal proxy states (Storybook)
 
 #### Bare Metal Proxy Stopped
@@ -42,3 +46,6 @@ Use this markdown block in the PR description:
 
 #### Register AKS Cluster - Alternate capture 2
 ![Register AKS Cluster - Alternate capture 2](https://github.com/user-attachments/assets/f4afb871-bd8c-44dc-adfc-154ac9752862)
+
+#### Register AKS Cluster - Alternate capture 3
+![Register AKS Cluster - Alternate capture 3](https://github.com/user-attachments/assets/349285b4-db9c-496b-b0fe-c6f402e612ff)

@@ -13,10 +13,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  Menu,
+  MenuItem,
   TextField,
   Typography,
 } from '@mui/material';
-import React from 'react';
+import React, { useState } from 'react';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import BareMetalProxyPanel from '../BareMetal/BareMetalProxyPanel';
 import type { BareMetalProxyStatus } from '../BareMetal/proxy';
@@ -117,11 +120,14 @@ export default function RegisterAKSClusterDialogPure({
 }: RegisterAKSClusterDialogPureProps) {
   const { t } = useTranslation();
   const isBareMetalCluster = (selectedCluster?.clusterType || 'aks') === 'aksarc';
+  const [clusterActionsAnchorEl, setClusterActionsAnchorEl] = useState<HTMLElement | null>(null);
+  const clusterActionsOpen = Boolean(clusterActionsAnchorEl);
   const handleOpenProxyControls = () => {
     const panel = document.getElementById('baremetal-proxy-controls');
     panel?.scrollIntoView({ behavior: 'smooth' });
     panel?.focus();
   };
+  const closeClusterActions = () => setClusterActionsAnchorEl(null);
 
   return (
     <Dialog
@@ -355,9 +361,74 @@ export default function RegisterAKSClusterDialogPure({
                   role="region"
                   aria-label={t('Selected Cluster Details')}
                 >
-                  <Typography variant="subtitle2" component="p" gutterBottom>
-                    {t('Selected Cluster Details')}
-                  </Typography>
+                  <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                    <Typography variant="subtitle2" component="p">
+                      {t('Selected Cluster Details')}
+                    </Typography>
+                    {isBareMetalCluster && (
+                      <>
+                        <IconButton
+                          size="small"
+                          aria-label={t('Proxy')}
+                          aria-controls={
+                            clusterActionsOpen ? 'baremetal-cluster-actions-menu' : undefined
+                          }
+                          aria-haspopup="true"
+                          aria-expanded={clusterActionsOpen ? 'true' : undefined}
+                          onClick={event => setClusterActionsAnchorEl(event.currentTarget)}
+                        >
+                          <Icon
+                            icon="mdi:dots-vertical"
+                            width={18}
+                            height={18}
+                            aria-hidden="true"
+                          />
+                        </IconButton>
+                        <Menu
+                          id="baremetal-cluster-actions-menu"
+                          anchorEl={clusterActionsAnchorEl}
+                          open={clusterActionsOpen}
+                          onClose={closeClusterActions}
+                        >
+                          <MenuItem
+                            onClick={() => {
+                              closeClusterActions();
+                              onProxyStart();
+                            }}
+                            disabled={proxyActionLoading}
+                          >
+                            {t('Start Proxy')}
+                          </MenuItem>
+                          <MenuItem
+                            onClick={() => {
+                              closeClusterActions();
+                              onProxyStop();
+                            }}
+                            disabled={proxyActionLoading}
+                          >
+                            {t('Stop Proxy')}
+                          </MenuItem>
+                          <MenuItem
+                            onClick={() => {
+                              closeClusterActions();
+                              onProxyRestart();
+                            }}
+                            disabled={proxyActionLoading}
+                          >
+                            {t('Restart Proxy')}
+                          </MenuItem>
+                          <MenuItem
+                            onClick={() => {
+                              closeClusterActions();
+                              handleOpenProxyControls();
+                            }}
+                          >
+                            {t('Open Proxy Controls')}
+                          </MenuItem>
+                        </Menu>
+                      </>
+                    )}
+                  </Box>
                   <Typography variant="body2">
                     <strong>{t('Name')}:</strong> {selectedCluster.name}
                   </Typography>
