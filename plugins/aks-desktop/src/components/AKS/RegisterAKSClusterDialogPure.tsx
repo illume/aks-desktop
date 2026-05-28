@@ -18,8 +18,8 @@ import {
 } from '@mui/material';
 import React from 'react';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
-import type { BareMetalProxyStatus } from '../../utils/azure/aks';
 import BareMetalProxyPanel from '../BareMetal/BareMetalProxyPanel';
+import type { BareMetalProxyStatus } from '../BareMetal/proxy';
 import { ClusterConfigurePanel } from '../CreateAKSProject/components/ClusterConfigurePanel';
 
 export interface Subscription {
@@ -280,9 +280,7 @@ export default function RegisterAKSClusterDialogPure({
               )}
 
               {!loadingClusters && selectedSubscription && clusters.length === 0 && (
-                <Alert severity="info">
-                  {t('No AKS or BareMetal clusters found in this subscription.')}
-                </Alert>
+                <Alert severity="info">{t('No clusters found in this subscription.')}</Alert>
               )}
 
               {!loadingClusters && selectedSubscription && clusters.length > 0 && (
@@ -347,17 +345,19 @@ export default function RegisterAKSClusterDialogPure({
                 </Box>
               )}
 
-              {selectedCluster && clusterInputValue === selectedCluster.name && isBareMetalCluster && (
-                <BareMetalProxyPanel
-                  proxyStatus={proxyStatus}
-                  proxyActionLoading={proxyActionLoading}
-                  disabled={!selectedSubscription}
-                  onProxyStart={onProxyStart}
-                  onProxyStop={onProxyStop}
-                  onProxyRestart={onProxyRestart}
-                  onProxyRefresh={onProxyRefresh}
-                />
-              )}
+              {selectedCluster &&
+                clusterInputValue === selectedCluster.name &&
+                isBareMetalCluster && (
+                  <BareMetalProxyPanel
+                    proxyStatus={proxyStatus}
+                    proxyActionLoading={proxyActionLoading}
+                    disabled={!selectedSubscription}
+                    onProxyStart={onProxyStart}
+                    onProxyStop={onProxyStop}
+                    onProxyRestart={onProxyRestart}
+                    onProxyRefresh={onProxyRefresh}
+                  />
+                )}
             </>
           )}
           {/* Persistent live region for loading status announcements.

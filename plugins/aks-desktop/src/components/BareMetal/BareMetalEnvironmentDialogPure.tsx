@@ -16,8 +16,8 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
-import type { BareMetalExtensionStatus } from './useBareMetalExtensionCheck';
 import { BAREMETAL_ENV_DEFAULTS } from './environment';
+import type { BareMetalExtensionStatus } from './useBareMetalExtensionCheck';
 
 export interface BareMetalEnvironmentDialogPureProps {
   open: boolean;
@@ -280,9 +280,7 @@ export default function BareMetalEnvironmentDialogPure({
           }
           aria-busy={(loading && loadingAction === 'setup') || undefined}
         >
-          {loading && loadingAction === 'setup'
-            ? `${t('Setting up')}...`
-            : t('Setup Environment')}
+          {loading && loadingAction === 'setup' ? `${t('Setting up')}...` : t('Setup Environment')}
         </Button>
       </DialogActions>
     </Dialog>

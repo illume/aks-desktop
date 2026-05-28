@@ -197,7 +197,11 @@ export async function startBareMetalProxy(
 
   // If process handle is gone (after reload), reconcile first so we don't start duplicates.
   if (!existing || !existing.cmd) {
-    const reconciled = await reconcileBareMetalProxyStatus(subscriptionId, resourceGroup, clusterName);
+    const reconciled = await reconcileBareMetalProxyStatus(
+      subscriptionId,
+      resourceGroup,
+      clusterName
+    );
     if (reconciled.status === 'running') {
       return reconciled;
     }

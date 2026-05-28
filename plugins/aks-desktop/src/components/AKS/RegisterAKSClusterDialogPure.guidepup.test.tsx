@@ -222,15 +222,13 @@ describe('SR: Default — dialog structure', () => {
   it('announces the dialog landmark', async () => {
     await mount();
     const ps = await phrases();
-    expect(ps.some(p => p.includes('dialog') && p.includes('Register AKS/BareMetal Cluster'))).toBe(true);
+    expect(ps.some(p => p.includes('dialog') && p.includes('Register AKS Cluster'))).toBe(true);
   });
 
-  it('announces the dialog heading "Register AKS/BareMetal Cluster"', async () => {
+  it('announces the dialog heading "Register AKS Cluster"', async () => {
     await mount();
     const ps = await phrases();
-    expect(ps.some(p => p.includes('heading') && p.includes('Register AKS/BareMetal Cluster'))).toBe(
-      true
-    );
+    expect(ps.some(p => p.includes('heading') && p.includes('Register AKS Cluster'))).toBe(true);
   });
 
   it('announces the Subscription combobox', async () => {
@@ -326,7 +324,7 @@ describe('SR: LoadingClusters — loading status', () => {
   it('announces the status region with loading clusters text', async () => {
     await mount(LoadingClusters.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
-    expect(ps.some(p => p.includes('Loading AKS/BareMetal clusters'))).toBe(true);
+    expect(ps.some(p => p.includes('Loading clusters'))).toBe(true);
   });
 });
 
@@ -335,16 +333,16 @@ describe('SR: NoClusters — info alert', () => {
     await mount(NoClusters.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
     expect(ps).toContain('alert');
-    expect(ps.some(p => p.includes('No AKS or BareMetal clusters found'))).toBe(true);
+    expect(ps.some(p => p.includes('No clusters found'))).toBe(true);
   });
 });
 
 describe('SR: WithClusters — both comboboxes', () => {
-  it('announces both Subscription and AKS/BareMetal Cluster comboboxes', async () => {
+  it('announces both Subscription and Cluster comboboxes', async () => {
     await mount(WithClusters.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
     expect(ps.some(p => p.includes('combobox') && p.includes('Subscription'))).toBe(true);
-    expect(ps.some(p => p.includes('combobox') && p.includes('AKS/BareMetal Cluster'))).toBe(true);
+    expect(ps.some(p => p.includes('combobox') && p.includes('Cluster'))).toBe(true);
   });
 });
 
@@ -352,7 +350,7 @@ describe('SR: BareMetalProxy — proxy controls', () => {
   it('announces proxy status and controls for a stopped BareMetal proxy', async () => {
     await mount(BareMetalProxyStopped.args as Partial<RegisterAKSClusterDialogPureProps>);
     const ps = await phrases();
-    expect(ps.some(p => p.includes('BareMetal Proxy'))).toBe(true);
+    expect(ps.some(p => p.includes('Proxy'))).toBe(true);
     expect(ps.some(p => p.includes('STOPPED'))).toBe(true);
     expect(ps.some(p => p.includes('button') && p.includes('Start Proxy'))).toBe(true);
     expect(ps.some(p => p.includes('button') && p.includes('Stop Proxy'))).toBe(true);

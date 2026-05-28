@@ -3,22 +3,25 @@
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useBareMetalExtensionCheck } from './useBareMetalExtensionCheck';
 import { useAzureAuth } from '../../hooks/useAzureAuth';
+import BareMetalEnvironmentDialogPure from './BareMetalEnvironmentDialogPure';
 import {
-  type BareMetalEnvironmentConfig,
   BAREMETAL_ENV_DEFAULTS,
+  type BareMetalEnvironmentConfig,
   setupBareMetalEnvironment,
   teardownBareMetalEnvironment,
 } from './environment';
-import BareMetalEnvironmentDialogPure from './BareMetalEnvironmentDialogPure';
+import { useBareMetalExtensionCheck } from './useBareMetalExtensionCheck';
 
 interface BareMetalEnvironmentDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
-export default function BareMetalEnvironmentDialog({ open, onClose }: BareMetalEnvironmentDialogProps) {
+export default function BareMetalEnvironmentDialog({
+  open,
+  onClose,
+}: BareMetalEnvironmentDialogProps) {
   const { t } = useTranslation();
   const authStatus = useAzureAuth();
   const extensionCheck = useBareMetalExtensionCheck();

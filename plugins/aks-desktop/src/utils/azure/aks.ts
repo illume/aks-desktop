@@ -1,15 +1,6 @@
 import { getClusters, getConnectedClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 
-// Re-export BareMetal proxy types and functions from the dedicated module.
-export type { BareMetalProxyStatus } from '../../components/BareMetal/proxy';
-export {
-  getBareMetalProxyStatus,
-  startBareMetalProxy,
-  stopBareMetalProxy,
-  restartBareMetalProxy,
-} from '../../components/BareMetal/proxy';
-
 /** An Azure subscription returned by the Azure CLI. */
 export interface Subscription {
   /** The subscription GUID. */

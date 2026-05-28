@@ -72,7 +72,8 @@ describe('getConnectedClusters', () => {
   it('should return empty list when connectedk8s extension is not installed', async () => {
     mockRunCommandAsync.mockResolvedValue({
       stdout: '',
-      stderr: "'connectedk8s' is not a recognized command. Try az extension add --name connectedk8s",
+      stderr:
+        "'connectedk8s' is not a recognized command. Try az extension add --name connectedk8s",
     });
 
     const result = await getConnectedClusters('sub-1');

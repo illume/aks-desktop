@@ -50,9 +50,7 @@ describe('setupBareMetalEnvironment', () => {
     // Providers + resource group succeed
     mockRun.mockResolvedValue({ stdout: '{}', stderr: '' });
     // Then override for the VM creation call (last call)
-    let callCount = 0;
     mockRun.mockImplementation(async (_cmd, args) => {
-      callCount++;
       if (args.includes('vm')) {
         return { stdout: '', stderr: 'ERROR: VM quota exceeded' };
       }
