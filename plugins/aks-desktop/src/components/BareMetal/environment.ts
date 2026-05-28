@@ -215,6 +215,8 @@ export async function setupBareMetalEnvironment(
       groupName,
       '--name',
       vmName,
+      '--subscription',
+      config.subscription,
     ]);
 
     if (identityResult.stderr && identityResult.stderr.includes('ERROR:')) {
@@ -236,6 +238,8 @@ export async function setupBareMetalEnvironment(
       'identity.principalId',
       '-o',
       'tsv',
+      '--subscription',
+      config.subscription,
     ]);
 
     const principalId = showResult.stdout.trim();
@@ -267,6 +271,8 @@ export async function setupBareMetalEnvironment(
       'RunPowerShellScript',
       '--scripts',
       'Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart',
+      '--subscription',
+      config.subscription,
     ]);
 
     if (initResult.stderr && initResult.stderr.includes('ERROR:')) {
