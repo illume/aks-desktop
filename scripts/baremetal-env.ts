@@ -131,7 +131,7 @@ function setup(args: Record<string, string>) {
   console.log('Step 1/5: Registering resource providers...');
   for (const provider of REQUIRED_PROVIDERS) {
     console.log(`  Registering ${provider}...`);
-    run(`az provider register --namespace ${provider} --wait`);
+    run(`az provider register --namespace ${provider} --wait --subscription ${subscription}`);
   }
   console.log('  ✓ All providers registered.\n');
 
