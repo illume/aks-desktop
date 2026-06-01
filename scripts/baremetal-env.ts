@@ -24,7 +24,7 @@
 
 import { spawnSync } from 'child_process';
 
-// ---- Defaults (mirrored from baremetal-environment.ts) ----
+// ---- Defaults (mirrored from components/BareMetal/environment.ts) ----
 
 const BAREMETAL_ENV_DEFAULTS = {
   groupName: 'jumpstart-rg',
