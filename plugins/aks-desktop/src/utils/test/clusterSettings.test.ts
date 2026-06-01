@@ -99,10 +99,7 @@ describe('clusterSettings', () => {
     });
 
     test('falls back to legacy key when disambiguated key has no entry', () => {
-      localStorage.setItem(
-        'cluster_settings.my-cluster',
-        JSON.stringify({ clusterType: 'aks' })
-      );
+      localStorage.setItem('cluster_settings.my-cluster', JSON.stringify({ clusterType: 'aks' }));
 
       const settings = getClusterSettings('my-cluster', 'sub-1', 'rg-1');
       expect(settings.clusterType).toBe('aks');
@@ -122,6 +119,32 @@ describe('clusterSettings', () => {
       const b = getClusterSettings('cluster', 'sub-2', 'rg-b');
       expect(a.subscriptionId).toBe('sub-1');
       expect(b.subscriptionId).toBe('sub-2');
+    });
+
+    test('finds unique disambiguated entry when called with only clusterName', () => {
+      localStorage.setItem(
+        'cluster_settings.sub-1.rg-1.my-cluster',
+        JSON.stringify({ clusterType: 'aksarc', subscriptionId: 'sub-1' })
+      );
+
+      const settings = getClusterSettings('my-cluster');
+      expect(settings.clusterType).toBe('aksarc');
+      expect(settings.subscriptionId).toBe('sub-1');
+    });
+
+    test('returns legacy key when multiple disambiguated entries exist for same name', () => {
+      localStorage.setItem(
+        'cluster_settings.sub-1.rg-a.my-cluster',
+        JSON.stringify({ subscriptionId: 'sub-1' })
+      );
+      localStorage.setItem(
+        'cluster_settings.sub-2.rg-b.my-cluster',
+        JSON.stringify({ subscriptionId: 'sub-2' })
+      );
+      localStorage.setItem('cluster_settings.my-cluster', JSON.stringify({ clusterType: 'aks' }));
+
+      const settings = getClusterSettings('my-cluster');
+      expect(settings.clusterType).toBe('aks');
     });
   });
 

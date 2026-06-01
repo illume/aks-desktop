@@ -32,14 +32,33 @@ export function clusterSettingsKey(
   return `cluster_settings.${clusterName}`;
 }
 
+/** Attempt to parse a localStorage value as a plain object. */
+function parseSettingsValue(raw: string | null): ClusterSettings | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as ClusterSettings;
+    }
+  } catch {
+    /* unparseable – treat as missing */
+  }
+  return undefined;
+}
+
 /**
  * Reads and parses cluster settings from localStorage.
  * Returns a plain object with the parsed settings,
  * or an empty object if the key is missing or unparseable.
  *
- * When called with only `clusterName` the function first tries the
- * legacy key (`cluster_settings.${clusterName}`).  Pass `subscriptionId`
- * and `resourceGroup` when available to use the disambiguated key.
+ * When `subscriptionId` and `resourceGroup` are provided the
+ * disambiguated key is tried first, then the legacy key as a fallback.
+ *
+ * When called with only `clusterName` the function scans localStorage
+ * for disambiguated entries whose key ends with `.${clusterName}`.  If
+ * exactly one match is found it is returned; otherwise the legacy key
+ * is used (avoids ambiguity when the same cluster name exists in
+ * multiple subscriptions/resource-groups).
  */
 export function getClusterSettings(
   clusterName: string,
@@ -48,23 +67,32 @@ export function getClusterSettings(
 ): ClusterSettings {
   try {
     const key = clusterSettingsKey(clusterName, subscriptionId, resourceGroup);
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as ClusterSettings;
-      }
-    }
+    const result = parseSettingsValue(localStorage.getItem(key));
+    if (result) return result;
+
     // Fall back to the legacy key when the qualified key has no entry
     if (subscriptionId && resourceGroup) {
-      const legacyRaw = localStorage.getItem(`cluster_settings.${clusterName}`);
-      if (legacyRaw) {
-        const parsed = JSON.parse(legacyRaw);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          return parsed as ClusterSettings;
+      return parseSettingsValue(localStorage.getItem(`cluster_settings.${clusterName}`)) ?? {};
+    }
+
+    // No subscription/resourceGroup supplied – look for a unique disambiguated entry.
+    const suffix = `.${clusterName}`;
+    const prefix = 'cluster_settings.';
+    let match: ClusterSettings | undefined;
+    let matchCount = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix) && k.endsWith(suffix) && k !== key) {
+        const candidate = parseSettingsValue(localStorage.getItem(k));
+        if (candidate) {
+          match = candidate;
+          matchCount++;
+          if (matchCount > 1) break; // ambiguous – stop early
         }
       }
     }
+    if (matchCount === 1 && match) return match;
+
     return {};
   } catch {
     return {};

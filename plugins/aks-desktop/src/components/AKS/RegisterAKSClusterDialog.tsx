@@ -321,7 +321,11 @@ export default function RegisterAKSClusterDialog({
       // Persist Azure metadata so cluster provider menu items can identify BareMetal clusters
       // and retrieve the subscription / resource group for proxy management.
       setClusterSettings(selectedCluster.name, {
-        ...getClusterSettings(selectedCluster.name),
+        ...getClusterSettings(
+          selectedCluster.name,
+          selectedSubscription.id,
+          selectedCluster.resourceGroup
+        ),
         clusterType: selectedCluster.clusterType || 'aks',
         subscriptionId: selectedSubscription.id,
         resourceGroup: selectedCluster.resourceGroup,

@@ -256,8 +256,7 @@ export async function startBareMetalProxy(
         // Only escalate to an error state when the process is not yet running and the
         // message looks like a genuine error (not a warning or informational line).
         const isWarning =
-          /^\s*(WARNING|warn(ing)?)\b/i.test(msg) ||
-          /^\s*\[.*\]\s*(WARNING|Info)/i.test(msg);
+          /^\s*(WARNING|warn(ing)?)\b/i.test(msg) || /^\s*\[.*\]\s*(WARNING|Info)/i.test(msg);
         if (!isWarning) {
           latest.lastError = msg;
           if (latest.status !== 'running') {
