@@ -29,21 +29,24 @@ export default function BareMetalProxyPanel({
   onProxyRefresh,
 }: BareMetalProxyPanelProps) {
   const { t } = useTranslation();
+  const titleId = `${panelId || 'baremetal-proxy-panel'}-title`;
 
   return (
     <Box
+      component="section"
       id={panelId}
+      aria-labelledby={titleId}
       tabIndex={panelId ? -1 : undefined}
       p={2}
       border={1}
       borderColor="divider"
       borderRadius={1}
     >
-      <Typography variant="subtitle2" component="p" gutterBottom>
+      <Typography id={titleId} variant="subtitle2" component="h2" gutterBottom>
         {t('Proxy')}
       </Typography>
 
-      <Typography variant="body2" sx={{ mb: 1 }}>
+      <Typography variant="body2" sx={{ mb: 1 }} role="status" aria-live="polite">
         <strong>{t('Status')}:</strong>{' '}
         {proxyStatus?.status ? proxyStatus.status.toUpperCase() : t('Unknown')}
         {proxyStatus?.pid ? ` (PID ${proxyStatus.pid})` : ''}

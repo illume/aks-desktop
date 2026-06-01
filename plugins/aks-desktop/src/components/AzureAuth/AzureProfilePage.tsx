@@ -61,7 +61,7 @@ export default function AzureProfilePage() {
 
   if (isChecking) {
     return (
-      <Box sx={pageSx}>
+      <Box component="main" sx={pageSx}>
         <Container maxWidth="sm">
           <Box
             sx={{
@@ -72,7 +72,7 @@ export default function AzureProfilePage() {
               minHeight: '50vh',
             }}
           >
-            <CircularProgress />
+            <CircularProgress aria-hidden="true" />
             <Typography variant="body1" sx={{ mt: 2 }}>
               {t('Loading Azure account information')}...
             </Typography>
@@ -88,7 +88,7 @@ export default function AzureProfilePage() {
   }
 
   return (
-    <Box sx={pageSx}>
+    <Box component="main" sx={pageSx}>
       <Container maxWidth="sm">
         <Button
           variant="text"
@@ -119,7 +119,7 @@ export default function AzureProfilePage() {
             }}
           />
 
-          <Typography variant="h4" sx={{ mb: 1, fontWeight: 600 }}>
+          <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 600 }}>
             {t('Azure Account')}
           </Typography>
 

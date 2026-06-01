@@ -157,7 +157,7 @@ export default function BareMetalProxySettingsPage() {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default', pt: 2 }}>
+    <Box component="main" sx={{ minHeight: '100vh', backgroundColor: 'background.default', pt: 2 }}>
       <Container maxWidth="md">
         <Button
           variant="text"
@@ -169,7 +169,7 @@ export default function BareMetalProxySettingsPage() {
         </Button>
 
         <Card sx={{ p: 3 }}>
-          <Typography variant="h5" sx={{ mb: 2 }}>
+          <Typography variant="h5" component="h1" sx={{ mb: 2 }}>
             {t('BareMetal Proxy')}
           </Typography>
 
