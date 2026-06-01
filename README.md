@@ -97,6 +97,7 @@ To get started with AKS desktop, follow these steps:
 - [Cluster Requirements](docs/cluster-requirements.md) — What your AKS cluster needs for the best AKS desktop experience
 - [BareMetal Testing](docs/baremetal-testing.md) — How to set up and tear down an AKS BareMetal test environment
 - [BareMetal Support](docs/baremetal-support.md) — AKS Desktop UI experience for BareMetal clusters
+- [`headlamp-baremetal-support.diff`](headlamp-baremetal-support.diff) — Patch for the Headlamp Electron backend/preload to accept the `clusterType` parameter and run `az aksarc get-credentials` for Arc clusters
 - [AKS Desktop Documentation](https://aka.ms/aks/aks-desktop)
 - [AKS Managed Namespaces](https://learn.microsoft.com/en-us/azure/aks/managed-namespaces)
 

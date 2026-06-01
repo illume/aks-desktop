@@ -402,18 +402,18 @@ if (Headlamp.isRunningAsApp()) {
     registerClusterProviderMenuItem(({ cluster, handleMenuClose }) => {
       const settings = getClusterSettings(cluster.name);
       if (settings.clusterType !== 'aksarc') return null;
+      // Hide the action when required Azure metadata is missing or corrupt
+      if (!settings.subscriptionId || !settings.resourceGroup) return null;
 
       return (
         <MenuItem
           onClick={() => {
             handleMenuClose();
-            if (settings.subscriptionId && settings.resourceGroup) {
-              cmd
-                .action(settings.subscriptionId, settings.resourceGroup, cluster.name)
-                .catch((err: unknown) =>
-                  console.error(`[AKS] BareMetal proxy action "${cmd.label}" failed:`, err)
-                );
-            }
+            cmd
+              .action(settings.subscriptionId!, settings.resourceGroup!, cluster.name)
+              .catch((err: unknown) =>
+                console.error(`[AKS] BareMetal proxy action "${cmd.label}" failed:`, err)
+              );
           }}
         >
           <ListItemText>{cmd.label}</ListItemText>

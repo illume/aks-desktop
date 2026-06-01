@@ -251,9 +251,18 @@ export async function startBareMetalProxy(
     cmd.stderr.on('data', (data: string) => {
       const latest = bareMetalProxySessions.get(key);
       if (latest) {
-        latest.lastError = data.toString().trim();
-        if (latest.status !== 'running') {
-          latest.status = 'error';
+        const msg = data.toString().trim();
+        // Azure CLI frequently writes warnings/progress to stderr even when healthy.
+        // Only escalate to an error state when the process is not yet running and the
+        // message looks like a genuine error (not a warning or informational line).
+        const isWarning =
+          /^\s*(WARNING|warn(ing)?)\b/i.test(msg) ||
+          /^\s*\[.*\]\s*(WARNING|Info)/i.test(msg);
+        if (!isWarning) {
+          latest.lastError = msg;
+          if (latest.status !== 'running') {
+            latest.status = 'error';
+          }
         }
         bareMetalProxySessions.set(key, latest);
       }

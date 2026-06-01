@@ -106,7 +106,16 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
  * Register an AKS cluster using the Electron IPC API.
  * This calls the native registration logic in the Electron backend.
  *
+ * When `clusterType` is `'aksarc'`, the backend runs
+ * `az aksarc get-credentials` instead of `az aks get-credentials`.
+ * The required Electron/preload changes are captured in
+ * `headlamp-baremetal-support.diff` at the repository root.
+ *
+ * @param subscriptionId - Azure subscription ID
+ * @param resourceGroup - Azure resource group name
+ * @param clusterName - Cluster name
  * @param managedNamespace - Optional managed namespace name to use for scoped credentials
+ * @param clusterType - `'aks'` for managed clusters, `'aksarc'` for Arc-connected clusters
  */
 export async function registerAKSCluster(
   subscriptionId: string,
