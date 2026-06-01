@@ -18,6 +18,8 @@
  *   --password       VM admin password (required for setup)
  *   --group-name     Resource group name (default: jumpstart-rg)
  *   --vm-name        VM name (default: jumpstartVM)
+ *   --vnet-name      Virtual network name (default: jumpstartVNet)
+ *   --subnet-name    Subnet name (default: jumpstartSubnet)
  */
 
 import { spawnSync } from 'child_process';
