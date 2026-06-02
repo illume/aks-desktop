@@ -10,8 +10,20 @@ import BareMetalProxySettingsPagePure, {
 const noOp = () => {};
 
 const sampleSubscriptions = [
-  { id: 'sub-1', name: 'Dev Subscription' },
-  { id: 'sub-2', name: 'Production Subscription' },
+  {
+    id: 'sub-1',
+    name: 'Dev Subscription',
+    state: 'Enabled',
+    tenantId: 'tenant-1',
+    isDefault: true,
+  },
+  {
+    id: 'sub-2',
+    name: 'Production Subscription',
+    state: 'Enabled',
+    tenantId: 'tenant-1',
+    isDefault: false,
+  },
 ];
 
 const sampleClusters = [
@@ -23,6 +35,8 @@ const sampleClusters = [
     provisioningState: 'Succeeded',
     powerState: 'Running',
     nodeCount: 3,
+    fqdn: '',
+    isAzureRBACEnabled: false,
     clusterType: 'aksarc' as const,
   },
   {
@@ -33,6 +47,8 @@ const sampleClusters = [
     provisioningState: 'Succeeded',
     powerState: 'Running',
     nodeCount: 1,
+    fqdn: '',
+    isAzureRBACEnabled: false,
     clusterType: 'aksarc' as const,
   },
 ];
