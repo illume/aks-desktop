@@ -1,7 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
+/** Per-cluster metadata persisted in localStorage. */
 export interface ClusterSettings {
+  /** Namespaces the user is allowed to access in this cluster. */
   allowedNamespaces?: string[];
   /** Discriminator stored at registration time: `'aks'` for managed clusters, `'aksarc'` for Arc-connected clusters. */
   clusterType?: 'aks' | 'aksarc';

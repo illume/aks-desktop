@@ -7,14 +7,23 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 import React from 'react';
 import type { BareMetalProxyStatus } from './proxy';
 
+/** Props for the BareMetal proxy control panel. */
 export interface BareMetalProxyPanelProps {
+  /** Optional HTML id for the panel section element. */
   panelId?: string;
+  /** Current proxy status, or null when status is unknown. */
   proxyStatus: BareMetalProxyStatus | null;
+  /** Whether a proxy action (start/stop/restart) is currently in progress. */
   proxyActionLoading: boolean;
+  /** When true, all action buttons are disabled. */
   disabled: boolean;
+  /** Called when the user clicks Start Proxy. */
   onProxyStart: () => void;
+  /** Called when the user clicks Stop Proxy. */
   onProxyStop: () => void;
+  /** Called when the user clicks Restart Proxy. */
   onProxyRestart: () => void;
+  /** Called when the user clicks Refresh Status. */
   onProxyRefresh: () => void;
 }
 
