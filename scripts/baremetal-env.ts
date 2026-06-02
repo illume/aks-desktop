@@ -8,17 +8,18 @@
  * Uses the same setup/teardown logic as the AKS Desktop UI.
  *
  * Usage:
- *   npx tsx scripts/baremetal-env.ts setup        --subscription <id> --location <region> --username <user> --password <pass> [options]
- *   npx tsx scripts/baremetal-env.ts teardown     --subscription <id> [--group-name <name>]
- *   npx tsx scripts/baremetal-env.ts deployaksarc --subscription <id> --location <region> [options]
+ *   npx tsx scripts/baremetal-env.ts setup        --subscription <id> --username <user> --password <pass> --group-name rg-yourname-testing [options]
+ *   npx tsx scripts/baremetal-env.ts teardown     --subscription <id> --group-name rg-yourname-testing
+ *   npx tsx scripts/baremetal-env.ts deployaksarc --subscription <id> --group-name rg-yourname-testing [options]
  *
  * Options:
  *   --subscription      Azure subscription ID (required)
- *   --location          Azure region, e.g. eastus (required for setup/deployaksarc)
+ *   --location          Azure region (default: westus3)
  *   --username          VM admin username (required for setup)
  *   --password          VM admin password (required for setup)
  *   --group-name        Resource group name (default: jumpstart-rg)
  *   --vm-name           VM name (default: jumpstartVM)
+ *   --vm-size           VM size (default: Standard_E16s_v5)
  *   --vnet-name         Virtual network name (default: jumpstartVNet)
  *   --subnet-name       Subnet name (default: jumpstartSubnet)
  *   --appliance-name    Appliance name (default: <vmName>-appliance)
@@ -36,7 +37,9 @@ import * as path from 'path';
 
 const BAREMETAL_ENV_DEFAULTS = {
   groupName: 'jumpstart-rg',
+  location: 'westus3',
   vmName: 'jumpstartVM',
+  vmSize: 'Standard_E16s_v5',
   vnetName: 'jumpstartVNet',
   subnetName: 'jumpstartSubnet',
 };
@@ -134,17 +137,18 @@ function required(args: Record<string, string>, key: string): string {
  * 4. Assigns a managed identity with Contributor role to the VM.
  * 5. Installs Hyper-V on the VM via `az vm run-command` (no RDP required).
  *
- * @param args - Parsed CLI arguments. Required: `subscription`, `location`,
- *   `username`, `password`. Optional: `group-name`, `vm-name`, `vnet-name`,
- *   `subnet-name`.
+ * @param args - Parsed CLI arguments. Required: `subscription`, `username`,
+ *   `password`. Optional: `location`, `group-name`, `vm-name`, `vm-size`,
+ *   `vnet-name`, `subnet-name`.
  */
 function setup(args: Record<string, string>) {
   const subscription = required(args, 'subscription');
-  const location = required(args, 'location');
+  const location = args['location'] || BAREMETAL_ENV_DEFAULTS.location;
   const username = required(args, 'username');
   const password = required(args, 'password');
   const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
   const vmName = args['vm-name'] || BAREMETAL_ENV_DEFAULTS.vmName;
+  const vmSize = args['vm-size'] || BAREMETAL_ENV_DEFAULTS.vmSize;
   const vnetName = args['vnet-name'] || BAREMETAL_ENV_DEFAULTS.vnetName;
   const subnetName = args['subnet-name'] || BAREMETAL_ENV_DEFAULTS.subnetName;
 
@@ -170,7 +174,7 @@ function setup(args: Record<string, string>) {
     '--resource-group', groupName,
     '--name', vmName,
     '--image', 'MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest',
-    '--size', 'Standard_E16s_v4',
+    '--size', vmSize,
     '--admin-username', username,
     '--admin-password', password,
     '--vnet-name', vnetName,
