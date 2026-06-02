@@ -133,18 +133,32 @@ function isMicrosoftRdpInstalled(): boolean {
   );
 }
 
-// ---- aksArc jumpstart URLs ----
+// ---- aksArc jumpstart repo ----
+
+const AKSARC_REPO_URL = 'https://github.com/Azure/aksArc.git';
+const AKSARC_LOCAL_DIR = path.join(os.homedir(), '.aksarc-jumpstart');
 
 /**
- * GitHub raw URLs for aksArc jumpstart assets.
+ * Clones or fast-forward updates the aksArc repo to `~/.aksarc-jumpstart/`.
+ * Returns the path to the `aksarc_jumpstart/` subdirectory.
  */
-const AKSARC_JUMPSTART_BASE =
-  'https://raw.githubusercontent.com/Azure/aksArc/refs/heads/main/aksarc_jumpstart';
-const AKSARC_TEMPLATE_URL = `${AKSARC_JUMPSTART_BASE}/configuration/executescript-template.json`;
-const AKSARC_SCRIPTS_URL = `${AKSARC_JUMPSTART_BASE}/scripts`;
-
-/** Timeout in seconds for MOC installation via `az vm run-command invoke`. */
-const MOC_INSTALL_TIMEOUT_SECONDS = '3600';
+function ensureJumpstartRepo(): string {
+  const jumpstartDir = path.join(AKSARC_LOCAL_DIR, 'aksarc_jumpstart');
+  if (fs.existsSync(path.join(AKSARC_LOCAL_DIR, '.git'))) {
+    console.log('  Updating aksArc repo...');
+    run(['git', '-C', AKSARC_LOCAL_DIR, 'fetch', '--depth=1', '--quiet']);
+    run(['git', '-C', AKSARC_LOCAL_DIR, 'reset', '--hard', 'FETCH_HEAD']);
+  } else {
+    console.log('  Cloning aksArc repo...');
+    if (fs.existsSync(AKSARC_LOCAL_DIR)) {
+      fs.rmSync(AKSARC_LOCAL_DIR, { recursive: true, force: true });
+    }
+    run(['git', 'clone', '--depth=1', AKSARC_REPO_URL, AKSARC_LOCAL_DIR]);
+  }
+  const sha = run(['git', '-C', AKSARC_LOCAL_DIR, 'rev-parse', '--short', 'HEAD']).trim();
+  console.log(`  ✓ Repo ready at ${jumpstartDir} (commit ${sha})`);
+  return jumpstartDir;
+}
 
 // ---- Commands ----
 
@@ -156,8 +170,10 @@ const MOC_INSTALL_TIMEOUT_SECONDS = '3600';
  * 2. Creates a resource group.
  * 3. Creates a Windows Server 2022 VM with nested virtualisation support.
  * 4. Assigns a managed identity with Contributor role to the VM.
- * 5. Installs Hyper-V on the VM via `az vm run-command` (no RDP required).
- * 6. Installs MOC on the VM via `az vm run-command` (no RDP required).
+ * 5. Clones the aksArc jumpstart repo and runs 5 upstream init scripts on the VM
+ *    via ARM deployments: initializes the data disk, installs DNS/DHCP/Hyper-V
+ *    (triggers a VM restart), configures the post-restart environment, installs
+ *    Azure CLI, and sets up MOC (triggers a second restart).
  *
  * @param args - Parsed CLI arguments. Required: `subscription`, `username`,
  *   `password`. Optional: `location`, `group-name`, `vm-name`, `vm-size`,
@@ -177,7 +193,7 @@ function setup(args: Record<string, string>) {
   console.log('\n=== AKS BareMetal Test Environment Setup ===\n');
 
   // Step 1: Register providers
-  console.log('Step 1/6: Registering resource providers...');
+  console.log('Step 1/5: Registering resource providers...');
   for (const provider of REQUIRED_PROVIDERS) {
     console.log(`  Registering ${provider}...`);
     run(['az', 'provider', 'register', '--namespace', provider, '--wait', '--subscription', subscription]);
@@ -185,12 +201,12 @@ function setup(args: Record<string, string>) {
   console.log('  ✓ All providers registered.\n');
 
   // Step 2: Create resource group
-  console.log('Step 2/6: Creating resource group...');
+  console.log('Step 2/5: Creating resource group...');
   run(['az', 'group', 'create', '--name', groupName, '--location', location, '--subscription', subscription]);
   console.log(`  ✓ Resource group '${groupName}' created.\n`);
 
   // Step 3: Create VM
-  console.log('Step 3/6: Creating VM...');
+  console.log('Step 3/5: Creating VM...');
   run([
     'az', 'vm', 'create',
     '--resource-group', groupName,
@@ -223,7 +239,7 @@ function setup(args: Record<string, string>) {
   console.log(`  ✓ VM '${vmName}' created.\n`);
 
   // Step 4: Assign managed identity + Contributor role
-  console.log('Step 4/6: Assigning managed identity...');
+  console.log('Step 4/5: Assigning managed identity...');
   run(['az', 'vm', 'identity', 'assign', '--resource-group', groupName, '--name', vmName, '--subscription', subscription]);
 
   const principalId = run([
@@ -246,68 +262,46 @@ function setup(args: Record<string, string>) {
   }
   console.log('  ✓ Managed identity assigned with Contributor role.\n');
 
-  // Step 5: Install Hyper-V on the VM (no RDP required)
-  console.log('Step 5/6: Installing Hyper-V on VM (via run-command)...');
-  try {
-    run([
-      'az', 'vm', 'run-command', 'invoke',
-      '--resource-group', groupName,
-      '--name', vmName,
-      '--command-id', 'RunPowerShellScript',
-      '--scripts', 'Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart',
-      '--subscription', subscription,
-    ]);
-    console.log('  ✓ Hyper-V installation initiated (VM will restart).\n');
-  } catch {
-    console.log('  ⚠ Hyper-V install may require a VM restart (this is normal).\n');
-  }
+  // Step 5/5: Clone jumpstart repo and run the 5 upstream init scripts on the VM.
+  // These scripts: initialise the data disk (sets WorkingDir), install DNS/DHCP/Hyper-V
+  // (triggers a VM restart), configure the post-restart environment, install Azure CLI,
+  // and set up MOC (triggers a second VM restart, after which MOC installs automatically).
+  console.log('Step 5/5: Running VM initialisation scripts...');
+  const jumpstartDir = ensureJumpstartRepo();
+  console.log('');
 
-  // Wait for the VM to come back after Hyper-V restart
-  console.log('  Waiting for VM to restart after Hyper-V installation...');
-  try {
-    run([
-      'az', 'vm', 'wait',
-      '--resource-group', groupName,
-      '--name', vmName,
-      '--custom', '"instanceView.statuses[?code==\'PowerState/running\']"',
-      '--interval', '15',
-      '--timeout', '600',
-      '--subscription', subscription,
-    ]);
-    console.log('  ✓ VM is running.\n');
-  } catch {
-    console.log('  ⚠ Could not confirm VM restart. Proceeding anyway.\n');
-  }
+  const templatePath = path.join(jumpstartDir, 'configuration', 'executescript-template.json');
+  // Use the Git-derived raw URL from the cloned repo so script URLs match the checked-out commit.
+  const clonedSha = run(['git', '-C', AKSARC_LOCAL_DIR, 'rev-parse', 'HEAD']).trim();
+  const scriptBaseUrl = `https://raw.githubusercontent.com/Azure/aksArc/${clonedSha}/aksarc_jumpstart/scripts`;
+  const initScripts = ['initializedisk.ps1', '0.ps1', '1.ps1', 'deployazcli.ps1', 'deploymoc.ps1'];
 
-  // Step 6: Install MOC on the VM (no RDP required)
-  console.log('Step 6/6: Installing MOC on VM (via run-command)...');
-  const mocInstallScript = [
-    // Download and run the MOC installer from the aksArc jumpstart repo
-    '$ErrorActionPreference = "Stop"',
-    '$ProgressPreference = "SilentlyContinue"',
-    'Write-Host "Downloading MOC installer..."',
-    `Invoke-WebRequest -Uri '${AKSARC_SCRIPTS_URL}/deploymoc.ps1' -OutFile 'C:\\deploymoc.ps1'`,
-    'Write-Host "Running MOC installer..."',
-    `& C:\\deploymoc.ps1 -resource_group '${groupName}' -location '${location}' -subscription '${subscription}'`,
-    'Write-Host "MOC installation complete."',
-  ].join('; ');
-  try {
-    run([
-      'az', 'vm', 'run-command', 'invoke',
-      '--resource-group', groupName,
-      '--name', vmName,
-      '--command-id', 'RunPowerShellScript',
-      '--scripts', mocInstallScript,
-      '--subscription', subscription,
-      '--timeout', MOC_INSTALL_TIMEOUT_SECONDS,
-    ]);
-    console.log('  ✓ MOC installation complete.\n');
-  } catch (err) {
-    console.error('  ✗ MOC installation failed.');
-    console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`);
-    console.error('  You may need to install MOC manually via RDP.');
-    console.error('  After installing MOC, run: npx tsx scripts/baremetal-env.ts deployaksarc ...\n');
+  for (const [i, scriptName] of initScripts.entries()) {
+    const scriptStem = scriptName.replace(/\.ps1$/, '');
+    const deploymentName = `executescript-${vmName}-${scriptStem}`;
+    const scriptUri = `${scriptBaseUrl}/${scriptName}`;
+    const commandToExecute = `powershell.exe -ExecutionPolicy Unrestricted -File ${scriptName}`;
+    console.log(`  [${i + 1}/${initScripts.length}] ${scriptName}...`);
+    try {
+      run([
+        'az', 'deployment', 'group', 'create',
+        '--name', deploymentName,
+        '--resource-group', groupName,
+        '--template-file', templatePath,
+        '--parameters',
+        `location=${location}`,
+        `vmName=${vmName}`,
+        `scriptFileUri=${scriptUri}`,
+        `commandToExecute=${commandToExecute}`,
+        '--subscription', subscription,
+      ]);
+      console.log(`    ✓ done.`);
+    } catch {
+      // Scripts that restart the VM (0.ps1, deploymoc.ps1) are expected to fail here.
+      console.log(`    ⚠ ended (may have triggered a VM restart — this is normal).`);
+    }
   }
+  console.log('  ✓ Init scripts complete. MOC will install automatically on next VM boot.\n');
 
   console.log('=== Setup Complete ===');
   console.log(`Resource group: ${groupName}`);
@@ -349,10 +343,10 @@ function setup(args: Record<string, string>) {
     console.log('  Open Microsoft Remote Desktop, add a new PC using the IP above, and connect.');
   }
   console.log('');
-  console.log('  Once Server Manager appears, the VM is ready. Disconnect from RDP.');
-  console.log('  (MOC and all other components are installed by the deployaksarc command below, not inside the VM.)');
+  console.log('  Once Server Manager appears the VM is ready. Disconnect — no action needed.');
+  console.log('  MOC installs automatically in the background (~2-3 min after VM boots).');
   console.log('');
-  console.log('After MOC is ready, run:');
+  console.log('After setup, run:');
   console.log(`  npm run deployAksArc -- --subscription ${subscription} --group-name ${groupName}`);
 }
 
@@ -426,10 +420,10 @@ function rdp(args: Record<string, string>) {
     console.log('  Open Microsoft Remote Desktop, add a new PC with the IP above, then connect.');
   }
   console.log('');
-  console.log('Once Server Manager appears, the VM is ready. Disconnect from RDP.');
-  console.log('(MOC and all other components are installed by deployaksarc, not inside the VM.)');
+  console.log('Once Server Manager appears the VM is ready. Disconnect — no action needed.');
+  console.log('MOC installs automatically in the background (~2-3 min after VM boots).');
   console.log('');
-  console.log('After MOC is ready, run:');
+  console.log('After RDP, run:');
   console.log(`  npm run deployAksArc -- --subscription ${subscription} --group-name ${groupName}`);
 }
 
@@ -454,156 +448,53 @@ function teardown(args: Record<string, string>) {
 }
 
 /**
- * Deploys AKS Arc components on a VM that already has MOC installed.
+ * Deploys AKS Arc components by delegating to the upstream `deployaksarc.sh`
+ * from the aksArc jumpstart repo (cloned to `~/.aksarc-jumpstart/`).
  *
- * Downloads the ARM execution template from the aksArc jumpstart repo and
- * runs the 7 deployment scripts sequentially via `az deployment group create`.
- *
- * MOC is normally pre-installed by the `setup` command (step 6). If that step
- * failed, MOC can be installed manually via RDP before running this command.
- *
- * @param args - Parsed CLI arguments. Required: `subscription`, `location`.
- *   Optional: `group-name`, `vm-name`, `appliance-name`, `custom-location`,
- *   `lnet-name`, `aks-cluster`.
+ * @param args - Parsed CLI arguments. Required: `subscription`.
+ *   Optional: `location`, `group-name`, `vm-name`, `vnet-name`, `subnet-name`,
+ *   `appliance-name`, `custom-location`, `lnet-name`, `aks-cluster`.
  */
 function deployAksArc(args: Record<string, string>) {
   const subscription = required(args, 'subscription');
   const location = args['location'] || BAREMETAL_ENV_DEFAULTS.location;
   const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
   const vmName = args['vm-name'] || BAREMETAL_ENV_DEFAULTS.vmName;
-  const applianceName = args['appliance-name'] || `${vmName}-appliance`;
-  const customLocation = args['custom-location'] || `${applianceName}-cl`;
-  const lnetName = args['lnet-name'] || `${applianceName}-lnet`;
-  const aksCluster = args['aks-cluster'] || `${vmName}-aksarc`;
+  const vnetName = args['vnet-name'] || BAREMETAL_ENV_DEFAULTS.vnetName;
+  const subnetName = args['subnet-name'] || BAREMETAL_ENV_DEFAULTS.subnetName;
 
   console.log('\n=== AKS Arc Deployment ===\n');
-  console.log('NOTE: MOC must be installed on the VM before running this command.');
-  console.log('MOC is automatically installed during `setup` (step 6).');
-  console.log('If that step failed, install MOC manually via RDP before proceeding.');
+  console.log('Cloning/updating aksArc jumpstart repo...');
+  const jumpstartDir = ensureJumpstartRepo();
   console.log('');
 
-  // Download the ARM execution template to a temp file
-  const templatePath = path.join(os.tmpdir(), 'aksarc-exec-template.json');
-  console.log('Downloading ARM execution template...');
-  const curlResult = spawnSync(
-    'curl',
-    ['-fsSL', '-o', templatePath, AKSARC_TEMPLATE_URL],
-    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-  );
-  if (curlResult.status !== 0) {
-    console.error(`Error: Failed to download ARM template from ${AKSARC_TEMPLATE_URL}`);
-    console.error(curlResult.stderr || `curl exited with status ${curlResult.status}`);
-    process.exit(1);
+  const script = path.join(jumpstartDir, 'deployaksarc.sh');
+  run(['chmod', '+x', script]);
+
+  const scriptArgs = [
+    script,
+    '--subscription', subscription,
+    '--location', location,
+    '--group-name', groupName,
+    '--vm-name', vmName,
+    '--vnet-name', vnetName,
+    '--subnet-name', subnetName,
+  ];
+  if (args['appliance-name']) scriptArgs.push('--appliance-name', args['appliance-name']);
+  if (args['custom-location']) scriptArgs.push('--custom-location', args['custom-location']);
+  if (args['lnet-name']) scriptArgs.push('--lnet-name', args['lnet-name']);
+  if (args['aks-cluster']) scriptArgs.push('--aks-cluster', args['aks-cluster']);
+
+  const result = spawnSync('bash', scriptArgs, {
+    stdio: 'inherit',
+    cwd: jumpstartDir,
+    encoding: 'utf8',
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
   }
-  console.log(`  ✓ Template saved to ${templatePath}\n`);
-
-  /**
-   * Runs a PowerShell script on the VM via an ARM deployment.
-   *
-   * @param step - Step number for logging, e.g. `"1/7"`.
-   * @param label - Human-readable step label.
-   * @param scriptName - Filename under the aksArc jumpstart scripts directory.
-   * @param scriptParams - PowerShell parameters to pass to the script.
-   */
-  function deployScript(
-    step: string,
-    label: string,
-    scriptName: string,
-    scriptParams: string
-  ) {
-    const scriptStem = scriptName.replace(/\.ps1$/, '');
-    const deploymentName = `executescript-${vmName}-${scriptStem}`;
-    const scriptUri = `${AKSARC_SCRIPTS_URL}/${scriptName}`;
-    const commandToExecute = `powershell.exe -ExecutionPolicy Unrestricted -File ${scriptName} ${scriptParams}`;
-
-    console.log(`Step ${step}: ${label}...`);
-    run([
-      'az', 'deployment', 'group', 'create',
-      '--name', deploymentName,
-      '--resource-group', groupName,
-      '--template-file', templatePath,
-      '--parameters',
-      `location=${location}`,
-      `vmName=${vmName}`,
-      `scriptFileUri=${scriptUri}`,
-      `commandToExecute=${commandToExecute}`,
-      '--subscription', subscription,
-    ]);
-    console.log(`  ✓ ${label} complete.\n`);
-  }
-
-  // Step 1: Install Az modules
-  deployScript(
-    '1/7',
-    'Installing Az modules',
-    'installazmodules.ps1',
-    '-arcHciVersion "1.3.15"'
-  );
-
-  // Step 2: Deploy appliance
-  deployScript(
-    '2/7',
-    'Deploying appliance',
-    'deployappliance.ps1',
-    `-resource_group ${groupName} -appliance_name ${applianceName} -location ${location} -subscription ${subscription}`
-  );
-
-  // Step 3: Deploy AKS Arc extension
-  deployScript(
-    '3/7',
-    'Deploying AKS Arc extension',
-    'deployaksarcextension.ps1',
-    `-resource_group ${groupName} -appliance_name ${applianceName} -location ${location} -subscription ${subscription}`
-  );
-
-  // Step 4: Deploy VMSS extension
-  deployScript(
-    '4/7',
-    'Deploying VMSS extension',
-    'deployvmssextension.ps1',
-    `-resource_group ${groupName} -appliance_name ${applianceName} -location ${location} -subscription ${subscription}`
-  );
-
-  // Step 5: Deploy custom location
-  deployScript(
-    '5/7',
-    'Deploying custom location',
-    'deploycustomlocation.ps1',
-    `-resource_group ${groupName} -appliance_name ${applianceName} -customLocationName ${customLocation} -subscription ${subscription}`
-  );
-
-  // Step 6: Deploy logical network
-  deployScript(
-    '6/7',
-    'Deploying logical network',
-    'deploylnet.ps1',
-    `-resource_group ${groupName} -lnetName ${lnetName} -customLocationName ${customLocation} -location ${location} -subscription ${subscription}`
-  );
-
-  // Step 7: Deploy AKS Arc cluster
-  deployScript(
-    '7/7',
-    'Deploying AKS Arc cluster',
-    'deployaksarccluster.ps1',
-    `-resource_group ${groupName} -aksArcClusterName ${aksCluster} -lnetName ${lnetName} -customLocationName ${customLocation} -subscription ${subscription}`
-  );
-
-  // Clean up temp file
-  try {
-    fs.unlinkSync(templatePath);
-  } catch {
-    /* ignore cleanup errors */
-  }
-
-  console.log('=== AKS Arc Deployment Complete ===\n');
-  console.log(`Resource group:    ${groupName}`);
-  console.log(`Appliance:         ${applianceName}`);
-  console.log(`Custom location:   ${customLocation}`);
-  console.log(`Logical network:   ${lnetName}`);
-  console.log(`AKS Arc cluster:   ${aksCluster}`);
-  console.log('');
-  console.log('To connect to the cluster:');
-  console.log(`  az connectedk8s proxy --resource-group ${groupName} --name ${aksCluster}`);
 }
 
 // ---- Main ----
@@ -627,7 +518,7 @@ switch (command) {
   default:
     console.log('Usage:');
     console.log(
-      '  npx tsx scripts/baremetal-env.ts setup        --subscription <id> --location <region> --username <user> --password <pass>'
+      '  npx tsx scripts/baremetal-env.ts setup        --subscription <id> --username <user> --password <pass> [--location <region>] [--vm-size <size>] [--group-name <name>]'
     );
     console.log(
       '  npx tsx scripts/baremetal-env.ts teardown     --subscription <id> [--group-name <name>]'
