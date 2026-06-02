@@ -15,11 +15,25 @@ Use this markdown block in the PR description:
 #### BareMetal proxy recovery action shown (dropped)
 ![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
 
-#### Register AKS Cluster overview cluster-action menu (BareMetal)
-![Register AKS Cluster - BareMetal Cluster Actions](docs/images/storybook/register-aks-cluster-baremetal-cluster-actions.png)
-![Register AKS Cluster - BareMetal Cluster Actions (alternate)](https://github.com/user-attachments/assets/2997f43b-fed6-480e-bff6-ef33e604f1f4)
+### BareMetal proxy settings page (Storybook)
 
-### BareMetal proxy states (Storybook)
+> Stories: `BareMetal/ProxySettingsPage` — Default, LoadingSubscriptions, LoadingClusters, NoClustersFound, ClusterSelected, ProxyRunning, ProxyError, ProxyActionLoading, ProxyDropped, WithError, WithProxyUiError, NoSubscription
+
+#### Proxy Settings Page — Default
+![Proxy Settings Page Default](docs/images/storybook/baremetal-proxy-settings-default.png)
+
+#### Proxy Settings Page — Cluster selected, proxy running
+![Proxy Settings Page Running](docs/images/storybook/baremetal-proxy-settings-running.png)
+
+#### Proxy Settings Page — Proxy error
+![Proxy Settings Page Error](docs/images/storybook/baremetal-proxy-settings-error.png)
+
+#### Proxy Settings Page — Proxy dropped
+![Proxy Settings Page Dropped](docs/images/storybook/baremetal-proxy-settings-dropped.png)
+
+### BareMetal proxy panel (Storybook)
+
+> Stories: `BareMetal/ProxyPanel` — Unknown, Stopped, Running, ErrorState, ActionLoading, Disabled
 
 #### Bare Metal Proxy Stopped
 ![Bare Metal Proxy Stopped](docs/images/storybook/baremetal-proxy-stopped.png)
@@ -36,7 +50,16 @@ Use this markdown block in the PR description:
 #### Bare Metal Proxy Dropped
 ![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
 
+### BareMetal environment dialog (Storybook)
+
+> Stories: `BareMetal/EnvironmentDialog` — Default, NotLoggedIn, CheckingAuth, FilledForm, SetupLoading, TeardownLoading, WithError, WithSuccess, ExtensionsRequired, ExtensionsInstalling, ExtensionsInstalled, ExtensionError
+
+#### Environment Dialog — Default
+![Environment Dialog Default](docs/images/storybook/baremetal-env-dialog-default.png)
+
 ### Register AKS Cluster dialog (Storybook)
+
+> Stories: `AKS/RegisterAKSClusterDialogPure` — Default, NotLoggedIn, CheckingAuth, LoadingSubscriptions, LoadingClusters, NoClusters, WithClusters, ClusterSelected, BareMetalProxyStopped, BareMetalProxyRunning, BareMetalProxyError, BareMetalProxyActionLoading, BareMetalProxyDropped, Registering, Success, Error, CheckingCapabilities, AllCapabilitiesEnabled, RbacNotEnabled, NoNetworkPolicy
 
 #### Register AKS Cluster - Default
 ![Register AKS Cluster - Default](docs/images/storybook/register-aks-cluster-default.png)
