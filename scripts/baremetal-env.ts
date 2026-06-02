@@ -125,6 +125,14 @@ function required(args: Record<string, string>, key: string): string {
   return args[key];
 }
 
+/** Returns true if Microsoft Remote Desktop is installed (Mac App Store or Homebrew). */
+function isMicrosoftRdpInstalled(): boolean {
+  return (
+    fs.existsSync('/Applications/Microsoft Remote Desktop.app') ||
+    fs.existsSync(`${os.homedir()}/Applications/Microsoft Remote Desktop.app`)
+  );
+}
+
 // ---- Commands ----
 
 /**
@@ -183,6 +191,21 @@ function setup(args: Record<string, string>) {
     '--subscription', subscription,
     '--output', 'json',
   ]);
+
+  let publicIp = '';
+  try {
+    publicIp = run([
+      'az', 'vm', 'list-ip-addresses',
+      '--resource-group', groupName,
+      '--name', vmName,
+      '--subscription', subscription,
+      '--query', '[0].virtualMachine.network.publicIpAddresses[0].ipAddress',
+      '-o', 'tsv',
+    ]).trim();
+  } catch {
+    // non-fatal — IP will be shown as a lookup instruction
+  }
+
   console.log(`  ✓ VM '${vmName}' created.\n`);
 
   // Step 4: Assign managed identity + Contributor role
@@ -201,9 +224,10 @@ function setup(args: Record<string, string>) {
   if (principalId) {
     run([
       'az', 'role', 'assignment', 'create',
-      '--assignee', principalId,
+      '--assignee-object-id', principalId,
+      '--assignee-principal-type', 'ServicePrincipal',
       '--role', 'Contributor',
-      '--scope', `/subscriptions/${subscription}`,
+      '--scope', `/subscriptions/${subscription}/resourceGroups/${groupName}`,
     ]);
   }
   console.log('  ✓ Managed identity assigned with Contributor role.\n');
@@ -227,14 +251,125 @@ function setup(args: Record<string, string>) {
   console.log('=== Setup Complete ===');
   console.log(`Resource group: ${groupName}`);
   console.log(`VM: ${vmName}`);
+  if (publicIp) {
+    console.log(`VM public IP: ${publicIp}`);
+  }
   console.log('');
-  console.log('Next step:');
-  console.log(
-    'Deploy AKS Arc components using the aksArc jumpstart scripts:'
-  );
-  console.log(
-    'https://github.com/Azure/aksArc/tree/main/aksarc_jumpstart'
-  );
+  console.log('Next step — RDP into the VM (macOS):');
+  console.log('');
+  if (publicIp) {
+    console.log(`  VM address: ${publicIp}`);
+  } else {
+    const ipCmd = `az vm list-ip-addresses -g ${groupName} -n ${vmName} --subscription ${subscription} -o tsv --query '[0].virtualMachine.network.publicIpAddresses[0].ipAddress'`;
+    console.log(`  Get VM IP:  ${ipCmd}`);
+  }
+  console.log(`  Username:   ${username}`);
+  console.log('  Password:   (the --password you supplied)');
+  console.log('');
+  const rdpInstalled = isMicrosoftRdpInstalled();
+  if (!rdpInstalled) {
+    console.log('  Microsoft Remote Desktop is required on macOS:');
+    console.log('    brew install --cask microsoft-remote-desktop');
+    console.log('    or install from the Mac App Store (search "Microsoft Remote Desktop")');
+    console.log('');
+  }
+  if (publicIp) {
+    const rdpFile = path.join(os.tmpdir(), `${vmName}.rdp`);
+    const rdpContent = [
+      `full address:s:${publicIp}:3389`,
+      `username:s:${username}`,
+      'authentication level:i:2',
+      'prompt for credentials:i:0',
+    ].join('\n');
+    fs.writeFileSync(rdpFile, rdpContent);
+    console.log('  Connect:');
+    console.log(`    open "${rdpFile}"`);
+  } else {
+    console.log('  Open Microsoft Remote Desktop, add a new PC using the IP above, and connect.');
+  }
+  console.log('');
+  console.log('  Once Server Manager appears, the VM is ready. Disconnect from RDP.');
+  console.log('  (MOC and all other components are installed by the deployaksarc command below, not inside the VM.)');
+  console.log('');
+  console.log('After MOC is ready, run:');
+  console.log(`  npm run deployAksArc -- --subscription ${subscription} --group-name ${groupName}`);
+}
+
+/**
+ * Prints macOS RDP instructions for the jumpstart VM.
+ *
+ * Looks up the VM's public IP from Azure and prints ready-to-use connection
+ * options for Microsoft Remote Desktop and the macOS built-in RDP handler.
+ *
+ * @param args - Parsed CLI arguments. Required: `subscription`, `username`.
+ *   Optional: `group-name`, `vm-name`.
+ */
+function rdp(args: Record<string, string>) {
+  const subscription = required(args, 'subscription');
+  const username = required(args, 'username');
+  const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
+  const vmName = args['vm-name'] || BAREMETAL_ENV_DEFAULTS.vmName;
+
+  console.log('\n=== RDP Instructions ===\n');
+
+  let publicIp = '';
+  try {
+    publicIp = run([
+      'az', 'vm', 'list-ip-addresses',
+      '--resource-group', groupName,
+      '--name', vmName,
+      '--subscription', subscription,
+      '--query', '[0].virtualMachine.network.publicIpAddresses[0].ipAddress',
+      '-o', 'tsv',
+    ]).trim();
+  } catch {
+    // fall through — print lookup command instead
+  }
+
+  if (publicIp) {
+    console.log(`VM address: ${publicIp}`);
+  } else {
+    console.log(
+      `VM address: run: az vm list-ip-addresses -g ${groupName} -n ${vmName} --subscription ${subscription} -o tsv --query '[0].virtualMachine.network.publicIpAddresses[0].ipAddress'`
+    );
+  }
+  console.log(`Username:   ${username}`);
+  console.log('Password:   (the --password you supplied at setup)');
+  console.log('');
+
+  const rdpInstalled = isMicrosoftRdpInstalled();
+  if (!rdpInstalled) {
+    console.log('Step 1 — Install Microsoft Remote Desktop (required on macOS):');
+    console.log('  brew install --cask microsoft-remote-desktop');
+    console.log('  or install from the Mac App Store (search "Microsoft Remote Desktop")');
+    console.log('');
+    console.log('Step 2 — Connect:');
+  } else {
+    console.log('Connect:');
+  }
+  if (publicIp) {
+    const rdpFile = path.join(os.tmpdir(), `${vmName}.rdp`);
+    const rdpContent = [
+      `full address:s:${publicIp}:3389`,
+      `username:s:${username}`,
+      'authentication level:i:2',
+      'prompt for credentials:i:0',
+    ].join('\n');
+    fs.writeFileSync(rdpFile, rdpContent);
+    console.log(`  open "${rdpFile}"`);
+    spawnSync('open', [rdpFile], { stdio: 'inherit' });
+    console.log('');
+    console.log(`  Microsoft Remote Desktop will open. Look for "${vmName}" in the PCs list`);
+    console.log('  and double-click it to connect. Enter your password when prompted.');
+  } else {
+    console.log('  Open Microsoft Remote Desktop, add a new PC with the IP above, then connect.');
+  }
+  console.log('');
+  console.log('Once Server Manager appears, the VM is ready. Disconnect from RDP.');
+  console.log('(MOC and all other components are installed by deployaksarc, not inside the VM.)');
+  console.log('');
+  console.log('After MOC is ready, run:');
+  console.log(`  npm run deployAksArc -- --subscription ${subscription} --group-name ${groupName}`);
 }
 
 /**
@@ -280,7 +415,7 @@ const AKSARC_SCRIPTS_URL = `${AKSARC_JUMPSTART_BASE}/scripts`;
  */
 function deployAksArc(args: Record<string, string>) {
   const subscription = required(args, 'subscription');
-  const location = required(args, 'location');
+  const location = args['location'] || BAREMETAL_ENV_DEFAULTS.location;
   const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
   const vmName = args['vm-name'] || BAREMETAL_ENV_DEFAULTS.vmName;
   const applianceName = args['appliance-name'] || `${vmName}-appliance`;
@@ -435,6 +570,9 @@ switch (command) {
   case 'deployaksarc':
     deployAksArc(args);
     break;
+  case 'rdp':
+    rdp(args);
+    break;
   default:
     console.log('Usage:');
     console.log(
@@ -445,6 +583,9 @@ switch (command) {
     );
     console.log(
       '  npx tsx scripts/baremetal-env.ts deployaksarc --subscription <id> --location <region> [options]'
+    );
+    console.log(
+      '  npx tsx scripts/baremetal-env.ts rdp           --subscription <id> --username <user> [--group-name <name>] [--vm-name <name>]'
     );
     process.exit(command ? 1 : 0);
 }
