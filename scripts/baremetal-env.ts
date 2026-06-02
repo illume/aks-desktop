@@ -8,21 +8,29 @@
  * Uses the same setup/teardown logic as the AKS Desktop UI.
  *
  * Usage:
- *   npx tsx scripts/baremetal-env.ts setup   --subscription <id> --location <region> --username <user> --password <pass> [options]
- *   npx tsx scripts/baremetal-env.ts teardown --subscription <id> [--group-name <name>]
+ *   npx tsx scripts/baremetal-env.ts setup        --subscription <id> --location <region> --username <user> --password <pass> [options]
+ *   npx tsx scripts/baremetal-env.ts teardown     --subscription <id> [--group-name <name>]
+ *   npx tsx scripts/baremetal-env.ts deployaksarc --subscription <id> --location <region> [options]
  *
  * Options:
- *   --subscription   Azure subscription ID (required)
- *   --location       Azure region, e.g. eastus (required for setup)
- *   --username       VM admin username (required for setup)
- *   --password       VM admin password (required for setup)
- *   --group-name     Resource group name (default: jumpstart-rg)
- *   --vm-name        VM name (default: jumpstartVM)
- *   --vnet-name      Virtual network name (default: jumpstartVNet)
- *   --subnet-name    Subnet name (default: jumpstartSubnet)
+ *   --subscription      Azure subscription ID (required)
+ *   --location          Azure region, e.g. eastus (required for setup/deployaksarc)
+ *   --username          VM admin username (required for setup)
+ *   --password          VM admin password (required for setup)
+ *   --group-name        Resource group name (default: jumpstart-rg)
+ *   --vm-name           VM name (default: jumpstartVM)
+ *   --vnet-name         Virtual network name (default: jumpstartVNet)
+ *   --subnet-name       Subnet name (default: jumpstartSubnet)
+ *   --appliance-name    Appliance name (default: <vmName>-appliance)
+ *   --custom-location   Custom location name (default: <applianceName>-cl)
+ *   --lnet-name         Logical network name (default: <applianceName>-lnet)
+ *   --aks-cluster       AKS Arc cluster name (default: <vmName>-aksarc)
  */
 
 import { spawnSync } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // ---- Defaults (mirrored from components/BareMetal/environment.ts) ----
 
@@ -245,6 +253,169 @@ function teardown(args: Record<string, string>) {
   console.log('  This may take several minutes to complete.\n');
 }
 
+/**
+ * GitHub raw URLs for aksArc jumpstart assets.
+ */
+const AKSARC_JUMPSTART_BASE =
+  'https://raw.githubusercontent.com/Azure/aksArc/refs/heads/main/aksarc_jumpstart';
+const AKSARC_TEMPLATE_URL = `${AKSARC_JUMPSTART_BASE}/configuration/executescript-template.json`;
+const AKSARC_SCRIPTS_URL = `${AKSARC_JUMPSTART_BASE}/scripts`;
+
+/**
+ * Deploys AKS Arc components on a VM that already has MOC installed.
+ *
+ * Downloads the ARM execution template from the aksArc jumpstart repo and
+ * runs the 7 deployment scripts sequentially via `az deployment group create`.
+ *
+ * PREREQUISITE: The VM must have MOC installed via the jumpstart.sh / RDP
+ * flow before this command is run.
+ *
+ * @param args - Parsed CLI arguments. Required: `subscription`, `location`.
+ *   Optional: `group-name`, `vm-name`, `appliance-name`, `custom-location`,
+ *   `lnet-name`, `aks-cluster`.
+ */
+function deployAksArc(args: Record<string, string>) {
+  const subscription = required(args, 'subscription');
+  const location = required(args, 'location');
+  const groupName = args['group-name'] || BAREMETAL_ENV_DEFAULTS.groupName;
+  const vmName = args['vm-name'] || BAREMETAL_ENV_DEFAULTS.vmName;
+  const applianceName = args['appliance-name'] || `${vmName}-appliance`;
+  const customLocation = args['custom-location'] || `${applianceName}-cl`;
+  const lnetName = args['lnet-name'] || `${applianceName}-lnet`;
+  const aksCluster = args['aks-cluster'] || `${vmName}-aksarc`;
+
+  console.log('\n=== AKS Arc Deployment ===\n');
+  console.log('PREREQUISITE: MOC must already be installed on the VM.');
+  console.log("If you haven't done this yet:");
+  console.log(`  1. RDP or Bastion into VM '${vmName}' in resource group '${groupName}'`);
+  console.log('  2. Wait 2-3 minutes for the MOC PowerShell install to complete automatically');
+  console.log('  3. Re-run this command once MOC is done');
+  console.log('');
+
+  // Download the ARM execution template to a temp file
+  const templatePath = path.join(os.tmpdir(), 'aksarc-exec-template.json');
+  console.log('Downloading ARM execution template...');
+  const curlResult = spawnSync(
+    'curl',
+    ['-fsSL', '-o', templatePath, AKSARC_TEMPLATE_URL],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+  );
+  if (curlResult.status !== 0) {
+    console.error(`Error: Failed to download ARM template from ${AKSARC_TEMPLATE_URL}`);
+    console.error(curlResult.stderr || `curl exited with status ${curlResult.status}`);
+    process.exit(1);
+  }
+  console.log(`  ✓ Template saved to ${templatePath}\n`);
+
+  /**
+   * Runs a PowerShell script on the VM via an ARM deployment.
+   *
+   * @param step - Step number for logging, e.g. `"1/7"`.
+   * @param label - Human-readable step label.
+   * @param scriptName - Filename under the aksArc jumpstart scripts directory.
+   * @param scriptParams - PowerShell parameters to pass to the script.
+   */
+  function deployScript(
+    step: string,
+    label: string,
+    scriptName: string,
+    scriptParams: string
+  ) {
+    const scriptStem = scriptName.replace(/\.ps1$/, '');
+    const deploymentName = `executescript-${vmName}-${scriptStem}`;
+    const scriptUri = `${AKSARC_SCRIPTS_URL}/${scriptName}`;
+    const commandToExecute = `powershell.exe -ExecutionPolicy Unrestricted -File ${scriptName} ${scriptParams}`;
+
+    console.log(`Step ${step}: ${label}...`);
+    run([
+      'az', 'deployment', 'group', 'create',
+      '--name', deploymentName,
+      '--resource-group', groupName,
+      '--template-file', templatePath,
+      '--parameters',
+      `location=${location}`,
+      `vmName=${vmName}`,
+      `scriptFileUri=${scriptUri}`,
+      `commandToExecute=${commandToExecute}`,
+      '--subscription', subscription,
+    ]);
+    console.log(`  ✓ ${label} complete.\n`);
+  }
+
+  // Step 1: Install Az modules
+  deployScript(
+    '1/7',
+    'Installing Az modules',
+    'installazmodules.ps1',
+    '-arcHciVersion "1.3.15"'
+  );
+
+  // Step 2: Deploy appliance
+  deployScript(
+    '2/7',
+    'Deploying appliance',
+    'deployappliance.ps1',
+    `-resource_group ${groupName} -appliance_name ${applianceName} -location ${location} -subscription ${subscription}`
+  );
+
+  // Step 3: Deploy AKS Arc extension
+  deployScript(
+    '3/7',
+    'Deploying AKS Arc extension',
+    'deployaksarcextension.ps1',
+    `-resource_group ${groupName} -appliance_name ${applianceName} -location ${location} -subscription ${subscription}`
+  );
+
+  // Step 4: Deploy VMSS extension
+  deployScript(
+    '4/7',
+    'Deploying VMSS extension',
+    'deployvmssextension.ps1',
+    `-resource_group ${groupName} -appliance_name ${applianceName} -location ${location} -subscription ${subscription}`
+  );
+
+  // Step 5: Deploy custom location
+  deployScript(
+    '5/7',
+    'Deploying custom location',
+    'deploycustomlocation.ps1',
+    `-resource_group ${groupName} -appliance_name ${applianceName} -customLocationName ${customLocation} -subscription ${subscription}`
+  );
+
+  // Step 6: Deploy logical network
+  deployScript(
+    '6/7',
+    'Deploying logical network',
+    'deploylnet.ps1',
+    `-resource_group ${groupName} -lnetName ${lnetName} -customLocationName ${customLocation} -location ${location} -subscription ${subscription}`
+  );
+
+  // Step 7: Deploy AKS Arc cluster
+  deployScript(
+    '7/7',
+    'Deploying AKS Arc cluster',
+    'deployaksarccluster.ps1',
+    `-resource_group ${groupName} -aksArcClusterName ${aksCluster} -lnetName ${lnetName} -customLocationName ${customLocation} -subscription ${subscription}`
+  );
+
+  // Clean up temp file
+  try {
+    fs.unlinkSync(templatePath);
+  } catch {
+    /* ignore cleanup errors */
+  }
+
+  console.log('=== AKS Arc Deployment Complete ===\n');
+  console.log(`Resource group:    ${groupName}`);
+  console.log(`Appliance:         ${applianceName}`);
+  console.log(`Custom location:   ${customLocation}`);
+  console.log(`Logical network:   ${lnetName}`);
+  console.log(`AKS Arc cluster:   ${aksCluster}`);
+  console.log('');
+  console.log('To connect to the cluster:');
+  console.log(`  az connectedk8s proxy --resource-group ${groupName} --name ${aksCluster}`);
+}
+
 // ---- Main ----
 
 const [command, ...rest] = process.argv.slice(2);
@@ -257,13 +428,19 @@ switch (command) {
   case 'teardown':
     teardown(args);
     break;
+  case 'deployaksarc':
+    deployAksArc(args);
+    break;
   default:
     console.log('Usage:');
     console.log(
-      '  npx tsx scripts/baremetal-env.ts setup   --subscription <id> --location <region> --username <user> --password <pass>'
+      '  npx tsx scripts/baremetal-env.ts setup        --subscription <id> --location <region> --username <user> --password <pass>'
     );
     console.log(
-      '  npx tsx scripts/baremetal-env.ts teardown --subscription <id> [--group-name <name>]'
+      '  npx tsx scripts/baremetal-env.ts teardown     --subscription <id> [--group-name <name>]'
+    );
+    console.log(
+      '  npx tsx scripts/baremetal-env.ts deployaksarc --subscription <id> --location <region> [options]'
     );
     process.exit(command ? 1 : 0);
 }
