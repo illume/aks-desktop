@@ -110,8 +110,6 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
  *
  * When `clusterType` is `'aksarc'`, the backend runs
  * `az aksarc get-credentials` instead of `az aks get-credentials`.
- * The required Electron/preload changes are captured in
- * `headlamp-baremetal-support.diff` at the repository root.
  *
  * @param subscriptionId - Azure subscription ID
  * @param resourceGroup - Azure resource group name
