@@ -15,10 +15,6 @@ Use this markdown block in the PR description:
 #### BareMetal proxy recovery action shown (dropped)
 ![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
 
-#### Register AKS Cluster overview cluster-action menu (BareMetal)
-![Register AKS Cluster - BareMetal Cluster Actions](docs/images/storybook/register-aks-cluster-baremetal-cluster-actions.png)
-![Register AKS Cluster - BareMetal Cluster Actions (alternate)](https://github.com/user-attachments/assets/2997f43b-fed6-480e-bff6-ef33e604f1f4)
-
 ### BareMetal proxy settings page (Storybook)
 
 > Stories: `BareMetal/ProxySettingsPage` — Default, LoadingSubscriptions, LoadingClusters, NoClustersFound, ClusterSelected, ProxyRunning, ProxyError, ProxyActionLoading, ProxyDropped, WithError, WithProxyUiError, NoSubscription
@@ -53,16 +49,6 @@ Use this markdown block in the PR description:
 
 #### Bare Metal Proxy Dropped
 ![Bare Metal Proxy Dropped](docs/images/storybook/baremetal-proxy-dropped.png)
-
-### BareMetal cluster action menu (Storybook)
-
-> Stories: `BareMetal/ClusterActions` — Default, AlternateCluster
-
-The cluster overview action menu shows proxy actions for each `aksarc` (BareMetal) cluster:
-Start Proxy, Stop Proxy, Restart Proxy, and BareMetal Proxy Settings.
-
-#### Cluster action menu — Default
-![Cluster Actions Default](docs/images/storybook/baremetal-cluster-actions-default.png)
 
 ### BareMetal environment dialog (Storybook)
 
