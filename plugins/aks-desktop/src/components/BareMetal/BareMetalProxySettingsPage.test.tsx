@@ -37,7 +37,14 @@ vi.mock('./useBareMetalProxy', () => ({
 
 import BareMetalProxySettingsPage from './BareMetalProxySettingsPage';
 
-const subscriptions = [{ id: 'sub-1', name: 'Subscription One', state: 'Enabled', tenantId: 'tenant-1' }];
+const subscriptions = [
+  {
+    id: 'sub-1',
+    name: 'Subscription One',
+    state: 'Enabled',
+    tenantId: 'tenant-1',
+  },
+];
 const clusters = [
   {
     name: 'edge-cluster',
@@ -101,7 +108,11 @@ describe('BareMetalProxySettingsPage', () => {
 
   it('has no axe violations for the dropped proxy recovery state', async () => {
     mockUseBareMetalProxy.mockReturnValue({
-      proxyStatus: { success: true, status: 'error', lastError: 'Proxy disconnected unexpectedly.' },
+      proxyStatus: {
+        success: true,
+        status: 'error',
+        lastError: 'Proxy disconnected unexpectedly.',
+      },
       proxyActionLoading: false,
       proxyUiError: '',
       proxyDropped: true,
@@ -116,7 +127,9 @@ describe('BareMetalProxySettingsPage', () => {
     render(<BareMetalProxySettingsPage />);
 
     await screen.findByText('BareMetal proxy disconnected');
-    expect((await screen.findAllByRole('button', { name: 'Restart Proxy' })).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByRole('button', { name: 'Restart Proxy' })).length
+    ).toBeGreaterThan(0);
     await screen.findByRole('button', { name: 'Open Proxy Controls' });
 
     const violations = await runAxe();
@@ -129,7 +142,9 @@ describe('BareMetalProxySettingsPage', () => {
     render(<BareMetalProxySettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No BareMetal clusters found in this subscription.')).toBeInTheDocument();
+      expect(
+        screen.getByText('No BareMetal clusters found in this subscription.')
+      ).toBeInTheDocument();
     });
   });
 });
