@@ -135,6 +135,9 @@ const AKSARC_JUMPSTART_BASE =
 const AKSARC_TEMPLATE_URL = `${AKSARC_JUMPSTART_BASE}/configuration/executescript-template.json`;
 const AKSARC_SCRIPTS_URL = `${AKSARC_JUMPSTART_BASE}/scripts`;
 
+/** Timeout in seconds for MOC installation via `az vm run-command invoke`. */
+const MOC_INSTALL_TIMEOUT_SECONDS = '3600';
+
 // ---- Commands ----
 
 /**
@@ -272,7 +275,7 @@ function setup(args: Record<string, string>) {
       '--command-id', 'RunPowerShellScript',
       '--scripts', mocInstallScript,
       '--subscription', subscription,
-      '--timeout', '3600',
+      '--timeout', MOC_INSTALL_TIMEOUT_SECONDS,
     ]);
     console.log('  ✓ MOC installation complete.\n');
   } catch (err) {
