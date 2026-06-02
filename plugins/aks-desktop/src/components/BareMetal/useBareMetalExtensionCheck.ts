@@ -95,6 +95,9 @@ export function useBareMetalExtensionCheck() {
         showSuccess: true,
       }));
 
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
       successTimeoutRef.current = setTimeout(() => {
         setStatus(prev => ({ ...prev, showSuccess: false }));
       }, 3000);

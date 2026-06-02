@@ -166,6 +166,11 @@ export function useBareMetalProxy(
       return;
     }
 
+    setProxyStatus(null);
+    setProxyUiError('');
+    setProxyDropped(false);
+    previousProxyStatusRef.current = null;
+
     refreshProxyStatus();
     const id = window.setInterval(() => {
       refreshProxyStatus();

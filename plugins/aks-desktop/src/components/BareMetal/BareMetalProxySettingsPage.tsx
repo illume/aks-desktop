@@ -235,7 +235,10 @@ export default function BareMetalProxySettingsPage() {
             <Autocomplete
               options={clusters}
               value={selectedCluster}
-              onChange={(_e, value) => setSelectedCluster(value)}
+              onChange={(_e, value) => {
+                resetProxyState();
+                setSelectedCluster(value);
+              }}
               getOptionLabel={option => option.name}
               isOptionEqualToValue={(option, value) =>
                 option.name === value.name && option.resourceGroup === value.resourceGroup
