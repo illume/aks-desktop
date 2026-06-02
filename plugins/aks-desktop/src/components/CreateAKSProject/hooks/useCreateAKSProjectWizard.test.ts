@@ -22,7 +22,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', async () => {
       returnEmptyString: false,
     });
   }
-  return { useTranslation };
+  return { K8s: { useClustersConf: () => ({}) }, useTranslation };
 });
 
 vi.mock('react-router-dom', () => ({
@@ -126,10 +126,6 @@ vi.mock('./useFormData', () => ({
 
 vi.mock('./useValidation', () => ({
   useValidation: () => ({ isValid: true, errors: {}, warnings: [], fieldErrors: {} }),
-}));
-
-vi.mock('@kinvolk/headlamp-plugin/lib/lib/k8s', () => ({
-  useClustersConf: () => ({}),
 }));
 
 import { checkNamespaceExists, createManagedNamespace } from '../../../utils/azure/az-cli';

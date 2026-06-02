@@ -1,8 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { useClustersConf } from '@kinvolk/headlamp-plugin/lib/lib/k8s';
+import { K8s, useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import React, { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import {
@@ -134,7 +133,7 @@ export function useCreateAKSProjectWizard(): UseCreateAKSProjectWizardResult {
   const featureStatus = useFeatureCheck({ subscription: formData.subscription });
   const namespaceCheck = useNamespaceCheck();
 
-  const clustersConf = useClustersConf();
+  const clustersConf = K8s.useClustersConf();
   const isClusterMissing =
     formData.cluster &&
     Object.values(clustersConf).find((it: any) => it.name === formData.cluster) === undefined
