@@ -1,24 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { Icon } from '@iconify/react';
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import {
-  Alert,
-  Autocomplete,
-  Box,
-  Button,
-  Card,
-  CircularProgress,
-  Container,
-  TextField,
-  Typography,
-} from '@mui/material';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import type { AKSCluster, Subscription } from '../../utils/azure/aks';
 import { getAKSClusters, getSubscriptions } from '../../utils/azure/aks';
-import BareMetalProxyPanel from './BareMetalProxyPanel';
+import BareMetalProxySettingsPagePure from './BareMetalProxySettingsPagePure';
 import { useBareMetalProxy } from './useBareMetalProxy';
 
 export default function BareMetalProxySettingsPage() {
@@ -157,134 +145,30 @@ export default function BareMetalProxySettingsPage() {
   };
 
   return (
-    <Box component="main" sx={{ minHeight: '100vh', backgroundColor: 'background.default', pt: 2 }}>
-      <Container maxWidth="md">
-        <Button
-          variant="text"
-          onClick={() => history.push('/azure/profile')}
-          startIcon={<Icon icon="mdi:chevron-left" height={20} width={20} aria-hidden="true" />}
-          sx={{ mb: 3, color: 'text.secondary', textTransform: 'uppercase', fontSize: 14 }}
-        >
-          {t('Back')}
-        </Button>
-
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h5" component="h1" sx={{ mb: 2 }}>
-            {t('BareMetal Proxy')}
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          {proxyUiError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {proxyUiError}
-            </Alert>
-          )}
-
-          {proxyDropped && selectedCluster && (
-            <Alert
-              severity="warning"
-              sx={{ mb: 2 }}
-              onClose={dismissProxyDropped}
-              action={
-                <Box display="flex" gap={1}>
-                  <Button color="inherit" size="small" onClick={handleProxyRestart}>
-                    {t('Restart Proxy')}
-                  </Button>
-                  <Button color="inherit" size="small" onClick={handleOpenRegisterControls}>
-                    {t('Open Proxy Controls')}
-                  </Button>
-                </Box>
-              }
-            >
-              {t('BareMetal proxy disconnected')}
-            </Alert>
-          )}
-
-          <Box display="flex" flexDirection="column" gap={2}>
-            <Autocomplete
-              options={subscriptions}
-              value={selectedSubscription}
-              onChange={(_e, value) => setSelectedSubscription(value)}
-              getOptionLabel={option => option.name}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              loading={loadingSubscriptions}
-              renderInput={params => (
-                <TextField
-                  {...params}
-                  label={t('Subscription')}
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <>
-                        {loadingSubscriptions ? (
-                          <CircularProgress color="inherit" size={20} aria-hidden="true" />
-                        ) : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
-                />
-              )}
-            />
-
-            <Autocomplete
-              options={clusters}
-              value={selectedCluster}
-              onChange={(_e, value) => {
-                resetProxyState();
-                setSelectedCluster(value);
-              }}
-              getOptionLabel={option => option.name}
-              isOptionEqualToValue={(option, value) =>
-                option.name === value.name && option.resourceGroup === value.resourceGroup
-              }
-              loading={loadingClusters}
-              disabled={!selectedSubscription}
-              renderInput={params => (
-                <TextField
-                  {...params}
-                  label={t('BareMetal cluster')}
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <>
-                        {loadingClusters ? (
-                          <CircularProgress color="inherit" size={20} aria-hidden="true" />
-                        ) : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
-                />
-              )}
-            />
-
-            {!loadingClusters && selectedSubscription && clusters.length === 0 && (
-              <Alert severity="info">
-                {t('No BareMetal clusters found in this subscription.')}
-              </Alert>
-            )}
-
-            {selectedCluster && (
-              <BareMetalProxyPanel
-                panelId="baremetal-proxy-controls"
-                proxyStatus={proxyStatus}
-                proxyActionLoading={proxyActionLoading}
-                disabled={false}
-                onProxyStart={handleProxyStart}
-                onProxyStop={handleProxyStop}
-                onProxyRestart={handleProxyRestart}
-                onProxyRefresh={refreshProxyStatus}
-              />
-            )}
-          </Box>
-        </Card>
-      </Container>
-    </Box>
+    <BareMetalProxySettingsPagePure
+      loadingSubscriptions={loadingSubscriptions}
+      loadingClusters={loadingClusters}
+      error={error}
+      proxyUiError={proxyUiError}
+      proxyDropped={proxyDropped}
+      subscriptions={subscriptions}
+      selectedSubscription={selectedSubscription}
+      clusters={clusters}
+      selectedCluster={selectedCluster}
+      proxyStatus={proxyStatus}
+      proxyActionLoading={proxyActionLoading}
+      onSubscriptionChange={setSelectedSubscription}
+      onClusterChange={value => {
+        resetProxyState();
+        setSelectedCluster(value);
+      }}
+      onProxyStart={handleProxyStart}
+      onProxyStop={handleProxyStop}
+      onProxyRestart={handleProxyRestart}
+      onProxyRefresh={refreshProxyStatus}
+      onDismissProxyDropped={dismissProxyDropped}
+      onOpenRegisterControls={handleOpenRegisterControls}
+      onBack={() => history.push('/azure/profile')}
+    />
   );
 }

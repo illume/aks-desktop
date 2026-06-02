@@ -133,6 +133,19 @@ function isMicrosoftRdpInstalled(): boolean {
   );
 }
 
+// ---- aksArc jumpstart URLs ----
+
+/**
+ * GitHub raw URLs for aksArc jumpstart assets.
+ */
+const AKSARC_JUMPSTART_BASE =
+  'https://raw.githubusercontent.com/Azure/aksArc/refs/heads/main/aksarc_jumpstart';
+const AKSARC_TEMPLATE_URL = `${AKSARC_JUMPSTART_BASE}/configuration/executescript-template.json`;
+const AKSARC_SCRIPTS_URL = `${AKSARC_JUMPSTART_BASE}/scripts`;
+
+/** Timeout in seconds for MOC installation via `az vm run-command invoke`. */
+const MOC_INSTALL_TIMEOUT_SECONDS = '3600';
+
 // ---- Commands ----
 
 /**
@@ -144,6 +157,7 @@ function isMicrosoftRdpInstalled(): boolean {
  * 3. Creates a Windows Server 2022 VM with nested virtualisation support.
  * 4. Assigns a managed identity with Contributor role to the VM.
  * 5. Installs Hyper-V on the VM via `az vm run-command` (no RDP required).
+ * 6. Installs MOC on the VM via `az vm run-command` (no RDP required).
  *
  * @param args - Parsed CLI arguments. Required: `subscription`, `username`,
  *   `password`. Optional: `location`, `group-name`, `vm-name`, `vm-size`,
@@ -163,7 +177,7 @@ function setup(args: Record<string, string>) {
   console.log('\n=== AKS BareMetal Test Environment Setup ===\n');
 
   // Step 1: Register providers
-  console.log('Step 1/5: Registering resource providers...');
+  console.log('Step 1/6: Registering resource providers...');
   for (const provider of REQUIRED_PROVIDERS) {
     console.log(`  Registering ${provider}...`);
     run(['az', 'provider', 'register', '--namespace', provider, '--wait', '--subscription', subscription]);
@@ -171,12 +185,12 @@ function setup(args: Record<string, string>) {
   console.log('  ✓ All providers registered.\n');
 
   // Step 2: Create resource group
-  console.log('Step 2/5: Creating resource group...');
+  console.log('Step 2/6: Creating resource group...');
   run(['az', 'group', 'create', '--name', groupName, '--location', location, '--subscription', subscription]);
   console.log(`  ✓ Resource group '${groupName}' created.\n`);
 
   // Step 3: Create VM
-  console.log('Step 3/5: Creating VM...');
+  console.log('Step 3/6: Creating VM...');
   run([
     'az', 'vm', 'create',
     '--resource-group', groupName,
@@ -209,7 +223,7 @@ function setup(args: Record<string, string>) {
   console.log(`  ✓ VM '${vmName}' created.\n`);
 
   // Step 4: Assign managed identity + Contributor role
-  console.log('Step 4/5: Assigning managed identity...');
+  console.log('Step 4/6: Assigning managed identity...');
   run(['az', 'vm', 'identity', 'assign', '--resource-group', groupName, '--name', vmName, '--subscription', subscription]);
 
   const principalId = run([
@@ -233,7 +247,7 @@ function setup(args: Record<string, string>) {
   console.log('  ✓ Managed identity assigned with Contributor role.\n');
 
   // Step 5: Install Hyper-V on the VM (no RDP required)
-  console.log('Step 5/5: Installing Hyper-V on VM (via run-command)...');
+  console.log('Step 5/6: Installing Hyper-V on VM (via run-command)...');
   try {
     run([
       'az', 'vm', 'run-command', 'invoke',
@@ -243,9 +257,56 @@ function setup(args: Record<string, string>) {
       '--scripts', 'Install-WindowsFeature -Name Hyper-V -IncludeManagementTools -Restart',
       '--subscription', subscription,
     ]);
-    console.log('  ✓ Hyper-V installation initiated.\n');
+    console.log('  ✓ Hyper-V installation initiated (VM will restart).\n');
   } catch {
     console.log('  ⚠ Hyper-V install may require a VM restart (this is normal).\n');
+  }
+
+  // Wait for the VM to come back after Hyper-V restart
+  console.log('  Waiting for VM to restart after Hyper-V installation...');
+  try {
+    run([
+      'az', 'vm', 'wait',
+      '--resource-group', groupName,
+      '--name', vmName,
+      '--custom', '"instanceView.statuses[?code==\'PowerState/running\']"',
+      '--interval', '15',
+      '--timeout', '600',
+      '--subscription', subscription,
+    ]);
+    console.log('  ✓ VM is running.\n');
+  } catch {
+    console.log('  ⚠ Could not confirm VM restart. Proceeding anyway.\n');
+  }
+
+  // Step 6: Install MOC on the VM (no RDP required)
+  console.log('Step 6/6: Installing MOC on VM (via run-command)...');
+  const mocInstallScript = [
+    // Download and run the MOC installer from the aksArc jumpstart repo
+    '$ErrorActionPreference = "Stop"',
+    '$ProgressPreference = "SilentlyContinue"',
+    'Write-Host "Downloading MOC installer..."',
+    `Invoke-WebRequest -Uri '${AKSARC_SCRIPTS_URL}/deploymoc.ps1' -OutFile 'C:\\deploymoc.ps1'`,
+    'Write-Host "Running MOC installer..."',
+    `& C:\\deploymoc.ps1 -resource_group '${groupName}' -location '${location}' -subscription '${subscription}'`,
+    'Write-Host "MOC installation complete."',
+  ].join('; ');
+  try {
+    run([
+      'az', 'vm', 'run-command', 'invoke',
+      '--resource-group', groupName,
+      '--name', vmName,
+      '--command-id', 'RunPowerShellScript',
+      '--scripts', mocInstallScript,
+      '--subscription', subscription,
+      '--timeout', MOC_INSTALL_TIMEOUT_SECONDS,
+    ]);
+    console.log('  ✓ MOC installation complete.\n');
+  } catch (err) {
+    console.error('  ✗ MOC installation failed.');
+    console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`);
+    console.error('  You may need to install MOC manually via RDP.');
+    console.error('  After installing MOC, run: npx tsx scripts/baremetal-env.ts deployaksarc ...\n');
   }
 
   console.log('=== Setup Complete ===');
@@ -299,7 +360,7 @@ function setup(args: Record<string, string>) {
  * Prints macOS RDP instructions for the jumpstart VM.
  *
  * Looks up the VM's public IP from Azure and prints ready-to-use connection
- * options for Microsoft Remote Desktop and the macOS built-in RDP handler.
+ * options for Microsoft Remote Desktop.
  *
  * @param args - Parsed CLI arguments. Required: `subscription`, `username`.
  *   Optional: `group-name`, `vm-name`.
@@ -393,21 +454,13 @@ function teardown(args: Record<string, string>) {
 }
 
 /**
- * GitHub raw URLs for aksArc jumpstart assets.
- */
-const AKSARC_JUMPSTART_BASE =
-  'https://raw.githubusercontent.com/Azure/aksArc/refs/heads/main/aksarc_jumpstart';
-const AKSARC_TEMPLATE_URL = `${AKSARC_JUMPSTART_BASE}/configuration/executescript-template.json`;
-const AKSARC_SCRIPTS_URL = `${AKSARC_JUMPSTART_BASE}/scripts`;
-
-/**
  * Deploys AKS Arc components on a VM that already has MOC installed.
  *
  * Downloads the ARM execution template from the aksArc jumpstart repo and
  * runs the 7 deployment scripts sequentially via `az deployment group create`.
  *
- * PREREQUISITE: The VM must have MOC installed via the jumpstart.sh / RDP
- * flow before this command is run.
+ * MOC is normally pre-installed by the `setup` command (step 6). If that step
+ * failed, MOC can be installed manually via RDP before running this command.
  *
  * @param args - Parsed CLI arguments. Required: `subscription`, `location`.
  *   Optional: `group-name`, `vm-name`, `appliance-name`, `custom-location`,
@@ -424,11 +477,9 @@ function deployAksArc(args: Record<string, string>) {
   const aksCluster = args['aks-cluster'] || `${vmName}-aksarc`;
 
   console.log('\n=== AKS Arc Deployment ===\n');
-  console.log('PREREQUISITE: MOC must already be installed on the VM.');
-  console.log("If you haven't done this yet:");
-  console.log(`  1. RDP or Bastion into VM '${vmName}' in resource group '${groupName}'`);
-  console.log('  2. Wait 2-3 minutes for the MOC PowerShell install to complete automatically');
-  console.log('  3. Re-run this command once MOC is done');
+  console.log('NOTE: MOC must be installed on the VM before running this command.');
+  console.log('MOC is automatically installed during `setup` (step 6).');
+  console.log('If that step failed, install MOC manually via RDP before proceeding.');
   console.log('');
 
   // Download the ARM execution template to a temp file

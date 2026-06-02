@@ -19,9 +19,13 @@ import React from 'react';
 import { BAREMETAL_ENV_DEFAULTS } from './environment';
 import type { BareMetalExtensionStatus } from './useBareMetalExtensionCheck';
 
+/** Props for the pure (presentational) BareMetal environment setup dialog. */
 export interface BareMetalEnvironmentDialogPureProps {
+  /** Whether the dialog is open. */
   open: boolean;
+  /** Whether the user is currently logged in to Azure. */
   isLoggedIn: boolean;
+  /** Whether an Azure auth check is in progress. */
   isChecking: boolean;
   /** Current form values. */
   formData: {
@@ -42,12 +46,19 @@ export interface BareMetalEnvironmentDialogPureProps {
   success: string;
   /** Status of required CLI extensions. */
   extensionStatus: BareMetalExtensionStatus;
+  /** Called when the dialog is closed. */
   onClose: () => void;
+  /** Called when a form field value changes. */
   onChange: (field: string, value: string) => void;
+  /** Called when the user clicks the Setup button. */
   onSetup: () => void;
+  /** Called when the user clicks the Teardown button. */
   onTeardown: () => void;
+  /** Called when the user dismisses an error alert. */
   onDismissError: () => void;
+  /** Called when the user dismisses a success alert. */
   onDismissSuccess: () => void;
+  /** Called when the user clicks Install Extensions. */
   onInstallExtensions: () => void;
 }
 

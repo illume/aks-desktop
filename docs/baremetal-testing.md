@@ -30,19 +30,27 @@ Optional flags:
 | --- | --- | --- |
 | `--group-name` | `jumpstart-rg` | Resource group name |
 | `--vm-name` | `jumpstartVM` | Virtual machine name |
+| `--vm-size` | `Standard_E16s_v5` | VM size (SKU) |
 | `--vnet-name` | `jumpstartVNet` | Virtual network name |
 | `--subnet-name` | `jumpstartSubnet` | Subnet name |
 
 This creates a Windows Server 2022 VM with nested Hyper-V, assigns a
-managed identity with Contributor role, and initiates Hyper-V installation
-on the VM — all automated via `az vm run-command` (no RDP required).
+managed identity with Contributor role, installs Hyper-V and MOC on the
+VM — all automated via `az vm run-command` (no RDP required).
 
 ### 2. Deploy AKS BareMetal components
 
-After the VM is created, deploy AKS BareMetal components using the
-[aksArc jumpstart](https://github.com/Azure/aksArc/tree/main/aksarc_jumpstart)
-scripts. These scripts run remotely via ARM template deployments and
-`az vm run-command invoke` — no RDP is required.
+After the VM is created (with MOC pre-installed), deploy AKS Arc components:
+
+```bash
+npm run setupBareMetalEnv -- deployaksarc \
+  --subscription <subscription-id> \
+  --location eastus \
+  --group-name jumpstart-rg
+```
+
+This runs 7 deployment scripts sequentially via `az deployment group create`
+— no RDP is required.
 
 ### 3. Register the cluster in AKS Desktop
 
