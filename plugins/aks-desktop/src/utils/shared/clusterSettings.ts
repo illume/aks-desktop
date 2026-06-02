@@ -70,9 +70,31 @@ export function getClusterSettings(
     const result = parseSettingsValue(localStorage.getItem(key));
     if (result) return result;
 
-    // Fall back to the legacy key when the qualified key has no entry
+    // Fall back to the legacy key when the qualified key has no entry,
+    // but only if there are no other disambiguated entries for the same
+    // clusterName – otherwise the legacy entry is ambiguous and could
+    // belong to a different cluster with the same name.
     if (subscriptionId && resourceGroup) {
-      return parseSettingsValue(localStorage.getItem(`cluster_settings.${clusterName}`)) ?? {};
+      const suffix = `.${clusterName}`;
+      const prefix = 'cluster_settings.';
+      let hasDisambiguated = false;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          k.startsWith(prefix) &&
+          k.endsWith(suffix) &&
+          k !== key &&
+          k !== `cluster_settings.${clusterName}`
+        ) {
+          hasDisambiguated = true;
+          break;
+        }
+      }
+      if (!hasDisambiguated) {
+        return parseSettingsValue(localStorage.getItem(`cluster_settings.${clusterName}`)) ?? {};
+      }
+      return {};
     }
 
     // No subscription/resourceGroup supplied – look for a unique disambiguated entry.

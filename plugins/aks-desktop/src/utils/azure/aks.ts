@@ -75,8 +75,10 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
   clusters?: AKSCluster[];
 }> {
   try {
-    const aksClusters = await getClusters(subscriptionId);
-    const arcClusters = await getConnectedClusters(subscriptionId);
+    const [aksClusters, arcClusters] = await Promise.all([
+      getClusters(subscriptionId),
+      getConnectedClusters(subscriptionId),
+    ]);
     const clusters = [...aksClusters, ...arcClusters];
 
     return {

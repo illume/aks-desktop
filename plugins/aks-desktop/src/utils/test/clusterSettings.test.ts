@@ -98,11 +98,23 @@ describe('clusterSettings', () => {
       expect(settings.clusterType).toBe('aksarc');
     });
 
-    test('falls back to legacy key when disambiguated key has no entry', () => {
+    test('falls back to legacy key when disambiguated key has no entry and no other disambiguated entries exist', () => {
       localStorage.setItem('cluster_settings.my-cluster', JSON.stringify({ clusterType: 'aks' }));
 
       const settings = getClusterSettings('my-cluster', 'sub-1', 'rg-1');
       expect(settings.clusterType).toBe('aks');
+    });
+
+    test('does not fall back to legacy key when other disambiguated entries exist for same name', () => {
+      localStorage.setItem('cluster_settings.my-cluster', JSON.stringify({ clusterType: 'aks' }));
+      localStorage.setItem(
+        'cluster_settings.sub-2.rg-2.my-cluster',
+        JSON.stringify({ clusterType: 'aksarc' })
+      );
+
+      // sub-1/rg-1 has no entry, but sub-2/rg-2 does – legacy entry is ambiguous
+      const settings = getClusterSettings('my-cluster', 'sub-1', 'rg-1');
+      expect(settings).toEqual({});
     });
 
     test('same cluster name in different subs/rgs does not collide', () => {
