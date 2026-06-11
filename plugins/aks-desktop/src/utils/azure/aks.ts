@@ -1,22 +1,38 @@
-import { getClusters } from './az-clusters';
+import { getClusters, getConnectedClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 
+/** An Azure subscription returned by the Azure CLI. */
 export interface Subscription {
+  /** The subscription GUID. */
   id: string;
+  /** Human-readable subscription display name. */
   name: string;
+  /** Subscription state, e.g. `"Enabled"`. */
   state: string;
+  /** The Azure AD tenant that owns this subscription. */
   tenantId: string;
+  /** Whether this is the CLI's currently-active default subscription. */
   isDefault: boolean;
 }
 
+/** A unified representation of an AKS managed cluster or an AKS BareMetal (connected) cluster. */
 export interface AKSCluster {
+  /** Cluster resource name. */
   name: string;
+  /** Azure resource group containing the cluster. */
   resourceGroup: string;
+  /** Azure region / location. */
   location: string;
+  /** Kubernetes version running on the cluster. */
   kubernetesVersion: string;
+  /** Current provisioning state, e.g. `"Succeeded"`. */
   provisioningState: string;
+  /** Fully-qualified domain name (empty for BareMetal clusters). */
   fqdn: string;
+  /** Whether Azure RBAC is enabled on the cluster's AAD profile. */
   isAzureRBACEnabled: boolean;
+  /** Discriminator: `'aks'` for managed clusters, `'aksarc'` for Arc-connected clusters. */
+  clusterType: 'aks' | 'aksarc';
 }
 
 /**
@@ -59,19 +75,24 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
   clusters?: AKSCluster[];
 }> {
   try {
-    const clusters = await getClusters(subscriptionId);
+    const [aksClusters, arcClusters] = await Promise.all([
+      getClusters(subscriptionId),
+      getConnectedClusters(subscriptionId),
+    ]);
+    const clusters = [...aksClusters, ...arcClusters];
 
     return {
       success: true,
-      message: 'AKS clusters retrieved successfully',
+      message: 'AKS/BareMetal clusters retrieved successfully',
       clusters: clusters.map((cluster: any) => ({
         name: cluster.name,
         resourceGroup: cluster.resourceGroup,
         location: cluster.location,
-        kubernetesVersion: cluster.version,
+        kubernetesVersion: cluster.version || '',
         provisioningState: cluster.status,
         fqdn: '', // Not returned by getClusters
-        isAzureRBACEnabled: cluster.aadProfile !== null,
+        isAzureRBACEnabled: cluster.aadProfile?.enableAzureRbac === true,
+        clusterType: cluster.clusterType || 'aks',
       })),
     };
   } catch (error) {
@@ -87,14 +108,21 @@ export async function getAKSClusters(subscriptionId: string): Promise<{
  * Register an AKS cluster using the Electron IPC API.
  * This calls the native registration logic in the Electron backend.
  *
+ * When `clusterType` is `'aksarc'`, the backend runs
+ * `az aksarc get-credentials` instead of `az aks get-credentials`.
+ *
+ * @param subscriptionId - Azure subscription ID
+ * @param resourceGroup - Azure resource group name
+ * @param clusterName - Cluster name
  * @param managedNamespace - Optional managed namespace name to use for scoped credentials
+ * @param clusterType - `'aks'` for managed clusters, `'aksarc'` for Arc-connected clusters
  */
 export async function registerAKSCluster(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string,
   managedNamespace?: string,
-  tenantId?: string
+  clusterType: 'aks' | 'aksarc' = 'aks'
 ): Promise<{
   success: boolean;
   message: string;
@@ -121,9 +149,9 @@ export async function registerAKSCluster(
       subscriptionId,
       resourceGroup,
       clusterName,
-      false, // isAzureRBACEnabled
+      false, // isAzureRBACEnabled retained for backwards compatibility
       managedNamespace,
-      tenantId
+      clusterType
     );
 
     console.debug('[AKS] Registration result:', result);
