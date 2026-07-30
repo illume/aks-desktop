@@ -1,0 +1,347 @@
+# Removing the Headlamp submodule
+
+> Research snapshot: 2026-07-30. Headlamp `v0.44.0` is the latest release
+> considered here. Proposed package names and manifests in this document do not
+> exist yet.
+
+## Recommendation
+
+Do not replace the submodule with an official Headlamp installer. Installers are
+finished applications: they do not provide a supported way to inject AKS
+Desktop's plugins, external tools, identity, or Electron main-process services.
+Also do not remove the fork until the command, cluster-registration, storage,
+and OAuth capabilities listed below have replacement APIs.
+
+Use this two-step dependency strategy:
+
+1. **Near term:** build a pristine, commit- and checksum-pinned upstream source
+   archive. Keep AKS product configuration, plugins, external tools, and
+   packaging in this repository. This removes the fork and Git submodule once
+   the required extension APIs are available, even before Headlamp publishes
+   composable packages.
+2. **Target:** consume one logical, lockstep Headlamp distribution made of
+   several physical packages/artifacts. JavaScript belongs on npm; native Go
+   binaries are better represented by a signed release manifest. One Headlamp
+   version must resolve the frontend, server for each target, Electron shell,
+   and plugin API.
+
+This is preferable to one large npm package containing every operating-system
+binary. It preserves a one-line version update without making every consumer
+download every platform or hiding downloads in an install script.
+
+The [commit audit](headlamp-fork-commit-audit.md) gives a disposition and an AKS
+replacement for all 115 downstream non-merge commits.
+
+## Current state
+
+### What is coupled to the submodule
+
+| Consumer | Current dependency on `headlamp/` |
+| --- | --- |
+| `.gitmodules` | Points at the `headlamp-downstream` branch of the AKS Desktop repository. |
+| Root build scripts | Run `make app` inside the submodule. |
+| `build/setup-plugins.ts` | Builds AKS plugins and copies them to `headlamp/.plugins`. |
+| `build/setup-external-tools.ts` | Writes Azure CLI and Python into `headlamp/app/resources/external-tools`. |
+| Build verification | Reads `headlamp/app/package.json` and `headlamp/app/dist`. |
+| `Localize/translation-manager.mjs` | Reads and writes Headlamp frontend locale files directly. |
+| Downstream Headlamp | Contains product identity, build targets, Electron IPC, backend, frontend, and generated translation changes. |
+
+The fork is based on upstream `v0.43.0`. It has 115 non-merge commits and a
+large apparent diff; generated translations and snapshots account for much of
+the file count. A strict comparison found no patch-identical commits in current
+upstream. Several behaviors do now have semantic upstream equivalents, so the
+audit treats a rebase and behavior tests—not subject-line matching—as the final
+authority.
+
+### What Headlamp distributes today
+
+As of the research date:
+
+- `frontend/package.json` is private. There is no supported core frontend npm
+  package, backend library package, Electron shell package, or all-in-one
+  Headlamp npm package.
+- npm contains plugin tooling, including
+  `@kinvolk/headlamp-plugin@0.14.0`,
+  `@headlamp-k8s/pluginctl@0.1.1`, and
+  `@headlamp-k8s/eslint-config@0.7.0`.
+- The `v0.44.0` release contains desktop installers/tarballs and
+  `checksums.txt`, but no standalone frontend or embedded server assets.
+- Upstream has a manually dispatched workflow that builds embedded server
+  archives. Its default Actions retention is two days; those archives were not
+  attached to the `v0.44.0` release.
+- Containers and the Helm chart are good server deployments, but neither is a
+  reusable desktop application shell.
+
+Upstream issue
+[`kubernetes-sigs/headlamp#197`](https://github.com/kubernetes-sigs/headlamp/issues/197)
+previously proposed an npm package. The main concerns were making the entire
+application a component library and distributing the correct native server
+binary. The issue was closed by the inactivity bot, not by an implemented
+package design.
+
+## Configuration boundaries
+
+Headlamp already has two different environment-variable contracts:
+
+- Frontend `REACT_APP_*` values are converted into Vite build values by
+  `frontend/make-env.js`. They are compiled into public static assets.
+- Backend `HEADLAMP_CONFIG_*` values are read at runtime. Explicit command-line
+  flags override environment values.
+- The Electron main process currently sets backend options such as Helm,
+  dynamic clusters, kubeconfig changes, the backend token, and the static
+  plugin directory before starting the server.
+
+Those contracts should remain separate:
+
+| Layer | Proposed input | Examples | Secret-safe? |
+| --- | --- | --- | --- |
+| Product assembly | Versioned product manifest | app ID, name, protocol, icons, targets, legal files, external tools | Non-secret only |
+| Frontend startup | Public runtime JSON, with build-time defaults | product labels, feature flags, help links, release-notes policy | **Public; never secrets or tokens** |
+| Backend runtime | Existing flags and `HEADLAMP_CONFIG_*` | listen address, plugin paths, dynamic clusters, OIDC settings | Process environment/secret store |
+| Desktop host | Permissioned extension manifest | command prefixes, secure-storage namespace, OAuth/cluster providers | Capabilities, not credentials |
+
+A runtime public frontend document avoids rebuilding Headlamp merely to change
+text or feature defaults. Values needed before startup—icons, executable name,
+protocol registration, signing, and installer targets—remain assembly-time
+product configuration.
+
+An illustrative AKS product manifest is:
+
+```json
+{
+  "schemaVersion": 1,
+  "product": {
+    "id": "com.microsoft.aksdesktop",
+    "name": "aks-desktop",
+    "displayName": "AKS desktop",
+    "protocols": ["aks-desktop"],
+    "icons": "branding/icons",
+    "legalFiles": ["LICENSES.txt"],
+    "targets": ["darwin-arm64", "linux-x64", "win32-x64"]
+  },
+  "frontend": {
+    "publicConfig": {
+      "releaseNotes": false,
+      "noClustersMessage": "No AKS clusters added"
+    }
+  },
+  "plugins": [
+    {
+      "id": "aks-desktop",
+      "source": "plugins/aks-desktop/dist",
+      "enabled": true,
+      "capabilities": [
+        "commands:az:aks",
+        "commands:kubectl",
+        "clusters:register",
+        "storage:aks-desktop",
+        "oauth:github"
+      ]
+    }
+  ],
+  "externalTools": {
+    "az": {
+      "source": "build/output/external-tools/az",
+      "sha256": "<platform artifact digest>"
+    }
+  }
+}
+```
+
+This schema is a proposal. The real schema should reject unknown keys, validate
+paths and capability names, and be versioned independently from product data.
+Signing credentials, OAuth tokens, backend tokens, and connection strings must
+not appear in it.
+
+## How AKS Desktop could consume Headlamp
+
+### Immediate source distribution
+
+Until packages exist, commit a small lock file instead of a Git link:
+
+```json
+{
+  "schemaVersion": 1,
+  "headlampVersion": "0.44.0",
+  "source": {
+    "commit": "7e2f255cc256a16c39681ffea31fa16e11a11eaf",
+    "url": "https://github.com/kubernetes-sigs/headlamp/archive/7e2f255cc256a16c39681ffea31fa16e11a11eaf.tar.gz",
+    "sha256": "<verified archive digest>"
+  },
+  "pluginSdk": "@kinvolk/headlamp-plugin@0.14.0"
+}
+```
+
+The build should download into a cache, verify the digest before extraction,
+build unmodified upstream source, and assemble the output with AKS plugins and
+resources. A full commit ID plus digest protects against a moved tag and makes
+updates reviewable. This is source consumption, not the final package API, but
+it removes submodule mechanics and the permanent fork.
+
+### Target package/artifact set
+
+The following names illustrate boundaries, not existing npm packages:
+
+| Proposed unit | Contents | Delivery |
+| --- | --- | --- |
+| `@headlamp-k8s/plugin-api` | Supported TypeScript types and browser plugin API | npm |
+| `@headlamp-k8s/frontend-assets` | Versioned, prebuilt static frontend and public-config schema | npm or release archive |
+| `@headlamp-k8s/desktop-kit` | Electron shell source, typed host-extension API, and base builder configuration | npm |
+| `headlamp-server-{os}-{arch}` | Compressed Go server binary and metadata | Signed GitHub/OCI release artifacts |
+| `@headlamp-k8s/distribution` | Small lockstep manifest/resolver; no hidden unverified downloads | npm |
+
+Publishing platform server packages to npm is possible, using optional
+dependencies selected by operating system and CPU. A signed distribution
+manifest is a better default because the server is a Go artifact, release
+checksums/signatures and SBOMs can cover every platform, and non-JavaScript
+consumers can use the same files.
+
+The logical distribution manifest should contain:
+
+```json
+{
+  "schemaVersion": 1,
+  "version": "0.45.0",
+  "pluginApiVersion": "0.15",
+  "artifacts": {
+    "frontend": {"url": "...", "sha256": "..."},
+    "desktopKit": {"npm": "@headlamp-k8s/desktop-kit@0.45.0"},
+    "server": {
+      "darwin-arm64": {"url": "...", "sha256": "..."},
+      "linux-x64": {"url": "...", "sha256": "..."},
+      "win32-x64": {"url": "...", "sha256": "..."}
+    }
+  }
+}
+```
+
+All units should be produced from the same source tag and carry the same
+release version. The resolver must fail on a platform without an entry and on
+any digest, signature, schema, or plugin-API mismatch. It should materialize
+artifacts during an explicit build step, not an npm `postinstall`.
+
+### One package versus several
+
+| Shape | Advantages | Disadvantages | Verdict |
+| --- | --- | --- | --- |
+| One npm package with source and all binaries | One dependency; simple concept | Large cross-platform install; native release/signing concerns; coarse caching | Not recommended |
+| Independent npm packages | Clear boundaries; normal JS tooling; platform selection | Easy to create unsupported version combinations | Useful only with lockstep versions |
+| Signed artifact manifest only | Language-neutral; natural for Go binaries; signatures/checksums/SBOMs | Needs a resolver and cache | Best native-artifact boundary |
+| **Hybrid meta-package + signed manifest** | One update plus appropriate JS/native delivery | Requires upstream release work | **Recommended target** |
+
+### Update workflow
+
+A Headlamp update should become one automated pull request:
+
+1. Change the single distribution version or source lock.
+2. Verify signatures and SHA-256 values before extraction.
+3. Reject an incompatible plugin API before building plugins.
+4. Assemble AKS plugins, product resources, and pinned external tools without
+   editing the Headlamp tree.
+5. Build every supported OS/architecture and run plugin, Electron IPC,
+   cluster-registration, installer, and startup smoke tests.
+6. Review release notes and the public configuration schema diff.
+
+No step should update a submodule pointer, merge a long-lived branch, or copy
+secrets into frontend assets. Dependabot/Renovate can update npm units; a small
+repository-owned updater can refresh the signed native-artifact lock only after
+verification.
+
+## Host APIs needed before removing the fork
+
+The browser plugin API cannot implement privileged Electron behavior by itself.
+Upstream should expose these generic, least-privilege host services:
+
+1. **Command broker:** identify the calling plugin, accept executable plus
+   argument arrays (not shell strings), resolve declared bundled tools, enforce
+   executable/subcommand permissions, prompt for consent, stream output, and
+   unsubscribe IPC listeners. AKS configuration requests `az`, `kubectl`, and
+   `kubelogin` scopes; it must not hard-code a global consent bypass.
+2. **Cluster-registration provider:** a plugin registers a typed provider; the
+   host performs approved process/file operations. The AKS provider owns
+   Azure/Arc choices, managed namespaces, Azure RBAC, and kubeconfig conversion,
+   while the generic host honors `KUBECONFIG` and refreshes clusters.
+3. **Namespaced secure storage:** Electron `safeStorage` behind a plugin-scoped
+   key namespace and narrow preload API. Plugins must not read one another's
+   values.
+4. **OAuth/deep-link provider:** main-process browser flow, state/PKCE
+   validation, configurable product protocol, and token storage through the
+   namespaced service. Tokens never enter build/public configuration.
+5. **Product/build kit:** product identity, artifact naming, targets, icons,
+   legal resources, bundled plugins/tools, backend app name, and verification
+   paths supplied by the product manifest.
+6. **Frontend extension/config APIs:** public runtime product information,
+   configurable empty/error/404/release-note content, conditional project
+   overview sections, project-header navigation, default-disabled plugins, and
+   a supported locale overlay.
+
+These APIs turn useful differences into AKS configuration or plugin code.
+Generic correctness, accessibility, LogsViewer, table, theme, source-map, and
+backend fixes should be contributed upstream without AKS switches.
+
+## Alternatives
+
+| Alternative | Update effort | Keeps AKS desktop behavior | Fork removed? | Main trade-off |
+| --- | --- | --- | --- | --- |
+| Pinned pristine source archive | Low/medium | Yes, after extension APIs | Yes | AKS still builds Headlamp |
+| Hybrid packages + signed manifest | **Low** | Yes | Yes | Requires upstream packaging/API work |
+| Official desktop installer | Low | No | Yes | Cannot safely compose the product |
+| Container or Helm chart | Low | Server only | Yes | Not a desktop shell |
+| External fork builds published artifacts | Medium | Yes | Submodule only | Fork maintenance merely moves to CI |
+| Small patch queue on pristine source | Medium | Yes | Git submodule | Patches still rebase and delay upstreaming |
+| Git subtree/vendored source | High | Yes | Submodule only | Larger repository; same merge burden |
+| Keep the present submodule/fork | High over time | Yes | No | Lowest immediate migration risk |
+
+An external artifact-producing fork is a useful temporary fallback if release
+deadlines precede the host APIs, but it is not the end state: AKS still owns and
+rebases the same code.
+
+## Migration plan and exit criteria
+
+### Phase 0: reduce the delta
+
+- Rebase onto `v0.44.0`.
+- Drop behavior already supplied upstream and squash fixup/generated commits.
+- Submit the generic batches listed in the commit audit.
+- Add behavior tests for every retained privileged capability.
+
+### Phase 1: separate product assembly
+
+- Introduce a validated AKS product manifest outside `headlamp/`.
+- Stage plugins and external tools in a repository-owned assembly directory.
+- Stop writing translations and resources into the Headlamp source tree.
+- Keep the submodule temporarily, but build it without product edits.
+
+### Phase 2: establish extension APIs
+
+- Land the generic host and frontend APIs upstream.
+- Move AKS registration, Azure policy, wording, and defaults to the AKS plugin
+  and product manifest.
+- Pin and test plugin API compatibility.
+
+### Phase 3: remove the submodule
+
+- Replace `.gitmodules`, the submodule pointer, and
+  `scripts/headlamp-submodule.sh` with the verified source lock/resolver.
+- Build a pristine source archive and assemble AKS Desktop externally.
+- The exit test is a successful update to a newer upstream commit without an
+  AKS patch applied inside the extracted tree.
+
+### Phase 4: switch to published distributions
+
+- Upstream publishes frontend assets, desktop kit, plugin API, per-platform
+  server artifacts, signatures/checksums, provenance, and SBOMs from one tag.
+- Replace the source lock with the lockstep distribution version.
+- The final success criterion is one version-bump pull request that produces
+  all AKS Desktop installers without checking out Headlamp source.
+
+## Primary sources
+
+- [Headlamp `v0.44.0` release and assets](https://github.com/kubernetes-sigs/headlamp/releases/tag/v0.44.0)
+- [Private frontend package at `v0.44.0`](https://github.com/kubernetes-sigs/headlamp/blob/v0.44.0/frontend/package.json)
+- [Frontend build environment generation](https://github.com/kubernetes-sigs/headlamp/blob/v0.44.0/frontend/make-env.js)
+- [Backend environment/flag configuration](https://github.com/kubernetes-sigs/headlamp/blob/v0.44.0/backend/pkg/config/config.go)
+- [Embedded server artifact workflow](https://github.com/kubernetes-sigs/headlamp/blob/v0.44.0/.github/workflows/app-artifacts-embedded.yml)
+- [Plugin SDK on npm](https://www.npmjs.com/package/@kinvolk/headlamp-plugin)
+- [Plugin manager CLI on npm](https://www.npmjs.com/package/@headlamp-k8s/pluginctl)
+- [Original npm-package proposal and maintainer response](https://github.com/kubernetes-sigs/headlamp/issues/197)
