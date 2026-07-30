@@ -9,6 +9,10 @@ implement features and fixes that are specific to AKS desktop. This fork is kept
 `headlamp-downstream`, and is set up as a git submodule in this project's repository. This
 ensures flexibility.
 
+See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
+[distribution builds](docs/headlamp-distribution-builds.md), and
+[commit audit](docs/headlamp-fork-commit-audit.md) for the plan to remove this fork.
+
 This fork is meant to be kept in sync with the upstream Headlamp project as much as possible,
 meaning the downstream changes we make should be minimal and focused on AKS desktop-specific needs
 that do not make sense to contribute back upstream.

@@ -14,8 +14,8 @@ and OAuth capabilities listed below have replacement APIs.
 
 Use this two-step dependency strategy:
 
-1. **Near term:** build a pristine, commit- and checksum-pinned upstream source
-   archive. Keep AKS product configuration, plugins, external tools, and
+1. **Near term:** build a pristine, commit- and tree-pinned upstream source
+   export. Keep AKS product configuration, plugins, external tools, and
    packaging in this repository. This removes the fork and Git submodule once
    the required extension APIs are available, even before Headlamp publishes
    composable packages.
@@ -25,12 +25,17 @@ Use this two-step dependency strategy:
    version must resolve the frontend, server for each target, Electron shell,
    and plugin API.
 
-This is preferable to one large npm package containing every operating-system
-binary. It preserves a one-line version update without making every consumer
-download every platform or hiding downloads in an install script.
+For public/general use this is preferable to one large npm package containing
+every operating-system binary. It preserves a one-line version update without
+making every consumer download every platform or hiding downloads in an
+install script. A literal all-platform package remains viable for AKS's
+private/offline build cache and is detailed in the companion design.
 
 The [commit audit](headlamp-fork-commit-audit.md) gives a disposition and an AKS
 replacement for all 115 downstream non-merge commits.
+[Distribution and product builds](headlamp-distribution-builds.md) specifies the
+literal single-package option, derived container image, multi-plugin bundle,
+and reusable build tooling to contribute upstream.
 
 ## Current state
 
@@ -111,7 +116,7 @@ An illustrative AKS product manifest is:
 {
   "schemaVersion": 1,
   "product": {
-    "id": "com.microsoft.aksdesktop",
+    "id": "com.microsoft.aks-desktop",
     "name": "aks-desktop",
     "displayName": "AKS desktop",
     "protocols": ["aks-desktop"],
@@ -131,11 +136,13 @@ An illustrative AKS product manifest is:
       "source": "plugins/aks-desktop/dist",
       "enabled": true,
       "capabilities": [
-        "commands:az:aks",
-        "commands:kubectl",
         "clusters:register",
         "storage:aks-desktop",
         "oauth:github"
+      ],
+      "commandScopes": [
+        {"tool": "az", "subcommands": ["account", "aks", "aksarc", "connectedk8s"]},
+        {"tool": "kubectl", "subcommands": ["config", "top"]}
       ]
     }
   ],
@@ -164,19 +171,31 @@ Until packages exist, commit a small lock file instead of a Git link:
   "schemaVersion": 1,
   "headlampVersion": "0.44.0",
   "source": {
+    "repository": "https://github.com/kubernetes-sigs/headlamp.git",
+    "ref": "refs/tags/v0.44.0",
     "commit": "7e2f255cc256a16c39681ffea31fa16e11a11eaf",
-    "url": "https://github.com/kubernetes-sigs/headlamp/archive/7e2f255cc256a16c39681ffea31fa16e11a11eaf.tar.gz",
-    "sha256": "<verified archive digest>"
-  },
-  "pluginSdk": "@kinvolk/headlamp-plugin@0.14.0"
+    "tree": "6017e6fc330b7c5be930852093b97f173c9f7765"
+  }
 }
 ```
 
-The build should download into a cache, verify the digest before extraction,
-build unmodified upstream source, and assemble the output with AKS plugins and
-resources. A full commit ID plus digest protects against a moved tag and makes
-updates reviewable. This is source consumption, not the final package API, but
-it removes submodule mechanics and the permanent fork.
+The resolver should fetch the advertised ref into a disposable/cache repository,
+verify both the commit and Git tree object, export that tree, build unmodified
+upstream source, and assemble AKS plugins and resources around it. A moved tag
+then fails closed. GitHub's automatically generated source archives are not
+guaranteed to remain byte-identical, so their compressed-file digest should not
+be the long-term lock. A build that cannot use Git should consume a manually
+uploaded immutable source release asset with a signed checksum instead.
+
+The current `v0.44.0` tag is lightweight rather than signed. The interim phase
+therefore relies on reviewed lock-file changes and Git object verification;
+upstream signatures/provenance become mandatory for the target distribution.
+This is source consumption, not the final package API, but it removes submodule
+mechanics and the permanent fork.
+
+Headlamp `v0.44.0` contains plugin SDK `0.14.0`, while the AKS plugin currently
+declares `^0.13.1`; the migration must align and test the AKS plugin rather than
+assuming compatibility.
 
 ### Target package/artifact set
 
@@ -189,6 +208,20 @@ The following names illustrate boundaries, not existing npm packages:
 | `@headlamp-k8s/desktop-kit` | Electron shell source, typed host-extension API, and base builder configuration | npm |
 | `headlamp-server-{os}-{arch}` | Compressed Go server binary and metadata | Signed GitHub/OCI release artifacts |
 | `@headlamp-k8s/distribution` | Small lockstep manifest/resolver; no hidden unverified downloads | npm |
+
+With the meta-package exact-pinning and exporting the JavaScript units, AKS
+Desktop's root dependency could be only:
+
+```json
+{
+  "dependencies": {
+    "@headlamp-k8s/distribution": "0.45.0"
+  }
+}
+```
+
+AKS plugins would still declare the compatible plugin SDK for development; the
+distribution manifest supplies the required API version so CI can reject skew.
 
 Publishing platform server packages to npm is possible, using optional
 dependencies selected by operating system and CPU. A signed distribution
@@ -224,7 +257,7 @@ artifacts during an explicit build step, not an npm `postinstall`.
 
 | Shape | Advantages | Disadvantages | Verdict |
 | --- | --- | --- | --- |
-| One npm package with source and all binaries | One dependency; simple concept | Large cross-platform install; native release/signing concerns; coarse caching | Not recommended |
+| One npm package with source and all binaries | One dependency; offline cross-builds | Large cross-platform install; public registry size; coarse caching | Viable private/offline option |
 | Independent npm packages | Clear boundaries; normal JS tooling; platform selection | Easy to create unsupported version combinations | Useful only with lockstep versions |
 | Signed artifact manifest only | Language-neutral; natural for Go binaries; signatures/checksums/SBOMs | Needs a resolver and cache | Best native-artifact boundary |
 | **Hybrid meta-package + signed manifest** | One update plus appropriate JS/native delivery | Requires upstream release work | **Recommended target** |
@@ -255,8 +288,10 @@ Upstream should expose these generic, least-privilege host services:
 1. **Command broker:** identify the calling plugin, accept executable plus
    argument arrays (not shell strings), resolve declared bundled tools, enforce
    executable/subcommand permissions, prompt for consent, stream output, and
-   unsubscribe IPC listeners. AKS configuration requests `az`, `kubectl`, and
-   `kubelogin` scopes; it must not hard-code a global consent bypass.
+   unsubscribe IPC listeners. Identity must come from the host's registered
+   plugin context, never a caller-supplied string. AKS configuration requests
+   `az`, `kubectl`, and `kubelogin` scopes; it must not hard-code a global
+   consent bypass.
 2. **Cluster-registration provider:** a plugin registers a typed provider; the
    host performs approved process/file operations. The AKS provider owns
    Azure/Arc choices, managed namespaces, Azure RBAC, and kubeconfig conversion,
@@ -283,13 +318,14 @@ backend fixes should be contributed upstream without AKS switches.
 
 | Alternative | Update effort | Keeps AKS desktop behavior | Fork removed? | Main trade-off |
 | --- | --- | --- | --- | --- |
-| Pinned pristine source archive | Low/medium | Yes, after extension APIs | Yes | AKS still builds Headlamp |
+| Pinned pristine Git tree/source asset | Low/medium | Yes, after extension APIs | Yes | AKS still builds Headlamp |
 | Hybrid packages + signed manifest | **Low** | Yes | Yes | Requires upstream packaging/API work |
 | Official desktop installer | Low | No | Yes | Cannot safely compose the product |
 | Container or Helm chart | Low | Server only | Yes | Not a desktop shell |
-| External fork builds published artifacts | Medium | Yes | Submodule only | Fork maintenance merely moves to CI |
-| Small patch queue on pristine source | Medium | Yes | Git submodule | Patches still rebase and delay upstreaming |
-| Git subtree/vendored source | High | Yes | Submodule only | Larger repository; same merge burden |
+| Derived AKS container from pinned base | Low | Browser/plugin subset | Yes | Electron-only capabilities need alternatives |
+| External fork builds published artifacts | Medium | Yes | No; only the local submodule | Fork maintenance merely moves to CI |
+| Small patch queue on pristine source | Medium | Yes | No; only the Git link | Patches still rebase and delay upstreaming |
+| Git subtree/vendored source | High | Yes | No; same downstream delta | Larger repository; same merge burden |
 | Keep the present submodule/fork | High over time | Yes | No | Lowest immediate migration risk |
 
 An external artifact-producing fork is a useful temporary fallback if release
@@ -300,6 +336,9 @@ rebases the same code.
 
 ### Phase 0: reduce the delta
 
+- Treat the rebase as the main schedule risk: `v0.43.0..v0.44.0` contains 743
+  commits (504 non-merge), and generated translations/snapshots enlarge the
+  conflict surface.
 - Rebase onto `v0.44.0`.
 - Drop behavior already supplied upstream and squash fixup/generated commits.
 - Submit the generic batches listed in the commit audit.
@@ -323,7 +362,7 @@ rebases the same code.
 
 - Replace `.gitmodules`, the submodule pointer, and
   `scripts/headlamp-submodule.sh` with the verified source lock/resolver.
-- Build a pristine source archive and assemble AKS Desktop externally.
+- Build a pristine verified source tree and assemble AKS Desktop externally.
 - The exit test is a successful update to a newer upstream commit without an
   AKS patch applied inside the extracted tree.
 
