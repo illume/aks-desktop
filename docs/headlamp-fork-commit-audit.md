@@ -68,6 +68,38 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | `6f13c6288` EditorDialog zoom | `7e07f4180` DataField zoom | Different components and layout failures. |
 | `badc4713b` list-plugins execution | `144f95847` plugin script execution | Upstream Electron `main.ts` still uses a shell string for `list-plugins`. |
 
+## LogsViewer reassessment
+
+The downstream `LogsViewer` chain can be removed when rebasing onto Headlamp
+`v0.44.0`. It is not patch-identical to upstream, but its product-neutral use
+case now has a maintained semantic replacement:
+
+- upstream `LogsButton` aggregates a workload's pods and supports Deployment,
+  ReplicaSet, DaemonSet, StatefulSet, and Job;
+- the activity can select one pod or all pods, select a container, choose line
+  count, show previous logs, follow and reconnect, show timestamps, filter by
+  severity, search, clear, and download;
+- upstream exports `LogsButton`, `launchWorkloadLogs`, and
+  `LOGGABLE_WORKLOAD_KINDS` through the plugin library; and
+- the underlying `LogViewer` has no-dialog rendering, current theme support,
+  accessible action labels, and search-listener cleanup.
+
+The relevant upstream work is present in `v0.44.0`, including the
+[workload log API and cross-bundle support](https://github.com/kubernetes-sigs/headlamp/commit/019103c40b0a37f18db0c20b8340ccaa10678d16),
+[multi-pod rendering fix](https://github.com/kubernetes-sigs/headlamp/commit/aec7c6a4d8fe012cbf4fbab81024c8fac1c53264),
+[severity filtering](https://github.com/kubernetes-sigs/headlamp/commit/c5b06decf1833def7289252c732eb8de719c2f8e),
+[Job support](https://github.com/kubernetes-sigs/headlamp/commit/efe6526d744c587ddf8bd7bec87a7df1050cb180),
+and [DaemonSet integration](https://github.com/kubernetes-sigs/headlamp/commit/6e57d6155f4cfcee7a300d6757ac863129f1a658).
+
+AKS Desktop's `LogsTab` currently imports the downstream plural
+`LogsViewer` and renders it inline. Before dropping the fork commits, migrate
+that tab to the exported upstream `LogsButton` or `launchWorkloadLogs` activity
+and add a behavior test. This changes the presentation from an inline viewer to
+Headlamp's full Activity. If inline rendering remains a product requirement,
+request a supported upstream content/customization API instead of retaining a
+second core log implementation. The AI Assistant's response-log dialog is a
+different feature and is not part of this downstream chain.
+
 ## Commit ledger
 
 | # | Commit | Disposition / replacement | What to do |
@@ -101,7 +133,7 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | 27 | `5eb5cd53e` Build with AKS version | **CFG / IDENTITY** | Read the product version from the AKS release source. |
 | 28 | `d68693b04` Show AKS version in About | **API / PUBLIC** | Expose runtime product information/About contributions. |
 | 29 | `067bf68f3` Show AKS version in top bar | **FOLD / PUBLIC** | Consume the same product-information API as row 28. |
-| 30 | `024ec74a7` New LogsViewer | **UP** | Submit the complete LogsViewer chain as a cohesive upstream feature. |
+| 30 | `024ec74a7` New LogsViewer | **DROP** | Use the exported upstream `v0.44.0` workload-log activity; migrate the AKS `LogsTab` first. |
 | 31 | `7725d00f3` Verify bundled tools | **CFG / TOOLS** | Keep verification in the AKS assembly pipeline and validate every target. |
 | 32 | `ed960d0a3` Add external tools to macOS | **CFG / TOOLS** | Use per-platform resource mappings. |
 | 33 | `9a3ccb390` Remove unscoped external resource | **FOLD / TOOLS** | Keep only the final platform-scoped mapping. |
@@ -109,7 +141,7 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | 35 | `5e79994e5` Conditional project overview sections | **UP / PROJECT** | Submit `isEnabled` for overview sections; it is absent upstream. |
 | 36 | `e0f08105d` Suppress az confirmation | **FOLD / row 11** | Represent any product-approved scope in policy; do not hard-code AKS bypasses. |
 | 37 | `d484bcd0f` Disable release notes | **CFG / PUBLIC** | Set the public `releaseNotes` product flag. |
-| 38 | `0f537cf57` Add LogsViewer index | **FOLD / row 30** | Include it in the LogsViewer upstream PR. |
+| 38 | `0f537cf57` Add LogsViewer index | **DROP / row 30** | Upstream exports `LogsButton`, `launchWorkloadLogs`, and `LogViewer` through the plugin library. |
 | 39 | `6e70e0740` Add cached icons | **FOLD / IDENTITY** | Generate/copy all required icon variants during assembly. |
 | 40 | `a1d884296` Fix app builds in CI | **CFG / IDENTITY** | Move root-version and builder-path assumptions to the product build kit. |
 | 41 | `f45b3b90c` Fix package for macOS build | **FOLD / IDENTITY** | Fold the final settings into product builder configuration. |
@@ -143,7 +175,7 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | 69 | `013129c89` Fix GraphView CRD watch story | **UP** | Submit the remaining story behavior after rebasing the current CRD mocks. |
 | 70 | `dd6cf9ae4` Fix docs TypeScript errors | **UP** | Re-test current docs and submit the generic type fix if still reproducible. |
 | 71 | `5e3c5e26c` Fix axe tooltip region check | **UP** | Submit the generic e2e accessibility test fix. |
-| 72 | `2f54e5cde` Fix log-search e2e test | **FOLD / row 30** | Include with LogsViewer. |
+| 72 | `2f54e5cde` Fix log-search e2e test | **DROP / row 30** | Use upstream workload-log and `LogViewer` search coverage after the AKS migration. |
 | 73 | `53917bfee` Use AKS HTML title | **CFG / PUBLIC** | Populate the public title/product name during assembly or startup. |
 | 74 | `642809609` Fix Electron zoom menu | **UP** | Submit the generic desktop menu fix. |
 | 75 | `ee162d9af` Expand locales | **CHECK / LOCALE** | Upstream only still-missing generic locales; keep AKS strings in a supported overlay. |
@@ -160,8 +192,8 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | 86 | `46e6c031b` Make project tabs usable at zoom | **UP** | Submit the generic accessibility/layout fix. |
 | 87 | `2fd768195` Update project creation menu | **CHECK / PROJECT** | If generic UX, upstream it; if AKS workflow, implement through a project creation contribution. |
 | 88 | `c28257a3b` Fix original-name narration | **DROP** | Current upstream `f7c5f76f0` contains the complete fix; verify screen-reader behavior. |
-| 89 | `44e78118a` Fix severity narration | **FOLD / row 30** | Include the accessible LogsViewer control. |
-| 90 | `26d8e68de` Label log search buttons | **FOLD / row 30** | Include the accessible LogsViewer control. |
+| 89 | `44e78118a` Fix severity narration | **DROP / row 30** | Verify the upstream severity selector with AKS accessibility tests. |
+| 90 | `26d8e68de` Label log search buttons | **DROP / row 30** | Upstream actions have translated accessible descriptions; verify them after migration. |
 | 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **UP / PROJECT** | Extend the existing generic header-action API and published types. |
 | 92 | `10c313f02` Fix command/plugin IPC listener leaks | **UP / CMD** | Rebase on the new preload listener registry; retain command cleanup/error exits not upstream. |
 | 93 | `d9748fb0c` Improve appearance-control narration | **UP** | Submit as a follow-up to upstream `7c6a4ecf5`. |
@@ -180,7 +212,7 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | 106 | `fa1dcf6d1` Add runCmd plugin identification | **API / CMD** | Upstream the permissioned identity contract; remove AKS/AI package branches. |
 | 107 | `551275e71` Add AKS Arc cluster type | **AKS / CLUSTER** | Implement Arc as an AKS provider mode. |
 | 108 | `0aa41fb22` Fix runCmd test mocks | **FOLD / row 106** | Port relevant tests to the generic broker. |
-| 109 | `903360924` Expand LogsViewer workload types | **FOLD / row 30** | Include the type fix with LogsViewer. |
+| 109 | `903360924` Expand LogsViewer workload types | **DROP / row 30** | Upstream supports Deployment, ReplicaSet, DaemonSet, StatefulSet, and Job. |
 | 110 | `2babb4675` Suppress ESLint warnings | **FOLD** | Fix warnings in their destination PRs; do not carry a suppression commit. |
 | 111 | `a87a8909f` Update translations | **FOLD / LOCALE** | Regenerate upstream strings in their PRs and keep AKS strings in the overlay. |
 | 112 | `3c9d0b941` Adjust backend output verification | **CFG / IDENTITY** | Generate verification paths from product artifact metadata. |
@@ -192,7 +224,6 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 
 | Batch | Commits | Notes |
 | --- | --- | --- |
-| LogsViewer | `024ec74a7`, `0f537cf57`, `2f54e5cde`, `44e78118a`, `26d8e68de`, `903360924` | Feature, types, a11y, and e2e together. |
 | Command/desktop correctness | `72e169328`, `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small PRs may review better. |
 | Project extensions | `5e79994e5`, `22a5008a2` | Complete existing overview/header extension APIs. |
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |

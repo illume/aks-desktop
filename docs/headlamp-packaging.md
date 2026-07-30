@@ -171,6 +171,7 @@ Until packages exist, commit a small lock file instead of a Git link:
   "schemaVersion": 1,
   "headlampVersion": "0.44.0",
   "source": {
+    "kind": "git",
     "repository": "https://github.com/kubernetes-sigs/headlamp.git",
     "ref": "refs/tags/v0.44.0",
     "commit": "7e2f255cc256a16c39681ffea31fa16e11a11eaf",
@@ -192,6 +193,63 @@ therefore relies on reviewed lock-file changes and Git object verification;
 upstream signatures/provenance become mandatory for the target distribution.
 This is source consumption, not the final package API, but it removes submodule
 mechanics and the permanent fork.
+
+#### Releases, forks, and local checkouts
+
+The resolver should keep the build independent from where Headlamp comes from.
+These source choices serve different purposes:
+
+| Use | Source | Reproducibility rule |
+| --- | --- | --- |
+| Normal release | Canonical repository and a release tag | Pin and verify the commit and tree, as above. |
+| Temporary fork | Fork repository and branch, tag, or pull-request ref | Pin and verify the reviewed commit and tree; never build a floating ref. |
+| Published source asset | Manually attached release archive | Require an immutable URL, SHA-256, and preferably a signature/provenance. Do not use GitHub's generated source archive as the lock. |
+| Local development | Developer-only path override | Permit dirty files for iteration, print the commit and dirty state, and reject this mode in CI and release builds. |
+
+For example, testing a temporary fork changes only the Git identity in the
+checked-in lock:
+
+```json
+{
+  "schemaVersion": 1,
+  "headlampVersion": "0.44.0-aks.1",
+  "source": {
+    "kind": "git",
+    "repository": "https://github.com/example/headlamp.git",
+    "ref": "refs/heads/aks-experiment",
+    "commit": "<reviewed full commit SHA>",
+    "tree": "<reviewed Git tree SHA>"
+  }
+}
+```
+
+The branch documents where to look for updates; the commit and tree determine
+what is built. An update command may resolve a requested repository and ref, but
+it should write the new commit and tree for review rather than silently building
+the current branch tip.
+
+For active development, support this sibling layout without changing the
+checked-in lock:
+
+```text
+dev/
+├── headlamp/
+└── aks-desktop/
+```
+
+The resolver should accept an explicit, untracked local override such as
+`../headlamp`, validate that it is a Headlamp Git worktree, and expose it through
+the same build input used for locked sources. This lets a developer edit
+Headlamp and AKS Desktop together without copying changes into the submodule or
+publishing a fork first. The build must report the local HEAD and whether the
+worktree is dirty so test results can be reproduced later. Local mode is an
+intentional reproducibility escape hatch: release automation must disable it,
+and a local path must never be written to the shared lock.
+
+Released desktop installers remain unsuitable as build inputs because they
+cannot be recomposed with AKS plugins and host services. A released *source*
+version is supported either through its pinned Git tag/commit/tree or through a
+manually published, digest-verified source asset.
 
 Headlamp `v0.44.0` contains plugin SDK `0.14.0`, while the AKS plugin currently
 declares `^0.13.1`; the migration must align and test the AKS plugin rather than
@@ -311,8 +369,11 @@ Upstream should expose these generic, least-privilege host services:
    a supported locale overlay.
 
 These APIs turn useful differences into AKS configuration or plugin code.
-Generic correctness, accessibility, LogsViewer, table, theme, source-map, and
-backend fixes should be contributed upstream without AKS switches.
+Generic correctness, accessibility, table, theme, source-map, and backend fixes
+should be contributed upstream without AKS switches. Headlamp `v0.44.0` already
+supplies the downstream LogsViewer use case through its exported workload-log
+activity; the [commit audit](headlamp-fork-commit-audit.md#logsviewer-reassessment)
+describes the remaining AKS plugin migration.
 
 ## Alternatives
 
