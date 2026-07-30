@@ -370,10 +370,11 @@ Upstream should expose these generic, least-privilege host services:
 
 These APIs turn useful differences into AKS configuration or plugin code.
 Generic correctness, accessibility, table, theme, source-map, and backend fixes
-should be contributed upstream without AKS switches. Headlamp `v0.44.0` already
-supplies the downstream LogsViewer use case through its exported workload-log
-activity; the [commit audit](headlamp-fork-commit-audit.md#logsviewer-reassessment)
-describes the remaining AKS plugin migration.
+should be contributed upstream without AKS switches. Headlamp `v0.44.0` supplies
+comparable workload-log functionality through its exported Activity API, but
+not the downstream inline `LogsViewer` interface. The
+[commit audit](headlamp-fork-commit-audit.md#logsviewer-reassessment) describes
+the product decision and AKS plugin migration required before removing it.
 
 ## Alternatives
 
