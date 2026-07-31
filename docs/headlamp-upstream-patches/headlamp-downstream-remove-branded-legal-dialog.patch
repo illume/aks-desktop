@@ -1,18 +1,69 @@
-From 099bb0de603809a9149bcb0466770a251f2a2a34 Mon Sep 17 00:00:00 2001
+From ef3e6c7653a42a6bddb6fb7891e9ef5f06e3202e Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 18:46:37 +0000
-Subject: [PATCH] aksd: use manifest-declared legal documents
+Date: Fri, 31 Jul 2026 19:01:05 +0000
+Subject: [PATCH] aksd: migrate product terms to legal documents
 
 ---
- app/electron/main.ts                          |  34 +--
+ app/AKS_DESKTOP_TERMS.md                      |  15 ++
+ app/app-build-manifest.json                   |  17 ++
+ app/electron/main.ts                          |  36 +---
  app/electron/preload.ts                       |  10 +-
- app/package.json                              |  14 ++
+ app/package.json                              |   4 +
  frontend/src/components/App/VersionDialog.tsx | 145 ++-----------
  ...sionDialog.VersionDialog.stories.storyshot | 197 ++++--------------
- 5 files changed, 87 insertions(+), 313 deletions(-)
+ 7 files changed, 111 insertions(+), 313 deletions(-)
+ create mode 100644 app/AKS_DESKTOP_TERMS.md
 
+diff --git a/app/AKS_DESKTOP_TERMS.md b/app/AKS_DESKTOP_TERMS.md
+new file mode 100644
+index 000000000..4160e276c
+--- /dev/null
++++ b/app/AKS_DESKTOP_TERMS.md
+@@ -0,0 +1,15 @@
++# AKS Desktop terms
++
++As installed, this program contains software and functionality that is either
++open source or provided under the terms governing your use of Microsoft Azure.
++
++For all software found at <https://github.com/Azure/aks-desktop>, such software
++is provided under the terms of the Apache License, version 2.0.
++
++For any other software or functionality included in this install, it is
++governed by your agreement governing use of Azure that incorporates the
++Microsoft Product Terms (see in particular the section titled "Use of Software
++with the Online Service"). Additionally, the software is a preview version and
++subject to terms applicable to "Previews" as detailed in the "Universal License
++Terms for Online Services" section of the Product Terms and the Microsoft
++Products and Services Data Protection Addendum.
+diff --git a/app/app-build-manifest.json b/app/app-build-manifest.json
+index 06226af19..517609f4b 100644
+--- a/app/app-build-manifest.json
++++ b/app/app-build-manifest.json
+@@ -9,5 +9,22 @@
+       "archive": "https://github.com/kaito-project/headlamp-kaito/releases/download/0.0.7/headlamp-kaito-0.0.7.tar.gz",
+       "enabled": false
+     }
++  ],
++  "legalDocuments": [
++    {
++      "id": "terms",
++      "title": "AKS Desktop terms",
++      "file": "AKS_DESKTOP_TERMS.md"
++    },
++    {
++      "id": "license",
++      "title": "Apache License 2.0",
++      "file": "LICENSE"
++    },
++    {
++      "id": "notices",
++      "title": "Third-party notices",
++      "file": "NOTICE.md"
++    }
+   ]
+ }
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index 261643b26..3b11ed1bb 100644
+index 261643b26..7e3ce8cce 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
 @@ -44,6 +44,7 @@ import yargs from 'yargs';
@@ -23,15 +74,17 @@ index 261643b26..3b11ed1bb 100644
  import MCPClient from './mcp/MCPClient';
  import {
    addToPath,
-@@ -90,6 +91,7 @@ function getProtocolScheme(): string {
- }
+@@ -103,6 +104,9 @@ const ENABLE_MCP = process.env.HEADLAMP_MCP_ENABLE !== 'false';
+ dotenv.config({ path: path.join(process.resourcesPath, '.env') });
  
- const protocolScheme = getProtocolScheme();
-+const legalDocuments = loadLegalDocuments(path.join(__dirname, '..', 'package.json'));
+ const isDev = !!process.env.ELECTRON_DEV;
++const legalDocuments = loadLegalDocuments(
++  path.join(isDev ? path.resolve('./') : process.resourcesPath, 'app-build-manifest.json')
++);
+ let frontendPath = '';
  
- let isRunningScript = false;
- if (process.env.HEADLAMP_RUN_SCRIPT) {
-@@ -1912,32 +1914,12 @@ async function startElectron() {
+ if (isDev) {
+@@ -1912,32 +1916,12 @@ async function startElectron() {
        mainWindow?.webContents.send('backend-port', actualPort);
      });
  
@@ -92,30 +145,20 @@ index b1772aa28..ac2a63302 100644
    platform: process.platform,
  
 diff --git a/app/package.json b/app/package.json
-index f14835eee..27325c0f8 100644
+index f14835eee..e2df10483 100644
 --- a/app/package.json
 +++ b/app/package.json
-@@ -192,6 +192,20 @@
-     },
-     "extends": null
-   },
-+  "headlamp": {
-+    "legalDocuments": [
-+      {
-+        "id": "license",
-+        "title": "Apache License 2.0",
-+        "file": "LICENSE"
+@@ -183,6 +183,10 @@
+       {
+         "from": "../../NOTICE.md",
+         "to": "NOTICE.md"
 +      },
 +      {
-+        "id": "notices",
-+        "title": "Third-party notices",
-+        "file": "NOTICE.md"
-+      }
-+    ]
-+  },
-   "keywords": [],
-   "author": {
-     "name": "Microsoft"
++        "from": "./AKS_DESKTOP_TERMS.md",
++        "to": "AKS_DESKTOP_TERMS.md"
+       }
+     ],
+     "publish": {
 diff --git a/frontend/src/components/App/VersionDialog.tsx b/frontend/src/components/App/VersionDialog.tsx
 index 43b0c9743..db3667dd4 100644
 --- a/frontend/src/components/App/VersionDialog.tsx

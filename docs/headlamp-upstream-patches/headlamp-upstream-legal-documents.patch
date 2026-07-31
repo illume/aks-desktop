@@ -1,29 +1,52 @@
-From fd5575c9c8bde028cb630721a23535d92723df6c Mon Sep 17 00:00:00 2001
+From dfa70b76945e90760ab4e1cc9221095cf62982b0 Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 18:46:37 +0000
+Date: Fri, 31 Jul 2026 19:00:19 +0000
 Subject: [PATCH] app: expose manifest-declared legal documents
 
 ---
- app/electron/legal-documents.test.ts          |  84 +++++++++++++
- app/electron/legal-documents.ts               |  95 +++++++++++++++
- app/electron/main.ts                          |   9 ++
+ app/app-build-manifest.json                   |  12 ++
+ app/electron/legal-documents.test.ts          |  80 +++++++++++++
+ app/electron/legal-documents.ts               |  89 ++++++++++++++
+ app/electron/main.ts                          |  11 ++
  app/electron/preload.ts                       |   5 +
- app/package.json                              |  22 ++++
+ app/package.json                              |   8 ++
  .../components/App/LegalDocuments.test.tsx    |  48 ++++++++
  .../src/components/App/LegalDocuments.tsx     | 111 ++++++++++++++++++
  frontend/src/components/App/VersionDialog.tsx |  46 ++++++--
- 8 files changed, 408 insertions(+), 12 deletions(-)
+ 9 files changed, 398 insertions(+), 12 deletions(-)
  create mode 100644 app/electron/legal-documents.test.ts
  create mode 100644 app/electron/legal-documents.ts
  create mode 100644 frontend/src/components/App/LegalDocuments.test.tsx
  create mode 100644 frontend/src/components/App/LegalDocuments.tsx
 
+diff --git a/app/app-build-manifest.json b/app/app-build-manifest.json
+index b444c77c3..9d1da2eeb 100644
+--- a/app/app-build-manifest.json
++++ b/app/app-build-manifest.json
+@@ -13,5 +13,17 @@
+       "name": "prometheus",
+       "archive": "https://github.com/headlamp-k8s/plugins/releases/download/prometheus-0.9.1/prometheus-0.9.1.tar.gz"
+     }
++  ],
++  "legalDocuments": [
++    {
++      "id": "license",
++      "title": "License",
++      "file": "LICENSE"
++    },
++    {
++      "id": "notices",
++      "title": "Third-party notices",
++      "file": "NOTICE"
++    }
+   ]
+ }
 diff --git a/app/electron/legal-documents.test.ts b/app/electron/legal-documents.test.ts
 new file mode 100644
-index 000000000..70159d351
+index 000000000..6c1ed3a49
 --- /dev/null
 +++ b/app/electron/legal-documents.test.ts
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,80 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -50,9 +73,7 @@ index 000000000..70159d351
 +  it('accepts manifest-declared legal documents', () => {
 +    expect(
 +      getLegalDocuments({
-+        headlamp: {
-+          legalDocuments: [{ id: 'license', title: 'License', file: 'LICENSE' }],
-+        },
++        legalDocuments: [{ id: 'license', title: 'License', file: 'LICENSE' }],
 +      })
 +    ).toEqual([{ id: 'license', title: 'License', file: 'LICENSE' }]);
 +  });
@@ -63,7 +84,7 @@ index 000000000..70159d351
 +    { id: 'license', title: 'License', file: '../LICENSE' },
 +    { id: 'license', title: 'License', file: '..\\LICENSE' },
 +  ])('rejects invalid document configuration %#', document => {
-+    expect(getLegalDocuments({ headlamp: { legalDocuments: [document] } })).toEqual([]);
++    expect(getLegalDocuments({ legalDocuments: [document] })).toEqual([]);
 +  });
 +});
 +
@@ -83,9 +104,7 @@ index 000000000..70159d351
 +    fs.writeFileSync(
 +      packagePath,
 +      JSON.stringify({
-+        headlamp: {
-+          legalDocuments: [{ id: 'notice', title: 'Notices', file: 'NOTICE' }],
-+        },
++        legalDocuments: [{ id: 'notice', title: 'Notices', file: 'NOTICE' }],
 +      })
 +    );
 +
@@ -110,10 +129,10 @@ index 000000000..70159d351
 +});
 diff --git a/app/electron/legal-documents.ts b/app/electron/legal-documents.ts
 new file mode 100644
-index 000000000..199247578
+index 000000000..59518ce80
 --- /dev/null
 +++ b/app/electron/legal-documents.ts
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,89 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -146,13 +165,7 @@ index 000000000..199247578
 +    return [];
 +  }
 +
-+  const configuredDocuments = (
-+    packageConfig as {
-+      headlamp?: {
-+        legalDocuments?: unknown;
-+      };
-+    }
-+  ).headlamp?.legalDocuments;
++  const configuredDocuments = (packageConfig as { legalDocuments?: unknown }).legalDocuments;
 +
 +  if (!Array.isArray(configuredDocuments)) {
 +    return [];
@@ -210,7 +223,7 @@ index 000000000..199247578
 +  }
 +}
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index a2ac8e598..9f4ff60a2 100644
+index a2ac8e598..2007f63f1 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
 @@ -42,6 +42,7 @@ import yargs from 'yargs';
@@ -221,15 +234,17 @@ index a2ac8e598..9f4ff60a2 100644
  import MCPClient from './mcp/MCPClient';
  import { filterUserOwnedPids } from './ownedProcesses';
  import {
-@@ -192,6 +193,7 @@ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS
+@@ -192,6 +193,9 @@ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS
  
  const useExternalServer = process.env.EXTERNAL_SERVER || false;
  const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
-+const legalDocuments = loadLegalDocuments(path.join(__dirname, '..', 'package.json'));
++const legalDocuments = loadLegalDocuments(
++  path.join(isDev ? path.resolve('./') : process.resourcesPath, 'app-build-manifest.json')
++);
  
  // make it global so that it doesn't get garbage collected
  let mainWindow: BrowserWindow | null;
-@@ -1783,6 +1785,13 @@ function startElectron() {
+@@ -1783,6 +1787,13 @@ function startElectron() {
        mainWindow?.webContents.send('backend-port', actualPort);
      });
  
@@ -258,7 +273,7 @@ index 1edbdf963..2251ddec1 100644
 +    ipcRenderer.invoke('get-legal-document', id),
  });
 diff --git a/app/package.json b/app/package.json
-index 079e68373..9d2cd4b9a 100644
+index 079e68373..703de687a 100644
 --- a/app/package.json
 +++ b/app/package.json
 @@ -162,6 +162,14 @@
@@ -276,27 +291,6 @@ index 079e68373..9d2cd4b9a 100644
        }
      ],
      "publish": {
-@@ -171,6 +179,20 @@
-     },
-     "extends": null
-   },
-+  "headlamp": {
-+    "legalDocuments": [
-+      {
-+        "id": "license",
-+        "title": "License",
-+        "file": "LICENSE"
-+      },
-+      {
-+        "id": "notices",
-+        "title": "Third-party notices",
-+        "file": "NOTICE"
-+      }
-+    ]
-+  },
-   "keywords": [],
-   "author": {
-     "name": "Kinvolk",
 diff --git a/frontend/src/components/App/LegalDocuments.test.tsx b/frontend/src/components/App/LegalDocuments.test.tsx
 new file mode 100644
 index 000000000..5e7cc5fe8

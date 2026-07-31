@@ -1,23 +1,48 @@
-From 898698c8bd0cf0cd7990fbfe1ada3c93d613c00a Mon Sep 17 00:00:00 2001
+From 894ac37ca300e355d44c6ec384d8633d3fdcdefc Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 18:38:43 +0000
-Subject: [PATCH] aksd: restore configurable update checks
+Date: Fri, 31 Jul 2026 18:56:38 +0000
+Subject: [PATCH] aksd: configure update checks in product metadata
 
 ---
- app/electron/main.ts | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ app/app-build-manifest.json | 3 ++-
+ app/electron/main.ts        | 8 ++++++--
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
+diff --git a/app/app-build-manifest.json b/app/app-build-manifest.json
+index 06226af19..c4f1701e8 100644
+--- a/app/app-build-manifest.json
++++ b/app/app-build-manifest.json
+@@ -9,5 +9,6 @@
+       "archive": "https://github.com/kaito-project/headlamp-kaito/releases/download/0.0.7/headlamp-kaito-0.0.7.tar.gz",
+       "enabled": false
+     }
+-  ]
++  ],
++  "checkForUpdates": false
+ }
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index 261643b26..c11242c45 100644
+index 261643b26..19ffe4dc2 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
-@@ -193,8 +193,7 @@ let actualPort = defaultPort; // Will be updated when backend starts
+@@ -57,6 +57,7 @@ import {
+ import { addRunCmdConsent, removeRunCmdConsent, runScript, setupRunCmdHandlers } from './runCmd';
+ import { setupSecureStorageHandlers } from './secure-storage';
+ import { cleanupHeadlampTray, createHeadlampTray } from './tray';
++import { readUpdateCheckSetting } from './update-check';
+ import windowSize from './windowSize';
+ 
+ if (process.env.APPIMAGE) {
+@@ -193,8 +194,11 @@ let actualPort = defaultPort; // Will be updated when backend starts
  const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS) || 100); // Maximum number of ports to try
  
  const useExternalServer = process.env.EXTERNAL_SERVER || false;
 -// const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
 -const shouldCheckForUpdates = false;
-+const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
++const buildManifestPath = path.join(
++  isDev ? path.resolve('./') : process.resourcesPath,
++  'app-build-manifest.json'
++);
++const shouldCheckForUpdates = readUpdateCheckSetting(buildManifestPath);
  
  // make it global so that it doesn't get garbage collected
  let mainWindow: BrowserWindow | null;

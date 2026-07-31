@@ -1,18 +1,18 @@
-From 81749cab727dfd86687aef0e46fc03f3d0bc442c Mon Sep 17 00:00:00 2001
+From 554919d17198e6ae3b0ea94af9ef3515c0985aa8 Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 18:40:10 +0000
-Subject: [PATCH] app: derive the custom protocol from package metadata
+Date: Fri, 31 Jul 2026 18:58:03 +0000
+Subject: [PATCH] app: read the custom protocol from product metadata
 
 ---
- app/electron/main.ts          | 10 ++++++
- app/electron/protocol.test.ts | 62 +++++++++++++++++++++++++++++++++++
- app/electron/protocol.ts      | 57 ++++++++++++++++++++++++++++++++
- 3 files changed, 129 insertions(+)
+ app/electron/main.ts          | 14 ++++++++++
+ app/electron/protocol.test.ts | 52 +++++++++++++++++++++++++++++++++++
+ app/electron/protocol.ts      | 47 +++++++++++++++++++++++++++++++
+ 3 files changed, 113 insertions(+)
  create mode 100644 app/electron/protocol.test.ts
  create mode 100644 app/electron/protocol.ts
 
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index a2ac8e598..7631629da 100644
+index a2ac8e598..d92526681 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
 @@ -53,6 +53,7 @@ import {
@@ -23,15 +23,19 @@ index a2ac8e598..7631629da 100644
  import {
    addRunCmdConsent,
    environmentOverrides,
-@@ -192,6 +193,7 @@ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS
+@@ -192,6 +193,11 @@ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS
  
  const useExternalServer = process.env.EXTERNAL_SERVER || false;
  const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
-+const protocolScheme = readProtocolScheme(path.join(__dirname, '..', 'package.json'));
++const productManifestPath = path.join(
++  isDev ? path.resolve('./') : process.resourcesPath,
++  'app-build-manifest.json'
++);
++const protocolScheme = readProtocolScheme(productManifestPath);
  
  // make it global so that it doesn't get garbage collected
  let mainWindow: BrowserWindow | null;
-@@ -1717,6 +1719,13 @@ function startElectron() {
+@@ -1717,6 +1723,13 @@ function startElectron() {
          );
          return;
        }
@@ -45,7 +49,7 @@ index a2ac8e598..7631629da 100644
  
        const urlParam = urlObj.hostname;
        let baseUrl = startUrl;
-@@ -1737,6 +1746,7 @@ function startElectron() {
+@@ -1737,6 +1750,7 @@ function startElectron() {
        mainWindow?.webContents.send('appConfig', {
          checkForUpdates: shouldCheckForUpdates,
          appVersion,
@@ -55,10 +59,10 @@ index a2ac8e598..7631629da 100644
  
 diff --git a/app/electron/protocol.test.ts b/app/electron/protocol.test.ts
 new file mode 100644
-index 000000000..b15cd93d3
+index 000000000..e699b9e95
 --- /dev/null
 +++ b/app/electron/protocol.test.ts
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,52 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -79,34 +83,24 @@ index 000000000..b15cd93d3
 +import { getProtocolScheme, isProtocolUrl, readProtocolScheme } from './protocol';
 +
 +describe('getProtocolScheme', () => {
-+  it('returns the first configured package protocol', () => {
-+    expect(
-+      getProtocolScheme({
-+        build: {
-+          protocols: {
-+            schemes: ['My-Desktop', 'unused'],
-+          },
-+        },
-+      })
-+    ).toBe('my-desktop');
++  it('returns the protocol persisted in product metadata', () => {
++    expect(getProtocolScheme({ protocolScheme: 'My-Desktop' })).toBe('my-desktop');
 +  });
 +
-+  it.each([{}, null, { build: { protocols: { schemes: [] } } }])(
-+    'falls back for package configuration without a protocol',
-+    packageConfig => {
-+      expect(getProtocolScheme(packageConfig)).toBe('headlamp');
++  it.each([{}, null, { protocolScheme: 1 }])(
++    'falls back for product metadata without a protocol',
++    buildManifest => {
++      expect(getProtocolScheme(buildManifest)).toBe('headlamp');
 +    }
 +  );
 +
 +  it('falls back for an invalid protocol', () => {
-+    expect(getProtocolScheme({ build: { protocols: { schemes: ['not a scheme'] } } })).toBe(
-+      'headlamp'
-+    );
++    expect(getProtocolScheme({ protocolScheme: 'not a scheme' })).toBe('headlamp');
 +  });
 +});
 +
 +describe('readProtocolScheme', () => {
-+  it('falls back when package metadata cannot be read', () => {
++  it('falls back when product metadata cannot be read', () => {
 +    expect(readProtocolScheme('/path/that/does/not/exist')).toBe('headlamp');
 +  });
 +});
@@ -123,10 +117,10 @@ index 000000000..b15cd93d3
 +});
 diff --git a/app/electron/protocol.ts b/app/electron/protocol.ts
 new file mode 100644
-index 000000000..ac7d41249
+index 000000000..f9b178ece
 --- /dev/null
 +++ b/app/electron/protocol.ts
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,47 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -148,30 +142,20 @@ index 000000000..ac7d41249
 +const DEFAULT_PROTOCOL_SCHEME = 'headlamp';
 +const VALID_PROTOCOL_SCHEME = /^[a-z][a-z0-9+.-]*$/i;
 +
-+export function getProtocolScheme(packageConfig: unknown): string {
-+  if (typeof packageConfig !== 'object' || packageConfig === null) {
++export function getProtocolScheme(buildManifest: unknown): string {
++  if (typeof buildManifest !== 'object' || buildManifest === null) {
 +    return DEFAULT_PROTOCOL_SCHEME;
 +  }
 +
-+  const schemes = (
-+    packageConfig as {
-+      build?: {
-+        protocols?: {
-+          schemes?: unknown;
-+        };
-+      };
-+    }
-+  ).build?.protocols?.schemes;
-+  const scheme = Array.isArray(schemes) ? schemes[0] : undefined;
-+
++  const scheme = (buildManifest as { protocolScheme?: unknown }).protocolScheme;
 +  return typeof scheme === 'string' && VALID_PROTOCOL_SCHEME.test(scheme)
 +    ? scheme.toLowerCase()
 +    : DEFAULT_PROTOCOL_SCHEME;
 +}
 +
-+export function readProtocolScheme(packagePath: string): string {
++export function readProtocolScheme(manifestPath: string): string {
 +  try {
-+    return getProtocolScheme(JSON.parse(fs.readFileSync(packagePath, 'utf8')));
++    return getProtocolScheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
 +  } catch {
 +    return DEFAULT_PROTOCOL_SCHEME;
 +  }

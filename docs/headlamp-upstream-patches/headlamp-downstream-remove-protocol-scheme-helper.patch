@@ -1,14 +1,25 @@
-From 4c201b980ef595e2201eadd96a7f55057daf43d1 Mon Sep 17 00:00:00 2001
+From f6b96f1c41710c6453b9f94d4fece5b66602274f Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 18:40:10 +0000
-Subject: [PATCH] aksd: use the shared package protocol helper
+Date: Fri, 31 Jul 2026 18:58:03 +0000
+Subject: [PATCH] aksd: persist the product protocol scheme
 
 ---
- app/electron/main.ts | 21 ++-------------------
- 1 file changed, 2 insertions(+), 19 deletions(-)
+ app/app-build-manifest.json |  1 +
+ app/electron/main.ts        | 26 ++++++--------------------
+ 2 files changed, 7 insertions(+), 20 deletions(-)
 
+diff --git a/app/app-build-manifest.json b/app/app-build-manifest.json
+index 06226af19..7fb3cf6a8 100644
+--- a/app/app-build-manifest.json
++++ b/app/app-build-manifest.json
+@@ -1,4 +1,5 @@
+ {
++  "protocolScheme": "aks-desktop",
+   "plugins": [
+     {
+       "name": "prometheus",
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index 261643b26..55f621203 100644
+index 261643b26..32b354a65 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
 @@ -54,6 +54,7 @@ import {
@@ -19,7 +30,7 @@ index 261643b26..55f621203 100644
  import { addRunCmdConsent, removeRunCmdConsent, runScript, setupRunCmdHandlers } from './runCmd';
  import { setupSecureStorageHandlers } from './secure-storage';
  import { cleanupHeadlampTray, createHeadlampTray } from './tray';
-@@ -71,25 +72,7 @@ if (process.platform === 'linux') {
+@@ -71,26 +72,6 @@ if (process.platform === 'linux') {
    app.commandLine.appendSwitch('gtk-version', '3');
  }
  
@@ -42,10 +53,22 @@ index 261643b26..55f621203 100644
 -}
 -
 -const protocolScheme = getProtocolScheme();
-+const protocolScheme = readProtocolScheme(path.join(__dirname, '..', 'package.json'));
- 
+-
  let isRunningScript = false;
  if (process.env.HEADLAMP_RUN_SCRIPT) {
+   isRunningScript = true;
+@@ -103,6 +84,11 @@ const ENABLE_MCP = process.env.HEADLAMP_MCP_ENABLE !== 'false';
+ dotenv.config({ path: path.join(process.resourcesPath, '.env') });
+ 
+ const isDev = !!process.env.ELECTRON_DEV;
++const productManifestPath = path.join(
++  isDev ? path.resolve('./') : process.resourcesPath,
++  'app-build-manifest.json'
++);
++const protocolScheme = readProtocolScheme(productManifestPath);
+ let frontendPath = '';
+ 
+ if (isDev) {
 -- 
 2.54.0
 

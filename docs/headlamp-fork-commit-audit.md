@@ -756,28 +756,30 @@ restore the fork's historical Storyshot files to their pre-commit state.
   checks](headlamp-upstream-patches/headlamp-upstream-configurable-update-checks.patch).
 - **Downstream removal:** [drop the hard-coded update
   disable](headlamp-upstream-patches/headlamp-downstream-remove-disabled-update-checks.patch).
-- **AKS Desktop follow-up:** Set `HEADLAMP_CHECK_FOR_UPDATES=false` in product
-  launch configuration instead of changing Headlamp source. Other
-  distributions retain the enabled default.
-- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; both focused
-  update-configuration tests.
-- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+- **AKS Desktop follow-up:** Set `checkForUpdates` to `false` in the copied
+  `app-build-manifest.json` so packaged applications retain the product policy.
+  The `HEADLAMP_CHECK_FOR_UPDATES` environment variable remains a fallback for
+  distributions that do not declare a policy; update checks remain enabled by
+  default.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all four
+  focused update-configuration tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 145
   downstream app unit tests.
 
-### Derive the deep-link scheme from package metadata
+### Derive the deep-link scheme from the product manifest
 
 - **Fork source:** `86a4ce067`.
-- **Upstream patch:** [app: derive the custom protocol from package
+- **Upstream patch:** [app: derive the custom protocol from product
   metadata](headlamp-upstream-patches/headlamp-upstream-package-protocol-scheme.patch).
 - **Downstream removal:** [drop the duplicated package-protocol
   helper](headlamp-upstream-patches/headlamp-downstream-remove-protocol-scheme-helper.patch).
-- **AKS Desktop follow-up:** Keep `aks-desktop` in
-  `build.protocols.schemes`. The OAuth provider consumes the validated shared
-  value rather than maintaining a second package reader. The runtime also
-  rejects deep links for schemes not registered by the package.
+- **AKS Desktop follow-up:** Set `protocolScheme` to `aks-desktop` in the copied
+  `app-build-manifest.json`. The OAuth provider consumes the validated shared
+  value rather than maintaining a second manifest reader. The runtime also
+  rejects deep links that do not use the configured scheme.
 - **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all eight
   package-protocol and URL validation tests.
-- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 15 OAuth
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 23 OAuth
   and deep-link tests, with the upstream helper present.
 
 ### Expose product legal documents
@@ -787,15 +789,17 @@ restore the fork's historical Storyshot files to their pre-commit state.
   documents](headlamp-upstream-patches/headlamp-upstream-legal-documents.patch).
 - **Downstream removal:** [replace the branded legal
   dialog](headlamp-upstream-patches/headlamp-downstream-remove-branded-legal-dialog.patch).
-- **AKS Desktop follow-up:** Declare packaged legal files under
-  `headlamp.legalDocuments`. Keep product-specific legal prose in a packaged
-  document instead of the Headlamp About component. The main process exposes
-  only validated manifest entries and never accepts a renderer-provided path.
+- **AKS Desktop follow-up:** Declare packaged legal files in the
+  `legalDocuments` array of the copied `app-build-manifest.json`. Keep
+  product-specific legal prose in a packaged document instead of the Headlamp
+  About component. The main process exposes only validated manifest entries and
+  never accepts a renderer-provided path.
 - **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
   `npm run app:lint`; all seven manifest/file tests and the legal-document
   interaction test.
 - **Removal validation:** `npm run app:tsc`; `npm run frontend:tsc`;
-  `npm run app:lint`; the same seven manifest/file tests and interaction test.
+  `npm run app:lint`; the same seven manifest/file tests and interaction test;
+  package-resource mapping check for all three AKS Desktop legal documents.
 
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
@@ -902,7 +906,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 34 | `a013f5330` Add DMG license | **Upstream fix** | Use the [ready generic electron-builder patch](headlamp-upstream-patches/headlamp-upstream-dmg-license.patch). |
 | 35 | `5e79994e5` Conditional project overview sections | **Upstream fix / Project extensions** | Use the [ready conditional-section patch](headlamp-upstream-patches/headlamp-upstream-conditional-project-overview-sections.patch). |
 | 36 | `e0f08105d` Suppress az confirmation | **Fold into row 11** | Represent any product-approved scope in policy; do not hard-code AKS bypasses. |
-| 37 | `d484bcd0f` Disable release notes | **Upstream fix + AKS configuration / Public frontend configuration** | Use the [ready update-configuration patch](headlamp-upstream-patches/headlamp-upstream-configurable-update-checks.patch), then set `HEADLAMP_CHECK_FOR_UPDATES=false` in AKS launch configuration. |
+| 37 | `d484bcd0f` Disable release notes | **Upstream fix + AKS configuration / Public frontend configuration** | Use the [ready update-configuration patch](headlamp-upstream-patches/headlamp-upstream-configurable-update-checks.patch), then set `checkForUpdates` to `false` in the AKS build manifest. |
 | 38 | `0f537cf57` Add LogsViewer index | **Fold into row 30** | It becomes unnecessary only after the row 30 plugin migration. |
 | 39 | `6e70e0740` Add cached icons | **Fold / Product identity** | Generate/copy all required icon variants during assembly. |
 | 40 | `a1d884296` Fix app builds in CI | **AKS configuration / Product identity** | Move root-version and builder-path assumptions to the product build kit. |
@@ -916,7 +920,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 48 | `a2be5742f` Add disabled Kaito plugin | **AKS configuration / Plugin bundle** | Declare Kaito and its disabled default in the AKS manifest. |
 | 49 | `7a830d425` Add Microsoft headers | **Fold** | Keep notices only on AKS-owned files after extraction; do not patch upstream files. |
 | 50 | `5fae2b773` Separate managed projects by cluster | **Upstream extension + AKS plugin / Project extensions** | Add a generic project identity/key hook; implement AKS policy in the plugin. |
-| 51 | `4d854f759` Add Legal tab | **Upstream extension / Product identity** | Use the [ready legal-document patch](headlamp-upstream-patches/headlamp-upstream-legal-documents.patch), declare AKS legal files in package metadata, and keep AKS prose out of Headlamp source. |
+| 51 | `4d854f759` Add Legal tab | **Upstream extension / Product identity** | Use the [ready legal-document patch](headlamp-upstream-patches/headlamp-upstream-legal-documents.patch), declare AKS legal files in the copied build manifest, and keep AKS prose out of Headlamp source. |
 | 52 | `40364e142` Update 404 page | **AKS configuration / Public frontend configuration** | Supply branded graphic/text through public product configuration. |
 | 53 | `e697c0aaf` Override macOS version | **Fold / Product identity** | Use the single product version source from row 27. |
 | 54 | `578cd9cb6` Azure-RBAC-only kubelogin auth | **AKS plugin / Cluster registration** | Keep Azure auth selection in the AKS provider. |
@@ -961,7 +965,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Use the [ready follow-up patch](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch) after upstream `7c6a4ecf5`. |
 | 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Use the [ready accessibility patch](headlamp-upstream-patches/headlamp-upstream-debug-image-narration.patch). |
 | 95 | `0570f3a31` Style Material UI Alert in dark mode | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch). |
-| 96 | `86a4ce067` Derive deep-link scheme | **Upstream fix + AKS configuration / Product identity, OAuth sign-in** | Use the [ready package-protocol patch](headlamp-upstream-patches/headlamp-upstream-package-protocol-scheme.patch); keep `aks-desktop` in package metadata and consume the shared validated value. |
+| 96 | `86a4ce067` Derive deep-link scheme | **Upstream fix + AKS configuration / Product identity, OAuth sign-in** | Use the [ready package-protocol patch](headlamp-upstream-patches/headlamp-upstream-package-protocol-scheme.patch); keep `aks-desktop` in the copied build manifest and consume the shared validated value. |
 | 97 | `0badba5aa` Reflow map labels at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-resource-map-label-reflow.patch). |
 | 98 | `4b6197255` Keep resource grid visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-grid-zoom.patch) after row 86. |
 | 99 | `65c871c7c` Hide empty project details card | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-hide-empty-project-sections.patch). |
