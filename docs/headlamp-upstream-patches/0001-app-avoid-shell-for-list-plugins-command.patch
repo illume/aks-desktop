@@ -1,34 +1,22 @@
 From 4a48ffe22b5249aea476f30cc2e4dee1524315e5 Mon Sep 17 00:00:00 2001
 From: Oleksandr Dubenko <oldubenko@microsoft.com>
 Date: Fri, 31 Jul 2026 13:03:22 +0000
-Subject: [PATCH 1/2] app: avoid shell for list-plugins command
+Subject: [PATCH] app: avoid shell for list-plugins command
 
 ---
  app/electron/main.ts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/app/electron/main.ts b/app/electron/main.ts
-index a2ac8e5988a8ae9578111ae2d4ba0678679ceb45..2ffbbe631b085499c797fb5d0fcf54ef80092abd 100644
+index a2ac8e598..2ffbbe631 100644
 --- a/app/electron/main.ts
 +++ b/app/electron/main.ts
-@@ -14,7 +14,7 @@
-  * limitations under the License.
-  */
- 
+@@ -17,2 +17,2 @@
 -import { ChildProcessWithoutNullStreams, exec, execSync, spawn } from 'child_process';
 +import { ChildProcessWithoutNullStreams, exec, execFileSync, execSync, spawn } from 'child_process';
  import { randomBytes } from 'crypto';
- import dotenv from 'dotenv';
- import {
-@@ -132,7 +132,7 @@ const args = yargs(hideBin(process.argv))
-     () => {
-       try {
+@@ -134,3 +134,3 @@ const args = yargs(hideBin(process.argv))
          const backendPath = path.join(process.resourcesPath, 'headlamp-server');
 -        const stdout = execSync(`${backendPath} list-plugins`);
 +        const stdout = execFileSync(backendPath, ['list-plugins']);
          process.stdout.write(stdout);
-         process.exit(0);
-       } catch (error) {
--- 
-2.54.0
-

@@ -61,17 +61,52 @@ The replacement names used in the ledger mean:
 The following mailbox patches apply to upstream Headlamp commit
 `506465d78ca162f65e46c57fab7b014fd771d047`:
 
-| Fork source | Patch | AKS Desktop follow-up | Validation at the patch commit |
-| --- | --- | --- | --- |
-| `badc4713b` | [Run `list-plugins` without a shell](headlamp-upstream-patches/0001-app-avoid-shell-for-list-plugins-command.patch) | **None.** This changes only how Headlamp invokes its own server. The existing `list-plugins` command and output stay the same, so AKS Desktop automatically receives the path-handling fix when it updates Headlamp. | `npm run app:tsc`; `npm run app:lint`; all 139 app unit tests |
-| `12b579560` | [Allow a plugin theme to set secondary contrast text](headlamp-upstream-patches/0002-frontend-support-secondary-contrast-theme-color.patch) | **No immediate change.** `plugins/aks-desktop/src/utils/shared/theme.ts` currently sets `secondary: '#ecebe9'` and relies on Headlamp's black (`#000`) fallback, which the patch preserves. After AKS Desktop updates its plugin software development kit to a release containing this field, it may set `secondaryContrastText` in that file if a different color is required. | `npm run frontend:tsc`; `npm run frontend:lint`; all 22 tests in `frontend/src/lib/themes.test.ts` |
+The paired removal patches apply to the audited downstream tip
+`4d00ea845c8f4faf2c7fde887f6a4bf9da2000c6`. **Do not ship a removal patch by
+itself:** that would temporarily restore the old bug. During a rebase, prefer to
+drop the original fork commit after selecting an upstream base that contains
+the matching fix. Use the removal patch only when a normal cleanup commit is
+needed, and include the upstream fix in the same branch update.
 
-Each check was run immediately after its patch commit. The second patch also
-adds a regression test. Submit these as separate upstream pull requests; they
-do not contain AKS-specific behavior. Add the corresponding AKS Desktop
-configuration or plugin migration to this table for each future patch. When no
-product change is needed, state why the upstream behavior is transparent or
-backward-compatible rather than leaving the entry blank.
+### Run `list-plugins` without a shell
+
+- **Fork source:** `badc4713b`.
+- **Upstream patch:** [app: avoid shell for `list-plugins`
+  command](headlamp-upstream-patches/0001-app-avoid-shell-for-list-plugins-command.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/0003-headlamp-downstream-drop-list-plugins-fix.patch).
+- **AKS Desktop follow-up:** None. This changes only how Headlamp invokes its own
+  server. The command and output stay the same, so AKS Desktop automatically
+  receives the path-handling fix when it updates Headlamp.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 139 app
+  unit tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+  downstream app unit tests.
+
+### Allow a plugin theme to set secondary contrast text
+
+- **Fork source:** `12b579560`.
+- **Upstream patch:** [frontend: support a secondary contrast theme
+  color](headlamp-upstream-patches/0002-frontend-support-secondary-contrast-theme-color.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/0004-headlamp-downstream-drop-theme-contrast-fix.patch).
+- **AKS Desktop follow-up:** No immediate change.
+  `plugins/aks-desktop/src/utils/shared/theme.ts` currently sets
+  `secondary: '#ecebe9'` and relies on Headlamp's black (`#000`) fallback, which
+  the patch preserves. After AKS Desktop updates its plugin software development
+  kit to a release containing this field, it may set `secondaryContrastText` in
+  that file if a different color is required.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  22 tests in `frontend/src/lib/themes.test.ts`.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  20 downstream tests in `frontend/src/lib/themes.test.ts`.
+
+Each check was run immediately after its patch commit. The upstream theme patch
+also adds a regression test. Submit the upstream patches as separate pull
+requests; they do not contain AKS-specific behavior. For each future patch,
+record both the downstream removal and the corresponding AKS Desktop
+configuration or plugin migration. When no product change is needed, state why
+the upstream behavior is transparent or backward-compatible.
 
 ## Important look-alikes
 
