@@ -1,16 +1,16 @@
-From ad45941278ba33b958248aecef24f89cf23579d3 Mon Sep 17 00:00:00 2001
+From 0b66ce3b814c0d85aaccc4cd35578ee7aa0b3899 Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
 Date: Fri, 31 Jul 2026 18:07:25 +0000
 Subject: [PATCH] app: derive verification names from package metadata
 
 ---
- app/scripts/verify-build-linux.sh    | 26 +++++++++++++-------------
- app/scripts/verify-build-mac.sh      | 26 +++++++++++++-------------
- app/scripts/verify-build-windows.ps1 | 22 +++++++++++-----------
- 3 files changed, 37 insertions(+), 37 deletions(-)
+ app/scripts/verify-build-linux.sh    | 39 ++++++++++++++++++----------
+ app/scripts/verify-build-mac.sh      | 26 +++++++++----------
+ app/scripts/verify-build-windows.ps1 | 22 ++++++++--------
+ 3 files changed, 50 insertions(+), 37 deletions(-)
 
 diff --git a/app/scripts/verify-build-linux.sh b/app/scripts/verify-build-linux.sh
-index 195afcb96..d5a0984f0 100755
+index 195afcb96..aa8fa5c7d 100755
 --- a/app/scripts/verify-build-linux.sh
 +++ b/app/scripts/verify-build-linux.sh
 @@ -19,6 +19,7 @@ set -e
@@ -21,7 +21,7 @@ index 195afcb96..d5a0984f0 100755
  
  echo "=== Verifying Linux Build Artifacts ==="
  echo ""
-@@ -65,27 +66,26 @@ if [ ! -z "$TARBALL" ]; then
+@@ -65,27 +66,39 @@ if [ ! -z "$TARBALL" ]; then
      exit 1
    fi
    echo "Backend version: $VERSION_OUTPUT"
@@ -52,11 +52,24 @@ index 195afcb96..d5a0984f0 100755
      exit 1
    fi
 -  echo "Found Headlamp at: $HEADLAMP_EXEC"
++  HEADLAMP_EXEC=$(readlink -f "$HEADLAMP_EXEC")
++
++  find_electron_pids() {
++    local process
++    local executable
++    for process in /proc/[0-9]*; do
++      executable=$(readlink -f "$process/exe" 2>/dev/null || true)
++      if [ "$executable" = "$HEADLAMP_EXEC" ]; then
++        basename "$process"
++      fi
++    done
++  }
++
 +  echo "Found $APP_EXECUTABLE_NAME at: $HEADLAMP_EXEC"
    
    # Create unique temporary file for output
    OUTPUT_FILE=$(mktemp)
-@@ -116,9 +116,9 @@ if [ ! -z "$TARBALL" ]; then
+@@ -116,9 +129,9 @@ if [ ! -z "$TARBALL" ]; then
    # Step 4: Verify headlamp-server is cleaned up when app closes
    echo "=== Verifying Server Cleanup After App Close ==="
  
@@ -64,20 +77,20 @@ index 195afcb96..d5a0984f0 100755
 +  # Record existing backend and Electron PIDs to exclude them
    EXISTING_SERVER_PIDS=$(pgrep -f headlamp-server 2>/dev/null || true)
 -  EXISTING_HEADLAMP_PIDS=$(pgrep -x headlamp 2>/dev/null || true)
-+  EXISTING_HEADLAMP_PIDS=$(pgrep -x "$APP_EXECUTABLE_NAME" 2>/dev/null || true)
++  EXISTING_HEADLAMP_PIDS=$(find_electron_pids)
  
    # Start the app in the background (needs a virtual display on headless CI)
    if command -v xvfb-run &>/dev/null; then
-@@ -153,7 +153,7 @@ if [ ! -z "$TARBALL" ]; then
+@@ -153,7 +166,7 @@ if [ ! -z "$TARBALL" ]; then
      echo "⚠ headlamp-server did not start within 30 seconds, skipping cleanup test"
      # Kill the wrapper and any headlamp (Electron) processes we spawned
      kill -TERM "$WRAPPER_PID" 2>/dev/null || true
 -    ALL_HEADLAMP_PIDS=$(pgrep -x headlamp 2>/dev/null || true)
-+    ALL_HEADLAMP_PIDS=$(pgrep -x "$APP_EXECUTABLE_NAME" 2>/dev/null || true)
++    ALL_HEADLAMP_PIDS=$(find_electron_pids)
      for pid in $ALL_HEADLAMP_PIDS; do
        if [ -z "$EXISTING_HEADLAMP_PIDS" ] || ! echo "$EXISTING_HEADLAMP_PIDS" | grep -qw "$pid"; then
          kill -TERM "$pid" 2>/dev/null || true
-@@ -169,11 +169,11 @@ if [ ! -z "$TARBALL" ]; then
+@@ -169,11 +182,11 @@ if [ ! -z "$TARBALL" ]; then
        fi
      done
    else
@@ -87,7 +100,7 @@ index 195afcb96..d5a0984f0 100755
      # the Electron process directly so its quit handler fires.
      ELECTRON_PID=""
 -    ALL_HEADLAMP_PIDS=$(pgrep -x headlamp 2>/dev/null || true)
-+    ALL_HEADLAMP_PIDS=$(pgrep -x "$APP_EXECUTABLE_NAME" 2>/dev/null || true)
++    ALL_HEADLAMP_PIDS=$(find_electron_pids)
      for pid in $ALL_HEADLAMP_PIDS; do
        if [ -z "$EXISTING_HEADLAMP_PIDS" ] || ! echo "$EXISTING_HEADLAMP_PIDS" | grep -qw "$pid"; then
          ELECTRON_PID="$pid"
