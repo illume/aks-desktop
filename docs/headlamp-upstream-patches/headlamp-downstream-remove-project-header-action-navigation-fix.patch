@@ -1,0 +1,68 @@
+From c10d50704c45f86c1d3938fc96943492d5d8c84c Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 15:28:42 +0000
+Subject: [PATCH] aksd: drop upstreamed project header navigation
+
+---
+ frontend/src/components/project/ProjectDetails.tsx | 14 +++++---------
+ frontend/src/redux/projectsSlice.ts                |  5 +----
+ 2 files changed, 6 insertions(+), 13 deletions(-)
+
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index 320657ecb..2a2958c41 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -451,9 +451,6 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+     };
+   }, [customDeleteButton, project]);
+ 
+-  const [selectedTab, setSelectedTab] = useState<string>();
+-  const [selectedCategoryName, setSelectedCategoryName] = React.useState<string>();
+-
+   // Load custom header actions
+   useEffect(() => {
+     let isCurrent = true;
+@@ -480,11 +477,7 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+ 
+       if (isCurrent) {
+         const actions = enabledActions
+-          .map(action =>
+-            action ? (
+-              <action.component key={action.id} project={project} setSelectedTab={setSelectedTab} />
+-            ) : null
+-          )
++          .map(action => (action ? <action.component key={action.id} project={project} /> : null))
+           .filter(Boolean);
+         setHeaderActions(actions);
+       }
+@@ -495,7 +488,10 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+     return () => {
+       isCurrent = false;
+     };
+-  }, [registeredHeaderActions, project, setSelectedTab]);
++  }, [registeredHeaderActions, project]);
++
++  const [selectedTab, setSelectedTab] = useState<string>();
++  const [selectedCategoryName, setSelectedCategoryName] = React.useState<string>();
+ 
+   const { items, isLoading } = useProjectItems(project);
+ 
+diff --git a/frontend/src/redux/projectsSlice.ts b/frontend/src/redux/projectsSlice.ts
+index b1af23e9e..8fcbcf008 100644
+--- a/frontend/src/redux/projectsSlice.ts
++++ b/frontend/src/redux/projectsSlice.ts
+@@ -70,10 +70,7 @@ export interface ProjectDeleteButton {
+ 
+ export interface ProjectHeaderAction {
+   id: string;
+-  component: (props: {
+-    project: ProjectDefinition;
+-    setSelectedTab?: (tabId: string) => void;
+-  }) => ReactNode;
++  component: (props: { project: ProjectDefinition }) => ReactNode;
+   /** Function to check if this action should be displayed in the given project. If not provided the action will be enabled. */
+   isEnabled?: ({ project }: { project: ProjectDefinition }) => Promise<boolean>;
+ }
+-- 
+2.54.0
+

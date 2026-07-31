@@ -1,0 +1,80 @@
+From af9ab90d4b6d13ccc0a4881da648b87fa8a54a77 Mon Sep 17 00:00:00 2001
+From: gambtho <Thomas.Gamble@microsoft.com>
+Date: Wed, 11 Mar 2026 15:01:41 -0400
+Subject: [PATCH] frontend: let project header actions select tabs
+
+---
+ frontend/src/components/project/ProjectDetails.tsx | 12 ++++++++----
+ frontend/src/plugin/registry.tsx                   |  2 +-
+ frontend/src/redux/projectsSlice.ts                |  5 ++++-
+ 3 files changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index f177cf4a9..94a7412bd 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -410,6 +410,9 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+     };
+   }, [customDeleteButton, project]);
+ 
++  const [selectedTab, setSelectedTab] = useState<string>();
++  const [selectedCategoryName, setSelectedCategoryName] = React.useState<string>();
++
+   // Load custom header actions
+   useEffect(() => {
+     let isCurrent = true;
+@@ -436,7 +439,11 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+ 
+       if (isCurrent) {
+         const actions = enabledActions
+-          .map(action => (action ? <action.component key={action.id} project={project} /> : null))
++          .map(action =>
++            action ? (
++              <action.component key={action.id} project={project} setSelectedTab={setSelectedTab} />
++            ) : null
++          )
+           .filter(Boolean);
+         setHeaderActions(actions);
+       }
+@@ -449,9 +456,6 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+     };
+   }, [registeredHeaderActions, project]);
+ 
+-  const [selectedTab, setSelectedTab] = useState<string>();
+-  const [selectedCategoryName, setSelectedCategoryName] = React.useState<string>();
+-
+   const { items, isLoading } = useProjectItems(project);
+ 
+   const [allTabs, setAllTabs] = useState<Record<string, ProjectDetailsTab>>(DEFAULT_TABS);
+diff --git a/frontend/src/plugin/registry.tsx b/frontend/src/plugin/registry.tsx
+index b06f5a4b9..84c7eac46 100644
+--- a/frontend/src/plugin/registry.tsx
++++ b/frontend/src/plugin/registry.tsx
+@@ -1178,7 +1178,7 @@ export function registerProjectDeleteButton(projectDeleteButton: ProjectDeleteBu
+  *
+  * @param projectHeaderAction - The action configuration to register
+  * @param projectHeaderAction.id - Unique identifier for the action
+- * @param projectHeaderAction.component - React component to render as the action button
++ * @param projectHeaderAction.component - React component to render as the action button; receives an optional callback for selecting a project tab
+  * @param projectHeaderAction.isEnabled - Optional function to determine if action is displayed
+  *
+  * @example
+diff --git a/frontend/src/redux/projectsSlice.ts b/frontend/src/redux/projectsSlice.ts
+index a9ae50074..1009ca6e6 100644
+--- a/frontend/src/redux/projectsSlice.ts
++++ b/frontend/src/redux/projectsSlice.ts
+@@ -66,7 +66,10 @@ export interface ProjectDeleteButton {
+ 
+ export interface ProjectHeaderAction {
+   id: string;
+-  component: (props: { project: ProjectDefinition }) => ReactNode;
++  component: (props: {
++    project: ProjectDefinition;
++    setSelectedTab?: (tabId: string) => void;
++  }) => ReactNode;
+   /** Function to check if this action should be displayed in the given project. If not provided the action will be enabled. */
+   isEnabled?: ({ project }: { project: ProjectDefinition }) => Promise<boolean>;
+ }
+-- 
+2.54.0
+

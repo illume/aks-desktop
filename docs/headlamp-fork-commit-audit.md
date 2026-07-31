@@ -363,9 +363,101 @@ upstream fix in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   nine downstream `graphGrouping` tests.
 
+### Skip Unix shell lookup on Windows
+
+- **Fork source:** `ac7319372`.
+- **Upstream patch:** [app: skip Unix shell lookup on
+  Windows](headlamp-upstream-patches/headlamp-upstream-windows-shell-lookup.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-windows-shell-lookup-fix.patch).
+- **AKS Desktop follow-up:** None. On Windows, Headlamp uses the current process
+  environment and no longer probes Unix shell paths before returning it.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 139 app
+  unit tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+  downstream app unit tests.
+
+### Ignore tooltip portals in landmark accessibility checks
+
+- **Fork source:** `5e3c5e26c`.
+- **Upstream patch:** [end-to-end tests: exclude tooltips from landmark
+  checks](headlamp-upstream-patches/headlamp-upstream-tooltip-landmark-check.patch).
+- **Downstream removal:** [drop the duplicated fork test
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-tooltip-landmark-check-fix.patch).
+- **AKS Desktop follow-up:** None. The shared accessibility helper accepts an
+  explicit exclusion, and only the pods page excludes Material UI tooltip
+  portals that render outside landmark regions.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  direct lint and formatting checks for the changed end-to-end files; Playwright
+  discovered all four pod scenarios. Running those scenarios requires a live
+  Kubernetes test cluster.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  direct lint and formatting checks for the changed end-to-end file; Playwright
+  discovered both downstream pod scenarios.
+
+### List allowed namespaces without cluster-wide access
+
+- **Fork source:** `06f1208e6`.
+- **Upstream patch:** [frontend: fetch allowed namespaces
+  individually](headlamp-upstream-patches/headlamp-upstream-allowed-namespace-list.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-allowed-namespace-list-fix.patch).
+- **AKS Desktop follow-up:** None. Restricted AKS users automatically receive a
+  synthesized namespace list without requiring permission to list or watch all
+  namespaces.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  32 `useKubeObjectList` tests, including the new individual-fetch and
+  watch-suppression regression.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  19 downstream `useKubeObjectList` tests.
+
+### Allow bundled plugins to be disabled by default
+
+- **Fork source:** `2ce445ee1`.
+- **Upstream patch:** [app: support default-disabled bundled
+  plugins](headlamp-upstream-patches/headlamp-upstream-default-disabled-plugins.patch).
+- **Downstream removal:** [drop the duplicated fork
+  support](headlamp-upstream-patches/headlamp-downstream-remove-default-disabled-plugins-fix.patch).
+- **AKS Desktop follow-up:** Set `enabledByDefault: false` on the relevant entry
+  in the external AKS plugin-bundle manifest and preserve that field when
+  generating Headlamp's build manifest. Existing user choices continue to take
+  precedence after first discovery.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run app:tsc`;
+  `npm run frontend:lint`; all six `updateSettingsPackages` tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run app:tsc`;
+  `npm run frontend:lint`; all four downstream `updateSettingsPackages` tests.
+
+### Support conditional project overview sections
+
+- **Fork source:** `5e79994e5`.
+- **Upstream patch:** [frontend: support conditional project overview
+  sections](headlamp-upstream-patches/headlamp-upstream-conditional-project-overview-sections.patch).
+- **Downstream removal:** [drop the duplicated fork
+  extension](headlamp-upstream-patches/headlamp-downstream-remove-conditional-project-overview-sections-fix.patch).
+- **AKS Desktop follow-up:** None. AKS project overview contributions may use
+  the product-neutral optional `isEnabled` predicate after Headlamp is updated.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  Project Details Storybook test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  downstream Project Details Storybook test.
+
+### Let project header actions select a tab
+
+- **Fork source:** `22a5008a2`.
+- **Upstream patch:** [frontend: pass tab selection to project header
+  actions](headlamp-upstream-patches/headlamp-upstream-project-header-action-navigation.patch).
+- **Downstream removal:** [drop the duplicated fork
+  extension](headlamp-upstream-patches/headlamp-downstream-remove-project-header-action-navigation-fix.patch).
+- **AKS Desktop follow-up:** None. Project header actions receive an optional
+  product-neutral callback and can navigate to a registered project tab.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  Project Details Storybook test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  downstream Project Details Storybook test.
+
 Each check was run immediately after its patch commit. The upstream theme,
-resource-view, table, narration, Resource Map, plugin, and static-serving
-patches add or update focused regression coverage. Submit the
+resource-view, table, narration, Resource Map, namespace, plugin, and
+static-serving patches add or update focused regression coverage. Submit the
 upstream patches as separate pull requests; they do not contain AKS-specific
 behavior. For each future patch, record both the downstream removal and the
 corresponding AKS Desktop configuration or plugin migration. When no product
@@ -448,8 +540,8 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 17 | `c79db3039` Remove kubelogin permission | **Fold into row 13** | Keep only the final least-privilege scope set. |
 | 18 | `3d7ddb3a6` Update branded snapshot | **Fold / Product identity** | Regenerate product tests from the external branding config. |
 | 19 | `1d1f03e58` Programmatic AKS registration | **Upstream extension + AKS plugin / Cluster registration** | Upstream a provider contract; move the implementation to the AKS provider. |
-| 20 | `72e169328` Windows quoting fix | **Upstream fix / Command execution** | Rebase as platform-safe argument handling with Windows tests. |
-| 21 | `ac7319372` Avoid shell except on Windows | **Upstream fix / Command execution** | Upstream a no-shell default and use a shell only where platform behavior requires it. |
+| 20 | `72e169328` Windows quoting fix | **Remove / Command execution** | Upstream `v0.44.0` already passes the executable directly to `spawn` with `shell: false`; drop this duplicate after command tests. |
+| 21 | `ac7319372` Avoid shell except on Windows | **Upstream fix / Command execution** | Use the [ready Windows environment patch](headlamp-upstream-patches/headlamp-upstream-windows-shell-lookup.patch). |
 | 22 | `d125e6505` Azure CLI path through env | **Upstream extension / Command execution, external tools** | Resolve a declared tool ID to a verified path instead of a mutable AKS-only env variable. |
 | 23 | `69e20c5dd` Exclude catalog plugins | **AKS configuration / Plugin bundle** | List product-disabled built-ins in the AKS manifest. |
 | 24 | `65e207537` Remove Artifact Hub proxy config | **AKS configuration / Plugin bundle** | Put plugin source/proxy policy in the AKS manifest. |
@@ -463,7 +555,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 32 | `ed960d0a3` Add external tools to macOS | **AKS configuration / External tools** | Use per-platform resource mappings. |
 | 33 | `9a3ccb390` Remove unscoped external resource | **Fold / External tools** | Keep only the final platform-scoped mapping. |
 | 34 | `a013f5330` Add DMG license | **Upstream fix** | Use the [ready generic electron-builder patch](headlamp-upstream-patches/headlamp-upstream-dmg-license.patch). |
-| 35 | `5e79994e5` Conditional project overview sections | **Upstream fix / Project extensions** | Submit `isEnabled` for overview sections; it is absent upstream. |
+| 35 | `5e79994e5` Conditional project overview sections | **Upstream fix / Project extensions** | Use the [ready conditional-section patch](headlamp-upstream-patches/headlamp-upstream-conditional-project-overview-sections.patch). |
 | 36 | `e0f08105d` Suppress az confirmation | **Fold into row 11** | Represent any product-approved scope in policy; do not hard-code AKS bypasses. |
 | 37 | `d484bcd0f` Disable release notes | **AKS configuration / Public frontend configuration** | Set the public `releaseNotes` product flag. |
 | 38 | `0f537cf57` Add LogsViewer index | **Fold into row 30** | It becomes unnecessary only after the row 30 plugin migration. |
@@ -475,7 +567,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 44 | `c01009765` Update icons | **Fold into row 3** | Keep only the current AKS icon set. |
 | 45 | `ceea7720d` Update Azure logo | **AKS configuration / Product identity, public frontend configuration** | Supply product logo assets without editing Headlamp source. |
 | 46 | `bd39620b1` Reload after cluster deletion | **Needs decision / Upstream fix** | Reproduce the stale state, then upstream a targeted reset or justify the full reload. |
-| 47 | `2ce445ee1` Default-disabled plugins | **Upstream fix / Plugin bundle** | Upstream manifest support; select disabled plugins in AKS configuration. |
+| 47 | `2ce445ee1` Default-disabled plugins | **Upstream fix / Plugin bundle** | Use the [ready plugin-default patch](headlamp-upstream-patches/headlamp-upstream-default-disabled-plugins.patch); select disabled plugins in AKS configuration. |
 | 48 | `a2be5742f` Add disabled Kaito plugin | **AKS configuration / Plugin bundle** | Declare Kaito and its disabled default in the AKS manifest. |
 | 49 | `7a830d425` Add Microsoft headers | **Fold** | Keep notices only on AKS-owned files after extraction; do not patch upstream files. |
 | 50 | `5fae2b773` Separate managed projects by cluster | **Upstream extension + AKS plugin / Project extensions** | Add a generic project identity/key hook; implement AKS policy in the plugin. |
@@ -487,7 +579,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 56 | `5504295b8` Comment default consent | **Fold into row 11** | Document the generic policy instead of retaining a code-only commit. |
 | 57 | `c5a969eab` Open ViewButton activity on right | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-view-button-split-right.patch). |
 | 58 | `00320948b` Stop retries for sub-500 responses | **Needs decision / Upstream fix** | Decide whether 408/429 should retry, then submit only the agreed generic policy with status tests. |
-| 59 | `06f1208e6` Handle allowed namespaces in list queries | **Upstream fix** | Submit the generic namespace-query behavior with tests. |
+| 59 | `06f1208e6` Handle allowed namespaces in list queries | **Upstream fix** | Use the [ready namespace-query patch](headlamp-upstream-patches/headlamp-upstream-allowed-namespace-list.patch). |
 | 60 | `edcdb2ba4` Correct plugin source-map offset | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-plugin-source-map-offset.patch). |
 | 61 | `a73b4302a` Move `getAllowedNamespaces` | **Fold into row 59** | Move only if needed by the final namespace design; the export already exists upstream. |
 | 62 | `c9ec6c99c` Update branded error snapshots | **Fold into row 55** | Regenerate product-level tests. |
@@ -499,7 +591,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 68 | `d709d2ddf` Add base Kubernetes MSW handlers | **Upstream fix** | Rebase handlers onto the shared API base and submit with stories. |
 | 69 | `013129c89` Fix GraphView CRD watch story | **Upstream fix** | Use the [ready rebased story patch](headlamp-upstream-patches/headlamp-upstream-graphview-crd-watch.patch). |
 | 70 | `dd6cf9ae4` Fix docs TypeScript errors | **Remove** | The current upstream documentation build passes, and plugin locale metadata now has the dedicated `PluginPackageInfo` type. |
-| 71 | `5e3c5e26c` Fix axe tooltip region check | **Upstream fix** | Submit the generic end-to-end accessibility test fix. |
+| 71 | `5e3c5e26c` Fix tooltip landmark check | **Upstream fix** | Use the [ready end-to-end accessibility patch](headlamp-upstream-patches/headlamp-upstream-tooltip-landmark-check.patch). |
 | 72 | `2f54e5cde` Fix log-search e2e test | **Fold into row 30** | Replace it with upstream workload-log and `LogViewer` coverage after migration. |
 | 73 | `53917bfee` Use AKS HTML title | **AKS configuration / Public frontend configuration** | Populate the public title/product name during assembly or startup. |
 | 74 | `642809609` Fix Electron zoom menu | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-electron-zoom-menu-actions.patch). |
@@ -519,7 +611,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 88 | `c28257a3b` Fix original-name narration | **Remove** | Current upstream `f7c5f76f0` contains the complete fix; verify screen-reader behavior. |
 | 89 | `44e78118a` Fix severity narration | **Needs decision / row 30** | Verify upstream's severity selector narration; submit a focused fix if the gap remains. |
 | 90 | `26d8e68de` Label log search buttons | **Remove after row 30** | Upstream actions have translated accessible descriptions; verify them after migration. |
-| 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **Upstream fix / Project extensions** | Extend the existing generic header-action interface and published types. |
+| 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **Upstream fix / Project extensions** | Use the [ready project-header navigation patch](headlamp-upstream-patches/headlamp-upstream-project-header-action-navigation.patch). |
 | 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Rebase on the new preload listener registry; retain command cleanup/error exits not upstream. |
 | 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Use the [ready follow-up patch](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch) after upstream `7c6a4ecf5`. |
 | 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Use the [ready accessibility patch](headlamp-upstream-patches/headlamp-upstream-debug-image-narration.patch). |
@@ -549,7 +641,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 
 | Batch | Commits | Notes |
 | --- | --- | --- |
-| Command/desktop correctness | `72e169328`, `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small PRs may review better. |
+| Command/desktop correctness | `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small pull requests may review better. Row 20 is already supplied upstream. |
 | Project extensions | `5e79994e5`, `22a5008a2` | Complete existing overview/header extension APIs. |
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
 | Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Rebase together to resolve shared Table/mock changes, then split reviewable PRs. |

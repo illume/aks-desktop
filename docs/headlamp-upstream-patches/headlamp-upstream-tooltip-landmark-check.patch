@@ -1,0 +1,74 @@
+From de1189e615279f8721ed896fb01f376a1e74bc8c Mon Sep 17 00:00:00 2001
+From: Evangelos Skopelitis <eskopelitis@microsoft.com>
+Date: Wed, 18 Feb 2026 09:37:38 -0500
+Subject: [PATCH] e2e: exclude tooltips from landmark checks
+
+---
+ e2e-tests/tests/a11yHelper.ts | 29 +++++++++++++++++++++--------
+ e2e-tests/tests/podsPage.ts   |  3 ++-
+ 2 files changed, 23 insertions(+), 9 deletions(-)
+
+diff --git a/e2e-tests/tests/a11yHelper.ts b/e2e-tests/tests/a11yHelper.ts
+index 449cb715d..c3dcf1184 100644
+--- a/e2e-tests/tests/a11yHelper.ts
++++ b/e2e-tests/tests/a11yHelper.ts
+@@ -17,14 +17,27 @@
+ import { AxeBuilder } from '@axe-core/playwright';
+ import type { Page } from '@playwright/test';
+ 
+-export async function runA11yScan(page: Page, expectFn: typeof import('@playwright/test').expect) {
+-  const axeBuilder = new AxeBuilder({ page });
+-  const accessibilityResults = await axeBuilder.analyze();
++export async function runA11yScan(
++  page: Page,
++  expectFn: typeof import('@playwright/test').expect,
++  regionExclusions: string[] = []
++) {
++  type AxeViolations = Awaited<ReturnType<AxeBuilder['analyze']>>['violations'];
++  const seriousViolations = (violations: AxeViolations) =>
++    violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+ 
+-  // Filter for critical and serious violations only for improved test stability
+-  const violations = accessibilityResults.violations.filter(
+-    v => v.impact === 'critical' || v.impact === 'serious'
+-  );
++  let violations: AxeViolations;
++  if (regionExclusions.length === 0) {
++    violations = seriousViolations((await new AxeBuilder({ page }).analyze()).violations);
++  } else {
++    const nonRegionResults = await new AxeBuilder({ page }).disableRules(['region']).analyze();
++    const regionBuilder = regionExclusions.reduce(
++      (builder, selector) => builder.exclude(selector),
++      new AxeBuilder({ page }).withRules(['region'])
++    );
++    const regionResults = await regionBuilder.analyze();
++    violations = [...seriousViolations(nonRegionResults.violations), ...regionResults.violations];
++  }
+ 
+   const violationSummary = violations
+     .map(
+@@ -36,6 +49,6 @@ export async function runA11yScan(page: Page, expectFn: typeof import('@playwrig
+ 
+   expectFn(
+     violations,
+-    `Found ${violations.length} critical/serious accessibility violations:\n\n${violationSummary}`
++    `Found ${violations.length} accessibility violations:\n\n${violationSummary}`
+   ).toEqual([]);
+ }
+diff --git a/e2e-tests/tests/podsPage.ts b/e2e-tests/tests/podsPage.ts
+index 163f5f715..046baae15 100644
+--- a/e2e-tests/tests/podsPage.ts
++++ b/e2e-tests/tests/podsPage.ts
+@@ -21,7 +21,8 @@ export class podsPage {
+   constructor(private page: Page) {}
+ 
+   async a11y() {
+-    await runA11yScan(this.page, expect);
++    // MUI tooltips render outside landmark regions, so exclude them from the region rule.
++    await runA11yScan(this.page, expect, ['[role="tooltip"]']);
+   }
+ 
+   async navigateToPods() {
+-- 
+2.54.0
+
