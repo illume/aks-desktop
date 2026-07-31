@@ -4,6 +4,27 @@
 > considered here. Proposed package names and manifests in this document do not
 > exist yet.
 
+## Terminology
+
+| Term | Meaning |
+| --- | --- |
+| AKS | Azure Kubernetes Service. AKS Desktop is the product discussed here. |
+| API | Application programming interface: a supported contract between components. |
+| CI | Continuous integration: automated build and test jobs. |
+| CLI | Command-line interface. |
+| CRD | Kubernetes custom resource definition. |
+| DMG | A macOS disk-image installer. |
+| IPC | Inter-process communication, used between Electron processes. |
+| MSW | Mock Service Worker, the request-mocking library used by frontend tests and stories. |
+| MUI | Material UI, the frontend component library. |
+| OAuth | Open Authorization, the delegated sign-in protocol used for GitHub authentication. |
+| OCI | Open Container Initiative; here it refers to container image formats and metadata. |
+| RBAC | Role-based access control. |
+| SBOM | Software bill of materials: an inventory of components in a build artifact. |
+| SDK | Software development kit. |
+| SHA-256 | Secure Hash Algorithm 256-bit digest, used here to verify downloaded files. |
+| UX | User experience. |
+
 ## Recommendation
 
 Do not replace the submodule with an official Headlamp installer. Installers are

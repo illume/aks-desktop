@@ -8,6 +8,8 @@ This document expands the
 [Headlamp packaging strategy](headlamp-packaging.md) with concrete designs for
 a literal all-platform npm package, an AKS-derived container image, bundling
 several plugins, and moving reusable build logic upstream.
+See the strategy's [terminology table](headlamp-packaging.md#terminology) for
+standard technical abbreviations.
 
 ## A single all-platform npm package
 
