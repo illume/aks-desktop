@@ -654,16 +654,62 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all three
   downstream job details tests.
 
+### Make the Table column selector keyboard accessible
+
+- **Fork source:** `a6e5b073a`.
+- **Upstream patch:** [frontend: use accessible menu items for column
+  visibility](headlamp-upstream-patches/headlamp-upstream-accessible-column-selector.patch).
+- **Downstream removal:** [drop the duplicated fork
+  implementation](headlamp-upstream-patches/headlamp-downstream-remove-accessible-column-selector-fix.patch).
+- **AKS Desktop follow-up:** None. Tables contributed by AKS plugins use
+  Headlamp's shared toolbar and receive the keyboard-accessible menu
+  automatically.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  focused column-selector interaction test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  14 downstream Table Storybook tests.
+
+### Refresh frontend state after deleting a cluster
+
+- **Fork source:** `bd39620b1`.
+- **Upstream patch:** [frontend: reload after successful cluster
+  deletion](headlamp-upstream-patches/headlamp-upstream-cluster-deletion-reload.patch).
+- **Downstream removal:** [drop the duplicated fork
+  reload](headlamp-upstream-patches/headlamp-downstream-remove-cluster-deletion-reload-fix.patch).
+- **AKS Desktop follow-up:** None. The shared cluster menu reloads only after a
+  successful deletion, clearing cluster-scoped frontend state without hiding a
+  deletion error.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  11 ClusterTable and cluster-menu tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  eight downstream ClusterTable and cluster-menu tests.
+
+### Configure the backend application name
+
+- **Fork source:** `148b45e3c`.
+- **Upstream patch:** [backend: add a runtime application-name
+  setting](headlamp-upstream-patches/headlamp-upstream-backend-app-name.patch).
+- **Downstream removal:** [drop the hard-coded AKS backend
+  name](headlamp-upstream-patches/headlamp-downstream-remove-backend-app-name-fix.patch).
+- **AKS Desktop follow-up:** Pass `--app-name` from product configuration when
+  starting the backend. The default remains `Headlamp`; the configured name is
+  used for version output and Kubernetes `User-Agent` headers.
+- **Upstream validation:** backend lint with Go 1.26.5; all tests in the
+  backend configuration, kubeconfig, and command packages. This Go-only patch
+  has no TypeScript check.
+- **Removal validation:** backend lint with Go 1.26.3; all tests in the
+  downstream kubeconfig package.
+
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
 testing a removal alone would temporarily restore a known bug. The upstream
 theme, resource-view, table, narration, Resource Map, namespace, query, command,
-plugin, packaging, story, and static-serving patches add or update focused
-regression coverage. Submit the upstream patches as separate pull requests;
-they do not contain AKS-specific behavior. For each future patch, record both
-the downstream removal and the corresponding AKS Desktop configuration or
-plugin migration. When no product change is needed, state why
-the upstream behavior is transparent or backward-compatible.
+plugin, packaging, story, cluster, backend-identity, and static-serving patches
+add or update focused regression coverage. Submit the upstream patches as
+separate pull requests; they do not contain AKS-specific behavior. For each
+future patch, record both the downstream removal and the corresponding AKS
+Desktop configuration or plugin migration. When no product change is needed,
+state why the upstream behavior is transparent or backward-compatible.
 
 ## Important look-alikes
 
@@ -677,7 +723,7 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | `c5a969eab` ViewButton | `8bb0d3500` Activity refactor | Upstream opens an Activity window; downstream's `split-right` behavior remains. |
 | `5f7ade8ca` Table props | `a90f608b1`/`b7b29804e` selection changes | Upstream still renders the top toolbar and range handler unconditionally. |
 | `d709d2ddf` base mocks | `fa559202e` shared API base | Centralizing the URL did not add these Kubernetes handlers; four ordered handler patches are ready. |
-| `a6e5b073a` keyboard column menu | `61aef6b61` visibility persistence | Persistence does not supply the accessible menu implementation. |
+| `a6e5b073a` keyboard column menu | `61aef6b61` visibility persistence | Persistence does not supply the [ready accessible menu patch](headlamp-upstream-patches/headlamp-upstream-accessible-column-selector.patch). |
 | `adbf7f039` static-plugin cache | `f1b8c850d` plugin cache | The old fix covers `/plugins/`, not the separate `/static-plugins/` route. |
 | `d9748fb0c` appearance narration | `7c6a4ecf5` initial narration fix | Downstream is a follow-up that adds the field labels to the accessible name. |
 | `6f13c6288` EditorDialog zoom | `7e07f4180` DataField zoom | Different components and layout failures. |
@@ -767,7 +813,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 43 | `645f38d2e` Build arm64 only | **AKS configuration / Product identity** | Declare targets; confirm whether the temporary x64 exclusion is still wanted. |
 | 44 | `c01009765` Update icons | **Fold into row 3** | Keep only the current AKS icon set. |
 | 45 | `ceea7720d` Update Azure logo | **AKS configuration / Product identity, public frontend configuration** | Supply product logo assets without editing Headlamp source. |
-| 46 | `bd39620b1` Reload after cluster deletion | **Needs decision / Upstream fix** | Reproduce the stale state, then upstream a targeted reset or justify the full reload. |
+| 46 | `bd39620b1` Reload after cluster deletion | **Upstream fix** | Use the [ready success-only reload patch](headlamp-upstream-patches/headlamp-upstream-cluster-deletion-reload.patch). |
 | 47 | `2ce445ee1` Default-disabled plugins | **Upstream fix / Plugin bundle** | Use the [ready plugin-default patch](headlamp-upstream-patches/headlamp-upstream-default-disabled-plugins.patch); select disabled plugins in AKS configuration. |
 | 48 | `a2be5742f` Add disabled Kaito plugin | **AKS configuration / Plugin bundle** | Declare Kaito and its disabled default in the AKS manifest. |
 | 49 | `7a830d425` Add Microsoft headers | **Fold** | Keep notices only on AKS-owned files after extraction; do not patch upstream files. |
@@ -805,7 +851,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 81 | `a20c30755` Stabilize EmptyContent timing | **Remove** | Its effect is absent from the final fork; there is no remaining patch to upstream. |
 | 82 | `0fa88cf56` Respect `KUBECONFIG` when writing | **AKS plugin / Cluster registration** | Keep in the AKS provider; require the generic provider contract to pass the target path. |
 | 83 | `b8f52f6f4` Remove Azure credential format | **AKS plugin / Cluster registration** | Keep this Azure/kubelogin policy in the AKS provider. |
-| 84 | `a6e5b073a` Accessible Table column selector | **Upstream fix** | Submit the keyboard/menu implementation; persistence work does not replace it. |
+| 84 | `a6e5b073a` Accessible Table column selector | **Upstream fix** | Use the [ready keyboard-accessible menu patch](headlamp-upstream-patches/headlamp-upstream-accessible-column-selector.patch); persistence work does not replace it. |
 | 85 | `adbf7f039` Disable cache for static plugins | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-static-plugin-no-cache.patch). |
 | 86 | `46e6c031b` Make project tabs usable at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-tabs-zoom.patch). |
 | 87 | `2fd768195` Update project creation menu | **Needs decision / Project extensions** | If generic user experience, upstream it; if AKS workflow, implement through a project creation contribution. |
@@ -826,7 +872,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 102 | `0b63e2251` Prevent ConditionsTable truncation | **Upstream fix** | Use the [ready SimpleTable patch](headlamp-upstream-patches/headlamp-upstream-simpletable-overflow.patch). |
 | 103 | `513e3ba2d` Announce no table data | **Remove** | Current upstream `de73608f2` supplies the same behavior; verify narration. |
 | 104 | `e87e6d6fe` Remove hidden cell overflow | **Fold into row 102** | Duplicate/follow-up application of the same SimpleTable change; submit once. |
-| 105 | `148b45e3c` Use AKS backend app/User-Agent name | **Upstream extension / Product identity** | Add a backend runtime app-name setting supplied by the product manifest. |
+| 105 | `148b45e3c` Use AKS backend app/User-Agent name | **Upstream extension / Product identity** | Use the [ready runtime app-name patch](headlamp-upstream-patches/headlamp-upstream-backend-app-name.patch), supplied by the product configuration. |
 | 106 | `fa1dcf6d1` Add runCmd plugin identification | **Upstream extension / Command execution** | Upstream the permissioned identity contract; remove AKS/AI package branches. |
 | 107 | `551275e71` Add AKS Arc cluster type | **AKS plugin / Cluster registration** | Implement Arc as an AKS provider mode. |
 | 108 | `0aa41fb22` Fix runCmd test mocks | **Fold into row 106** | Port relevant tests to the generic broker. |
@@ -845,13 +891,13 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | Command/desktop correctness | `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small pull requests may review better. Row 20 is already supplied upstream. |
 | Project extensions | `5e79994e5`, `22a5008a2` | Complete existing overview/header extension APIs. |
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
-| Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, story, and mock patches separately; rebase the remaining column-selector work after those land. |
+| Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, column-selector, story, and mock patches separately. |
+| Cluster and backend identity | `bd39620b1`, `148b45e3c` | Submit the successful-deletion reload and generic runtime application-name patches separately. |
 | Accessibility/theme | `12b579560`, `46e6c031b`, `d9748fb0c`, `a1769847c`, `0570f3a31`, `0badba5aa`, `4b6197255`, `6f13c6288` | Product-neutral; regenerate current snapshots/translations. |
 
 Resolve every **Needs decision** entry during the rebase: row 10 (PATH handling),
-row 46 (cluster-deletion state), row 75 (locale ownership), row 87
-(project-creation user experience), row 30 (inline versus Activity logs), and
-row 89 (severity narration).
+row 75 (locale ownership), row 87 (project-creation user experience), row 30
+(inline versus Activity logs), and row 89 (severity narration).
 
 Command execution, cluster registration, secure storage, OAuth sign-in,
 product identity, and project extension interfaces need upstream design

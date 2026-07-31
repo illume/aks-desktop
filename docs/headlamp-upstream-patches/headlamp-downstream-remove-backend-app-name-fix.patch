@@ -1,0 +1,25 @@
+From c1e49e0943acb1ba8074276230b18e44bb3b0cb8 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 17:05:48 +0000
+Subject: [PATCH] aksd: drop backend app-name override
+
+---
+ backend/pkg/kubeconfig/kubeconfig.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/backend/pkg/kubeconfig/kubeconfig.go b/backend/pkg/kubeconfig/kubeconfig.go
+index f9a8e191b..d8657534e 100644
+--- a/backend/pkg/kubeconfig/kubeconfig.go
++++ b/backend/pkg/kubeconfig/kubeconfig.go
+@@ -28,7 +28,7 @@ import (
+ 
+ var (
+ 	Version = "unknown"
+-	AppName = "AKS-desktop"
++	AppName = "Headlamp"
+ )
+ 
+ // userAgentRoundTripper wraps an http.RoundTripper and adds a Headlamp User-Agent header.
+-- 
+2.54.0
+
