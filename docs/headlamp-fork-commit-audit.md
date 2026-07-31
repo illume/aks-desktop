@@ -572,7 +572,7 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | Downstream | Upstream look-alike | Result |
 | --- | --- | --- |
 | `c4b0bb453` artifact name | `d76976282` package naming | Current upstream again uses `${productName}`; retain as product identity configuration. |
-| `00320948b` query retry | `ee0532558` cluster error handling | Upstream skips retries for 401/403; downstream also skips other sub-500 responses, so the remaining policy needs review/upstream tests. |
+| `00320948b` query retry | `ee0532558` cluster error handling | The [ready retry-policy patch](headlamp-upstream-patches/headlamp-upstream-query-retry-policy.patch) adds status tests, skips permanent 400–499 errors, and retains retries for `408` and `429`. |
 | `5e79994e5` overview `isEnabled` | `5cc6e4654` tab `isEnabled` | Different extension types; the overview API is still missing. |
 | `c5a969eab` ViewButton | `8bb0d3500` Activity refactor | Upstream opens an Activity window; downstream's `split-right` behavior remains. |
 | `5f7ade8ca` Table props | `a90f608b1`/`b7b29804e` selection changes | Upstream still renders the top toolbar and range handler unconditionally. |
