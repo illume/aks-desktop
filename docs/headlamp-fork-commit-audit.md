@@ -554,15 +554,109 @@ instead of leaving its caller waiting indefinitely.
   together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
   downstream `runCmd` tests.
 
+### Use the package name in desktop artifact filenames
+
+- **Fork source:** `c4b0bb453`.
+- **Upstream patch:** [app: use the package name in artifact
+  filenames](headlamp-upstream-patches/headlamp-upstream-artifact-package-name.patch).
+- **Downstream removal:** [drop the duplicated fork
+  override](headlamp-upstream-patches/headlamp-downstream-remove-artifact-package-name-fix.patch).
+- **AKS Desktop follow-up:** Keep the machine-readable package name in the
+  external product manifest. Electron Builder then uses that value for release
+  filenames instead of the display name.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all ten window
+  size tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all ten
+  downstream window size tests.
+
+### Derive the Linux executable name
+
+- **Fork source:** `c25c2099b`.
+- **Upstream patch:** [app: derive the Linux executable
+  name](headlamp-upstream-patches/headlamp-upstream-linux-executable-name.patch).
+- **Downstream removal:** [drop the duplicated fork
+  override](headlamp-upstream-patches/headlamp-downstream-remove-linux-executable-name-fix.patch).
+- **AKS Desktop follow-up:** Keep the executable identity in the external
+  product manifest. Electron Builder derives the Linux executable from the
+  configured product metadata, so a second Headlamp-specific setting is
+  unnecessary.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all ten window
+  size tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all ten
+  downstream window size tests.
+
+Fork commit `d709d2ddf` is split into the four ordered Mock Service Worker
+handler patches below. Each patch keeps the frontend and plugin-template base
+mocks synchronized. Current upstream has retired Storyshots, so the upstream
+patches contain only the live handlers. The matching downstream removals also
+restore the fork's historical Storyshot files to their pre-commit state.
+
+### Mock Custom Resource Definition lists in stories
+
+- **Fork source:** `d709d2ddf`.
+- **Upstream patch:** [frontend: mock Custom Resource Definition
+  lists](headlamp-upstream-patches/headlamp-upstream-storybook-crd-mocks.patch).
+- **Downstream removal:** [drop the duplicated fork handlers and historical
+  snapshots](headlamp-upstream-patches/headlamp-downstream-remove-storybook-crd-mocks-fix.patch).
+- **AKS Desktop follow-up:** None. The handlers return an empty version 1 list
+  and explicitly fail the obsolete version 1 beta 1 endpoint so stories do not
+  wait on unhandled requests.
+- **Upstream validation:** `npm run tsc`; `npm run lint -- --no-cache`; all
+  eight focused custom-resource tests.
+- **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all seven
+  focused downstream custom-resource tests.
+
+### Mock cluster-wide pod lists in stories
+
+- **Fork source:** `d709d2ddf`.
+- **Upstream patch:** [frontend: mock cluster-wide pod
+  lists](headlamp-upstream-patches/headlamp-upstream-storybook-pod-mocks.patch).
+- **Downstream removal:** [drop the duplicated fork handler and historical
+  snapshot](headlamp-upstream-patches/headlamp-downstream-remove-storybook-pod-mocks-fix.patch).
+- **AKS Desktop follow-up:** None. This product-neutral handler complements the
+  existing namespaced pod-list handler.
+- **Upstream validation:** `npm run tsc`; `npm run lint -- --no-cache`; all 15
+  focused pod details tests.
+- **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all 15
+  downstream pod details tests.
+
+### Mock apps workload lists in stories
+
+- **Fork source:** `d709d2ddf`.
+- **Upstream patch:** [frontend: mock apps workload
+  lists](headlamp-upstream-patches/headlamp-upstream-storybook-apps-workload-mocks.patch).
+- **Downstream removal:** [drop the duplicated fork handlers and historical
+  snapshots](headlamp-upstream-patches/headlamp-downstream-remove-storybook-apps-workload-mocks-fix.patch).
+- **AKS Desktop follow-up:** None. The handlers provide empty deployment,
+  StatefulSet, DaemonSet, and ReplicaSet lists.
+- **Upstream validation:** `npm run tsc`; `npm run lint -- --no-cache`; all five
+  focused workload details tests.
+- **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all five
+  downstream workload details tests.
+
+### Mock batch workload lists in stories
+
+- **Fork source:** `d709d2ddf`.
+- **Upstream patch:** [frontend: mock batch workload
+  lists](headlamp-upstream-patches/headlamp-upstream-storybook-batch-workload-mocks.patch).
+- **Downstream removal:** [drop the duplicated fork handlers and historical
+  snapshots](headlamp-upstream-patches/headlamp-downstream-remove-storybook-batch-workload-mocks-fix.patch).
+- **AKS Desktop follow-up:** None. The handlers provide empty Job and CronJob
+  lists.
+- **Upstream validation:** `npm run tsc`; `npm run lint -- --no-cache`; all
+  three focused job details tests.
+- **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all three
+  downstream job details tests.
+
 Each upstream check was run immediately after its patch commit. Removal checks
-used the state described for each entry; the six new removals were tested with
-their upstream replacements so the checks did not temporarily restore known
-bugs. The upstream theme, resource-view, table, narration, Resource Map,
-namespace, query, command, plugin, and static-serving patches add or update
-focused regression coverage. Submit the upstream patches as separate pull
-requests; they do not contain AKS-specific behavior. For each future patch,
-record both the downstream removal and the corresponding AKS Desktop
-configuration or plugin migration. When no product change is needed, state why
+used the state described for each entry; paired replacements were used whenever
+testing a removal alone would temporarily restore a known bug. The upstream
+theme, resource-view, table, narration, Resource Map, namespace, query, command,
+plugin, packaging, story, and static-serving patches add or update focused
+regression coverage. Submit the upstream patches as separate pull requests;
+they do not contain AKS-specific behavior. For each future patch, record both
+the downstream removal and the corresponding AKS Desktop configuration or
+plugin migration. When no product change is needed, state why
 the upstream behavior is transparent or backward-compatible.
 
 ## Important look-alikes
@@ -571,12 +665,12 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 
 | Downstream | Upstream look-alike | Result |
 | --- | --- | --- |
-| `c4b0bb453` artifact name | `d76976282` package naming | Current upstream again uses `${productName}`; retain as product identity configuration. |
+| `c4b0bb453` artifact name | `d76976282` package naming | Current upstream again uses `${productName}`; the tested package-name patch is ready and AKS supplies the product package name. |
 | `00320948b` query retry | `ee0532558` cluster error handling | The [ready retry-policy patch](headlamp-upstream-patches/headlamp-upstream-query-retry-policy.patch) adds status tests, skips permanent 400–499 errors, and retains retries for `408` and `429`. |
 | `5e79994e5` overview `isEnabled` | `5cc6e4654` tab `isEnabled` | Different extension types; the overview API is still missing. |
 | `c5a969eab` ViewButton | `8bb0d3500` Activity refactor | Upstream opens an Activity window; downstream's `split-right` behavior remains. |
 | `5f7ade8ca` Table props | `a90f608b1`/`b7b29804e` selection changes | Upstream still renders the top toolbar and range handler unconditionally. |
-| `d709d2ddf` base mocks | `fa559202e` shared API base | Centralizing the URL did not add these Kubernetes handlers. |
+| `d709d2ddf` base mocks | `fa559202e` shared API base | Centralizing the URL did not add these Kubernetes handlers; four ordered handler patches are ready. |
 | `a6e5b073a` keyboard column menu | `61aef6b61` visibility persistence | Persistence does not supply the accessible menu implementation. |
 | `adbf7f039` static-plugin cache | `f1b8c850d` plugin cache | The old fix covers `/plugins/`, not the separate `/static-plugins/` route. |
 | `d9748fb0c` appearance narration | `7c6a4ecf5` initial narration fix | Downstream is a follow-up that adds the field labels to the accessible name. |
@@ -625,8 +719,8 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 1 | `863957d9d` Add kubectl to valid commands | **Upstream extension / Command execution** | Declare the AKS plugin's `kubectl` scope; remove the global hard-coded allowlist entry. |
 | 2 | `af6132f55` Rebrand package name | **AKS configuration / Product identity** | Set product package name in the product manifest. |
 | 3 | `35c871acd` Replace icons | **AKS configuration / Product identity** | Supply the AKS icon set during assembly. |
-| 4 | `c4b0bb453` Use package name in artifact names | **AKS configuration / Product identity** | Let the desktop kit accept an artifact-name template. |
-| 5 | `c25c2099b` Remove Linux `executableName` | **AKS configuration / Product identity** | Derive or override the executable name in product builder configuration. |
+| 4 | `c4b0bb453` Use package name in artifact names | **Upstream fix / Product identity** | Use the [ready package-name patch](headlamp-upstream-patches/headlamp-upstream-artifact-package-name.patch), then set the package name in AKS configuration. |
+| 5 | `c25c2099b` Remove Linux `executableName` | **Upstream fix / Product identity** | Use the [ready executable-name patch](headlamp-upstream-patches/headlamp-upstream-linux-executable-name.patch), then keep the executable identity in AKS configuration. |
 | 6 | `43dc0e88f` Cache shell environment | **Remove / Command execution** | Upstream `63b629102` and `47c426634` provide newer login-shell caching; run command tests after rebase. |
 | 7 | `b6b1c330a` AKS plugin command support | **Fold / Command execution** | Fold into row 106; replace plugin-name branches with broker capabilities. |
 | 8 | `920dd7a8b` Frontend kubectl integration | **Fold / Command execution** | Fold into row 106; consume the supported browser command API from the plugin. |
@@ -689,7 +783,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 65 | `5f7ade8ca` Honor Table selection/top-bar props | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-table-props.patch). |
 | 66 | `db7e2db03` Expose desktop platform | **Upstream fix** | Use the [ready typed patch](headlamp-upstream-patches/headlamp-upstream-desktop-platform.patch). |
 | 67 | `5944280a5` Override Linux product name | **Fold / Product identity** | Fold into product builder configuration. |
-| 68 | `d709d2ddf` Add base Kubernetes MSW handlers | **Upstream fix** | Rebase handlers onto the shared API base and submit with stories. |
+| 68 | `d709d2ddf` Add base Kubernetes Mock Service Worker handlers | **Upstream fix** | Use the ordered ready patches for [Custom Resource Definitions](headlamp-upstream-patches/headlamp-upstream-storybook-crd-mocks.patch), [pods](headlamp-upstream-patches/headlamp-upstream-storybook-pod-mocks.patch), [apps workloads](headlamp-upstream-patches/headlamp-upstream-storybook-apps-workload-mocks.patch), and [batch workloads](headlamp-upstream-patches/headlamp-upstream-storybook-batch-workload-mocks.patch). |
 | 69 | `013129c89` Fix GraphView CRD watch story | **Upstream fix** | Use the [ready rebased story patch](headlamp-upstream-patches/headlamp-upstream-graphview-crd-watch.patch). |
 | 70 | `dd6cf9ae4` Fix docs TypeScript errors | **Remove** | The current upstream documentation build passes, and plugin locale metadata now has the dedicated `PluginPackageInfo` type. |
 | 71 | `5e3c5e26c` Fix tooltip landmark check | **Upstream fix** | Use the [ready end-to-end accessibility patch](headlamp-upstream-patches/headlamp-upstream-tooltip-landmark-check.patch). |
@@ -745,7 +839,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | Command/desktop correctness | `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small pull requests may review better. Row 20 is already supplied upstream. |
 | Project extensions | `5e79994e5`, `22a5008a2` | Complete existing overview/header extension APIs. |
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
-| Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Rebase together to resolve shared Table/mock changes, then split reviewable PRs. |
+| Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, story, and mock patches separately; rebase the remaining column-selector work after those land. |
 | Accessibility/theme | `12b579560`, `46e6c031b`, `d9748fb0c`, `a1769847c`, `0570f3a31`, `0badba5aa`, `4b6197255`, `6f13c6288` | Product-neutral; regenerate current snapshots/translations. |
 
 Resolve every **Needs decision** entry during the rebase: row 10 (PATH handling),

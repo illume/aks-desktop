@@ -1,0 +1,25 @@
+From 02570eaa99fd44aed3b2106c5114e0bb9ba56b1c Mon Sep 17 00:00:00 2001
+From: Joaquim Rocha <joaquim.rocha@microsoft.com>
+Date: Fri, 31 Jul 2026 16:40:44 +0000
+Subject: [PATCH] app: Use package name in artifact filenames
+
+---
+ app/package.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/app/package.json b/app/package.json
+index 079e68373..af8e879ba 100644
+--- a/app/package.json
++++ b/app/package.json
+@@ -38,7 +38,7 @@
+     "beforeBuild": "./scripts/build-backend.js",
+     "afterPack": "./scripts/after-pack.js",
+     "asar": false,
+-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
++    "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
+     "protocols": {
+       "name": "headlamp-protocol",
+       "schemes": [
+-- 
+2.54.0
+

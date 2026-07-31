@@ -1,0 +1,24 @@
+From c9056c9fb991dc51f37cd66b7758a442c4cbaa86 Mon Sep 17 00:00:00 2001
+From: Joaquim Rocha <joaquim.rocha@microsoft.com>
+Date: Fri, 31 Jul 2026 16:43:00 +0000
+Subject: [PATCH] aksd: drop Linux executable-name override
+
+---
+ app/package.json | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/app/package.json b/app/package.json
+index f14835eee..07857f1c9 100644
+--- a/app/package.json
++++ b/app/package.json
+@@ -92,6 +92,7 @@
+           ]
+         }
+       ],
++      "executableName": "headlamp",
+       "maintainer": "Microsoft",
+       "category": "Network",
+       "extraResources": [
+-- 
+2.54.0
+
