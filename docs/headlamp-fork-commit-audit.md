@@ -65,11 +65,13 @@ The paired removal patches apply to the audited downstream tip
 `4d00ea845c8f4faf2c7fde887f6a4bf9da2000c6`. Each patch applies directly to
 its stated baseline except the project-grid zoom patch, which follows the
 project-tabs zoom patch; its removal patch likewise follows the project-tabs
-removal. **Do not ship a removal patch by itself:** that would temporarily
-restore the old bug. During a rebase, prefer to drop the original fork commit
-after selecting an upstream base that contains the matching fix. Use the
-removal patch only when a normal cleanup commit is needed, and include the
-upstream fix in the same branch update.
+removal. The four Storybook handler patches and their removals are also ordered:
+Custom Resource Definitions, pods, apps workloads, then batch workloads.
+**Do not ship a removal patch by itself:** that would temporarily restore the
+old bug. During a rebase, prefer to drop the original fork commit after
+selecting an upstream base that contains the matching fix. Use the removal
+patch only when a normal cleanup commit is needed, and include the upstream fix
+in the same branch update.
 
 ### Run `list-plugins` without a shell
 
@@ -564,10 +566,12 @@ instead of leaving its caller waiting indefinitely.
 - **AKS Desktop follow-up:** Keep the machine-readable package name in the
   external product manifest. Electron Builder then uses that value for release
   filenames instead of the display name.
-- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all ten window
-  size tests.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all ten app
+  window-size smoke tests. The repository has no focused unit test for Electron
+  Builder artifact-name metadata, and no installer artifact was produced.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all ten
-  downstream window size tests.
+  downstream app window-size smoke tests, with the same packaging-test
+  limitation.
 
 ### Derive the Linux executable name
 
@@ -580,10 +584,12 @@ instead of leaving its caller waiting indefinitely.
   product manifest. Electron Builder derives the Linux executable from the
   configured product metadata, so a second Headlamp-specific setting is
   unnecessary.
-- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all ten window
-  size tests.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all ten app
+  window-size smoke tests. The repository has no focused unit test for Electron
+  Builder executable-name metadata, and no installer artifact was produced.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all ten
-  downstream window size tests.
+  downstream app window-size smoke tests, with the same packaging-test
+  limitation.
 
 Fork commit `d709d2ddf` is split into the four ordered Mock Service Worker
 handler patches below. Each patch keeps the frontend and plugin-template base
