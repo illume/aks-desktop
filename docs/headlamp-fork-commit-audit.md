@@ -72,6 +72,9 @@ with their matching upstream replacements present because each cleanup imports
 the new shared API.
 The verified external-tool patches follow the manifest command-capability
 patches because tool IDs extend those declared command scopes.
+The OAuth-provider patches follow the product-protocol and secure-storage
+patches. The cluster-provider patches follow the verified external-tool patches
+and therefore the command-capability patches on which tool scopes depend.
 **Do not ship a removal patch by itself:** that would temporarily restore the
 old bug. During a rebase, prefer to drop the original fork commit after
 selecting an upstream base that contains the matching fix. Use the removal
@@ -882,19 +885,74 @@ restore the fork's historical Storyshot files to their pre-commit state.
   `npm run app:lint`; all 41 downstream command-broker, external-tool, and AKS
   kubeconfig tests; all five downstream command-capability tests.
 
+### Row 79 — Register product-owned OAuth callback providers
+
+- **Fork source:** `e528e6a05`; row 80 supplies its tests.
+- **Upstream patch:** [app: register OAuth callback
+  providers](headlamp-upstream-patches/headlamp-upstream-oauth-provider-registry.patch).
+- **Downstream removal:** [register the GitHub OAuth
+  adapter](headlamp-upstream-patches/headlamp-downstream-register-github-oauth-provider.patch).
+- **AKS Desktop follow-up:** Keep GitHub authorization, token exchange, and
+  client metadata in a product-owned Electron adapter. Register only the exact
+  `oauth` host and `/callback` path, using the validated product protocol from
+  row 96. Persist tokens through `PluginSecureStorage` under namespace
+  `aks-desktop` and key `github-auth`; this preserves the existing
+  `aks-desktop:github-auth` entry. Move the adapter out of Headlamp when the
+  product assembly exposes its Electron entry point.
+- **Security boundary:** Generic Headlamp receives no provider credentials or
+  tokens. The main process dispatches only exact registered callbacks from cold
+  start, second-instance, and macOS `open-url` events; duplicate ownership and
+  malformed registrations fail closed.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 15 OAuth
+  registry and product-protocol tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 42 OAuth,
+  secure-storage, registry, and product-protocol tests. The matching row 78 and
+  row 96 upstream APIs were present.
+
+### Row 19 — Invoke package-declared host cluster providers
+
+- **Fork source:** `1d1f03e58`; this provides the host boundary needed by the
+  AKS registration policy folded into rows 54, 63, 82, 83, and 107.
+- **Upstream patch:** [app: authorize package-declared cluster
+  providers](headlamp-upstream-patches/headlamp-upstream-cluster-provider-capabilities.patch).
+- **Downstream removal:** [replace the positional AKS registration
+  bridge](headlamp-upstream-patches/headlamp-downstream-replace-aks-cluster-registration.patch).
+- **AKS Desktop follow-up:** Declare `aks-desktop.cluster` under
+  `headlamp.clusterProviders`, then change
+  `plugins/aks-desktop/src/utils/azure/aks.ts` to call the injected
+  `clusterProviderInvoke` function with a named request containing
+  `subscriptionId`, `resourceGroup`, `clusterName`, optional
+  `managedNamespace`, and `clusterType`. Do not pass `tenantId` into the old
+  positional `clusterType` slot. Move `aks-cluster-provider.ts` into the
+  product-owned Electron assembly entry while keeping Azure CLI, Azure Arc,
+  `KUBECONFIG`, and kubelogin policy there.
+- **Security boundary:** The host creates a random 256-bit capability only for
+  a provider declared by a loaded package and registered by the product. The
+  capability is scoped to one page load, accepted only from the main renderer,
+  and maps to one provider. Requests are size-limited; the AKS adapter also
+  rejects unknown fields, null bytes, option-like values, invalid cluster
+  types, and ambiguous positional arguments.
+- **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all eight host capability tests and eight frontend
+  provider/command capability tests.
+- **Removal validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 23 host-provider, AKS-adapter, kubeconfig, and
+  external-tool tests; all eight frontend provider/command capability tests.
+
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
 testing a removal alone would temporarily restore a known bug. The upstream
 theme, resource-view, table, narration, Resource Map, namespace, query, command,
 plugin, packaging, story, cluster, backend-identity, product-metadata,
 deep-link, legal-document, update-configuration, static-serving, project
-grouping, secure-storage, and command-capability patches add or update focused
-regression coverage. The external-tool patch additionally covers product
-resource integrity and path containment. Submit the upstream patches as separate pull requests;
-they do not contain AKS-specific behavior. For each future patch, record both
-the downstream removal and the corresponding AKS Desktop configuration or
-plugin migration. When no product change is needed, state why the upstream
-behavior is transparent or backward-compatible.
+grouping, secure-storage, OAuth-provider, command-capability, and
+cluster-provider patches add or update focused regression coverage. The
+external-tool patch additionally covers product resource integrity and path
+containment. Submit the upstream patches as separate pull requests; they do not
+contain AKS-specific behavior. For each future patch, record both the downstream
+removal and the corresponding AKS Desktop configuration or plugin migration.
+When no product change is needed, state why the upstream behavior is transparent
+or backward-compatible.
 
 ## Important look-alikes
 
@@ -971,7 +1029,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 16 | `c09a33860` Allow registration script | **Remove / Cluster registration** | The script was removed by row 19; do not expose it through the broker. |
 | 17 | `c79db3039` Remove kubelogin permission | **Fold into row 13** | Keep only the final least-privilege scope set. |
 | 18 | `3d7ddb3a6` Update branded snapshot | **Fold / Product identity** | Regenerate product tests from the external branding config. |
-| 19 | `1d1f03e58` Programmatic AKS registration | **Upstream extension + AKS plugin / Cluster registration** | Upstream a provider contract; move the implementation to the AKS provider. |
+| 19 | `1d1f03e58` Programmatic AKS registration | **Upstream extension + AKS plugin / Cluster registration** | Use the [ready package capability contract](headlamp-upstream-patches/headlamp-upstream-cluster-provider-capabilities.patch); move the implementation to the AKS provider. |
 | 20 | `72e169328` Windows quoting fix | **Remove / Command execution** | Upstream `v0.44.0` already passes the executable directly to `spawn` with `shell: false`; drop this duplicate after command tests. |
 | 21 | `ac7319372` Avoid shell except on Windows | **Upstream fix / Command execution** | Use the [ready Windows environment patch](headlamp-upstream-patches/headlamp-upstream-windows-shell-lookup.patch). |
 | 22 | `d125e6505` Azure CLI path through env | **Upstream extension / Command execution, external tools** | Use the [ready verified-tool patch](headlamp-upstream-patches/headlamp-upstream-verified-external-tools.patch) to resolve a declared product tool ID instead of a mutable AKS-only environment variable. |
@@ -1031,7 +1089,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 76 | `3b01fe701` Ignore generated resources | **Fold / Product identity** | Ignore outputs in the AKS assembly workspace, not upstream source. |
 | 77 | `195494e46` Announce EmptyContent | **Remove** | The final fork and upstream `EmptyContent.tsx` are identical; table live regions now cover the retained behavior. |
 | 78 | `076a7feda` Add Electron secure storage | **Upstream extension / Secure storage** | Use the [ready namespaced storage patch](headlamp-upstream-patches/headlamp-upstream-plugin-secure-storage.patch); migrate the AKS GitHub adapter to its injected capability. |
-| 79 | `e528e6a05` Add GitHub OAuth flow | **Upstream extension / OAuth sign-in** | Generalize provider registration; keep GitHub policy in the AKS plugin. |
+| 79 | `e528e6a05` Add GitHub OAuth flow | **Upstream extension / OAuth sign-in** | Use the [ready callback-provider patch](headlamp-upstream-patches/headlamp-upstream-oauth-provider-registry.patch); keep GitHub policy in the AKS product adapter. |
 | 80 | `da5a560ed` Move OAuth tests to Vitest | **Fold into row 79** | Include tests with the generalized provider. |
 | 81 | `a20c30755` Stabilize EmptyContent timing | **Remove** | Its effect is absent from the final fork; there is no remaining patch to upstream. |
 | 82 | `0fa88cf56` Respect `KUBECONFIG` when writing | **AKS plugin / Cluster registration** | Keep in the AKS provider; require the generic provider contract to pass the target path. |
@@ -1087,8 +1145,8 @@ Resolve the remaining **Needs decision** entries during the rebase: row 75
 (inline versus Activity logs). Current upstream behavior resolves the earlier
 PATH-handling and severity-narration questions in rows 10 and 89.
 
-Command execution, secure storage, and project grouping now have ready design
-patches but still need upstream review agreement. Cluster registration, OAuth
-sign-in, product identity, and the remaining project extension interfaces also
-need agreement before AKS can consume a pristine distribution. The ledger is
-not a request to upstream every downstream commit verbatim.
+Command execution, secure storage, project grouping, cluster registration, and
+OAuth sign-in now have ready design patches but still need upstream review
+agreement. Product identity and the remaining project extension interfaces
+also need agreement before AKS can consume a pristine distribution. The ledger
+is not a request to upstream every downstream commit verbatim.

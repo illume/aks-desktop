@@ -1,0 +1,256 @@
+From 2e4c7e7d95a8a0fcba47961e9a4e79616739b38c Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 21:52:32 +0000
+Subject: [PATCH] app: register OAuth callback providers
+
+---
+ app/electron/main.ts                | 18 ++++++-
+ app/electron/oauth-provider.test.ts | 82 ++++++++++++++++++++++++++++
+ app/electron/oauth-provider.ts      | 84 +++++++++++++++++++++++++++++
+ 3 files changed, 183 insertions(+), 1 deletion(-)
+ create mode 100644 app/electron/oauth-provider.test.ts
+ create mode 100644 app/electron/oauth-provider.ts
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index 3f05f55..2b066bd 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -43,6 +43,7 @@ import { hideBin } from 'yargs/helpers';
+ import { setupCustomCAs, setupSystemCAs } from './certificates';
+ import i18n from './i18next.config';
+ import MCPClient from './mcp/MCPClient';
++import { dispatchOAuthCallback } from './oauth-provider';
+ import { filterUserOwnedPids } from './ownedProcesses';
+ import {
+   addToPath,
+@@ -1636,6 +1637,7 @@ function startElectron() {
+       }
+     });
+ 
++    let initialOAuthCallbackHandled = false;
+     mainWindow.webContents.on('did-finish-load', async () => {
+       const startZoom = await loadZoomFactor();
+       if (startZoom !== 1.0) {
+@@ -1644,6 +1646,12 @@ function startElectron() {
+ 
+       // Inject the backend port into the window object
+       mainWindow?.webContents.executeJavaScript(`window.headlampBackendPort = ${actualPort};`);
++
++      if (!initialOAuthCallbackHandled && process.platform !== 'darwin') {
++        const callbackUrl = process.argv.find(value => isProtocolUrl(value, protocolScheme));
++        initialOAuthCallbackHandled =
++          callbackUrl !== undefined && dispatchOAuthCallback(new URL(callbackUrl), protocolScheme);
++      }
+     });
+ 
+     mainWindow.webContents.on('dom-ready', () => {
+@@ -1687,12 +1695,17 @@ function startElectron() {
+     // Force Single Instance Application
+     const gotTheLock = app.requestSingleInstanceLock();
+     if (gotTheLock) {
+-      app.on('second-instance', () => {
++      app.on('second-instance', (_event, argv) => {
+         // Someone tried to run a second instance, we should focus our window.
+         if (mainWindow) {
+           if (mainWindow.isMinimized()) mainWindow.restore();
+           mainWindow.focus();
+         }
++
++        const callbackUrl = argv.find(value => isProtocolUrl(value, protocolScheme));
++        if (callbackUrl) {
++          dispatchOAuthCallback(new URL(callbackUrl), protocolScheme);
++        }
+       });
+     } else {
+       app.quit();
+@@ -1731,6 +1744,9 @@ function startElectron() {
+         );
+         return;
+       }
++      if (dispatchOAuthCallback(urlObj, protocolScheme)) {
++        return;
++      }
+ 
+       const urlParam = urlObj.hostname;
+       let baseUrl = startUrl;
+diff --git a/app/electron/oauth-provider.test.ts b/app/electron/oauth-provider.test.ts
+new file mode 100644
+index 0000000..0845916
+--- /dev/null
++++ b/app/electron/oauth-provider.test.ts
+@@ -0,0 +1,82 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it, vi } from 'vitest';
++import { dispatchOAuthCallback, registerOAuthProvider } from './oauth-provider';
++
++function registration(handleCallback = vi.fn()) {
++  return {
++    id: 'example',
++    callback: { hostname: 'oauth', pathname: '/callback' },
++    handleCallback,
++  };
++}
++
++describe('OAuth provider registry', () => {
++  it('dispatches an exact callback and returns a cleanup function', () => {
++    const handleCallback = vi.fn();
++    const unregister = registerOAuthProvider(registration(handleCallback));
++    const url = new URL('headlamp://oauth/callback?code=code&state=state');
++
++    expect(dispatchOAuthCallback(url, 'headlamp')).toBe(true);
++    expect(handleCallback).toHaveBeenCalledWith(url);
++
++    unregister();
++    expect(dispatchOAuthCallback(url, 'headlamp')).toBe(false);
++  });
++
++  it('does not dispatch a different product protocol', () => {
++    const handleCallback = vi.fn();
++    const unregister = registerOAuthProvider(registration(handleCallback));
++
++    expect(dispatchOAuthCallback(new URL('headlamp://oauth/callback'), 'aks-desktop')).toBe(false);
++    expect(handleCallback).not.toHaveBeenCalled();
++    unregister();
++  });
++
++  it.each([
++    'headlamp://other/callback',
++    'headlamp://oauth/other',
++    'headlamp://oauth/callback/extra',
++  ])('does not dispatch an unregistered callback: %s', callback => {
++    const handleCallback = vi.fn();
++    const unregister = registerOAuthProvider(registration(handleCallback));
++
++    expect(dispatchOAuthCallback(new URL(callback), 'headlamp')).toBe(false);
++    expect(handleCallback).not.toHaveBeenCalled();
++    unregister();
++  });
++
++  it('rejects duplicate callback ownership', () => {
++    const unregister = registerOAuthProvider(registration());
++    expect(() =>
++      registerOAuthProvider({
++        ...registration(),
++        id: 'other',
++      })
++    ).toThrow('OAuth callback is already registered');
++    unregister();
++  });
++
++  it('rejects malformed registrations', () => {
++    expect(() =>
++      registerOAuthProvider({
++        ...registration(),
++        callback: { hostname: '../oauth', pathname: '/callback' },
++      })
++    ).toThrow('Invalid OAuth provider registration');
++  });
++});
+diff --git a/app/electron/oauth-provider.ts b/app/electron/oauth-provider.ts
+new file mode 100644
+index 0000000..af1c6c7
+--- /dev/null
++++ b/app/electron/oauth-provider.ts
+@@ -0,0 +1,84 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++const VALID_PROVIDER_ID = /^[a-z0-9][a-z0-9._-]*$/i;
++const VALID_HOSTNAME = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i;
++const VALID_PATHNAME = /^\/[a-z0-9/._~-]*$/i;
++const MAX_PROVIDER_ID_LENGTH = 128;
++
++export interface OAuthProviderRegistration {
++  id: string;
++  callback: {
++    hostname: string;
++    pathname: string;
++  };
++  handleCallback(url: URL): void | Promise<void>;
++}
++
++const providersByCallback = new Map<string, OAuthProviderRegistration>();
++
++function callbackKey(hostname: string, pathname: string): string {
++  return `${hostname.toLowerCase()}\n${pathname}`;
++}
++
++function isValidRegistration(registration: OAuthProviderRegistration): boolean {
++  return (
++    typeof registration.id === 'string' &&
++    registration.id.length <= MAX_PROVIDER_ID_LENGTH &&
++    VALID_PROVIDER_ID.test(registration.id) &&
++    typeof registration.callback?.hostname === 'string' &&
++    VALID_HOSTNAME.test(registration.callback.hostname) &&
++    typeof registration.callback?.pathname === 'string' &&
++    VALID_PATHNAME.test(registration.callback.pathname) &&
++    typeof registration.handleCallback === 'function'
++  );
++}
++
++export function registerOAuthProvider(registration: OAuthProviderRegistration): () => void {
++  if (!isValidRegistration(registration)) {
++    throw new Error('Invalid OAuth provider registration');
++  }
++  const key = callbackKey(registration.callback.hostname, registration.callback.pathname);
++  if (providersByCallback.has(key)) {
++    throw new Error('OAuth callback is already registered');
++  }
++  providersByCallback.set(key, registration);
++
++  return () => {
++    if (providersByCallback.get(key) === registration) {
++      providersByCallback.delete(key);
++    }
++  };
++}
++
++export function dispatchOAuthCallback(url: URL, protocolScheme: string): boolean {
++  if (url.protocol !== `${protocolScheme}:`) {
++    return false;
++  }
++  const provider = providersByCallback.get(callbackKey(url.hostname, url.pathname));
++  if (!provider) {
++    return false;
++  }
++
++  try {
++    Promise.resolve(provider.handleCallback(url)).catch(error => {
++      console.error(`OAuth callback failed for provider ${provider.id}:`, error);
++    });
++  } catch (error) {
++    console.error(`OAuth callback failed for provider ${provider.id}:`, error);
++  }
++  return true;
++}
+-- 
+2.54.0
+
