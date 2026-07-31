@@ -70,6 +70,8 @@ Custom Resource Definitions, pods, apps workloads, then batch workloads.
 The update-disable, protocol-helper, and legal-dialog removals are validated
 with their matching upstream replacements present because each cleanup imports
 the new shared API.
+The verified external-tool patches follow the manifest command-capability
+patches because tool IDs extend those declared command scopes.
 **Do not ship a removal patch by itself:** that would temporarily restore the
 old bug. During a rebase, prefer to drop the original fork commit after
 selecting an upstream base that contains the matching fix. Use the removal
@@ -859,6 +861,27 @@ restore the fork's historical Storyshot files to their pre-commit state.
   `npm run app:lint`; all 32 downstream command broker tests and 25 focused
   capability and plugin tests.
 
+### Row 22 — Resolve verified external tools by product ID
+
+- **Fork source:** `d125e6505`; this also replaces the path mutation and
+  platform-layout assumptions folded into rows 13–15, 31–33, 54, and 64.
+- **Upstream patch:** [app: resolve verified external
+  tools](headlamp-upstream-patches/headlamp-upstream-verified-external-tools.patch).
+- **Downstream removal:** [replace AKS path lookup with verified tool
+  IDs](headlamp-upstream-patches/headlamp-downstream-replace-external-tool-paths.patch).
+- **AKS Desktop follow-up:** Generate the product manifest's `external-tools`
+  entries during assembly. Each platform entry names a resource-relative path
+  and its SHA-256 digest. Declare `azure-cli`, `python`, and `az-kubelogin`
+  product IDs and use tool IDs, not mutable paths or environment lookup, in the
+  AKS plugin's reviewed command scopes. Verification rejects missing files,
+  digest mismatches, traversal, and symlinks escaping the resources directory.
+- **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 39 focused command-broker and external-tool tests;
+  all five frontend command-capability tests.
+- **Removal validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 41 downstream command-broker, external-tool, and AKS
+  kubeconfig tests; all five downstream command-capability tests.
+
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
 testing a removal alone would temporarily restore a known bug. The upstream
@@ -866,7 +889,8 @@ theme, resource-view, table, narration, Resource Map, namespace, query, command,
 plugin, packaging, story, cluster, backend-identity, product-metadata,
 deep-link, legal-document, update-configuration, static-serving, project
 grouping, secure-storage, and command-capability patches add or update focused
-regression coverage. Submit the upstream patches as separate pull requests;
+regression coverage. The external-tool patch additionally covers product
+resource integrity and path containment. Submit the upstream patches as separate pull requests;
 they do not contain AKS-specific behavior. For each future patch, record both
 the downstream removal and the corresponding AKS Desktop configuration or
 plugin migration. When no product change is needed, state why the upstream
@@ -950,7 +974,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 19 | `1d1f03e58` Programmatic AKS registration | **Upstream extension + AKS plugin / Cluster registration** | Upstream a provider contract; move the implementation to the AKS provider. |
 | 20 | `72e169328` Windows quoting fix | **Remove / Command execution** | Upstream `v0.44.0` already passes the executable directly to `spawn` with `shell: false`; drop this duplicate after command tests. |
 | 21 | `ac7319372` Avoid shell except on Windows | **Upstream fix / Command execution** | Use the [ready Windows environment patch](headlamp-upstream-patches/headlamp-upstream-windows-shell-lookup.patch). |
-| 22 | `d125e6505` Azure CLI path through env | **Upstream extension / Command execution, external tools** | Resolve a declared tool ID to a verified path instead of a mutable AKS-only env variable. |
+| 22 | `d125e6505` Azure CLI path through env | **Upstream extension / Command execution, external tools** | Use the [ready verified-tool patch](headlamp-upstream-patches/headlamp-upstream-verified-external-tools.patch) to resolve a declared product tool ID instead of a mutable AKS-only environment variable. |
 | 23 | `69e20c5dd` Exclude catalog plugins | **AKS configuration / Plugin bundle** | List product-disabled built-ins in the AKS manifest. |
 | 24 | `65e207537` Remove Artifact Hub proxy config | **AKS configuration / Plugin bundle** | Put plugin source/proxy policy in the AKS manifest. |
 | 25 | `33f4cfb35` Change empty cluster message | **AKS configuration / Public frontend configuration** | Supply an AKS public message/empty-state contribution. |
