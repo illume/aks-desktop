@@ -802,17 +802,75 @@ restore the fork's historical Storyshot files to their pre-commit state.
   `npm run app:lint`; the same seven manifest/file tests and interaction test;
   package-resource mapping check for all three AKS Desktop legal documents.
 
+### Row 50 — Let plugins choose an opaque project grouping key
+
+- **Fork source:** `5fae2b773`.
+- **Upstream patch:** [frontend: support custom project
+  grouping](headlamp-upstream-patches/headlamp-upstream-project-grouping.patch).
+- **Downstream removal:** [replace the AKS-specific grouping
+  fork](headlamp-upstream-patches/headlamp-downstream-replace-project-grouping.patch).
+- **AKS Desktop follow-up:** Register a grouping callback that adds the cluster
+  to the key only when `headlamp.dev/project-managed-by` is `aks-desktop`. Keep
+  that label policy in the plugin; Headlamp treats the returned key as opaque
+  and retains the existing cross-cluster behavior for every other project.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  six focused project grouping and routing tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  six downstream project grouping and routing tests.
+
+### Row 78 — Isolate plugin secure storage by package
+
+- **Fork source:** `076a7feda`.
+- **Upstream patch:** [app: expose namespaced plugin secure
+  storage](headlamp-upstream-patches/headlamp-upstream-plugin-secure-storage.patch).
+- **Downstream removal:** [replace renderer-global storage with plugin
+  capabilities](headlamp-upstream-patches/headlamp-downstream-replace-plugin-secure-storage.patch).
+- **AKS Desktop follow-up:** Change
+  `plugins/aks-desktop/src/utils/github/secure-storage.ts` to consume the
+  injected `pluginSecureStorage` adapter. Keep GitHub OAuth's compatibility
+  access in the main process while migrating the existing token entry; do not
+  restore renderer-selected global keys. Each package receives a one-time,
+  opaque capability for only its own namespace.
+- **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 11 app storage tests and the frontend adapter test.
+- **Removal validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 11 storage tests, 15 OAuth tests, and the frontend
+  adapter test.
+
+### Row 106 — Authorize manifest-declared plugin commands
+
+- **Fork source:** `fa1dcf6d1`; this also replaces the AKS command branches
+  folded into this row.
+- **Upstream patch:** [app: authorize manifest-declared plugin
+  commands](headlamp-upstream-patches/headlamp-upstream-plugin-command-capabilities.patch).
+- **Downstream removal:** [replace package command branches with
+  capabilities](headlamp-upstream-patches/headlamp-downstream-replace-plugin-command-capabilities.patch).
+- **AKS Desktop follow-up:** Add exact `az`, `kubectl`, and `kubelogin` command
+  and argument-prefix scopes under `headlamp.runCommands` in the plugin
+  manifest. Review those declarations as executable permissions. The host
+  binds each validated scope to a random 256-bit capability, enforces it in the
+  main process, and records consent per plugin identity. The internal
+  `scriptjs` pseudo-command cannot be declared. Remove the old AKS startup
+  consent and package-name allowlist only together with the manifest update.
+- **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 32 command broker tests and four frontend capability
+  tests.
+- **Removal validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all 32 downstream command broker tests and 25 focused
+  capability and plugin tests.
+
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
 testing a removal alone would temporarily restore a known bug. The upstream
 theme, resource-view, table, narration, Resource Map, namespace, query, command,
 plugin, packaging, story, cluster, backend-identity, product-metadata,
-deep-link, legal-document, update-configuration, and static-serving patches add
-or update focused regression coverage. Submit the upstream patches as separate
-pull requests; they do not contain AKS-specific behavior. For each future patch,
-record both the downstream removal and the corresponding AKS Desktop
-configuration or plugin migration. When no product change is needed, state why
-the upstream behavior is transparent or backward-compatible.
+deep-link, legal-document, update-configuration, static-serving, project
+grouping, secure-storage, and command-capability patches add or update focused
+regression coverage. Submit the upstream patches as separate pull requests;
+they do not contain AKS-specific behavior. For each future patch, record both
+the downstream removal and the corresponding AKS Desktop configuration or
+plugin migration. When no product change is needed, state why the upstream
+behavior is transparent or backward-compatible.
 
 ## Important look-alikes
 
@@ -920,7 +978,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 47 | `2ce445ee1` Default-disabled plugins | **Upstream fix / Plugin bundle** | Use the [ready plugin-default patch](headlamp-upstream-patches/headlamp-upstream-default-disabled-plugins.patch); select disabled plugins in AKS configuration. |
 | 48 | `a2be5742f` Add disabled Kaito plugin | **AKS configuration / Plugin bundle** | Declare Kaito and its disabled default in the AKS manifest. |
 | 49 | `7a830d425` Add Microsoft headers | **Fold** | Keep notices only on AKS-owned files after extraction; do not patch upstream files. |
-| 50 | `5fae2b773` Separate managed projects by cluster | **Upstream extension + AKS plugin / Project extensions** | Add a generic project identity/key hook; implement AKS policy in the plugin. |
+| 50 | `5fae2b773` Separate managed projects by cluster | **Upstream extension + AKS plugin / Project extensions** | Use the [ready opaque grouping-key patch](headlamp-upstream-patches/headlamp-upstream-project-grouping.patch); implement the managed-project label policy in the plugin. |
 | 51 | `4d854f759` Add Legal tab | **Upstream extension / Product identity** | Use the [ready legal-document patch](headlamp-upstream-patches/headlamp-upstream-legal-documents.patch), declare AKS legal files in the copied build manifest, and keep AKS prose out of Headlamp source. |
 | 52 | `40364e142` Update 404 page | **AKS configuration / Public frontend configuration** | Supply branded graphic/text through public product configuration. |
 | 53 | `e697c0aaf` Override macOS version | **Fold / Product identity** | Use the single product version source from row 27. |
@@ -948,7 +1006,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 75 | `ee162d9af` Expand locales | **Needs decision / Translations** | Upstream only still-missing generic locales; keep AKS strings in a supported overlay. |
 | 76 | `3b01fe701` Ignore generated resources | **Fold / Product identity** | Ignore outputs in the AKS assembly workspace, not upstream source. |
 | 77 | `195494e46` Announce EmptyContent | **Remove** | The final fork and upstream `EmptyContent.tsx` are identical; table live regions now cover the retained behavior. |
-| 78 | `076a7feda` Add Electron secure storage | **Upstream extension / Secure storage** | Upstream a product-neutral, plugin-namespaced service and tests. |
+| 78 | `076a7feda` Add Electron secure storage | **Upstream extension / Secure storage** | Use the [ready namespaced storage patch](headlamp-upstream-patches/headlamp-upstream-plugin-secure-storage.patch); migrate the AKS GitHub adapter to its injected capability. |
 | 79 | `e528e6a05` Add GitHub OAuth flow | **Upstream extension / OAuth sign-in** | Generalize provider registration; keep GitHub policy in the AKS plugin. |
 | 80 | `da5a560ed` Move OAuth tests to Vitest | **Fold into row 79** | Include tests with the generalized provider. |
 | 81 | `a20c30755` Stabilize EmptyContent timing | **Remove** | Its effect is absent from the final fork; there is no remaining patch to upstream. |
@@ -976,7 +1034,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 103 | `513e3ba2d` Announce no table data | **Remove** | Current upstream `de73608f2` supplies the same behavior; verify narration. |
 | 104 | `e87e6d6fe` Remove hidden cell overflow | **Fold into row 102** | Duplicate/follow-up application of the same SimpleTable change; submit once. |
 | 105 | `148b45e3c` Use AKS backend app/User-Agent name | **Upstream extension / Product identity** | Use the [ready runtime app-name patch](headlamp-upstream-patches/headlamp-upstream-backend-app-name.patch), supplied by the product configuration. |
-| 106 | `fa1dcf6d1` Add runCmd plugin identification | **Upstream extension / Command execution** | Upstream the permissioned identity contract; remove AKS/AI package branches. |
+| 106 | `fa1dcf6d1` Add runCmd plugin identification | **Upstream extension / Command execution** | Use the [ready manifest capability patch](headlamp-upstream-patches/headlamp-upstream-plugin-command-capabilities.patch); declare reviewed AKS command scopes instead of package-name branches. |
 | 107 | `551275e71` Add AKS Arc cluster type | **AKS plugin / Cluster registration** | Implement Arc as an AKS provider mode. |
 | 108 | `0aa41fb22` Fix runCmd test mocks | **Fold into row 106** | Port relevant tests to the generic broker. |
 | 109 | `903360924` Expand LogsViewer workload types | **Fold into row 30** | Upstream covers these types, so this becomes unnecessary after the row 30 migration. |
@@ -992,8 +1050,9 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | Batch | Commits | Notes |
 | --- | --- | --- |
 | Command/desktop correctness | `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small pull requests may review better. Row 20 is already supplied upstream. |
-| Project extensions | `5e79994e5`, `22a5008a2` | Complete existing overview/header extension APIs. |
+| Project extensions | `5e79994e5`, `5fae2b773`, `22a5008a2` | Complete the overview, opaque grouping-key, and header extension APIs. |
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
+| Plugin host capabilities | `076a7feda`, `fa1dcf6d1` | Submit namespaced secure storage and manifest-declared command scopes separately; both bind package identities to opaque main-process capabilities. |
 | Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, column-selector, story, and mock patches separately. |
 | Cluster and backend identity | `bd39620b1`, `148b45e3c` | Submit the successful-deletion reload and generic runtime application-name patches separately. |
 | Product metadata and verification | `d484bcd0f`, `4d854f759`, `d68693b04`, `067bf68f3`, `53917bfee`, `86a4ce067`, `3c9d0b941`, `fcad69534` | Submit the update configuration, legal-document interface, product version, document title, package protocol, and package-derived verification patches separately. |
@@ -1004,7 +1063,8 @@ Resolve the remaining **Needs decision** entries during the rebase: row 75
 (inline versus Activity logs). Current upstream behavior resolves the earlier
 PATH-handling and severity-narration questions in rows 10 and 89.
 
-Command execution, cluster registration, secure storage, OAuth sign-in,
-product identity, and project extension interfaces need upstream design
-agreement before AKS can consume a pristine distribution. The ledger is not a
-request to upstream every downstream commit verbatim.
+Command execution, secure storage, and project grouping now have ready design
+patches but still need upstream review agreement. Cluster registration, OAuth
+sign-in, product identity, and the remaining project extension interfaces also
+need agreement before AKS can consume a pristine distribution. The ledger is
+not a request to upstream every downstream commit verbatim.

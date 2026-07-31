@@ -1,0 +1,300 @@
+From 7b26fe83448974ef401972c4877b2a557debbf39 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 19:22:15 +0000
+Subject: [PATCH] frontend: support custom project grouping
+
+---
+ .../components/project/ProjectList.test.tsx   | 35 +++++++++++
+ .../src/components/project/ProjectList.tsx    | 60 ++++++++++++-------
+ .../plugin/__snapshots__/pluginLib.snapshot   |  1 +
+ frontend/src/plugin/registry.tsx              | 24 ++++++++
+ frontend/src/redux/projectsSlice.ts           | 25 ++++++++
+ 5 files changed, 124 insertions(+), 21 deletions(-)
+
+diff --git a/frontend/src/components/project/ProjectList.test.tsx b/frontend/src/components/project/ProjectList.test.tsx
+index a416bd98c..af6d47ff4 100644
+--- a/frontend/src/components/project/ProjectList.test.tsx
++++ b/frontend/src/components/project/ProjectList.test.tsx
+@@ -58,6 +58,41 @@ describe('groupNamespacesIntoProjects', () => {
+     expect(projects[0].clusters).toEqual(['cluster-a', 'cluster-b']);
+   });
+ 
++  it('uses registered grouping to separate entries with the same project id', () => {
++    const projects = groupNamespacesIntoProjects(
++      [
++        ns('shared', { project: 'app', cluster: 'cluster-a' }),
++        ns('shared', { project: 'app', cluster: 'cluster-b' }),
++      ],
++      {
++        getProjectKey: ({ namespace, projectId }) => `${projectId}:${namespace.cluster}`,
++      }
++    );
++
++    expect(projects).toEqual([
++      {
++        id: 'app',
++        key: 'app:cluster-a',
++        namespaces: ['shared'],
++        clusters: ['cluster-a'],
++      },
++      {
++        id: 'app',
++        key: 'app:cluster-b',
++        namespaces: ['shared'],
++        clusters: ['cluster-b'],
++      },
++    ]);
++  });
++
++  it('falls back to the project id when custom grouping returns an empty key', () => {
++    const projects = groupNamespacesIntoProjects([ns('shared', { project: 'app' })], {
++      getProjectKey: () => '',
++    });
++
++    expect(projects).toEqual([{ id: 'app', namespaces: ['shared'], clusters: ['cluster-a'] }]);
++  });
++
+   // Regression test for #5254: a namespace without metadata.labels reached
+   // the inner groupBy iteratee through a stale react-query cache and crashed
+   // the Projects page with
+diff --git a/frontend/src/components/project/ProjectList.tsx b/frontend/src/components/project/ProjectList.tsx
+index 9050ed4cc..9036fc89e 100644
+--- a/frontend/src/components/project/ProjectList.tsx
++++ b/frontend/src/components/project/ProjectList.tsx
+@@ -19,10 +19,11 @@ import { Box, Button, Typography } from '@mui/material';
+ import { groupBy, uniq } from 'lodash';
+ import React, { useMemo, useState } from 'react';
+ import { useTranslation } from 'react-i18next';
++import { useLocation } from 'react-router-dom';
+ import { useClustersConf } from '../../lib/k8s';
+ import Namespace from '../../lib/k8s/namespace';
+ import { useTypedSelector } from '../../redux/hooks';
+-import { ProjectDefinition } from '../../redux/projectsSlice';
++import { ProjectDefinition, ProjectGrouping, ProjectNamespace } from '../../redux/projectsSlice';
+ import { StatusLabel } from '../common';
+ import Link from '../common/Link';
+ import Table, { TableColumn } from '../common/Table/Table';
+@@ -36,36 +37,52 @@ import { useProjectItems } from './useProjectResources';
+ // removal). Without the filter below an unguarded access crashed the
+ // Projects page. See issue #5254.
+ export function groupNamespacesIntoProjects(
+-  namespaces: ReadonlyArray<{
+-    metadata: { name: string; labels?: Record<string, string> };
+-    cluster: string;
+-  }>
++  namespaces: ReadonlyArray<ProjectNamespace>,
++  projectGrouping?: ProjectGrouping
+ ): ProjectDefinition[] {
+   const labelled = namespaces.filter(n => n.metadata.labels?.[PROJECT_ID_LABEL]);
+-  return Object.entries(groupBy(labelled, n => n.metadata.labels![PROJECT_ID_LABEL])).map(
+-    ([id, ns]) => ({
++  return Object.entries(
++    groupBy(labelled, namespace => {
++      const projectId = namespace.metadata.labels![PROJECT_ID_LABEL];
++      const key = projectGrouping?.getProjectKey({ namespace, projectId });
++      return typeof key === 'string' && key ? key : projectId;
++    })
++  ).map(([key, ns]) => {
++    const id = ns[0].metadata.labels![PROJECT_ID_LABEL];
++    return {
+       id,
++      ...(key === id ? {} : { key }),
+       namespaces: uniq(ns.map(it => it.metadata.name)),
+       clusters: uniq(ns.map(it => it.cluster)),
+-    })
+-  );
++    };
++  });
+ }
+ 
+ const useProjects = (): ProjectDefinition[] => {
+   const clusterConf = useClustersConf();
+   const clusters = Object.values(clusterConf ?? {});
++  const projectGrouping = useTypedSelector(state => state.projects.projectGrouping);
+ 
+   const { items: namespaces } = Namespace.useList({
+     clusters: clusters.map(c => c.name),
+     labelSelector: PROJECT_ID_LABEL,
+   });
+ 
+-  return useMemo(() => groupNamespacesIntoProjects(namespaces ?? []), [namespaces]);
++  return useMemo(
++    () => groupNamespacesIntoProjects(namespaces ?? [], projectGrouping),
++    [namespaces, projectGrouping]
++  );
+ };
+ 
+ export const useProject = (name: string) => {
+   const clusterConf = useClustersConf();
+   const clusters = Object.values(clusterConf ?? {});
++  const location = useLocation();
++  const projectGrouping = useTypedSelector(state => state.projects.projectGrouping);
++  const projectKey = useMemo(
++    () => new URLSearchParams(location.search).get('projectKey'),
++    [location.search]
++  );
+ 
+   const { items: namespaces, isLoading } = Namespace.useList({
+     clusters: clusters.map(c => c.name),
+@@ -76,14 +93,12 @@ export const useProject = (name: string) => {
+     () => ({
+       isLoading,
+       project: namespaces
+-        ? ({
+-            clusters: uniq(namespaces.map(it => it.cluster)),
+-            namespaces: uniq(namespaces.map(it => it.metadata.name)),
+-            id: name,
+-          } as ProjectDefinition)
++        ? groupNamespacesIntoProjects(namespaces, projectGrouping).find(
++            project => project.id === name && (!projectKey || project.key === projectKey)
++          )
+         : undefined,
+     }),
+-    [namespaces, name, isLoading]
++    [isLoading, name, namespaces, projectGrouping, projectKey]
+   );
+ };
+ 
+@@ -104,13 +119,16 @@ export default function ProjectList() {
+         id: 'name',
+         header: t('Name'),
+         accessorFn: it => it.id,
+-        Cell: ({ row: { original } }) => (
+-          <>
+-            <Link routeName="projectDetails" params={{ name: original.id }}>
++        Cell: ({ row: { original } }) => {
++          const search = original.key
++            ? `projectKey=${encodeURIComponent(original.key)}`
++            : undefined;
++          return (
++            <Link routeName="projectDetails" params={{ name: original.id }} search={search}>
+               {original.id}
+             </Link>
+-          </>
+-        ),
++          );
++        },
+       },
+       {
+         id: 'resources',
+diff --git a/frontend/src/plugin/__snapshots__/pluginLib.snapshot b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+index 206883e2f..3febcf8a1 100644
+--- a/frontend/src/plugin/__snapshots__/pluginLib.snapshot
++++ b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+@@ -698,6 +698,7 @@
+   "registerProjectDeleteButton": [Function],
+   "registerProjectDetailsTab": [Function],
+   "registerProjectHeaderAction": [Function],
++  "registerProjectGrouping": [Function],
+   "registerProjectOverviewSection": [Function],
+   "registerResourceTableColumnsProcessor": [Function],
+   "registerRoute": [Function],
+diff --git a/frontend/src/plugin/registry.tsx b/frontend/src/plugin/registry.tsx
+index b06f5a4b9..21c403ee7 100644
+--- a/frontend/src/plugin/registry.tsx
++++ b/frontend/src/plugin/registry.tsx
+@@ -105,9 +105,11 @@ import {
+   CustomCreateProject,
+   ProjectDeleteButton,
+   ProjectDetailsTab,
++  ProjectGrouping,
+   ProjectHeaderAction,
+   ProjectOverviewSection,
+   setProjectDeleteButton,
++  setProjectGrouping,
+ } from '../redux/projectsSlice';
+ import { setRoute, setRouteFilter } from '../redux/routesSlice';
+ import store from '../redux/stores/store';
+@@ -1112,6 +1114,28 @@ export function registerCustomCreateProject(customCreateProject: CustomCreatePro
+   store.dispatch(addCustomCreateProject(customCreateProject));
+ }
+ 
++/**
++ * Register custom grouping for project namespaces.
++ *
++ * The returned key is opaque and only distinguishes entries that share a project ID.
++ * Return the project ID to retain Headlamp's default cross-cluster grouping.
++ *
++ * @param projectGrouping - Project grouping definition
++ *
++ * @example
++ * ```tsx
++ * registerProjectGrouping({
++ *   getProjectKey: ({ namespace, projectId }) =>
++ *     namespace.metadata.labels?.['example.com/separate-by-cluster'] === 'true'
++ *       ? `${projectId}:${namespace.cluster}`
++ *       : projectId,
++ * });
++ * ```
++ */
++export function registerProjectGrouping(projectGrouping: ProjectGrouping) {
++  store.dispatch(setProjectGrouping(projectGrouping));
++}
++
+ /**
+  * Register a new tab in the project details view.
+  *
+diff --git a/frontend/src/redux/projectsSlice.ts b/frontend/src/redux/projectsSlice.ts
+index a9ae50074..34a1d5299 100644
+--- a/frontend/src/redux/projectsSlice.ts
++++ b/frontend/src/redux/projectsSlice.ts
+@@ -24,10 +24,28 @@ import type { KubeObject } from '../lib/k8s/KubeObject';
+ 
+ export interface ProjectDefinition {
+   id: string;
++  /** Opaque grouping key used when one project ID represents multiple project entries. */
++  key?: string;
+   namespaces: string[];
+   clusters: string[];
+ }
+ 
++export interface ProjectNamespace {
++  metadata: {
++    name: string;
++    labels?: Record<string, string>;
++  };
++  cluster: string;
++}
++
++export interface ProjectGrouping {
++  /**
++   * Return an opaque key for grouping a namespace into a project entry.
++   * The project ID is used when the returned key is empty.
++   */
++  getProjectKey: (params: { namespace: ProjectNamespace; projectId: string }) => string;
++}
++
+ /** Define custom way to create new Projects */
+ export interface CustomCreateProject {
+   id: string;
+@@ -73,6 +91,7 @@ export interface ProjectHeaderAction {
+ 
+ export interface ProjectsState {
+   customCreateProject: Record<string, CustomCreateProject>;
++  projectGrouping?: ProjectGrouping;
+   overviewSections: Record<string, ProjectOverviewSection>;
+   detailsTabs: Record<string, ProjectDetailsTab>;
+   projectDeleteButton?: ProjectDeleteButton;
+@@ -98,6 +117,11 @@ const projectsSlice = createSlice({
+       state.customCreateProject[action.payload.id] = action.payload;
+     },
+ 
++    /** Set custom project grouping behavior. */
++    setProjectGrouping(state, action: PayloadAction<ProjectGrouping>) {
++      state.projectGrouping = action.payload;
++    },
++
+     /** Register additional tab for project details page */
+     addDetailsTab(state, action: PayloadAction<ProjectDetailsTab>) {
+       state.detailsTabs[action.payload.id] = action.payload;
+@@ -131,6 +155,7 @@ const projectsSlice = createSlice({
+ 
+ export const {
+   addCustomCreateProject,
++  setProjectGrouping,
+   addDetailsTab,
+   addOverviewSection,
+   setProjectDeleteButton,
+-- 
+2.54.0
+
