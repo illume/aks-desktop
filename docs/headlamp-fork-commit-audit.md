@@ -62,11 +62,14 @@ The following mailbox patches apply to upstream Headlamp commit
 `506465d78ca162f65e46c57fab7b014fd771d047`:
 
 The paired removal patches apply to the audited downstream tip
-`4d00ea845c8f4faf2c7fde887f6a4bf9da2000c6`. **Do not ship a removal patch by
-itself:** that would temporarily restore the old bug. During a rebase, prefer to
-drop the original fork commit after selecting an upstream base that contains
-the matching fix. Use the removal patch only when a normal cleanup commit is
-needed, and include the upstream fix in the same branch update.
+`4d00ea845c8f4faf2c7fde887f6a4bf9da2000c6`. Each patch applies directly to
+its stated baseline except the project-grid zoom patch, which follows the
+project-tabs zoom patch; its removal patch likewise follows the project-tabs
+removal. **Do not ship a removal patch by itself:** that would temporarily
+restore the old bug. During a rebase, prefer to drop the original fork commit
+after selecting an upstream base that contains the matching fix. Use the
+removal patch only when a normal cleanup commit is needed, and include the
+upstream fix in the same branch update.
 
 ### Run `list-plugins` without a shell
 
@@ -268,7 +271,8 @@ needed, and include the upstream fix in the same branch update.
 - **Downstream removal:** [drop the duplicated fork
   fix](headlamp-upstream-patches/headlamp-downstream-remove-project-grid-zoom-fix.patch).
 - **AKS Desktop follow-up:** None. AKS project resources use Headlamp's shared
-  responsive grid. Apply this patch after the project-tabs zoom patch above.
+  responsive grid. Apply this patch after the project-tabs zoom patch above,
+  and apply its removal after the project-tabs removal.
 - **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
   both Project Resources Storybook tests.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
