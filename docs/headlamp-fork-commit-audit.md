@@ -67,8 +67,9 @@ its stated baseline except the project-grid zoom patch, which follows the
 project-tabs zoom patch; its removal patch likewise follows the project-tabs
 removal. The four Storybook handler patches and their removals are also ordered:
 Custom Resource Definitions, pods, apps workloads, then batch workloads.
-The protocol-helper and legal-dialog removals are validated with their matching
-upstream replacements present because each cleanup imports the new shared API.
+The update-disable, protocol-helper, and legal-dialog removals are validated
+with their matching upstream replacements present because each cleanup imports
+the new shared API.
 **Do not ship a removal patch by itself:** that would temporarily restore the
 old bug. During a rebase, prefer to drop the original fork commit after
 selecting an upstream base that contains the matching fix. Use the removal
@@ -764,7 +765,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all four
   focused update-configuration tests.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 145
-  downstream app unit tests.
+  downstream app unit tests, with the upstream helper present.
 
 ### Derive the deep-link scheme from the product manifest
 
