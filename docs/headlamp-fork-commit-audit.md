@@ -101,12 +101,99 @@ needed, and include the upstream fix in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   20 downstream tests in `frontend/src/lib/themes.test.ts`.
 
-Each check was run immediately after its patch commit. The upstream theme patch
-also adds a regression test. Submit the upstream patches as separate pull
-requests; they do not contain AKS-specific behavior. For each future patch,
-record both the downstream removal and the corresponding AKS Desktop
-configuration or plugin migration. When no product change is needed, state why
-the upstream behavior is transparent or backward-compatible.
+### Open the resource view beside the current content
+
+- **Fork source:** `c5a969eab`.
+- **Upstream patch:** [frontend: open resource view beside current
+  content](headlamp-upstream-patches/headlamp-upstream-view-button-split-right.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-view-button-split-right-fix.patch).
+- **AKS Desktop follow-up:** None. AKS Desktop uses Headlamp's resource view
+  button, so it receives the side-by-side placement when it updates Headlamp.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  new resource-view placement regression test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; both
+  resource export tests.
+
+### Keep Electron zoom menu items working after plugin customization
+
+- **Fork source:** `642809609`.
+- **Upstream patch:** [app: restore zoom actions for plugin-provided
+  menus](headlamp-upstream-patches/headlamp-upstream-electron-zoom-menu-actions.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-electron-zoom-menu-fix.patch).
+- **AKS Desktop follow-up:** None. The fix restores Headlamp's built-in zoom
+  actions after plugins customize and return the menu definition.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 139 app
+  unit tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+  downstream app unit tests.
+
+### Prevent local caching of shipped plugins
+
+- **Fork source:** `adbf7f039`.
+- **Upstream patch:** [backend: disable local static plugin
+  caching](headlamp-upstream-patches/headlamp-upstream-static-plugin-no-cache.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-static-plugin-no-cache-fix.patch).
+- **AKS Desktop follow-up:** None. Local Headlamp instances, including AKS
+  Desktop development builds, automatically receive fresh shipped-plugin files.
+  In-cluster caching is unchanged.
+- **Upstream validation:** backend lint with Go 1.26.5; the new static-plugin
+  cache-control test. This Go-only patch has no TypeScript check.
+- **Removal validation:** backend lint with Go 1.26.3; all tests in the
+  downstream backend command package.
+
+### Improve warning alert contrast in dark mode
+
+- **Fork source:** `0570f3a31`.
+- **Upstream patch:** [frontend: improve warning alert contrast in dark
+  mode](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-dark-alert-contrast-fix.patch).
+- **AKS Desktop follow-up:** None. The colors are part of Headlamp's standard
+  dark theme and require no AKS theme override.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  22 tests in `frontend/src/lib/themes.test.ts`.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  20 downstream tests in `frontend/src/lib/themes.test.ts`.
+
+### Hide empty project overview sections
+
+- **Fork source:** `65c871c7c`.
+- **Upstream patch:** [frontend: hide empty project overview
+  sections](headlamp-upstream-patches/headlamp-upstream-hide-empty-project-sections.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-empty-project-section-fix.patch).
+- **AKS Desktop follow-up:** None. An AKS overview contribution that renders no
+  content no longer leaves an empty card.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  Project Details Storybook test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  downstream Project Details Storybook test.
+
+### Keep the resource editor usable at high zoom
+
+- **Fork source:** `6f13c6288`.
+- **Upstream patch:** [frontend: keep EditorDialog visible at high
+  zoom](headlamp-upstream-patches/headlamp-upstream-editor-dialog-zoom.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-editor-dialog-zoom-fix.patch).
+- **AKS Desktop follow-up:** None. AKS resource editors use the shared Headlamp
+  dialog and automatically receive its minimum height and scrolling behavior.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  three EditorDialog Storybook tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  three downstream EditorDialog Storybook tests.
+
+Each check was run immediately after its patch commit. The upstream theme,
+resource-view, dark-alert, and static-plugin patches add focused regression
+tests; the editor patch updates its focused Storybook snapshots. Submit the
+upstream patches as separate pull requests; they do not contain AKS-specific
+behavior. For each future patch, record both the downstream removal and the
+corresponding AKS Desktop configuration or plugin migration. When no product
+change is needed, state why the upstream behavior is transparent or
+backward-compatible.
 
 ## Important look-alikes
 
@@ -221,7 +308,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 54 | `578cd9cb6` Azure-RBAC-only kubelogin auth | **AKS plugin / Cluster registration** | Keep Azure auth selection in the AKS provider. |
 | 55 | `fcf1a7759` Replace error page | **AKS configuration / Public frontend configuration** | Supply branded error content/assets. |
 | 56 | `5504295b8` Comment default consent | **Fold into row 11** | Document the generic policy instead of retaining a code-only commit. |
-| 57 | `c5a969eab` Open ViewButton activity on right | **Upstream fix** | Submit the `split-right` user experience change; upstream's Activity refactor does not include it. |
+| 57 | `c5a969eab` Open ViewButton activity on right | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-view-button-split-right.patch). |
 | 58 | `00320948b` Stop retries for sub-500 responses | **Needs decision / Upstream fix** | Decide whether 408/429 should retry, then submit only the agreed generic policy with status tests. |
 | 59 | `06f1208e6` Handle allowed namespaces in list queries | **Upstream fix** | Submit the generic namespace-query behavior with tests. |
 | 60 | `edcdb2ba4` Correct plugin source-map offset | **Upstream fix** | Submit the plugin runtime fix and its tests. |
@@ -238,7 +325,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 71 | `5e3c5e26c` Fix axe tooltip region check | **Upstream fix** | Submit the generic end-to-end accessibility test fix. |
 | 72 | `2f54e5cde` Fix log-search e2e test | **Fold into row 30** | Replace it with upstream workload-log and `LogViewer` coverage after migration. |
 | 73 | `53917bfee` Use AKS HTML title | **AKS configuration / Public frontend configuration** | Populate the public title/product name during assembly or startup. |
-| 74 | `642809609` Fix Electron zoom menu | **Upstream fix** | Submit the generic desktop menu fix. |
+| 74 | `642809609` Fix Electron zoom menu | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-electron-zoom-menu-actions.patch). |
 | 75 | `ee162d9af` Expand locales | **Needs decision / Translations** | Upstream only still-missing generic locales; keep AKS strings in a supported overlay. |
 | 76 | `3b01fe701` Ignore generated resources | **Fold / Product identity** | Ignore outputs in the AKS assembly workspace, not upstream source. |
 | 77 | `195494e46` Announce EmptyContent | **Remove** | The final fork and upstream `EmptyContent.tsx` are identical; table live regions now cover the retained behavior. |
@@ -249,7 +336,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 82 | `0fa88cf56` Respect `KUBECONFIG` when writing | **AKS plugin / Cluster registration** | Keep in the AKS provider; require the generic provider contract to pass the target path. |
 | 83 | `b8f52f6f4` Remove Azure credential format | **AKS plugin / Cluster registration** | Keep this Azure/kubelogin policy in the AKS provider. |
 | 84 | `a6e5b073a` Accessible Table column selector | **Upstream fix** | Submit the keyboard/menu implementation; persistence work does not replace it. |
-| 85 | `adbf7f039` Disable cache for static plugins | **Upstream fix** | Extend the existing backend no-cache behavior to the static-plugin route. |
+| 85 | `adbf7f039` Disable cache for static plugins | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-static-plugin-no-cache.patch). |
 | 86 | `46e6c031b` Make project tabs usable at zoom | **Upstream fix** | Submit the generic accessibility/layout fix. |
 | 87 | `2fd768195` Update project creation menu | **Needs decision / Project extensions** | If generic user experience, upstream it; if AKS workflow, implement through a project creation contribution. |
 | 88 | `c28257a3b` Fix original-name narration | **Remove** | Current upstream `f7c5f76f0` contains the complete fix; verify screen-reader behavior. |
@@ -259,12 +346,12 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Rebase on the new preload listener registry; retain command cleanup/error exits not upstream. |
 | 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Submit as a follow-up to upstream `7c6a4ecf5`. |
 | 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Submit the generic accessibility fix and translations. |
-| 95 | `0570f3a31` Style MUI Alert in dark mode | **Upstream fix** | Submit the generic theme fix. |
+| 95 | `0570f3a31` Style Material UI Alert in dark mode | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch). |
 | 96 | `86a4ce067` Derive deep-link scheme | **AKS configuration / Product identity, OAuth sign-in** | Read the protocol from the product manifest; do not hard-code AKS. |
 | 97 | `0badba5aa` Reflow map labels at zoom | **Upstream fix** | Submit the generic accessibility fix. |
 | 98 | `4b6197255` Keep resource grid visible at zoom | **Upstream fix** | Submit the generic accessibility fix. |
-| 99 | `65c871c7c` Hide empty project details card | **Upstream fix** | Submit the generic project user-experience improvement. |
-| 100 | `6f13c6288` Keep EditorDialog visible at zoom | **Upstream fix** | Submit separately from the upstream DataField zoom fix. |
+| 99 | `65c871c7c` Hide empty project details card | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-hide-empty-project-sections.patch). |
+| 100 | `6f13c6288` Keep EditorDialog visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-editor-dialog-zoom.patch); keep it separate from the upstream DataField zoom fix. |
 | 101 | `b205d0618` Group unscheduled pods | **Upstream fix** | Submit the generic Resource Map feature and tests. |
 | 102 | `0b63e2251` Prevent ConditionsTable truncation | **Upstream fix** | Submit the SimpleTable overflow fix. |
 | 103 | `513e3ba2d` Announce no table data | **Remove** | Current upstream `de73608f2` supplies the same behavior; verify narration. |

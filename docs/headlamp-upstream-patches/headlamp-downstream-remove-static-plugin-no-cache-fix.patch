@@ -1,0 +1,28 @@
+From f3d8d1189080e27921496b2c4d8ee426b8ac6812 Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Fri, 31 Jul 2026 13:39:54 +0000
+Subject: [PATCH] aksd: drop upstreamed static plugin cache fix
+
+---
+ backend/cmd/headlamp.go | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/backend/cmd/headlamp.go b/backend/cmd/headlamp.go
+index 5322ed520..faf187811 100644
+--- a/backend/cmd/headlamp.go
++++ b/backend/cmd/headlamp.go
+@@ -347,11 +347,6 @@ func addPluginRoutes(config *HeadlampConfig, r *mux.Router) {
+ 	if config.StaticPluginDir != "" {
+ 		staticPluginsHandler := http.StripPrefix(config.BaseURL+"/static-plugins/",
+ 			http.FileServer(http.Dir(config.StaticPluginDir)))
+-
+-		if !config.UseInCluster {
+-			staticPluginsHandler = serveWithNoCacheHeader(staticPluginsHandler)
+-		}
+-
+ 		r.PathPrefix("/static-plugins/").Handler(staticPluginsHandler)
+ 	}
+ }
+-- 
+2.54.0
+

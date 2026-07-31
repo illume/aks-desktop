@@ -1,0 +1,55 @@
+From 0ea7210370dbc89523bc0d43aa69270cc8b1a083 Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Fri, 31 Jul 2026 13:50:14 +0000
+Subject: [PATCH] aksd: drop upstreamed EditorDialog zoom fix
+
+---
+ frontend/src/components/common/Resource/EditorDialog.tsx       | 3 +--
+ .../EditorDialog.EditorDialogWithResource.stories.storyshot    | 2 +-
+ .../__snapshots__/EditorDialog.ExtraActions.stories.storyshot  | 2 +-
+ 3 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/frontend/src/components/common/Resource/EditorDialog.tsx b/frontend/src/components/common/Resource/EditorDialog.tsx
+index ae07b7175..f12a4e854 100644
+--- a/frontend/src/components/common/Resource/EditorDialog.tsx
++++ b/frontend/src/components/common/Resource/EditorDialog.tsx
+@@ -478,9 +478,8 @@ export default function EditorDialog(props: EditorDialogProps) {
+       {uploadFiles ? <UploadDialog setUploadFiles={setUploadFiles} setCode={setCode} /> : ''}
+       <DialogContent
+         sx={{
+-          minHeight: '400px',
+           height: '80%',
+-          overflowY: 'auto',
++          overflowY: 'hidden',
+           display: 'flex',
+           flexDirection: 'column',
+         }}
+diff --git a/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot b/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot
+index cceed0564..72a1940ce 100644
+--- a/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot
++++ b/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot
+@@ -79,7 +79,7 @@
+           </div>
+         </h2>
+         <div
+-          class="MuiDialogContent-root css-ote8bl-MuiDialogContent-root"
++          class="MuiDialogContent-root css-1gh0c7s-MuiDialogContent-root"
+         >
+           <div
+             class="MuiBox-root css-1jpm9pd"
+diff --git a/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot b/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot
+index ace776a76..859aa3e41 100644
+--- a/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot
++++ b/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot
+@@ -79,7 +79,7 @@
+           </div>
+         </h2>
+         <div
+-          class="MuiDialogContent-root css-ote8bl-MuiDialogContent-root"
++          class="MuiDialogContent-root css-1gh0c7s-MuiDialogContent-root"
+         >
+           <div
+             class="MuiBox-root css-1jpm9pd"
+-- 
+2.54.0
+

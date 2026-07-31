@@ -1,0 +1,25 @@
+From 07b7b322fff3d0c5652bad222d2c0f794e298bd1 Mon Sep 17 00:00:00 2001
+From: Oleksandr Dubenko <oldubenko@microsoft.com>
+Date: Fri, 31 Jul 2026 13:48:05 +0000
+Subject: [PATCH] frontend: hide empty project overview sections
+
+---
+ frontend/src/components/project/ProjectDetails.tsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index f177cf4a9..f845b0082 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -293,7 +293,7 @@ function ProjectOverview({
+       </Grid>
+ 
+       {additionalOverviewSections.map(section => (
+-        <Grid item xs={12} md={4}>
++        <Grid item xs={12} md={4} sx={{ '&:has(.MuiCardContent-root:empty)': { display: 'none' } }}>
+           <Card sx={{ height: '100%' }}>
+             <CardContent>
+               <section.component
+-- 
+2.54.0
+

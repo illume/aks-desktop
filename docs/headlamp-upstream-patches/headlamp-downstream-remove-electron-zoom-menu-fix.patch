@@ -1,0 +1,29 @@
+From c5abb790775d80bb99a5189aeb4d21b43ba8506c Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Fri, 31 Jul 2026 13:38:31 +0000
+Subject: [PATCH] aksd: drop upstreamed Electron zoom menu fix
+
+---
+ app/electron/main.ts | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index 261643b26..6f6f5f4cd 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -1345,12 +1345,6 @@ function menusToTemplate(mainWindow: BrowserWindow | null, menusFromPlugins: App
+       menu.click = () => {
+         mainWindow?.webContents.send('open-about-dialog');
+       };
+-    } else if (appMenu.id === 'original-zoom-in') {
+-      menu.click = () => adjustZoom(0.1);
+-    } else if (appMenu.id === 'original-zoom-out') {
+-      menu.click = () => adjustZoom(-0.1);
+-    } else if (appMenu.id === 'original-reset-zoom') {
+-      menu.click = () => setZoom(1.0);
+     } else if (!!url) {
+       menu.click = async () => {
+         // Open external links in the external browser.
+-- 
+2.54.0
+

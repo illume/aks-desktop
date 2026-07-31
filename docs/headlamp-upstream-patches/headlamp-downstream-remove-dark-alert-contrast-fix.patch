@@ -1,0 +1,34 @@
+From 5bcc1b075f303c12936f0eacae0b4aebf8c09d3b Mon Sep 17 00:00:00 2001
+From: Copilot <copilot@github.com>
+Date: Fri, 31 Jul 2026 13:38:56 +0000
+Subject: [PATCH] aksd: drop upstreamed dark alert contrast fix
+
+---
+ frontend/src/lib/themes.ts | 11 -----------
+ 1 file changed, 11 deletions(-)
+
+diff --git a/frontend/src/lib/themes.ts b/frontend/src/lib/themes.ts
+index dd5b509bc..13366d455 100644
+--- a/frontend/src/lib/themes.ts
++++ b/frontend/src/lib/themes.ts
+@@ -539,17 +539,6 @@ export function createMuiTheme(currentTheme: AppTheme) {
+             underline: 'hover' as 'always' | 'hover' | 'none',
+           },
+         },
+-        MuiAlert: {
+-          styleOverrides: {
+-            standardWarning: {
+-              backgroundColor: 'rgba(255, 152, 0, 0.12)',
+-              color: orange[50],
+-              '& .MuiAlert-icon': {
+-                color: orange[300],
+-              },
+-            },
+-          },
+-        },
+         MuiSwitch: {
+           styleOverrides: {
+             root: {
+-- 
+2.54.0
+

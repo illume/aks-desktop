@@ -1,0 +1,58 @@
+From b6fa2371d832c2b85bf752d4ede3c3b57527c886 Mon Sep 17 00:00:00 2001
+From: tejhan-diallo <tejhan.diallo@gmail.com>
+Date: Fri, 31 Jul 2026 13:39:12 +0000
+Subject: [PATCH] frontend: improve warning alert contrast in dark mode
+
+---
+ frontend/src/lib/themes.test.ts | 12 ++++++++++++
+ frontend/src/lib/themes.ts      | 11 +++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/frontend/src/lib/themes.test.ts b/frontend/src/lib/themes.test.ts
+index 1eb5d4e3a..69af3ef1e 100644
+--- a/frontend/src/lib/themes.test.ts
++++ b/frontend/src/lib/themes.test.ts
+@@ -35,6 +35,18 @@ describe('themes.ts', () => {
+       expect(theme.palette.background.default).toBe('#1f1f1f');
+     });
+ 
++    it('should keep warning alerts readable in the dark theme', () => {
++      const theme = createMuiTheme({ base: 'dark', name: 'Dark Theme' });
++
++      expect(theme.components?.MuiAlert?.styleOverrides?.standardWarning).toEqual({
++        backgroundColor: 'rgba(255, 152, 0, 0.12)',
++        color: '#fff3e0',
++        '& .MuiAlert-icon': {
++          color: '#ffb74d',
++        },
++      });
++    });
++
+     it('should set searchHint defaults for light and dark themes', () => {
+       const lightTheme = createMuiTheme({ base: 'light', name: 'Light Theme' });
+       const darkTheme = createMuiTheme({ base: 'dark', name: 'Dark Theme' });
+diff --git a/frontend/src/lib/themes.ts b/frontend/src/lib/themes.ts
+index 173313bcc..8ab7752bc 100644
+--- a/frontend/src/lib/themes.ts
++++ b/frontend/src/lib/themes.ts
+@@ -534,6 +534,17 @@ export function createMuiTheme(currentTheme: AppTheme) {
+             underline: 'hover' as 'always' | 'hover' | 'none',
+           },
+         },
++        MuiAlert: {
++          styleOverrides: {
++            standardWarning: {
++              backgroundColor: 'rgba(255, 152, 0, 0.12)',
++              color: orange[50],
++              '& .MuiAlert-icon': {
++                color: orange[300],
++              },
++            },
++          },
++        },
+         MuiSwitch: {
+           styleOverrides: {
+             root: {
+-- 
+2.54.0
+
