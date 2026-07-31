@@ -1,23 +1,23 @@
-From 25ecb6e5456239b0b8140217f33b25234bd946ce Mon Sep 17 00:00:00 2001
+From ad45941278ba33b958248aecef24f89cf23579d3 Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 17:59:00 +0000
+Date: Fri, 31 Jul 2026 18:07:25 +0000
 Subject: [PATCH] app: derive verification names from package metadata
 
 ---
- app/scripts/verify-build-linux.sh    | 26 ++++++++++++------------
- app/scripts/verify-build-mac.sh      | 26 ++++++++++++------------
- app/scripts/verify-build-windows.ps1 | 30 ++++++++++++++++++----------
- 3 files changed, 45 insertions(+), 37 deletions(-)
+ app/scripts/verify-build-linux.sh    | 26 +++++++++++++-------------
+ app/scripts/verify-build-mac.sh      | 26 +++++++++++++-------------
+ app/scripts/verify-build-windows.ps1 | 22 +++++++++++-----------
+ 3 files changed, 37 insertions(+), 37 deletions(-)
 
 diff --git a/app/scripts/verify-build-linux.sh b/app/scripts/verify-build-linux.sh
-index 195afcb96..ad79116f5 100755
+index 195afcb96..d5a0984f0 100755
 --- a/app/scripts/verify-build-linux.sh
 +++ b/app/scripts/verify-build-linux.sh
 @@ -19,6 +19,7 @@ set -e
  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
  DIST_DIR="$APP_DIR/dist"
-+APP_EXECUTABLE_NAME=$(node -e "const p=require(process.argv[1]); process.stdout.write(p.build?.linux?.executableName || p.build?.executableName || p.name)" "$APP_DIR/package.json")
++APP_EXECUTABLE_NAME=$(node -e "const path=require('path'); const d=process.argv[1]; const p=require(path.join(d, 'package.json')); const {sanitizeFileName}=require(path.join(d, 'node_modules/builder-util/out/filename.js')); const n=p.build?.linux?.executableName ?? p.build?.executableName; process.stdout.write(n == null ? sanitizeFileName(p.name).toLowerCase() : sanitizeFileName(n))" "$APP_DIR")
  
  echo "=== Verifying Linux Build Artifacts ==="
  echo ""
@@ -92,14 +92,14 @@ index 195afcb96..ad79116f5 100755
        if [ -z "$EXISTING_HEADLAMP_PIDS" ] || ! echo "$EXISTING_HEADLAMP_PIDS" | grep -qw "$pid"; then
          ELECTRON_PID="$pid"
 diff --git a/app/scripts/verify-build-mac.sh b/app/scripts/verify-build-mac.sh
-index c913b13ef..826549d0d 100755
+index c913b13ef..8b8313ce6 100755
 --- a/app/scripts/verify-build-mac.sh
 +++ b/app/scripts/verify-build-mac.sh
 @@ -19,6 +19,7 @@ set -e
  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
  DIST_DIR="$APP_DIR/dist"
-+PRODUCT_NAME=$(node -e "const p=require(process.argv[1]); process.stdout.write(p.build?.mac?.executableName || p.build?.executableName || p.productName || p.name)" "$APP_DIR/package.json")
++PRODUCT_NAME=$(node -e "const path=require('path'); const d=process.argv[1]; const p=require(path.join(d, 'package.json')); const {sanitizeFileName}=require(path.join(d, 'node_modules/builder-util/out/filename.js')); const n=p.build?.mac?.executableName ?? p.build?.executableName; const productName=p.build?.productName || p.productName || p.name; process.stdout.write(sanitizeFileName(n ?? productName))" "$APP_DIR")
  
  # Function to test backend binary
  test_backend() {
@@ -189,30 +189,22 @@ index c913b13ef..826549d0d 100755
    fi
    echo "Electron app started with PID: $ELECTRON_PID"
 diff --git a/app/scripts/verify-build-windows.ps1 b/app/scripts/verify-build-windows.ps1
-index c17c1f6e5..42d63c011 100644
+index c17c1f6e5..59f33605d 100644
 --- a/app/scripts/verify-build-windows.ps1
 +++ b/app/scripts/verify-build-windows.ps1
-@@ -18,6 +18,19 @@ $ErrorActionPreference = "Stop"
+@@ -18,6 +18,11 @@ $ErrorActionPreference = "Stop"
  $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
  $appDir = Split-Path -Parent $scriptDir
  $distDir = Join-Path $appDir "dist"
-+$appPackage = Get-Content (Join-Path $appDir "package.json") -Raw | ConvertFrom-Json
-+$appExecutableName = if ($appPackage.build.win.executableName) {
-+  $appPackage.build.win.executableName
-+} elseif ($appPackage.build.executableName) {
-+  $appPackage.build.executableName
-+} elseif ($appPackage.productName) {
-+  $appPackage.productName
-+} else {
-+  $appPackage.name
-+}
-+if (-not $appExecutableName.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
-+  $appExecutableName += ".exe"
++$appExecutableName = & node -e "const path=require('path'); const d=process.argv[1]; const p=require(path.join(d, 'package.json')); const {sanitizeFileName}=require(path.join(d, 'node_modules/builder-util/out/filename.js')); const n=p.build?.win?.executableName ?? p.build?.executableName; const productName=p.build?.productName || p.productName || p.name; process.stdout.write(sanitizeFileName(n ?? productName) + '.exe')" $appDir
++if ($LASTEXITCODE -ne 0 -or -not $appExecutableName) {
++  Write-Host "[FAIL] Could not derive the app executable name" -ForegroundColor Red
++  exit 1
 +}
  
  # Function to test backend binary
  function Test-BackendBinary {
-@@ -55,12 +68,8 @@ function Test-BackendBinary {
+@@ -55,12 +60,8 @@ function Test-BackendBinary {
      exit $exitCode
    }
    Write-Host "Backend version: $versionOutput"
@@ -227,7 +219,7 @@ index c17c1f6e5..42d63c011 100644
      exit 1
    }
    Write-Host "[PASS] Backend binary is working" -ForegroundColor Green
-@@ -97,7 +106,7 @@ if (Test-Path $unpackedDir) {
+@@ -97,7 +98,7 @@ if (Test-Path $unpackedDir) {
    $backendPath = Join-Path $unpackedDir "resources\headlamp-server.exe"
    if (Test-Path $backendPath) {
      Test-BackendBinary $backendPath
@@ -236,7 +228,7 @@ index c17c1f6e5..42d63c011 100644
    } else {
      Write-Host "[FAIL] Backend server binary not found in unpacked resources" -ForegroundColor Red
      exit 1
-@@ -108,7 +117,7 @@ if (Test-Path $unpackedDir) {
+@@ -108,7 +109,7 @@ if (Test-Path $unpackedDir) {
    if ($backendPath) {
      Test-BackendBinary $backendPath.FullName
      # Try to find the app executable in the dist output
@@ -245,7 +237,7 @@ index c17c1f6e5..42d63c011 100644
    } else {
      Write-Host "[FAIL] Could not find backend binary to test in dist output" -ForegroundColor Red
      exit 1
-@@ -120,7 +129,7 @@ Write-Host ""
+@@ -120,7 +121,7 @@ Write-Host ""
  Write-Host "=== Verifying Electron App ===" -ForegroundColor Cyan
  if ($appPath -and (Test-Path $appPath)) {
    Write-Host "Testing Electron app..."
@@ -254,7 +246,7 @@ index c17c1f6e5..42d63c011 100644
    
    # Initialize tempDir outside try block so it's accessible in catch/finally
    $tempDir = $null
-@@ -200,7 +209,7 @@ if ($appPath -and (Test-Path $appPath)) {
+@@ -200,7 +201,7 @@ if ($appPath -and (Test-Path $appPath)) {
      }
    }
  } else {
@@ -263,7 +255,7 @@ index c17c1f6e5..42d63c011 100644
    exit 1
  }
  
-@@ -282,4 +291,3 @@ if ($null -eq $serverPID) {
+@@ -282,4 +283,3 @@ if ($null -eq $serverPID) {
  
  Write-Host ""
  Write-Host "[PASS] All Windows verification checks passed" -ForegroundColor Green
