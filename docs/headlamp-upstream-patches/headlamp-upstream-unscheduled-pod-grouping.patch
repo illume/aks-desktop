@@ -1,0 +1,109 @@
+From 6839d79e4a381435d21b48bd00b58916ccd806db Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 15:00:41 +0000
+Subject: [PATCH] frontend: group unscheduled pods in Resource Map
+
+---
+ .../resourceMap/graph/graphGrouping.test.ts   | 23 +++++++++++-----
+ .../resourceMap/graph/graphGrouping.tsx       | 27 ++++++++++++-------
+ 2 files changed, 35 insertions(+), 15 deletions(-)
+
+diff --git a/frontend/src/components/resourceMap/graph/graphGrouping.test.ts b/frontend/src/components/resourceMap/graph/graphGrouping.test.ts
+index b7375fd50..4508f0b36 100644
+--- a/frontend/src/components/resourceMap/graph/graphGrouping.test.ts
++++ b/frontend/src/components/resourceMap/graph/graphGrouping.test.ts
+@@ -16,7 +16,7 @@
+ 
+ import { KubeMetadata } from '../../../lib/k8s/KubeMetadata';
+ import { KubeObject } from '../../../lib/k8s/KubeObject';
+-import { getMainNode, groupGraph } from './graphGrouping';
++import { getMainNode, groupGraph, UNSCHEDULED_GROUP } from './graphGrouping';
+ import { GraphEdge, GraphNode } from './graphModel';
+ 
+ describe('getMainNode', () => {
+@@ -115,11 +115,22 @@ describe('groupGraph', () => {
+     });
+     const nodeNames = groupedGraph.nodes?.map(node => node.id);
+ 
+-    // Node 2 is grouped into Node-node1 group
+-    // Nodes 1, 3 and 4 don't have a node and are not grouped
+-    // After sorting by weight (descending) and ID (stable sort),
+-    // individual nodes come first, then group because no edges are present
+-    expect(nodeNames).toEqual(['1', '3', '4', 'Node-node1']);
++    // Pods 1, 3 and 4 have no nodeName and are grouped into Node-Unscheduled
++    // Pod 2 has nodeName 'node1' and is grouped into Node-node1
++    expect(nodeNames).toHaveLength(2);
++    expect(nodeNames).toEqual(expect.arrayContaining(['Node-Unscheduled', 'Node-node1']));
++  });
++
++  it('does not link a kubeObject to the Unscheduled group', () => {
++    const groupedGraph = groupGraph(nodes, edges, {
++      groupBy: 'node',
++      namespaces: [],
++      k8sNodes: [],
++    });
++    const unscheduledGroup = groupedGraph.nodes?.find(n => n.label === UNSCHEDULED_GROUP);
++    expect(unscheduledGroup).toBeDefined();
++    expect(unscheduledGroup?.kubeObject).toBeUndefined();
++    expect(unscheduledGroup?.nodes?.length).toBe(3);
+   });
+ 
+   it('associates k8sNode kubeObject with node groups when k8sNodes are provided', () => {
+diff --git a/frontend/src/components/resourceMap/graph/graphGrouping.tsx b/frontend/src/components/resourceMap/graph/graphGrouping.tsx
+index ac0103130..88825a66c 100644
+--- a/frontend/src/components/resourceMap/graph/graphGrouping.tsx
++++ b/frontend/src/components/resourceMap/graph/graphGrouping.tsx
+@@ -24,6 +24,8 @@ import { forEachNode, getNodeWeight, GraphEdge, GraphNode } from './graphModel';
+ 
+ export type GroupBy = 'node' | 'namespace' | 'instance';
+ 
++export const UNSCHEDULED_GROUP = 'Unscheduled';
++
+ /**
+  * Returns the amount of nodes in the graph
+  */
+@@ -318,25 +320,32 @@ export function groupGraph(
+   }
+ 
+   if (groupBy === 'node') {
+-    // Create groups based on the Kube resource node
++    // Create groups based on the Kube resource node.
++    // Pods without a nodeName (e.g. pending due to quota or scheduling failures)
++    // are grouped under an "Unscheduled" sentinel so they remain visible.
+     components = groupByProperty(
+       components,
+       component => {
++        let pod: Pod | undefined;
+         if (component.nodes) {
+-          return (component.nodes.find(node => node.kubeObject?.kind === 'Pod')?.kubeObject as Pod)
+-            ?.spec?.nodeName;
++          pod = component.nodes.find(node => node.kubeObject?.kind === 'Pod')?.kubeObject as
++            | Pod
++            | undefined;
++        } else if (component.kubeObject?.kind === 'Pod') {
++          pod = component.kubeObject as Pod;
+         }
+-
+-        return (component.kubeObject as Pod)?.spec?.nodeName;
++        if (pod) {
++          return pod.spec?.nodeName ?? UNSCHEDULED_GROUP;
++        }
++        // Non-Pod resources without a Pod in their component: leave ungrouped
++        return undefined;
+       },
+       { label: 'Node', allowSingleMemberGroup: true }
+     );
+ 
+     components.forEach(component => {
+-      if (!component.kubeObject) {
+-        component.kubeObject = k8sNodes.find(
+-          namespace => namespace.metadata.name === component.label
+-        );
++      if (!component.kubeObject && component.label !== UNSCHEDULED_GROUP) {
++        component.kubeObject = k8sNodes.find(node => node.metadata.name === component.label);
+         if (component.kubeObject) {
+           component.id = component.kubeObject.metadata.uid;
+         }
+-- 
+2.54.0
+

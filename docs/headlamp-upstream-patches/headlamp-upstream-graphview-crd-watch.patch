@@ -1,0 +1,25 @@
+From ab25dd50544fcee32eccd31aa6f457936e63fc42 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 14:47:12 +0000
+Subject: [PATCH] frontend: avoid CRD watches in GraphView story
+
+---
+ frontend/src/components/resourceMap/GraphView.stories.tsx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/frontend/src/components/resourceMap/GraphView.stories.tsx b/frontend/src/components/resourceMap/GraphView.stories.tsx
+index 7159ad3fe..4fcd53bef 100644
+--- a/frontend/src/components/resourceMap/GraphView.stories.tsx
++++ b/frontend/src/components/resourceMap/GraphView.stories.tsx
+@@ -212,7 +212,7 @@ const mockSource: GraphSource = {
+ 
+ export const BasicExample = () => (
+   <TestContext>
+-    <GraphView height="600px" defaultSources={[mockSource]} />
++    <GraphView height="600px" defaultSources={[mockSource]} defaultRelations={[]} />
+   </TestContext>
+ );
+ BasicExample.args = {};
+-- 
+2.54.0
+

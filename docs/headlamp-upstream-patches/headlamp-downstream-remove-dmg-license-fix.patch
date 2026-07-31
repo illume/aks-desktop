@@ -1,0 +1,25 @@
+From 58cba5e2e1d572bbef9e60bf2f6369a97aa84fea Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 14:50:35 +0000
+Subject: [PATCH] aksd: drop upstreamed DMG license support
+
+---
+ app/package.json | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/app/package.json b/app/package.json
+index f14835eee..a9046896c 100644
+--- a/app/package.json
++++ b/app/package.json
+@@ -229,8 +229,5 @@
+     "tar": "^7.5.11",
+     "yaml": "^2.6.1",
+     "yargs": "^17.7.2"
+-  },
+-  "optionalDependencies": {
+-    "dmg-license": "^1.0.11"
+   }
+ }
+-- 
+2.54.0
+

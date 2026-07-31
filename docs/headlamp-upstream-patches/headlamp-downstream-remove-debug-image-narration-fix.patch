@@ -1,0 +1,576 @@
+From 6aab648ddd7cb878116f8872b6d43cd8ac86d0c0 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 14:58:58 +0000
+Subject: [PATCH] aksd: drop upstreamed debug image label fix
+
+---
+ frontend/src/components/App/Settings/PodDebugSettings.tsx  | 6 +-----
+ .../PodDebugSettings.Default.stories.storyshot             | 7 +------
+ .../PodDebugSettings.Disabled.stories.storyshot            | 7 +------
+ .../SettingsCluster.Default.stories.storyshot              | 7 +------
+ .../SettingsCluster.DynamicCluster.stories.storyshot       | 7 +------
+ ...ingsCluster.MultipleAllowedNamespaces.stories.storyshot | 7 +------
+ .../SettingsCluster.NamespaceValidation.stories.storyshot  | 7 +------
+ .../SettingsCluster.WithAppearance.stories.storyshot       | 7 +------
+ .../SettingsCluster.WithSavedSettings.stories.storyshot    | 7 +------
+ frontend/src/i18n/locales/ar/translation.json              | 1 -
+ frontend/src/i18n/locales/bn/translation.json              | 1 -
+ frontend/src/i18n/locales/cs/translation.json              | 1 -
+ frontend/src/i18n/locales/de/translation.json              | 1 -
+ frontend/src/i18n/locales/en/translation.json              | 1 -
+ frontend/src/i18n/locales/es/translation.json              | 1 -
+ frontend/src/i18n/locales/fr/translation.json              | 1 -
+ frontend/src/i18n/locales/he/translation.json              | 1 -
+ frontend/src/i18n/locales/hi/translation.json              | 1 -
+ frontend/src/i18n/locales/hu/translation.json              | 1 -
+ frontend/src/i18n/locales/id/translation.json              | 1 -
+ frontend/src/i18n/locales/it/translation.json              | 1 -
+ frontend/src/i18n/locales/ja/translation.json              | 1 -
+ frontend/src/i18n/locales/ko/translation.json              | 1 -
+ frontend/src/i18n/locales/nl/translation.json              | 1 -
+ frontend/src/i18n/locales/pl/translation.json              | 1 -
+ frontend/src/i18n/locales/pt-BR/translation.json           | 1 -
+ frontend/src/i18n/locales/pt-PT/translation.json           | 1 -
+ frontend/src/i18n/locales/ru/translation.json              | 1 -
+ frontend/src/i18n/locales/sv/translation.json              | 1 -
+ frontend/src/i18n/locales/ta/translation.json              | 1 -
+ frontend/src/i18n/locales/tr/translation.json              | 1 -
+ frontend/src/i18n/locales/ur/translation.json              | 1 -
+ frontend/src/i18n/locales/zh-Hans/translation.json         | 1 -
+ frontend/src/i18n/locales/zh-Hant/translation.json         | 1 -
+ 34 files changed, 9 insertions(+), 78 deletions(-)
+
+diff --git a/frontend/src/components/App/Settings/PodDebugSettings.tsx b/frontend/src/components/App/Settings/PodDebugSettings.tsx
+index 3b514b74c..643649003 100644
+--- a/frontend/src/components/App/Settings/PodDebugSettings.tsx
++++ b/frontend/src/components/App/Settings/PodDebugSettings.tsx
+@@ -49,7 +49,6 @@ export default function PodDebugSettings(props: SettingsProps) {
+     useTypedSelector(state => state.config?.defaultPodDebugImage) || DEFAULT_POD_DEBUG_IMAGE;
+ 
+   const podDebugLabelID = 'pod-debug-enabled-label';
+-  const debugImageLabelID = 'debug-image-label';
+ 
+   const image = clusterSettings.podDebugTerminal?.debugImage ?? '';
+   const isEnabled = clusterSettings.podDebugTerminal?.isEnabled ?? true;
+@@ -83,7 +82,7 @@ export default function PodDebugSettings(props: SettingsProps) {
+             ),
+           },
+           {
+-            name: <span id={debugImageLabelID}>{t('translation|Debug Image')}</span>,
++            name: 'Debug Image',
+             value: (
+               <TextField
+                 onChange={event => {
+@@ -92,9 +91,6 @@ export default function PodDebugSettings(props: SettingsProps) {
+                 }}
+                 value={image}
+                 placeholder={defaultPodDebugImage}
+-                inputProps={{
+-                  'aria-labelledby': debugImageLabelID,
+-                }}
+                 helperText={t(
+                   'translation|The default image is used for creating ephemeral debug containers.'
+                 )}
+diff --git a/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Default.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Default.stories.storyshot
+index abf1ddc9c..958212764 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Default.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Default.stories.storyshot
+@@ -74,11 +74,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -92,7 +88,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Disabled.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Disabled.stories.storyshot
+index 1723182c5..2b01372f1 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Disabled.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/PodDebugSettings.Disabled.stories.storyshot
+@@ -73,11 +73,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -91,7 +87,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot
+index d47225fc6..cbb7aecbf 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot
+@@ -557,11 +557,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -575,7 +571,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot
+index b118d6e73..4a5e4864e 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot
+@@ -602,11 +602,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -620,7 +616,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot
+index 54bf5238d..07bc8f652 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot
+@@ -690,11 +690,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -708,7 +704,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot
+index ef83623d7..15a4582ba 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot
+@@ -602,11 +602,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -620,7 +616,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot
+index 81e73a3a6..93b47d796 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot
+@@ -580,11 +580,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -598,7 +594,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot
+index fbc9ca120..28a822dd3 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot
+@@ -647,11 +647,7 @@
+           <dt
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-3 MuiGrid-grid-md-2 css-1hrqr1q-MuiGrid-root"
+           >
+-            <span
+-              id="debug-image-label"
+-            >
+-              Debug Image
+-            </span>
++            Debug Image
+           </dt>
+           <dd
+             class="MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-9 MuiGrid-grid-md-10 css-ui3itl-MuiGrid-root"
+@@ -665,7 +661,6 @@
+                 <input
+                   aria-describedby=":mock-test-id:"
+                   aria-invalid="false"
+-                  aria-labelledby="debug-image-label"
+                   class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall css-1n4twyu-MuiInputBase-input-MuiOutlinedInput-input"
+                   id=":mock-test-id:"
+                   placeholder="docker.io/library/busybox:latest"
+diff --git a/frontend/src/i18n/locales/ar/translation.json b/frontend/src/i18n/locales/ar/translation.json
+index 168c38062..f6cc499ff 100644
+--- a/frontend/src/i18n/locales/ar/translation.json
++++ b/frontend/src/i18n/locales/ar/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "قيمة مخصصة",
+   "Pod Debug Settings": "إعدادات تصحيح Pod",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "لا يمكن إزالة حاويات التصحيح المؤقتة عبر Kubernetes API. ستبقى في مواصفات الـ pod حتى بعد إغلاق الطرفية. لإزالتها، يجب إعادة إنشاء الـ pod",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "تُستخدم الصورة الافتراضية لإنشاء حاويات تصحيح مؤقتة.",
+   "General Settings": "الإعدادات العامة",
+   "Version": "الإصدار",
+diff --git a/frontend/src/i18n/locales/bn/translation.json b/frontend/src/i18n/locales/bn/translation.json
+index 04ce11978..42b832c26 100644
+--- a/frontend/src/i18n/locales/bn/translation.json
++++ b/frontend/src/i18n/locales/bn/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "Custom মান",
+   "Pod Debug Settings": "Pod ডিবাগ সেটিংস",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "অস্থায়ী ডিবাগ কনটেইনার Kubernetes API এর মাধ্যমে সরানো যায় না। Terminal বন্ধ হওয়ার পরেও এগুলো Pod-এর স্পেসিফিকেশনে থাকবে। সরাতে হলে Pod পুনরায় তৈরি করতে হবে।",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "অস্থায়ী ডিবাগ কনটেইনার তৈরির জন্য ডিফল্ট ইমেজ ব্যবহৃত হয়।",
+   "General Settings": "সাধারণ সেটিংস",
+   "Version": "Version",
+diff --git a/frontend/src/i18n/locales/cs/translation.json b/frontend/src/i18n/locales/cs/translation.json
+index 3bd300c75..5db4210bf 100644
+--- a/frontend/src/i18n/locales/cs/translation.json
++++ b/frontend/src/i18n/locales/cs/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/de/translation.json b/frontend/src/i18n/locales/de/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/de/translation.json
++++ b/frontend/src/i18n/locales/de/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/en/translation.json b/frontend/src/i18n/locales/en/translation.json
+index 2c8213913..cceee5cb0 100644
+--- a/frontend/src/i18n/locales/en/translation.json
++++ b/frontend/src/i18n/locales/en/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "Custom value",
+   "Pod Debug Settings": "Pod Debug Settings",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.",
+-  "Debug Image": "Debug Image",
+   "The default image is used for creating ephemeral debug containers.": "The default image is used for creating ephemeral debug containers.",
+   "General Settings": "General Settings",
+   "Version": "Version",
+diff --git a/frontend/src/i18n/locales/es/translation.json b/frontend/src/i18n/locales/es/translation.json
+index 5ac971053..a1f51b58a 100644
+--- a/frontend/src/i18n/locales/es/translation.json
++++ b/frontend/src/i18n/locales/es/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/fr/translation.json b/frontend/src/i18n/locales/fr/translation.json
+index 5ac971053..a1f51b58a 100644
+--- a/frontend/src/i18n/locales/fr/translation.json
++++ b/frontend/src/i18n/locales/fr/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/he/translation.json b/frontend/src/i18n/locales/he/translation.json
+index 1a75508e8..0672c40f1 100644
+--- a/frontend/src/i18n/locales/he/translation.json
++++ b/frontend/src/i18n/locales/he/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "Custom value",
+   "Pod Debug Settings": "Pod Debug Settings",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "The default image is used for creating ephemeral debug containers.",
+   "General Settings": "General Settings",
+   "Version": "Version",
+diff --git a/frontend/src/i18n/locales/hi/translation.json b/frontend/src/i18n/locales/hi/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/hi/translation.json
++++ b/frontend/src/i18n/locales/hi/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/hu/translation.json b/frontend/src/i18n/locales/hu/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/hu/translation.json
++++ b/frontend/src/i18n/locales/hu/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/id/translation.json b/frontend/src/i18n/locales/id/translation.json
+index 3c9d02344..7c1ea25a7 100644
+--- a/frontend/src/i18n/locales/id/translation.json
++++ b/frontend/src/i18n/locales/id/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/it/translation.json b/frontend/src/i18n/locales/it/translation.json
+index 5ac971053..a1f51b58a 100644
+--- a/frontend/src/i18n/locales/it/translation.json
++++ b/frontend/src/i18n/locales/it/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/ja/translation.json b/frontend/src/i18n/locales/ja/translation.json
+index 3c9d02344..7c1ea25a7 100644
+--- a/frontend/src/i18n/locales/ja/translation.json
++++ b/frontend/src/i18n/locales/ja/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/ko/translation.json b/frontend/src/i18n/locales/ko/translation.json
+index 3c9d02344..7c1ea25a7 100644
+--- a/frontend/src/i18n/locales/ko/translation.json
++++ b/frontend/src/i18n/locales/ko/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/nl/translation.json b/frontend/src/i18n/locales/nl/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/nl/translation.json
++++ b/frontend/src/i18n/locales/nl/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/pl/translation.json b/frontend/src/i18n/locales/pl/translation.json
+index 3bd300c75..5db4210bf 100644
+--- a/frontend/src/i18n/locales/pl/translation.json
++++ b/frontend/src/i18n/locales/pl/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/pt-BR/translation.json b/frontend/src/i18n/locales/pt-BR/translation.json
+index 5ac971053..a1f51b58a 100644
+--- a/frontend/src/i18n/locales/pt-BR/translation.json
++++ b/frontend/src/i18n/locales/pt-BR/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/pt-PT/translation.json b/frontend/src/i18n/locales/pt-PT/translation.json
+index 5ac971053..a1f51b58a 100644
+--- a/frontend/src/i18n/locales/pt-PT/translation.json
++++ b/frontend/src/i18n/locales/pt-PT/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/ru/translation.json b/frontend/src/i18n/locales/ru/translation.json
+index 3bd300c75..5db4210bf 100644
+--- a/frontend/src/i18n/locales/ru/translation.json
++++ b/frontend/src/i18n/locales/ru/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/sv/translation.json b/frontend/src/i18n/locales/sv/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/sv/translation.json
++++ b/frontend/src/i18n/locales/sv/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/ta/translation.json b/frontend/src/i18n/locales/ta/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/ta/translation.json
++++ b/frontend/src/i18n/locales/ta/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/tr/translation.json b/frontend/src/i18n/locales/tr/translation.json
+index 0a0e3b34b..90355f223 100644
+--- a/frontend/src/i18n/locales/tr/translation.json
++++ b/frontend/src/i18n/locales/tr/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/ur/translation.json b/frontend/src/i18n/locales/ur/translation.json
+index d9f86f7f8..2962b9d6e 100644
+--- a/frontend/src/i18n/locales/ur/translation.json
++++ b/frontend/src/i18n/locales/ur/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "حسب ضرورت قدر",
+   "Pod Debug Settings": "پوڈ ڈیبگ ترتیبات",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "عارضی ڈیبگ کنٹینرز کو Kubernetes API کے ذریعے حذف نہیں کیا جا سکتا، ٹرمینل بند ہونے کے بعد بھی یہ پوڈ کی تفصیلات میں موجود رہیں گے، انہیں ہٹانے کے لیے پوڈ کو دوبارہ بنانا ہوگا",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "ڈیفالٹ امیج عارضی ڈیبگ کنٹینرز بنانے کے لیے استعمال ہوتی ہے",
+   "General Settings": "عمومی ترتیبات",
+   "Version": "ورژن",
+diff --git a/frontend/src/i18n/locales/zh-Hans/translation.json b/frontend/src/i18n/locales/zh-Hans/translation.json
+index 3c9d02344..7c1ea25a7 100644
+--- a/frontend/src/i18n/locales/zh-Hans/translation.json
++++ b/frontend/src/i18n/locales/zh-Hans/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+diff --git a/frontend/src/i18n/locales/zh-Hant/translation.json b/frontend/src/i18n/locales/zh-Hant/translation.json
+index 3c9d02344..7c1ea25a7 100644
+--- a/frontend/src/i18n/locales/zh-Hant/translation.json
++++ b/frontend/src/i18n/locales/zh-Hant/translation.json
+@@ -165,7 +165,6 @@
+   "Custom value": "",
+   "Pod Debug Settings": "",
+   "Ephemeral debug containers cannot be removed via Kubernetes API. They will remain in the pod specification even after the terminal closes. To remove them, the pod must be recreated.": "",
+-  "Debug Image": "",
+   "The default image is used for creating ephemeral debug containers.": "",
+   "General Settings": "",
+   "Version": "",
+-- 
+2.54.0
+

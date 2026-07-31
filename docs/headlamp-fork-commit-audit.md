@@ -278,10 +278,94 @@ upstream fix in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
   both downstream Project Resources Storybook tests.
 
+### Avoid Custom Resource Definition watches in the Resource Map story
+
+- **Fork source:** `013129c89`.
+- **Upstream patch:** [frontend: avoid Custom Resource Definition watches in
+  the GraphView story](headlamp-upstream-patches/headlamp-upstream-graphview-crd-watch.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-graphview-crd-watch-fix.patch).
+- **AKS Desktop follow-up:** None. This isolates Headlamp's test story from
+  default cluster relations and does not change runtime Resource Map behavior.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  GraphView `BasicExample` Storybook test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  downstream GraphView `BasicExample` Storybook test.
+
+### Include license resources in macOS disk images
+
+- **Fork source:** `a013f5330`.
+- **Upstream patch:** [app: add generic DMG license
+  support](headlamp-upstream-patches/headlamp-upstream-dmg-license.patch).
+- **Downstream removal:** [drop the duplicated fork
+  support](headlamp-upstream-patches/headlamp-downstream-remove-dmg-license-fix.patch).
+- **AKS Desktop follow-up:** Keep the AKS license content in product assembly.
+  The dependency only enables electron-builder's generic macOS license support.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 139 app
+  unit tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+  downstream app unit tests.
+
+### Honor Table toolbar and row-selection options
+
+- **Fork source:** `5f7ade8ca`.
+- **Upstream patch:** [frontend: honor Table toolbar and selection
+  props](headlamp-upstream-patches/headlamp-upstream-table-props.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fixes](headlamp-upstream-patches/headlamp-downstream-remove-table-props-fix.patch).
+- **AKS Desktop follow-up:** None. AKS plugin tables can use the existing public
+  options without a product-specific wrapper.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  14 Table Storybook tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  14 downstream Table Storybook tests.
+
+### Keep SimpleTable content visible when columns resize
+
+- **Fork sources:** `0b63e2251` and its duplicate `e87e6d6fe`.
+- **Upstream patch:** [frontend: remove cell overflow that truncates
+  ConditionsTable](headlamp-upstream-patches/headlamp-upstream-simpletable-overflow.patch).
+- **Downstream removal:** [drop the folded fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-simpletable-overflow-fix.patch).
+- **AKS Desktop follow-up:** None. AKS details pages use the shared table and
+  automatically retain visible condition text when columns resize.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  11 SimpleTable Storybook tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  11 downstream SimpleTable Storybook tests.
+
+### Label the pod debug image field for screen readers
+
+- **Fork source:** `a1769847c`.
+- **Upstream patch:** [frontend: label the pod debug image
+  field](headlamp-upstream-patches/headlamp-upstream-debug-image-narration.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-debug-image-narration-fix.patch).
+- **AKS Desktop follow-up:** None. The shared cluster setting supplies the
+  translated visible and accessible label for AKS clusters.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  locale consistency; all 17 PodDebugSettings and SettingsCluster Storybook
+  tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  locale consistency; all 17 downstream settings Storybook tests.
+
+### Group unscheduled pods in Resource Map node view
+
+- **Fork source:** `b205d0618`.
+- **Upstream patch:** [frontend: group unscheduled pods in Resource
+  Map](headlamp-upstream-patches/headlamp-upstream-unscheduled-pod-grouping.patch).
+- **Downstream removal:** [drop the duplicated fork
+  feature](headlamp-upstream-patches/headlamp-downstream-remove-unscheduled-pod-grouping-fix.patch).
+- **AKS Desktop follow-up:** None. Pending AKS pods remain visible under a
+  product-neutral `Unscheduled` group.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  12 `graphGrouping` tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  nine downstream `graphGrouping` tests.
+
 Each check was run immediately after its patch commit. The upstream theme,
-resource-view, dark-alert, static-plugin, Resource Map, and plugin source-map
-patches add focused regression tests; the editor and project patches update
-their focused Storybook snapshots. Submit the
+resource-view, table, narration, Resource Map, plugin, and static-serving
+patches add or update focused regression coverage. Submit the
 upstream patches as separate pull requests; they do not contain AKS-specific
 behavior. For each future patch, record both the downstream removal and the
 corresponding AKS Desktop configuration or plugin migration. When no product
@@ -378,7 +462,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 31 | `7725d00f3` Verify bundled tools | **AKS configuration / External tools** | Keep verification in the AKS assembly pipeline and validate every target. |
 | 32 | `ed960d0a3` Add external tools to macOS | **AKS configuration / External tools** | Use per-platform resource mappings. |
 | 33 | `9a3ccb390` Remove unscoped external resource | **Fold / External tools** | Keep only the final platform-scoped mapping. |
-| 34 | `a013f5330` Add DMG license | **Upstream fix** | Submit generic electron-builder license support. |
+| 34 | `a013f5330` Add DMG license | **Upstream fix** | Use the [ready generic electron-builder patch](headlamp-upstream-patches/headlamp-upstream-dmg-license.patch). |
 | 35 | `5e79994e5` Conditional project overview sections | **Upstream fix / Project extensions** | Submit `isEnabled` for overview sections; it is absent upstream. |
 | 36 | `e0f08105d` Suppress az confirmation | **Fold into row 11** | Represent any product-approved scope in policy; do not hard-code AKS bypasses. |
 | 37 | `d484bcd0f` Disable release notes | **AKS configuration / Public frontend configuration** | Set the public `releaseNotes` product flag. |
@@ -409,12 +493,12 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 62 | `c9ec6c99c` Update branded error snapshots | **Fold into row 55** | Regenerate product-level tests. |
 | 63 | `41d003eca` Import managed-namespace project | **AKS plugin / Cluster registration, project extensions** | Keep managed-namespace semantics in the AKS provider/plugin. |
 | 64 | `cdee9d62b` Include kubelogin script conditionally | **Fold into row 54** | Resolve the declared tool only for clusters that need it. |
-| 65 | `5f7ade8ca` Honor Table selection/top-bar props | **Upstream fix** | Submit both missing generic prop behaviors with tests. |
+| 65 | `5f7ade8ca` Honor Table selection/top-bar props | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-table-props.patch). |
 | 66 | `db7e2db03` Expose desktop platform | **Upstream fix** | Use the [ready typed patch](headlamp-upstream-patches/headlamp-upstream-desktop-platform.patch). |
 | 67 | `5944280a5` Override Linux product name | **Fold / Product identity** | Fold into product builder configuration. |
 | 68 | `d709d2ddf` Add base Kubernetes MSW handlers | **Upstream fix** | Rebase handlers onto the shared API base and submit with stories. |
-| 69 | `013129c89` Fix GraphView CRD watch story | **Upstream fix** | Submit the remaining story behavior after rebasing the current CRD mocks. |
-| 70 | `dd6cf9ae4` Fix docs TypeScript errors | **Upstream fix** | Re-test current docs and submit the generic type fix if still reproducible. |
+| 69 | `013129c89` Fix GraphView CRD watch story | **Upstream fix** | Use the [ready rebased story patch](headlamp-upstream-patches/headlamp-upstream-graphview-crd-watch.patch). |
+| 70 | `dd6cf9ae4` Fix docs TypeScript errors | **Remove** | The current upstream documentation build passes, and plugin locale metadata now has the dedicated `PluginPackageInfo` type. |
 | 71 | `5e3c5e26c` Fix axe tooltip region check | **Upstream fix** | Submit the generic end-to-end accessibility test fix. |
 | 72 | `2f54e5cde` Fix log-search e2e test | **Fold into row 30** | Replace it with upstream workload-log and `LogViewer` coverage after migration. |
 | 73 | `53917bfee` Use AKS HTML title | **AKS configuration / Public frontend configuration** | Populate the public title/product name during assembly or startup. |
@@ -438,15 +522,15 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **Upstream fix / Project extensions** | Extend the existing generic header-action interface and published types. |
 | 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Rebase on the new preload listener registry; retain command cleanup/error exits not upstream. |
 | 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Use the [ready follow-up patch](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch) after upstream `7c6a4ecf5`. |
-| 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Submit the generic accessibility fix and translations. |
+| 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Use the [ready accessibility patch](headlamp-upstream-patches/headlamp-upstream-debug-image-narration.patch). |
 | 95 | `0570f3a31` Style Material UI Alert in dark mode | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch). |
 | 96 | `86a4ce067` Derive deep-link scheme | **AKS configuration / Product identity, OAuth sign-in** | Read the protocol from the product manifest; do not hard-code AKS. |
 | 97 | `0badba5aa` Reflow map labels at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-resource-map-label-reflow.patch). |
 | 98 | `4b6197255` Keep resource grid visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-grid-zoom.patch) after row 86. |
 | 99 | `65c871c7c` Hide empty project details card | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-hide-empty-project-sections.patch). |
 | 100 | `6f13c6288` Keep EditorDialog visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-editor-dialog-zoom.patch); keep it separate from the upstream DataField zoom fix. |
-| 101 | `b205d0618` Group unscheduled pods | **Upstream fix** | Submit the generic Resource Map feature and tests. |
-| 102 | `0b63e2251` Prevent ConditionsTable truncation | **Upstream fix** | Submit the SimpleTable overflow fix. |
+| 101 | `b205d0618` Group unscheduled pods | **Upstream fix** | Use the [ready Resource Map patch](headlamp-upstream-patches/headlamp-upstream-unscheduled-pod-grouping.patch). |
+| 102 | `0b63e2251` Prevent ConditionsTable truncation | **Upstream fix** | Use the [ready SimpleTable patch](headlamp-upstream-patches/headlamp-upstream-simpletable-overflow.patch). |
 | 103 | `513e3ba2d` Announce no table data | **Remove** | Current upstream `de73608f2` supplies the same behavior; verify narration. |
 | 104 | `e87e6d6fe` Remove hidden cell overflow | **Fold into row 102** | Duplicate/follow-up application of the same SimpleTable change; submit once. |
 | 105 | `148b45e3c` Use AKS backend app/User-Agent name | **Upstream extension / Product identity** | Add a backend runtime app-name setting supplied by the product manifest. |
