@@ -1,0 +1,42 @@
+From 16bc4d58921975a7fe7a11e38d2966f76607bd9c Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 17:41:55 +0000
+Subject: [PATCH] frontend: derive the document title from product metadata
+
+---
+ frontend/index.html        | 6 ++++++
+ frontend/rsbuild.config.ts | 1 +
+ 2 files changed, 7 insertions(+)
+
+diff --git a/frontend/index.html b/frontend/index.html
+index 5a1d67a89..77a3b1430 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -26,6 +26,12 @@
+     <script>
+         // handles both webpack and rspack build systems
+         __baseUrl__ = '%BASE_URL%<%= BASE_URL %>'.replace('%BASE_' + 'URL%', '').replace('<' + '%= BASE_URL %>', '');
++        const productName = '%REACT_APP_HEADLAMP_PRODUCT_NAME%<%= PRODUCT_NAME %>'
++          .replace('%REACT_APP_HEADLAMP_' + 'PRODUCT_NAME%', '')
++          .replace('<' + '%= PRODUCT_NAME %>', '');
++        if (productName) {
++          document.title = productName;
++        }
+         // the syntax of the following line is special - it will be matched and replaced by the server if a base URL is set by the server
+         headlampBaseUrl = __baseUrl__;
+     </script>
+diff --git a/frontend/rsbuild.config.ts b/frontend/rsbuild.config.ts
+index b208535ed..e4163466f 100644
+--- a/frontend/rsbuild.config.ts
++++ b/frontend/rsbuild.config.ts
+@@ -50,6 +50,7 @@ export default defineConfig({
+     template: './index.html',
+     templateParameters: {
+       BASE_URL: process.env.BASE_URL || '/',
++      PRODUCT_NAME: process.env.REACT_APP_HEADLAMP_PRODUCT_NAME || 'Headlamp',
+     },
+   },
+   server: {
+-- 
+2.54.0
+

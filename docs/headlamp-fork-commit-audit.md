@@ -700,16 +700,62 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** backend lint with Go 1.26.3; all tests in the
   downstream kubeconfig package.
 
+### Derive the document title from product metadata
+
+- **Fork source:** `53917bfee`.
+- **Upstream patch:** [frontend: derive the document title from product
+  metadata](headlamp-upstream-patches/headlamp-upstream-product-document-title.patch).
+- **Downstream removal:** [drop the hard-coded AKS
+  title](headlamp-upstream-patches/headlamp-downstream-remove-product-document-title-fix.patch).
+- **AKS Desktop follow-up:** None beyond the existing package metadata. Both
+  supported frontend builders use the configured `productName`; `Headlamp`
+  remains the fallback.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  Vite and Rsbuild production builds with an `AKS Desktop` product-name probe.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; a
+  Vite production build with the default `Headlamp` title.
+
+### Expose a distribution product version
+
+- **Fork sources:** `d68693b04` and its top-bar follow-up `067bf68f3`.
+- **Upstream patch:** [frontend: support a distribution product
+  version](headlamp-upstream-patches/headlamp-upstream-product-version.patch).
+- **Downstream removal:** [drop the hard-coded AKS version
+  helper](headlamp-upstream-patches/headlamp-downstream-remove-product-version-fix.patch).
+- **AKS Desktop follow-up:** Set `REACT_APP_HEADLAMP_PRODUCT_VERSION` from the
+  AKS Desktop release source. The top bar uses that value, while About shows
+  both the distribution and Headlamp versions when they differ.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  focused product-version helper test.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`.
+
+### Derive build-verification names from package metadata
+
+- **Fork sources:** `3c9d0b941` and its binary-name follow-up `fcad69534`.
+- **Upstream patch:** [app: derive verification names from package
+  metadata](headlamp-upstream-patches/headlamp-upstream-package-verification-names.patch).
+- **Downstream removal:** [drop hard-coded AKS verification
+  names](headlamp-upstream-patches/headlamp-downstream-remove-package-verification-names-fix.patch).
+- **AKS Desktop follow-up:** None. Linux uses the configured executable or
+  package name; macOS and Windows use `productName`. Backend verification
+  accepts any successful, non-empty version output instead of branding it.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; Bash syntax
+  checks; Windows PowerShell parser check; package-metadata probes. Packaging
+  verification was not run because no platform artifacts were built.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; Bash syntax
+  checks; Windows PowerShell parser check.
+
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
 testing a removal alone would temporarily restore a known bug. The upstream
 theme, resource-view, table, narration, Resource Map, namespace, query, command,
-plugin, packaging, story, cluster, backend-identity, and static-serving patches
-add or update focused regression coverage. Submit the upstream patches as
-separate pull requests; they do not contain AKS-specific behavior. For each
-future patch, record both the downstream removal and the corresponding AKS
-Desktop configuration or plugin migration. When no product change is needed,
-state why the upstream behavior is transparent or backward-compatible.
+plugin, packaging, story, cluster, backend-identity, product-metadata, and
+static-serving patches add or update focused regression coverage. Submit the
+upstream patches as separate pull requests; they do not contain AKS-specific
+behavior. For each future patch, record both the downstream removal and the
+corresponding AKS Desktop configuration or plugin migration. When no product
+change is needed, state why the upstream behavior is transparent or
+backward-compatible.
 
 ## Important look-alikes
 
@@ -795,8 +841,8 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 25 | `33f4cfb35` Change empty cluster message | **AKS configuration / Public frontend configuration** | Supply an AKS public message/empty-state contribution. |
 | 26 | `24889f999` Update package name and author | **Fold / Product identity** | Fold into row 2. |
 | 27 | `5eb5cd53e` Build with AKS version | **AKS configuration / Product identity** | Read the product version from the AKS release source. |
-| 28 | `d68693b04` Show AKS version in About | **Upstream extension / Public frontend configuration** | Expose runtime product information/About contributions. |
-| 29 | `067bf68f3` Show AKS version in top bar | **Fold / Public frontend configuration** | Consume the same product-information interface as row 28. |
+| 28 | `d68693b04` Show AKS version in About | **Upstream extension / Public frontend configuration** | Use the [ready generic product-version patch](headlamp-upstream-patches/headlamp-upstream-product-version.patch) and set the version during AKS assembly. |
+| 29 | `067bf68f3` Show AKS version in top bar | **Fold / Public frontend configuration** | The [product-version patch](headlamp-upstream-patches/headlamp-upstream-product-version.patch) supplies the same value to the top bar. |
 | 30 | `024ec74a7` New LogsViewer | **Needs decision / Remove** | If the Activity user experience is accepted, migrate `LogsTab` and drop this; otherwise upstream an inline content interface. |
 | 31 | `7725d00f3` Verify bundled tools | **AKS configuration / External tools** | Keep verification in the AKS assembly pipeline and validate every target. |
 | 32 | `ed960d0a3` Add external tools to macOS | **AKS configuration / External tools** | Use per-platform resource mappings. |
@@ -840,7 +886,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 70 | `dd6cf9ae4` Fix docs TypeScript errors | **Remove** | The current upstream documentation build passes, and plugin locale metadata now has the dedicated `PluginPackageInfo` type. |
 | 71 | `5e3c5e26c` Fix tooltip landmark check | **Upstream fix** | Use the [ready end-to-end accessibility patch](headlamp-upstream-patches/headlamp-upstream-tooltip-landmark-check.patch). |
 | 72 | `2f54e5cde` Fix log-search e2e test | **Fold into row 30** | Replace it with upstream workload-log and `LogViewer` coverage after migration. |
-| 73 | `53917bfee` Use AKS HTML title | **AKS configuration / Public frontend configuration** | Populate the public title/product name during assembly or startup. |
+| 73 | `53917bfee` Use AKS HTML title | **Upstream fix / Public frontend configuration** | Use the [ready product-title patch](headlamp-upstream-patches/headlamp-upstream-product-document-title.patch); the existing package name supplies the AKS title. |
 | 74 | `642809609` Fix Electron zoom menu | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-electron-zoom-menu-actions.patch). |
 | 75 | `ee162d9af` Expand locales | **Needs decision / Translations** | Upstream only still-missing generic locales; keep AKS strings in a supported overlay. |
 | 76 | `3b01fe701` Ignore generated resources | **Fold / Product identity** | Ignore outputs in the AKS assembly workspace, not upstream source. |
@@ -879,8 +925,8 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 109 | `903360924` Expand LogsViewer workload types | **Fold into row 30** | Upstream covers these types, so this becomes unnecessary after the row 30 migration. |
 | 110 | `2babb4675` Suppress ESLint warnings | **Fold** | Fix warnings in their destination pull requests; do not carry a suppression commit. |
 | 111 | `a87a8909f` Update translations | **Fold / Translations** | Regenerate upstream strings in their pull requests and keep AKS strings in the overlay. |
-| 112 | `3c9d0b941` Adjust backend output verification | **AKS configuration / Product identity** | Generate verification paths from product artifact metadata. |
-| 113 | `fcad69534` Update verified binary name | **Fold into row 112** | Keep only the final generated verification expectation. |
+| 112 | `3c9d0b941` Adjust backend output verification | **Upstream fix / Product identity** | Use the [ready package-verification patch](headlamp-upstream-patches/headlamp-upstream-package-verification-names.patch), which accepts non-empty backend identity output. |
+| 113 | `fcad69534` Update verified binary name | **Fold into row 112** | The [package-verification patch](headlamp-upstream-patches/headlamp-upstream-package-verification-names.patch) derives each platform name from package metadata. |
 | 114 | `badc4713b` Use `execFileSync` for list-plugins | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-list-plugins-without-shell.patch). |
 | 115 | `c7505cce7` Canonical AI Assistant identity | **AKS configuration / Plugin bundle, command execution** | Preserve the host-side ID in separate vendored-plugin policy; the vendored plugin itself is out of scope. |
 
@@ -893,6 +939,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
 | Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, column-selector, story, and mock patches separately. |
 | Cluster and backend identity | `bd39620b1`, `148b45e3c` | Submit the successful-deletion reload and generic runtime application-name patches separately. |
+| Product metadata and verification | `d68693b04`, `067bf68f3`, `53917bfee`, `3c9d0b941`, `fcad69534` | Submit the product version, document title, and package-derived verification patches separately. |
 | Accessibility/theme | `12b579560`, `46e6c031b`, `d9748fb0c`, `a1769847c`, `0570f3a31`, `0badba5aa`, `4b6197255`, `6f13c6288` | Product-neutral; regenerate current snapshots/translations. |
 
 Resolve every **Needs decision** entry during the rebase: row 10 (PATH handling),
