@@ -1,0 +1,26 @@
+From 898698c8bd0cf0cd7990fbfe1ada3c93d613c00a Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 18:38:43 +0000
+Subject: [PATCH] aksd: restore configurable update checks
+
+---
+ app/electron/main.ts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index 261643b26..c11242c45 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -193,8 +193,7 @@ let actualPort = defaultPort; // Will be updated when backend starts
+ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS) || 100); // Maximum number of ports to try
+ 
+ const useExternalServer = process.env.EXTERNAL_SERVER || false;
+-// const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
+-const shouldCheckForUpdates = false;
++const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
+ 
+ // make it global so that it doesn't get garbage collected
+ let mainWindow: BrowserWindow | null;
+-- 
+2.54.0
+

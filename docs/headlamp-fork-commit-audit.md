@@ -67,6 +67,8 @@ its stated baseline except the project-grid zoom patch, which follows the
 project-tabs zoom patch; its removal patch likewise follows the project-tabs
 removal. The four Storybook handler patches and their removals are also ordered:
 Custom Resource Definitions, pods, apps workloads, then batch workloads.
+The protocol-helper and legal-dialog removals are validated with their matching
+upstream replacements present because each cleanup imports the new shared API.
 **Do not ship a removal patch by itself:** that would temporarily restore the
 old bug. During a rebase, prefer to drop the original fork commit after
 selecting an upstream base that contains the matching fix. Use the removal
@@ -747,17 +749,65 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; Bash syntax
   checks; Windows PowerShell parser check.
 
+### Keep update checks configurable
+
+- **Fork source:** `d484bcd0f`.
+- **Upstream patch:** [app: cover configurable update
+  checks](headlamp-upstream-patches/headlamp-upstream-configurable-update-checks.patch).
+- **Downstream removal:** [drop the hard-coded update
+  disable](headlamp-upstream-patches/headlamp-downstream-remove-disabled-update-checks.patch).
+- **AKS Desktop follow-up:** Set `HEADLAMP_CHECK_FOR_UPDATES=false` in product
+  launch configuration instead of changing Headlamp source. Other
+  distributions retain the enabled default.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; both focused
+  update-configuration tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+  downstream app unit tests.
+
+### Derive the deep-link scheme from package metadata
+
+- **Fork source:** `86a4ce067`.
+- **Upstream patch:** [app: derive the custom protocol from package
+  metadata](headlamp-upstream-patches/headlamp-upstream-package-protocol-scheme.patch).
+- **Downstream removal:** [drop the duplicated package-protocol
+  helper](headlamp-upstream-patches/headlamp-downstream-remove-protocol-scheme-helper.patch).
+- **AKS Desktop follow-up:** Keep `aks-desktop` in
+  `build.protocols.schemes`. The OAuth provider consumes the validated shared
+  value rather than maintaining a second package reader. The runtime also
+  rejects deep links for schemes not registered by the package.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all eight
+  package-protocol and URL validation tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 15 OAuth
+  and deep-link tests, with the upstream helper present.
+
+### Expose product legal documents
+
+- **Fork source:** `4d854f759`.
+- **Upstream patch:** [app: expose manifest-declared legal
+  documents](headlamp-upstream-patches/headlamp-upstream-legal-documents.patch).
+- **Downstream removal:** [replace the branded legal
+  dialog](headlamp-upstream-patches/headlamp-downstream-remove-branded-legal-dialog.patch).
+- **AKS Desktop follow-up:** Declare packaged legal files under
+  `headlamp.legalDocuments`. Keep product-specific legal prose in a packaged
+  document instead of the Headlamp About component. The main process exposes
+  only validated manifest entries and never accepts a renderer-provided path.
+- **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; all seven manifest/file tests and the legal-document
+  interaction test.
+- **Removal validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run app:lint`; the same seven manifest/file tests and interaction test.
+
 Each upstream check was run immediately after its patch commit. Removal checks
 used the state described for each entry; paired replacements were used whenever
 testing a removal alone would temporarily restore a known bug. The upstream
 theme, resource-view, table, narration, Resource Map, namespace, query, command,
-plugin, packaging, story, cluster, backend-identity, product-metadata, and
-static-serving patches add or update focused regression coverage. Submit the
-upstream patches as separate pull requests; they do not contain AKS-specific
-behavior. For each future patch, record both the downstream removal and the
-corresponding AKS Desktop configuration or plugin migration. When no product
-change is needed, state why the upstream behavior is transparent or
-backward-compatible.
+plugin, packaging, story, cluster, backend-identity, product-metadata,
+deep-link, legal-document, update-configuration, and static-serving patches add
+or update focused regression coverage. Submit the upstream patches as separate
+pull requests; they do not contain AKS-specific behavior. For each future patch,
+record both the downstream removal and the corresponding AKS Desktop
+configuration or plugin migration. When no product change is needed, state why
+the upstream behavior is transparent or backward-compatible.
 
 ## Important look-alikes
 
@@ -825,7 +875,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 7 | `b6b1c330a` AKS plugin command support | **Fold / Command execution** | Fold into row 106; replace plugin-name branches with broker capabilities. |
 | 8 | `920dd7a8b` Frontend kubectl integration | **Fold / Command execution** | Fold into row 106; consume the supported browser command API from the plugin. |
 | 9 | `290767161` Update `productName` | **Fold / Product identity** | Fold into row 2 and set `displayName`. |
-| 10 | `b2e6b1d94` Include PATH to avoid `ENOENT` | **Needs decision / Command execution** | Re-test on upstream shell-environment work; otherwise keep as a broker test/fix, not AKS branding. |
+| 10 | `b2e6b1d94` Include PATH to avoid `ENOENT` | **Remove / Command execution** | Current upstream lazily caches the login-shell environment, merges it with the live process environment, and passes it to direct command spawning. Drop the older implementation and run the command tests on Windows. |
 | 11 | `82365514d` Default AKS command consent | **Upstream extension / Command execution** | Use declared, reviewable command scopes; do not silently bypass consent in core. |
 | 12 | `44422b2e1` Fix az/kubectl consent | **Fold into row 11** | Preserve final behavior in command-broker tests. |
 | 13 | `dd207f955` Add kubelogin | **Upstream extension / Command execution, external tools** | Declare the pinned tool and only its required command scopes. |
@@ -852,7 +902,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 34 | `a013f5330` Add DMG license | **Upstream fix** | Use the [ready generic electron-builder patch](headlamp-upstream-patches/headlamp-upstream-dmg-license.patch). |
 | 35 | `5e79994e5` Conditional project overview sections | **Upstream fix / Project extensions** | Use the [ready conditional-section patch](headlamp-upstream-patches/headlamp-upstream-conditional-project-overview-sections.patch). |
 | 36 | `e0f08105d` Suppress az confirmation | **Fold into row 11** | Represent any product-approved scope in policy; do not hard-code AKS bypasses. |
-| 37 | `d484bcd0f` Disable release notes | **AKS configuration / Public frontend configuration** | Set the public `releaseNotes` product flag. |
+| 37 | `d484bcd0f` Disable release notes | **Upstream fix + AKS configuration / Public frontend configuration** | Use the [ready update-configuration patch](headlamp-upstream-patches/headlamp-upstream-configurable-update-checks.patch), then set `HEADLAMP_CHECK_FOR_UPDATES=false` in AKS launch configuration. |
 | 38 | `0f537cf57` Add LogsViewer index | **Fold into row 30** | It becomes unnecessary only after the row 30 plugin migration. |
 | 39 | `6e70e0740` Add cached icons | **Fold / Product identity** | Generate/copy all required icon variants during assembly. |
 | 40 | `a1d884296` Fix app builds in CI | **AKS configuration / Product identity** | Move root-version and builder-path assumptions to the product build kit. |
@@ -866,7 +916,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 48 | `a2be5742f` Add disabled Kaito plugin | **AKS configuration / Plugin bundle** | Declare Kaito and its disabled default in the AKS manifest. |
 | 49 | `7a830d425` Add Microsoft headers | **Fold** | Keep notices only on AKS-owned files after extraction; do not patch upstream files. |
 | 50 | `5fae2b773` Separate managed projects by cluster | **Upstream extension + AKS plugin / Project extensions** | Add a generic project identity/key hook; implement AKS policy in the plugin. |
-| 51 | `4d854f759` Add Legal tab | **Upstream extension / Product identity** | Support product legal files/About sections in the desktop kit. |
+| 51 | `4d854f759` Add Legal tab | **Upstream extension / Product identity** | Use the [ready legal-document patch](headlamp-upstream-patches/headlamp-upstream-legal-documents.patch), declare AKS legal files in package metadata, and keep AKS prose out of Headlamp source. |
 | 52 | `40364e142` Update 404 page | **AKS configuration / Public frontend configuration** | Supply branded graphic/text through public product configuration. |
 | 53 | `e697c0aaf` Override macOS version | **Fold / Product identity** | Use the single product version source from row 27. |
 | 54 | `578cd9cb6` Azure-RBAC-only kubelogin auth | **AKS plugin / Cluster registration** | Keep Azure auth selection in the AKS provider. |
@@ -904,14 +954,14 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 86 | `46e6c031b` Make project tabs usable at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-tabs-zoom.patch). |
 | 87 | `2fd768195` Update project creation menu | **Needs decision / Project extensions** | If generic user experience, upstream it; if AKS workflow, implement through a project creation contribution. |
 | 88 | `c28257a3b` Fix original-name narration | **Remove** | Current upstream `f7c5f76f0` contains the complete fix; verify screen-reader behavior. |
-| 89 | `44e78118a` Fix severity narration | **Needs decision / row 30** | Verify upstream's severity selector narration; submit a focused fix if the gap remains. |
+| 89 | `44e78118a` Fix severity narration | **Remove after row 30** | Upstream's workload-log Activity uses a labeled multi-select with checkbox state. Verify screen-reader behavior while migrating row 30, then drop this old `LogsViewer` refactor. |
 | 90 | `26d8e68de` Label log search buttons | **Remove after row 30** | Upstream actions have translated accessible descriptions; verify them after migration. |
 | 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **Upstream fix / Project extensions** | Use the [ready project-header navigation patch](headlamp-upstream-patches/headlamp-upstream-project-header-action-navigation.patch). |
 | 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Use the five ready listener and command-completion patches above; they build on the current preload unsubscribe interface. |
 | 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Use the [ready follow-up patch](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch) after upstream `7c6a4ecf5`. |
 | 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Use the [ready accessibility patch](headlamp-upstream-patches/headlamp-upstream-debug-image-narration.patch). |
 | 95 | `0570f3a31` Style Material UI Alert in dark mode | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch). |
-| 96 | `86a4ce067` Derive deep-link scheme | **AKS configuration / Product identity, OAuth sign-in** | Read the protocol from the product manifest; do not hard-code AKS. |
+| 96 | `86a4ce067` Derive deep-link scheme | **Upstream fix + AKS configuration / Product identity, OAuth sign-in** | Use the [ready package-protocol patch](headlamp-upstream-patches/headlamp-upstream-package-protocol-scheme.patch); keep `aks-desktop` in package metadata and consume the shared validated value. |
 | 97 | `0badba5aa` Reflow map labels at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-resource-map-label-reflow.patch). |
 | 98 | `4b6197255` Keep resource grid visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-grid-zoom.patch) after row 86. |
 | 99 | `65c871c7c` Hide empty project details card | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-hide-empty-project-sections.patch). |
@@ -941,12 +991,13 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
 | Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, column-selector, story, and mock patches separately. |
 | Cluster and backend identity | `bd39620b1`, `148b45e3c` | Submit the successful-deletion reload and generic runtime application-name patches separately. |
-| Product metadata and verification | `d68693b04`, `067bf68f3`, `53917bfee`, `3c9d0b941`, `fcad69534` | Submit the product version, document title, and package-derived verification patches separately. |
+| Product metadata and verification | `d484bcd0f`, `4d854f759`, `d68693b04`, `067bf68f3`, `53917bfee`, `86a4ce067`, `3c9d0b941`, `fcad69534` | Submit the update configuration, legal-document interface, product version, document title, package protocol, and package-derived verification patches separately. |
 | Accessibility/theme | `12b579560`, `46e6c031b`, `d9748fb0c`, `a1769847c`, `0570f3a31`, `0badba5aa`, `4b6197255`, `6f13c6288` | Product-neutral; regenerate current snapshots/translations. |
 
-Resolve every **Needs decision** entry during the rebase: row 10 (PATH handling),
-row 75 (locale ownership), row 87 (project-creation user experience), row 30
-(inline versus Activity logs), and row 89 (severity narration).
+Resolve the remaining **Needs decision** entries during the rebase: row 75
+(locale ownership), row 87 (project-creation user experience), and row 30
+(inline versus Activity logs). Current upstream behavior resolves the earlier
+PATH-handling and severity-narration questions in rows 10 and 89.
 
 Command execution, cluster registration, secure storage, OAuth sign-in,
 product identity, and project extension interfaces need upstream design

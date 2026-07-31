@@ -1,0 +1,96 @@
+From 040e4a3a1080a986b8535f38d14bb3d441de3f1c Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 18:38:43 +0000
+Subject: [PATCH] app: cover configurable update checks
+
+---
+ app/electron/main.ts              |  3 ++-
+ app/electron/update-check.test.ts | 28 ++++++++++++++++++++++++++++
+ app/electron/update-check.ts      | 19 +++++++++++++++++++
+ 3 files changed, 49 insertions(+), 1 deletion(-)
+ create mode 100644 app/electron/update-check.test.ts
+ create mode 100644 app/electron/update-check.ts
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index a2ac8e598..28e9f218b 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -68,6 +68,7 @@ import {
+   isTrayIconEnabled,
+   setTrayIconEnabled,
+ } from './tray';
++import { isUpdateCheckEnabled } from './update-check';
+ import windowSize from './windowSize';
+ 
+ if (process.env.APPIMAGE) {
+@@ -191,7 +192,7 @@ let actualPort = defaultPort; // Will be updated when backend starts
+ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS) || 100); // Maximum number of ports to try
+ 
+ const useExternalServer = process.env.EXTERNAL_SERVER || false;
+-const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
++const shouldCheckForUpdates = isUpdateCheckEnabled();
+ 
+ // make it global so that it doesn't get garbage collected
+ let mainWindow: BrowserWindow | null;
+diff --git a/app/electron/update-check.test.ts b/app/electron/update-check.test.ts
+new file mode 100644
+index 000000000..baa654c06
+--- /dev/null
++++ b/app/electron/update-check.test.ts
+@@ -0,0 +1,28 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import { isUpdateCheckEnabled } from './update-check';
++
++describe('isUpdateCheckEnabled', () => {
++  it('enables update checks by default', () => {
++    expect(isUpdateCheckEnabled({})).toBe(true);
++  });
++
++  it('disables update checks when explicitly configured', () => {
++    expect(isUpdateCheckEnabled({ HEADLAMP_CHECK_FOR_UPDATES: 'false' })).toBe(false);
++  });
++});
+diff --git a/app/electron/update-check.ts b/app/electron/update-check.ts
+new file mode 100644
+index 000000000..5ded35ea3
+--- /dev/null
++++ b/app/electron/update-check.ts
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++export function isUpdateCheckEnabled(environment: NodeJS.ProcessEnv = process.env): boolean {
++  return environment.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
++}
+-- 
+2.54.0
+

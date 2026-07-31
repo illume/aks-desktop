@@ -1,0 +1,51 @@
+From 4c201b980ef595e2201eadd96a7f55057daf43d1 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 18:40:10 +0000
+Subject: [PATCH] aksd: use the shared package protocol helper
+
+---
+ app/electron/main.ts | 21 ++-------------------
+ 1 file changed, 2 insertions(+), 19 deletions(-)
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index 261643b26..55f621203 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -54,6 +54,7 @@ import {
+   getPluginBinDirectories,
+   PluginManager,
+ } from './plugin-management';
++import { readProtocolScheme } from './protocol';
+ import { addRunCmdConsent, removeRunCmdConsent, runScript, setupRunCmdHandlers } from './runCmd';
+ import { setupSecureStorageHandlers } from './secure-storage';
+ import { cleanupHeadlampTray, createHeadlampTray } from './tray';
+@@ -71,25 +72,7 @@ if (process.platform === 'linux') {
+   app.commandLine.appendSwitch('gtk-version', '3');
+ }
+ 
+-/**
+- * Reads the custom URL protocol scheme from package.json's build.protocols.schemes.
+- * Falls back to the app name (lowercased, spaces replaced with hyphens), then 'headlamp'.
+- */
+-function getProtocolScheme(): string {
+-  try {
+-    const pkgPath = path.join(__dirname, '..', 'package.json');
+-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+-    const schemes: string[] | undefined = pkg?.build?.protocols?.schemes;
+-    if (schemes && schemes.length > 0) {
+-      return schemes[0];
+-    }
+-  } catch {
+-    // Fall through to fallback
+-  }
+-  return app.name?.toLowerCase().replace(/\s+/g, '-') || 'headlamp';
+-}
+-
+-const protocolScheme = getProtocolScheme();
++const protocolScheme = readProtocolScheme(path.join(__dirname, '..', 'package.json'));
+ 
+ let isRunningScript = false;
+ if (process.env.HEADLAMP_RUN_SCRIPT) {
+-- 
+2.54.0
+
