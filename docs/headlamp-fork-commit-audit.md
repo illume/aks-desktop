@@ -455,14 +455,115 @@ upstream fix in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
   downstream Project Details Storybook test.
 
-Each check was run immediately after its patch commit. The upstream theme,
-resource-view, table, narration, Resource Map, namespace, plugin, and
-static-serving patches add or update focused regression coverage. Submit the
-upstream patches as separate pull requests; they do not contain AKS-specific
-behavior. For each future patch, record both the downstream removal and the
-corresponding AKS Desktop configuration or plugin migration. When no product
-change is needed, state why the upstream behavior is transparent or
-backward-compatible.
+### Avoid retrying permanent HTTP errors
+
+- **Fork source:** `00320948b`.
+- **Upstream patch:** [frontend: avoid retrying permanent HTTP
+  errors](headlamp-upstream-patches/headlamp-upstream-query-retry-policy.patch).
+- **Downstream removal:** [drop the duplicated fork
+  policy](headlamp-upstream-patches/headlamp-downstream-remove-query-retry-policy-fix.patch).
+- **AKS Desktop follow-up:** None. The product-neutral policy does not retry
+  permanent client errors in the 400–499 range, but continues to retry request
+  timeouts (`408`), rate limits (`429`), server errors, and network errors.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  eight query retry policy tests.
+- **Removal validation:** the upstream replacement and removal were applied
+  together, then checked with `npm run frontend:tsc`, `npm run frontend:lint`,
+  and all eight query retry policy tests.
+
+The remaining behavior from fork commit `10c313f02` is split into five small
+patches below. Headlamp's current preload layer already returns listener
+cleanup functions, so the two frontend patches can consume that supported
+interface without carrying the fork's incompatible `removeListener` change.
+The other three patches ensure every rejected command sends a completion event
+instead of leaving its caller waiting indefinitely.
+
+### Clean up plugin manager listeners
+
+- **Fork source:** `10c313f02`.
+- **Upstream patch:** [frontend: unsubscribe plugin manager
+  listeners](headlamp-upstream-patches/headlamp-upstream-plugin-manager-listener-cleanup.patch).
+- **Downstream removal:** [drop the duplicated fork
+  cleanup](headlamp-upstream-patches/headlamp-downstream-remove-plugin-manager-listener-cleanup-fix.patch).
+- **AKS Desktop follow-up:** None. The plugin manager uses the standard
+  unsubscribe function after success, malformed input, the response limit, or
+  timeout.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  four plugin manager listener tests.
+- **Removal validation:** the upstream replacement and removal were applied
+  together, then checked with `npm run frontend:tsc`, `npm run frontend:lint`,
+  and all four plugin manager listener tests.
+
+### Clean up command listeners after exit
+
+- **Fork source:** `10c313f02`.
+- **Upstream patch:** [frontend: clean up command listeners on
+  exit](headlamp-upstream-patches/headlamp-upstream-command-listener-cleanup.patch).
+- **Downstream removal:** [drop the duplicated fork
+  cleanup](headlamp-upstream-patches/headlamp-downstream-remove-command-listener-cleanup-fix.patch).
+- **AKS Desktop follow-up:** None. Each command removes its standard output,
+  standard error, and exit listeners only after its own matching exit event.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; both
+  command listener cleanup tests.
+- **Removal validation:** the upstream replacement and removal were applied
+  together, then checked with `npm run frontend:tsc`, `npm run frontend:lint`,
+  and both command listener cleanup tests.
+
+### Complete malformed command requests
+
+- **Fork source:** `10c313f02`.
+- **Upstream patch:** [app: report invalid command
+  exits](headlamp-upstream-patches/headlamp-upstream-invalid-command-exit.patch).
+- **Downstream removal:** [drop the duplicated fork
+  completion](headlamp-upstream-patches/headlamp-downstream-remove-invalid-command-exit-fix.patch).
+- **AKS Desktop follow-up:** None. A malformed request that includes an
+  identifier receives an exit event with the existing generic failure code.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 26
+  upstream `runCmd` tests.
+- **Removal validation:** the upstream replacement and removal were applied
+  together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
+  downstream `runCmd` tests.
+
+### Complete permission-rejected command requests
+
+- **Fork source:** `10c313f02`.
+- **Upstream patch:** [app: report permission rejection
+  exits](headlamp-upstream-patches/headlamp-upstream-permission-rejection-exit.patch).
+- **Downstream removal:** [drop the duplicated fork
+  completion](headlamp-upstream-patches/headlamp-downstream-remove-permission-rejection-exit-fix.patch).
+- **AKS Desktop follow-up:** None. A request with an invalid permission secret
+  receives a distinct completion code; no command is started.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 26
+  upstream `runCmd` tests.
+- **Removal validation:** the upstream replacement and removal were applied
+  together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
+  downstream `runCmd` tests.
+
+### Complete consent-rejected command requests
+
+- **Fork source:** `10c313f02`.
+- **Upstream patch:** [app: report consent rejection
+  exits](headlamp-upstream-patches/headlamp-upstream-consent-rejection-exit.patch).
+- **Downstream removal:** [drop the duplicated fork
+  completion](headlamp-upstream-patches/headlamp-downstream-remove-consent-rejection-exit-fix.patch).
+- **AKS Desktop follow-up:** None. A request denied by the user's saved consent
+  choice receives a distinct completion code; no command is started.
+- **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; all 26
+  upstream `runCmd` tests.
+- **Removal validation:** the upstream replacement and removal were applied
+  together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
+  downstream `runCmd` tests.
+
+Each upstream check was run immediately after its patch commit. Removal checks
+used the state described for each entry; the six new removals were tested with
+their upstream replacements so the checks did not temporarily restore known
+bugs. The upstream theme, resource-view, table, narration, Resource Map,
+namespace, query, command, plugin, and static-serving patches add or update
+focused regression coverage. Submit the upstream patches as separate pull
+requests; they do not contain AKS-specific behavior. For each future patch,
+record both the downstream removal and the corresponding AKS Desktop
+configuration or plugin migration. When no product change is needed, state why
+the upstream behavior is transparent or backward-compatible.
 
 ## Important look-alikes
 
@@ -578,7 +679,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 55 | `fcf1a7759` Replace error page | **AKS configuration / Public frontend configuration** | Supply branded error content/assets. |
 | 56 | `5504295b8` Comment default consent | **Fold into row 11** | Document the generic policy instead of retaining a code-only commit. |
 | 57 | `c5a969eab` Open ViewButton activity on right | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-view-button-split-right.patch). |
-| 58 | `00320948b` Stop retries for sub-500 responses | **Needs decision / Upstream fix** | Decide whether 408/429 should retry, then submit only the agreed generic policy with status tests. |
+| 58 | `00320948b` Stop retries for sub-500 responses | **Upstream fix** | Use the [ready retry-policy patch](headlamp-upstream-patches/headlamp-upstream-query-retry-policy.patch), which retains retries for `408` and `429`. |
 | 59 | `06f1208e6` Handle allowed namespaces in list queries | **Upstream fix** | Use the [ready namespace-query patch](headlamp-upstream-patches/headlamp-upstream-allowed-namespace-list.patch). |
 | 60 | `edcdb2ba4` Correct plugin source-map offset | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-plugin-source-map-offset.patch). |
 | 61 | `a73b4302a` Move `getAllowedNamespaces` | **Fold into row 59** | Move only if needed by the final namespace design; the export already exists upstream. |
@@ -612,7 +713,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 89 | `44e78118a` Fix severity narration | **Needs decision / row 30** | Verify upstream's severity selector narration; submit a focused fix if the gap remains. |
 | 90 | `26d8e68de` Label log search buttons | **Remove after row 30** | Upstream actions have translated accessible descriptions; verify them after migration. |
 | 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **Upstream fix / Project extensions** | Use the [ready project-header navigation patch](headlamp-upstream-patches/headlamp-upstream-project-header-action-navigation.patch). |
-| 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Rebase on the new preload listener registry; retain command cleanup/error exits not upstream. |
+| 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Use the five ready listener and command-completion patches above; they build on the current preload unsubscribe interface. |
 | 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Use the [ready follow-up patch](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch) after upstream `7c6a4ecf5`. |
 | 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Use the [ready accessibility patch](headlamp-upstream-patches/headlamp-upstream-debug-image-narration.patch). |
 | 95 | `0570f3a31` Style Material UI Alert in dark mode | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch). |
@@ -647,10 +748,10 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Rebase together to resolve shared Table/mock changes, then split reviewable PRs. |
 | Accessibility/theme | `12b579560`, `46e6c031b`, `d9748fb0c`, `a1769847c`, `0570f3a31`, `0badba5aa`, `4b6197255`, `6f13c6288` | Product-neutral; regenerate current snapshots/translations. |
 
-Resolve every **Needs decision** entry during the rebase: row 10 (PATH handling), row 46
-(cluster-deletion state), row 58 (retry statuses), row 75 (locale ownership),
-row 87 (project-creation user experience), row 30 (inline versus Activity logs), and row 89
-(severity narration).
+Resolve every **Needs decision** entry during the rebase: row 10 (PATH handling),
+row 46 (cluster-deletion state), row 75 (locale ownership), row 87
+(project-creation user experience), row 30 (inline versus Activity logs), and
+row 89 (severity narration).
 
 Command execution, cluster registration, secure storage, OAuth sign-in,
 product identity, and project extension interfaces need upstream design

@@ -1,0 +1,72 @@
+From 32b85bb8979acd10a9abb7c4df3053cf4fede7c6 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 16:25:20 +0000
+Subject: [PATCH] aksd: drop upstreamed command listener cleanup
+
+---
+ frontend/src/components/App/runCommand.ts | 35 ++++++++---------------
+ 1 file changed, 12 insertions(+), 23 deletions(-)
+
+diff --git a/frontend/src/components/App/runCommand.ts b/frontend/src/components/App/runCommand.ts
+index 4168447bc..b87c07dbe 100644
+--- a/frontend/src/components/App/runCommand.ts
++++ b/frontend/src/components/App/runCommand.ts
+@@ -67,7 +67,7 @@ export function runCommand(
+   desktopApiReceive?: (
+     channel: string,
+     listener: (cmdId: string, data: string | number) => void
+-  ) => (() => void) | void
++  ) => void
+ ): {
+   stdout: { on: (event: string, listener: (chunk: any) => void) => void };
+   stderr: { on: (event: string, listener: (chunk: any) => void) => void };
+@@ -89,35 +89,24 @@ export function runCommand(
+   const id = `${new Date().getTime()}-${Math.random().toString(36)}`;
+ 
+   const stdout = new EventTarget();
+-  const removeStdout = desktopApiReceive(
+-    'command-stdout',
+-    (cmdId: string, data: string | number) => {
+-      if (cmdId === id) {
+-        const event = new CustomEvent('data', { detail: data });
+-        stdout.dispatchEvent(event);
+-      }
++  desktopApiReceive('command-stdout', (cmdId: string, data: string | number) => {
++    if (cmdId === id) {
++      const event = new CustomEvent('data', { detail: data });
++      stdout.dispatchEvent(event);
+     }
+-  );
++  });
+ 
+   const stderr = new EventTarget();
+-  const removeStderr = desktopApiReceive(
+-    'command-stderr',
+-    (cmdId: string, data: string | number) => {
+-      if (cmdId === id) {
+-        const event = new CustomEvent('data', { detail: data });
+-        stderr.dispatchEvent(event);
+-      }
++  desktopApiReceive('command-stderr', (cmdId: string, data: string | number) => {
++    if (cmdId === id) {
++      const event = new CustomEvent('data', { detail: data });
++      stderr.dispatchEvent(event);
+     }
+-  );
++  });
+ 
+   const exit = new EventTarget();
+-  const removeExit = desktopApiReceive('command-exit', (cmdId: string, code: string | number) => {
++  desktopApiReceive('command-exit', (cmdId: string, code: string | number) => {
+     if (cmdId === id) {
+-      // Clean up all IPC listeners for this command to prevent memory leaks.
+-      removeStdout?.();
+-      removeStderr?.();
+-      removeExit?.();
+-
+       const event = new CustomEvent('exit', { detail: code });
+       exit.dispatchEvent(event);
+     }
+-- 
+2.54.0
+
