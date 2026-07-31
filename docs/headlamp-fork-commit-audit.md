@@ -72,9 +72,9 @@ needed, and include the upstream fix in the same branch update.
 
 - **Fork source:** `badc4713b`.
 - **Upstream patch:** [app: avoid shell for `list-plugins`
-  command](headlamp-upstream-patches/0001-app-avoid-shell-for-list-plugins-command.patch).
+  command](headlamp-upstream-patches/headlamp-upstream-list-plugins-without-shell.patch).
 - **Downstream removal:** [drop the duplicated fork
-  fix](headlamp-upstream-patches/0003-headlamp-downstream-drop-list-plugins-fix.patch).
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-list-plugins-fix.patch).
 - **AKS Desktop follow-up:** None. This changes only how Headlamp invokes its own
   server. The command and output stay the same, so AKS Desktop automatically
   receives the path-handling fix when it updates Headlamp.
@@ -87,9 +87,9 @@ needed, and include the upstream fix in the same branch update.
 
 - **Fork source:** `12b579560`.
 - **Upstream patch:** [frontend: support a secondary contrast theme
-  color](headlamp-upstream-patches/0002-frontend-support-secondary-contrast-theme-color.patch).
+  color](headlamp-upstream-patches/headlamp-upstream-secondary-theme-contrast.patch).
 - **Downstream removal:** [drop the duplicated fork
-  fix](headlamp-upstream-patches/0004-headlamp-downstream-drop-theme-contrast-fix.patch).
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-theme-contrast-fix.patch).
 - **AKS Desktop follow-up:** No immediate change.
   `plugins/aks-desktop/src/utils/shared/theme.ts` currently sets
   `secondary: '#ecebe9'` and relies on Headlamp's black (`#000`) fallback, which
@@ -206,7 +206,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 39 | `6e70e0740` Add cached icons | **Fold / Product identity** | Generate/copy all required icon variants during assembly. |
 | 40 | `a1d884296` Fix app builds in CI | **AKS configuration / Product identity** | Move root-version and builder-path assumptions to the product build kit. |
 | 41 | `f45b3b90c` Fix package for macOS build | **Fold / Product identity** | Fold the final settings into product builder configuration. |
-| 42 | `12b579560` Add `secondaryContrastText` | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/0002-frontend-support-secondary-contrast-theme-color.patch). |
+| 42 | `12b579560` Add `secondaryContrastText` | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-secondary-theme-contrast.patch). |
 | 43 | `645f38d2e` Build arm64 only | **AKS configuration / Product identity** | Declare targets; confirm whether the temporary x64 exclusion is still wanted. |
 | 44 | `c01009765` Update icons | **Fold into row 3** | Keep only the current AKS icon set. |
 | 45 | `ceea7720d` Update Azure logo | **AKS configuration / Product identity, public frontend configuration** | Supply product logo assets without editing Headlamp source. |
@@ -278,7 +278,7 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 111 | `a87a8909f` Update translations | **Fold / Translations** | Regenerate upstream strings in their pull requests and keep AKS strings in the overlay. |
 | 112 | `3c9d0b941` Adjust backend output verification | **AKS configuration / Product identity** | Generate verification paths from product artifact metadata. |
 | 113 | `fcad69534` Update verified binary name | **Fold into row 112** | Keep only the final generated verification expectation. |
-| 114 | `badc4713b` Use `execFileSync` for list-plugins | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/0001-app-avoid-shell-for-list-plugins-command.patch). |
+| 114 | `badc4713b` Use `execFileSync` for list-plugins | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-list-plugins-without-shell.patch). |
 | 115 | `c7505cce7` Canonical AI Assistant identity | **AKS configuration / Plugin bundle, command execution** | Preserve the host-side ID in separate vendored-plugin policy; the vendored plugin itself is out of scope. |
 
 ## Suggested upstream batches
