@@ -76,7 +76,7 @@ selecting an upstream base that contains the matching fix. Use the removal
 patch only when a normal cleanup commit is needed, and include the upstream fix
 in the same branch update.
 
-### Run `list-plugins` without a shell
+### Row 114 — Run `list-plugins` without a shell
 
 - **Fork source:** `badc4713b`.
 - **Upstream patch:** [app: avoid shell for `list-plugins`
@@ -91,7 +91,7 @@ in the same branch update.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
   downstream app unit tests.
 
-### Allow a plugin theme to set secondary contrast text
+### Row 42 — Allow a plugin theme to set secondary contrast text
 
 - **Fork source:** `12b579560`.
 - **Upstream patch:** [frontend: support a secondary contrast theme
@@ -109,7 +109,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   20 downstream tests in `frontend/src/lib/themes.test.ts`.
 
-### Open the resource view beside the current content
+### Row 57 — Open the resource view beside the current content
 
 - **Fork source:** `c5a969eab`.
 - **Upstream patch:** [frontend: open resource view beside current
@@ -123,7 +123,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; both
   resource export tests.
 
-### Keep Electron zoom menu items working after plugin customization
+### Row 74 — Keep Electron zoom menu items working after plugin customization
 
 - **Fork source:** `642809609`.
 - **Upstream patch:** [app: restore zoom actions for plugin-provided
@@ -137,7 +137,7 @@ in the same branch update.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
   downstream app unit tests.
 
-### Prevent local caching of shipped plugins
+### Row 85 — Prevent local caching of shipped plugins
 
 - **Fork source:** `adbf7f039`.
 - **Upstream patch:** [backend: disable local static plugin
@@ -152,7 +152,7 @@ in the same branch update.
 - **Removal validation:** backend lint with Go 1.26.3; all tests in the
   downstream backend command package.
 
-### Improve warning alert contrast in dark mode
+### Row 95 — Improve warning alert contrast in dark mode
 
 - **Fork source:** `0570f3a31`.
 - **Upstream patch:** [frontend: improve warning alert contrast in dark
@@ -166,7 +166,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   20 downstream tests in `frontend/src/lib/themes.test.ts`.
 
-### Hide empty project overview sections
+### Row 99 — Hide empty project overview sections
 
 - **Fork source:** `65c871c7c`.
 - **Upstream patch:** [frontend: hide empty project overview
@@ -180,7 +180,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
   downstream Project Details Storybook test.
 
-### Keep the resource editor usable at high zoom
+### Row 100 — Keep the resource editor usable at high zoom
 
 - **Fork source:** `6f13c6288`.
 - **Upstream patch:** [frontend: keep EditorDialog visible at high
@@ -194,7 +194,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   three downstream EditorDialog Storybook tests.
 
-### Expose the desktop platform to plugins
+### Row 66 — Expose the desktop platform to plugins
 
 - **Fork source:** `db7e2db03`.
 - **Upstream patch:** [app: expose the platform through the typed desktop
@@ -210,7 +210,7 @@ in the same branch update.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
   downstream app unit tests.
 
-### Correct source-map locations for plugin code
+### Row 60 — Correct source-map locations for plugin code
 
 - **Fork source:** `edcdb2ba4`.
 - **Upstream patch:** [frontend: correct plugin source-map
@@ -225,7 +225,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   26 downstream `runPlugin` tests.
 
-### Keep project tabs usable at high zoom
+### Row 86 — Keep project tabs usable at high zoom
 
 - **Fork source:** `46e6c031b`.
 - **Upstream patch:** [frontend: keep project tabs usable at high
@@ -240,7 +240,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
   both downstream Project Resources Storybook tests.
 
-### Improve appearance-control narration
+### Row 93 — Improve appearance-control narration
 
 - **Fork source:** `d9748fb0c`.
 - **Upstream patch:** [frontend: include field labels in appearance-control
@@ -254,7 +254,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   15 downstream Settings Cluster Storybook tests.
 
-### Let Resource Map labels reflow at high zoom
+### Row 97 — Let Resource Map labels reflow at high zoom
 
 - **Fork source:** `0badba5aa`.
 - **Upstream patch:** [frontend: let Resource Map labels reflow at high
@@ -268,7 +268,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
   downstream GraphView Storybook test.
 
-### Keep the project resource grid visible at high zoom
+### Row 98 — Keep the project resource grid visible at high zoom
 
 - **Fork source:** `4b6197255`.
 - **Upstream patch:** [frontend: keep the project grid visible at high
@@ -283,7 +283,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
   both downstream Project Resources Storybook tests.
 
-### Avoid Custom Resource Definition watches in the Resource Map story
+### Row 69 — Avoid Custom Resource Definition watches in the Resource Map story
 
 - **Fork source:** `013129c89`.
 - **Upstream patch:** [frontend: avoid Custom Resource Definition watches in
@@ -297,7 +297,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
   downstream GraphView `BasicExample` Storybook test.
 
-### Include license resources in macOS disk images
+### Row 34 — Include license resources in macOS disk images
 
 - **Fork source:** `a013f5330`.
 - **Upstream patch:** [app: add generic DMG license
@@ -311,7 +311,7 @@ in the same branch update.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
   downstream app unit tests.
 
-### Honor Table toolbar and row-selection options
+### Row 65 — Honor Table toolbar and row-selection options
 
 - **Fork source:** `5f7ade8ca`.
 - **Upstream patch:** [frontend: honor Table toolbar and selection
@@ -325,7 +325,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   14 downstream Table Storybook tests.
 
-### Keep SimpleTable content visible when columns resize
+### Rows 102 and 104 — Keep SimpleTable content visible when columns resize
 
 - **Fork sources:** `0b63e2251` and its duplicate `e87e6d6fe`.
 - **Upstream patch:** [frontend: remove cell overflow that truncates
@@ -339,7 +339,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   11 downstream SimpleTable Storybook tests.
 
-### Label the pod debug image field for screen readers
+### Row 94 — Label the pod debug image field for screen readers
 
 - **Fork source:** `a1769847c`.
 - **Upstream patch:** [frontend: label the pod debug image
@@ -354,7 +354,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
   locale consistency; all 17 downstream settings Storybook tests.
 
-### Group unscheduled pods in Resource Map node view
+### Row 101 — Group unscheduled pods in Resource Map node view
 
 - **Fork source:** `b205d0618`.
 - **Upstream patch:** [frontend: group unscheduled pods in Resource
@@ -368,7 +368,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   nine downstream `graphGrouping` tests.
 
-### Skip Unix shell lookup on Windows
+### Row 21 — Skip Unix shell lookup on Windows
 
 - **Fork source:** `ac7319372`.
 - **Upstream patch:** [app: skip Unix shell lookup on
@@ -382,7 +382,7 @@ in the same branch update.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
   downstream app unit tests.
 
-### Ignore tooltip portals in landmark accessibility checks
+### Row 71 — Ignore tooltip portals in landmark accessibility checks
 
 - **Fork source:** `5e3c5e26c`.
 - **Upstream patch:** [end-to-end tests: exclude tooltips from landmark
@@ -400,7 +400,7 @@ in the same branch update.
   direct lint and formatting checks for the changed end-to-end file; Playwright
   discovered both downstream pod scenarios.
 
-### List allowed namespaces without cluster-wide access
+### Row 59 — List allowed namespaces without cluster-wide access
 
 - **Fork source:** `06f1208e6`.
 - **Upstream patch:** [frontend: fetch allowed namespaces
@@ -416,7 +416,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   19 downstream `useKubeObjectList` tests.
 
-### Allow bundled plugins to be disabled by default
+### Row 47 — Allow bundled plugins to be disabled by default
 
 - **Fork source:** `2ce445ee1`.
 - **Upstream patch:** [app: support default-disabled bundled
@@ -432,7 +432,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run app:tsc`;
   `npm run frontend:lint`; all four downstream `updateSettingsPackages` tests.
 
-### Support conditional project overview sections
+### Row 35 — Support conditional project overview sections
 
 - **Fork source:** `5e79994e5`.
 - **Upstream patch:** [frontend: support conditional project overview
@@ -446,7 +446,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
   downstream Project Details Storybook test.
 
-### Let project header actions select a tab
+### Row 91 — Let project header actions select a tab
 
 - **Fork source:** `22a5008a2`.
 - **Upstream patch:** [frontend: pass tab selection to project header
@@ -460,7 +460,7 @@ in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
   downstream Project Details Storybook test.
 
-### Avoid retrying permanent HTTP errors
+### Row 58 — Avoid retrying permanent HTTP errors
 
 - **Fork source:** `00320948b`.
 - **Upstream patch:** [frontend: avoid retrying permanent HTTP
@@ -483,7 +483,7 @@ interface without carrying the fork's incompatible `removeListener` change.
 The other three patches ensure every rejected command sends a completion event
 instead of leaving its caller waiting indefinitely.
 
-### Clean up plugin manager listeners
+### Row 92 — Clean up plugin manager listeners
 
 - **Fork source:** `10c313f02`.
 - **Upstream patch:** [frontend: unsubscribe plugin manager
@@ -499,7 +499,7 @@ instead of leaving its caller waiting indefinitely.
   together, then checked with `npm run frontend:tsc`, `npm run frontend:lint`,
   and all four plugin manager listener tests.
 
-### Clean up command listeners after exit
+### Row 92 — Clean up command listeners after exit
 
 - **Fork source:** `10c313f02`.
 - **Upstream patch:** [frontend: clean up command listeners on
@@ -514,7 +514,7 @@ instead of leaving its caller waiting indefinitely.
   together, then checked with `npm run frontend:tsc`, `npm run frontend:lint`,
   and both command listener cleanup tests.
 
-### Complete malformed command requests
+### Row 92 — Complete malformed command requests
 
 - **Fork source:** `10c313f02`.
 - **Upstream patch:** [app: report invalid command
@@ -529,7 +529,7 @@ instead of leaving its caller waiting indefinitely.
   together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
   downstream `runCmd` tests.
 
-### Complete permission-rejected command requests
+### Row 92 — Complete permission-rejected command requests
 
 - **Fork source:** `10c313f02`.
 - **Upstream patch:** [app: report permission rejection
@@ -544,7 +544,7 @@ instead of leaving its caller waiting indefinitely.
   together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
   downstream `runCmd` tests.
 
-### Complete consent-rejected command requests
+### Row 92 — Complete consent-rejected command requests
 
 - **Fork source:** `10c313f02`.
 - **Upstream patch:** [app: report consent rejection
@@ -559,7 +559,7 @@ instead of leaving its caller waiting indefinitely.
   together, then checked with `npm run app:tsc`, `npm run app:lint`, and all 25
   downstream `runCmd` tests.
 
-### Use the package name in desktop artifact filenames
+### Row 4 — Use the package name in desktop artifact filenames
 
 - **Fork source:** `c4b0bb453`.
 - **Upstream patch:** [app: use the package name in artifact
@@ -576,7 +576,7 @@ instead of leaving its caller waiting indefinitely.
   downstream app window-size smoke tests, with the same packaging-test
   limitation.
 
-### Derive the Linux executable name
+### Row 5 — Derive the Linux executable name
 
 - **Fork source:** `c25c2099b`.
 - **Upstream patch:** [app: derive the Linux executable
@@ -600,7 +600,7 @@ mocks synchronized. Current upstream has retired Storyshots, so the upstream
 patches contain only the live handlers. The matching downstream removals also
 restore the fork's historical Storyshot files to their pre-commit state.
 
-### Mock Custom Resource Definition lists in stories
+### Row 68 — Mock Custom Resource Definition lists in stories
 
 - **Fork source:** `d709d2ddf`.
 - **Upstream patch:** [frontend: mock Custom Resource Definition
@@ -615,7 +615,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all seven
   focused downstream custom-resource tests.
 
-### Mock cluster-wide pod lists in stories
+### Row 68 — Mock cluster-wide pod lists in stories
 
 - **Fork source:** `d709d2ddf`.
 - **Upstream patch:** [frontend: mock cluster-wide pod
@@ -629,7 +629,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all 15
   downstream pod details tests.
 
-### Mock apps workload lists in stories
+### Row 68 — Mock apps workload lists in stories
 
 - **Fork source:** `d709d2ddf`.
 - **Upstream patch:** [frontend: mock apps workload
@@ -643,7 +643,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all five
   downstream workload details tests.
 
-### Mock batch workload lists in stories
+### Row 68 — Mock batch workload lists in stories
 
 - **Fork source:** `d709d2ddf`.
 - **Upstream patch:** [frontend: mock batch workload
@@ -657,7 +657,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run tsc`; `npm run lint -- --no-cache`; all three
   downstream job details tests.
 
-### Make the Table column selector keyboard accessible
+### Row 84 — Make the Table column selector keyboard accessible
 
 - **Fork source:** `a6e5b073a`.
 - **Upstream patch:** [frontend: use accessible menu items for column
@@ -672,7 +672,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   14 downstream Table Storybook tests.
 
-### Refresh frontend state after deleting a cluster
+### Row 46 — Refresh frontend state after deleting a cluster
 
 - **Fork source:** `bd39620b1`.
 - **Upstream patch:** [frontend: reload after successful cluster
@@ -687,7 +687,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   eight downstream ClusterTable and cluster-menu tests.
 
-### Configure the backend application name
+### Row 105 — Configure the backend application name
 
 - **Fork source:** `148b45e3c`.
 - **Upstream patch:** [backend: add a runtime application-name
@@ -703,7 +703,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** backend lint with Go 1.26.3; all tests in the
   downstream kubeconfig package.
 
-### Derive the document title from product metadata
+### Row 73 — Derive the document title from product metadata
 
 - **Fork source:** `53917bfee`.
 - **Upstream patch:** [frontend: include product metadata in document
@@ -719,7 +719,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; a
   Vite production build with the default `Headlamp` title.
 
-### Expose a distribution product version
+### Rows 28 and 29 — Expose a distribution product version
 
 - **Fork sources:** `d68693b04` and its top-bar follow-up `067bf68f3`.
 - **Upstream patch:** [frontend: support a distribution product
@@ -733,7 +733,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
   focused product-version helper test.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`.
 
-### Derive build-verification names from package metadata
+### Rows 112 and 113 — Derive build-verification names from package metadata
 
 - **Fork sources:** `3c9d0b941` and its binary-name follow-up `fcad69534`.
 - **Upstream patch:** [app: derive verification names from package
@@ -750,7 +750,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; Bash syntax
   checks; Windows PowerShell parser check.
 
-### Keep update checks configurable
+### Row 37 — Keep update checks configurable
 
 - **Fork source:** `d484bcd0f`.
 - **Upstream patch:** [app: cover configurable update
@@ -767,7 +767,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 145
   downstream app unit tests, with the upstream helper present.
 
-### Derive the deep-link scheme from the product manifest
+### Row 96 — Derive the deep-link scheme from the product manifest
 
 - **Fork source:** `86a4ce067`.
 - **Upstream patch:** [app: derive the custom protocol from product
@@ -783,7 +783,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 23 OAuth
   and deep-link tests, with the upstream helper present.
 
-### Expose product legal documents
+### Row 51 — Expose product legal documents
 
 - **Fork source:** `4d854f759`.
 - **Upstream patch:** [app: expose manifest-declared legal
