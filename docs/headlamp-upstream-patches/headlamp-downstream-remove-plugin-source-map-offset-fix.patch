@@ -1,0 +1,133 @@
+From fe50ebbc299d61293b1deced5bb9ea9818a05cc5 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 14:22:20 +0000
+Subject: [PATCH] aksd: drop upstreamed plugin source-map fix
+
+---
+ frontend/src/plugin/runPlugin.test.ts | 42 +------------------------
+ frontend/src/plugin/runPlugin.ts      | 45 +--------------------------
+ 2 files changed, 2 insertions(+), 85 deletions(-)
+
+diff --git a/frontend/src/plugin/runPlugin.test.ts b/frontend/src/plugin/runPlugin.test.ts
+index 4b7b1f28f..edc805826 100644
+--- a/frontend/src/plugin/runPlugin.test.ts
++++ b/frontend/src/plugin/runPlugin.test.ts
+@@ -16,13 +16,7 @@
+ 
+ // Portions (c) Microsoft Corp.
+ 
+-import {
+-  adjustSourceMapOffsetForFunction,
+-  getInfoForRunningPlugins,
+-  identifyPackages,
+-  runPlugin,
+-  runPluginProps,
+-} from './runPlugin';
++import { getInfoForRunningPlugins, identifyPackages, runPlugin, runPluginProps } from './runPlugin';
+ 
+ function runPluginInner(info: runPluginProps) {
+   const source = info[0];
+@@ -554,37 +548,3 @@ describe('identifyPackages', () => {
+     });
+   });
+ });
+-
+-describe('adjustSourceMapOffsetForFunction', () => {
+-  test('should prepend semicolons to source map mappings when source map is present', () => {
+-    const originalMappings = 'AAAA,CAAC';
+-    const sourceMap = {
+-      version: 3,
+-      sources: ['test.ts'],
+-      mappings: originalMappings,
+-    };
+-    const base64SourceMap = btoa(JSON.stringify(sourceMap));
+-    const jsSource = [
+-      `console.log('hello');`,
+-      `//# sourceMappingURL=data:application/json;charset=utf-8;base64,${base64SourceMap}`,
+-    ].join('\n');
+-
+-    const result = adjustSourceMapOffsetForFunction(jsSource);
+-
+-    const resultMatch = result.match(
+-      /\/\/# sourceMappingURL=data:application\/json;charset=utf-8;base64,([A-Za-z0-9+/=]+)/
+-    );
+-    expect(resultMatch).not.toBeNull();
+-
+-    const resultSourceMap = JSON.parse(atob(resultMatch![1]));
+-    expect(resultSourceMap.mappings).toBe(';;' + originalMappings);
+-  });
+-
+-  test('should return source unchanged when no source map is present', () => {
+-    const jsSource = `console.log('hello');`;
+-
+-    const result = adjustSourceMapOffsetForFunction(jsSource);
+-
+-    expect(result).toBe(jsSource);
+-  });
+-});
+diff --git a/frontend/src/plugin/runPlugin.ts b/frontend/src/plugin/runPlugin.ts
+index 2f53298d3..c0a16cfab 100644
+--- a/frontend/src/plugin/runPlugin.ts
++++ b/frontend/src/plugin/runPlugin.ts
+@@ -129,49 +129,6 @@ export function getInfoForRunningPlugins({
+   ];
+ }
+ 
+-/**
+- * Adjusts inline source maps for code that will be executed via `new Function()`.
+- *
+- * When using `new Function(args, body)`, the browser wraps the code in a function declaration,
+- * adding 2 extra lines (function header and closing brace). This causes source map line numbers
+- * to be off by 2. We fix this by prepending semicolons to the mappings field - each semicolon
+- * represents an empty generated line, effectively shifting all mappings down.
+- */
+-export function adjustSourceMapOffsetForFunction(jsSource: string) {
+-  try {
+-    const marker = '//# sourceMappingURL=data:application/json;charset=utf-8;base64,';
+-    const markerIndex = jsSource.lastIndexOf(marker);
+-
+-    if (markerIndex === -1) {
+-      return jsSource;
+-    }
+-
+-    const base64Start = markerIndex + marker.length;
+-    const base64Data = jsSource.slice(base64Start).split(/[\s\n]/)[0];
+-
+-    const sourceMap = JSON.parse(atob(base64Data));
+-
+-    if (!sourceMap.mappings || typeof sourceMap.mappings !== 'string') {
+-      return jsSource;
+-    }
+-
+-    const wrapperLineCount = 2;
+-    sourceMap.mappings = ';'.repeat(wrapperLineCount) + sourceMap.mappings;
+-
+-    const newBase64 = btoa(JSON.stringify(sourceMap));
+-    const newSourceMapComment = `//# sourceMappingURL=data:application/json;charset=utf-8;base64,${newBase64}`;
+-
+-    const before = jsSource.slice(0, markerIndex);
+-    const after = jsSource.slice(base64Start + base64Data.length);
+-
+-    return before + newSourceMapComment + after;
+-  } catch (e) {
+-    // Oh well we tried and failed, return original code
+-    console.error('Failed to adjust source map offset', e);
+-    return jsSource;
+-  }
+-}
+-
+ /**
+  * Runs a plugin by executing the source code in the global scope.
+  *
+@@ -198,7 +155,7 @@ export function runPlugin(
+ ): void {
+   // We use PrivateFunction here instead of global Function so people can't
+   //   override Function and snoop on it.
+-  const executePlugin = new PrivateFunction(...args, adjustSourceMapOffsetForFunction(source));
++  const executePlugin = new PrivateFunction(...args, source);
+ 
+   try {
+     // This executes in the global scope,
+-- 
+2.54.0
+

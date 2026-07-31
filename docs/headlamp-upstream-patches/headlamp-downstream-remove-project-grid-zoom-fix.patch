@@ -1,0 +1,101 @@
+From 427eb3c89f4b0aac3c30b1675709f404eb167ede Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 14:20:57 +0000
+Subject: [PATCH] aksd: drop upstreamed project-grid zoom fix
+
+---
+ frontend/src/components/project/ProjectDetails.tsx        | 7 +------
+ frontend/src/components/project/ProjectResourcesTab.tsx   | 2 +-
+ .../src/components/project/ResourceCategoriesList.tsx     | 8 ++------
+ .../ProjectResourcesTab.Empty.stories.storyshot           | 4 ++--
+ .../ProjectResourcesTab.WithWorkloads.stories.storyshot   | 4 ++--
+ 5 files changed, 8 insertions(+), 17 deletions(-)
+
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index d8f9988b1..64347ed95 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -567,12 +567,7 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+   return (
+     <ProjectDetailsContext.Provider value={contextValue}>
+       <Box
+-        sx={{
+-          display: 'flex',
+-          flexDirection: 'column',
+-          minHeight: '100%',
+-          alignItems: 'flex-start',
+-        }}
++        sx={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'flex-start' }}
+       >
+         <SectionBox
+           outterBoxProps={{
+diff --git a/frontend/src/components/project/ProjectResourcesTab.tsx b/frontend/src/components/project/ProjectResourcesTab.tsx
+index 6e97d2dc1..88e2c347d 100644
+--- a/frontend/src/components/project/ProjectResourcesTab.tsx
++++ b/frontend/src/components/project/ProjectResourcesTab.tsx
+@@ -390,7 +390,7 @@ export function ProjectResourcesTab({
+           borderColor: theme.palette.divider,
+           borderTop: 0,
+           flexGrow: 1,
+-          minHeight: '300px',
++          minHeight: 0,
+           flexBasis: 0,
+         })}
+       >
+diff --git a/frontend/src/components/project/ResourceCategoriesList.tsx b/frontend/src/components/project/ResourceCategoriesList.tsx
+index 1e82fecbf..6ff64ba76 100644
+--- a/frontend/src/components/project/ResourceCategoriesList.tsx
++++ b/frontend/src/components/project/ResourceCategoriesList.tsx
+@@ -44,13 +44,9 @@ export function ResourceCategoriesList({
+ }) {
+   return (
+     <Box
+-      sx={theme => ({
++      sx={{
+         flexShrink: 0,
+-        [theme.breakpoints.down('md')]: {
+-          maxHeight: '200px',
+-          overflowY: 'auto',
+-        },
+-      })}
++      }}
+     >
+       <List dense>
+         {categoryList.map(({ category, items, health }) => {
+diff --git a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
+index cf44ef1df..174e17849 100644
+--- a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
++++ b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
+@@ -4,10 +4,10 @@
+       style="height: 500px;"
+     >
+       <div
+-        class="MuiBox-root css-q4p5cy"
++        class="MuiBox-root css-1xxsrwd"
+       >
+         <div
+-          class="MuiBox-root css-dlbtr1"
++          class="MuiBox-root css-6su6fj"
+         >
+           <ul
+             class="MuiList-root MuiList-padding MuiList-dense css-h4y409-MuiList-root"
+diff --git a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
+index 14464f983..0b58a5e67 100644
+--- a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
++++ b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
+@@ -4,10 +4,10 @@
+       style="height: 500px;"
+     >
+       <div
+-        class="MuiBox-root css-q4p5cy"
++        class="MuiBox-root css-1xxsrwd"
+       >
+         <div
+-          class="MuiBox-root css-dlbtr1"
++          class="MuiBox-root css-6su6fj"
+         >
+           <ul
+             class="MuiList-root MuiList-padding MuiList-dense css-h4y409-MuiList-root"
+-- 
+2.54.0
+

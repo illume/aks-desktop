@@ -1,0 +1,26 @@
+From b95dc8524a80711ec60d05572bca69e4b1675594 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 31 Jul 2026 14:12:53 +0000
+Subject: [PATCH] aksd: drop upstreamed desktop platform fix
+
+---
+ app/electron/preload.ts | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index b1772aa28..2906c564f 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -133,9 +133,6 @@ contextBridge.exposeInMainWorld('desktopApi', {
+   ): Promise<{ success: boolean; content?: string; error?: string }> => {
+     return ipcRenderer.invoke('get-license-file', filename);
+   },
+-
+-  platform: process.platform,
+-
+   // aksd: Secure storage — encrypt/decrypt via Electron safeStorage
+   secureStorageSave: (
+     key: string,
+-- 
+2.54.0
+

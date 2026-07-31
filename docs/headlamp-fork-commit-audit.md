@@ -186,9 +186,98 @@ needed, and include the upstream fix in the same branch update.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
   three downstream EditorDialog Storybook tests.
 
+### Expose the desktop platform to plugins
+
+- **Fork source:** `db7e2db03`.
+- **Upstream patch:** [app: expose the platform through the typed desktop
+  API](headlamp-upstream-patches/headlamp-upstream-desktop-platform.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-desktop-platform-fix.patch).
+- **AKS Desktop follow-up:** None.
+  `plugins/aks-desktop/src/telemetry/appInfo.ts` already reads this value and
+  retains an `unknown` fallback outside Electron. The plugin receives the
+  supported host value when AKS Desktop updates Headlamp.
+- **Upstream validation:** `npm run app:tsc`; `npm run frontend:tsc`;
+  `npm run frontend:lint`; all 139 app unit tests.
+- **Removal validation:** `npm run app:tsc`; `npm run app:lint`; all 141
+  downstream app unit tests.
+
+### Correct source-map locations for plugin code
+
+- **Fork source:** `edcdb2ba4`.
+- **Upstream patch:** [frontend: correct plugin source-map
+  offsets](headlamp-upstream-patches/headlamp-upstream-plugin-source-map-offset.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-plugin-source-map-offset-fix.patch).
+- **AKS Desktop follow-up:** None. Headlamp adjusts inline maps before running
+  every plugin, so AKS plugin stack traces gain the corrected source locations
+  without a plugin change.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  33 `runPlugin` tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  26 downstream `runPlugin` tests.
+
+### Keep project tabs usable at high zoom
+
+- **Fork source:** `46e6c031b`.
+- **Upstream patch:** [frontend: keep project tabs usable at high
+  zoom](headlamp-upstream-patches/headlamp-upstream-project-tabs-zoom.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-project-tabs-zoom-fix.patch).
+- **AKS Desktop follow-up:** None. AKS project tabs use the shared Headlamp
+  project layout and automatically gain scrollable tabs and minimum content
+  heights.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  both Project Resources Storybook tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  both downstream Project Resources Storybook tests.
+
+### Improve appearance-control narration
+
+- **Fork source:** `d9748fb0c`.
+- **Upstream patch:** [frontend: include field labels in appearance-control
+  names](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-appearance-control-narration-fix.patch).
+- **AKS Desktop follow-up:** None. The accessible names belong to Headlamp's
+  standard cluster settings and cover AKS clusters without an override.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  15 Settings Cluster Storybook tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  15 downstream Settings Cluster Storybook tests.
+
+### Let Resource Map labels reflow at high zoom
+
+- **Fork source:** `0badba5aa`.
+- **Upstream patch:** [frontend: let Resource Map labels reflow at high
+  zoom](headlamp-upstream-patches/headlamp-upstream-resource-map-label-reflow.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-resource-map-label-reflow-fix.patch).
+- **AKS Desktop follow-up:** None. AKS uses the shared Resource Map nodes, so
+  long workload names remain readable after a Headlamp update.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; all
+  13 `KubeObjectNode` tests, including the new label-reflow regression.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  downstream GraphView Storybook test.
+
+### Keep the project resource grid visible at high zoom
+
+- **Fork source:** `4b6197255`.
+- **Upstream patch:** [frontend: keep the project grid visible at high
+  zoom](headlamp-upstream-patches/headlamp-upstream-project-grid-zoom.patch).
+- **Downstream removal:** [drop the duplicated fork
+  fix](headlamp-upstream-patches/headlamp-downstream-remove-project-grid-zoom-fix.patch).
+- **AKS Desktop follow-up:** None. AKS project resources use Headlamp's shared
+  responsive grid. Apply this patch after the project-tabs zoom patch above.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  both Project Resources Storybook tests.
+- **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
+  both downstream Project Resources Storybook tests.
+
 Each check was run immediately after its patch commit. The upstream theme,
-resource-view, dark-alert, and static-plugin patches add focused regression
-tests; the editor patch updates its focused Storybook snapshots. Submit the
+resource-view, dark-alert, static-plugin, Resource Map, and plugin source-map
+patches add focused regression tests; the editor and project patches update
+their focused Storybook snapshots. Submit the
 upstream patches as separate pull requests; they do not contain AKS-specific
 behavior. For each future patch, record both the downstream removal and the
 corresponding AKS Desktop configuration or plugin migration. When no product
@@ -311,13 +400,13 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 57 | `c5a969eab` Open ViewButton activity on right | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-view-button-split-right.patch). |
 | 58 | `00320948b` Stop retries for sub-500 responses | **Needs decision / Upstream fix** | Decide whether 408/429 should retry, then submit only the agreed generic policy with status tests. |
 | 59 | `06f1208e6` Handle allowed namespaces in list queries | **Upstream fix** | Submit the generic namespace-query behavior with tests. |
-| 60 | `edcdb2ba4` Correct plugin source-map offset | **Upstream fix** | Submit the plugin runtime fix and its tests. |
+| 60 | `edcdb2ba4` Correct plugin source-map offset | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-plugin-source-map-offset.patch). |
 | 61 | `a73b4302a` Move `getAllowedNamespaces` | **Fold into row 59** | Move only if needed by the final namespace design; the export already exists upstream. |
 | 62 | `c9ec6c99c` Update branded error snapshots | **Fold into row 55** | Regenerate product-level tests. |
 | 63 | `41d003eca` Import managed-namespace project | **AKS plugin / Cluster registration, project extensions** | Keep managed-namespace semantics in the AKS provider/plugin. |
 | 64 | `cdee9d62b` Include kubelogin script conditionally | **Fold into row 54** | Resolve the declared tool only for clusters that need it. |
 | 65 | `5f7ade8ca` Honor Table selection/top-bar props | **Upstream fix** | Submit both missing generic prop behaviors with tests. |
-| 66 | `db7e2db03` Expose desktop platform | **Upstream fix** | Submit a narrow typed desktop-platform interface. |
+| 66 | `db7e2db03` Expose desktop platform | **Upstream fix** | Use the [ready typed patch](headlamp-upstream-patches/headlamp-upstream-desktop-platform.patch). |
 | 67 | `5944280a5` Override Linux product name | **Fold / Product identity** | Fold into product builder configuration. |
 | 68 | `d709d2ddf` Add base Kubernetes MSW handlers | **Upstream fix** | Rebase handlers onto the shared API base and submit with stories. |
 | 69 | `013129c89` Fix GraphView CRD watch story | **Upstream fix** | Submit the remaining story behavior after rebasing the current CRD mocks. |
@@ -337,19 +426,19 @@ confirm the Activity UX is acceptable, then migrate and remove them.
 | 83 | `b8f52f6f4` Remove Azure credential format | **AKS plugin / Cluster registration** | Keep this Azure/kubelogin policy in the AKS provider. |
 | 84 | `a6e5b073a` Accessible Table column selector | **Upstream fix** | Submit the keyboard/menu implementation; persistence work does not replace it. |
 | 85 | `adbf7f039` Disable cache for static plugins | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-static-plugin-no-cache.patch). |
-| 86 | `46e6c031b` Make project tabs usable at zoom | **Upstream fix** | Submit the generic accessibility/layout fix. |
+| 86 | `46e6c031b` Make project tabs usable at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-tabs-zoom.patch). |
 | 87 | `2fd768195` Update project creation menu | **Needs decision / Project extensions** | If generic user experience, upstream it; if AKS workflow, implement through a project creation contribution. |
 | 88 | `c28257a3b` Fix original-name narration | **Remove** | Current upstream `f7c5f76f0` contains the complete fix; verify screen-reader behavior. |
 | 89 | `44e78118a` Fix severity narration | **Needs decision / row 30** | Verify upstream's severity selector narration; submit a focused fix if the gap remains. |
 | 90 | `26d8e68de` Label log search buttons | **Remove after row 30** | Upstream actions have translated accessible descriptions; verify them after migration. |
 | 91 | `22a5008a2` Pass `setSelectedTab` to header actions | **Upstream fix / Project extensions** | Extend the existing generic header-action interface and published types. |
 | 92 | `10c313f02` Fix command/plugin IPC listener leaks | **Upstream fix / Command execution** | Rebase on the new preload listener registry; retain command cleanup/error exits not upstream. |
-| 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Submit as a follow-up to upstream `7c6a4ecf5`. |
+| 93 | `d9748fb0c` Improve appearance-control narration | **Upstream fix** | Use the [ready follow-up patch](headlamp-upstream-patches/headlamp-upstream-appearance-control-narration.patch) after upstream `7c6a4ecf5`. |
 | 94 | `a1769847c` Narrate debug image setting | **Upstream fix** | Submit the generic accessibility fix and translations. |
 | 95 | `0570f3a31` Style Material UI Alert in dark mode | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-dark-alert-contrast.patch). |
 | 96 | `86a4ce067` Derive deep-link scheme | **AKS configuration / Product identity, OAuth sign-in** | Read the protocol from the product manifest; do not hard-code AKS. |
-| 97 | `0badba5aa` Reflow map labels at zoom | **Upstream fix** | Submit the generic accessibility fix. |
-| 98 | `4b6197255` Keep resource grid visible at zoom | **Upstream fix** | Submit the generic accessibility fix. |
+| 97 | `0badba5aa` Reflow map labels at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-resource-map-label-reflow.patch). |
+| 98 | `4b6197255` Keep resource grid visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-project-grid-zoom.patch) after row 86. |
 | 99 | `65c871c7c` Hide empty project details card | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-hide-empty-project-sections.patch). |
 | 100 | `6f13c6288` Keep EditorDialog visible at zoom | **Upstream fix** | Use the [ready patch](headlamp-upstream-patches/headlamp-upstream-editor-dialog-zoom.patch); keep it separate from the upstream DataField zoom fix. |
 | 101 | `b205d0618` Group unscheduled pods | **Upstream fix** | Submit the generic Resource Map feature and tests. |

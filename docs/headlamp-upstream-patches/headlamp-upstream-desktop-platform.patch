@@ -1,0 +1,66 @@
+From c5ee2d24071b9fc188debc0b68e2d92f2cf51fc8 Mon Sep 17 00:00:00 2001
+From: Oleksandr Dubenko <oldubenko@microsoft.com>
+Date: Fri, 31 Jul 2026 14:12:18 +0000
+Subject: [PATCH] app: expose platform in desktop API
+
+---
+ app/electron/preload.ts            | 1 +
+ frontend/src/i18n/electronI18n.tsx | 6 ------
+ frontend/src/plugin/lib.ts         | 7 ++++++-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index 1edbdf963..8c631e519 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -117,4 +117,5 @@ contextBridge.exposeInMainWorld('desktopApi', {
+   notifyClusterChange: (cluster: string | null) => {
+     ipcRenderer.send('cluster-changed', cluster);
+   },
++  platform: process.platform,
+ });
+diff --git a/frontend/src/i18n/electronI18n.tsx b/frontend/src/i18n/electronI18n.tsx
+index 39255cb4a..edf0c854e 100644
+--- a/frontend/src/i18n/electronI18n.tsx
++++ b/frontend/src/i18n/electronI18n.tsx
+@@ -18,12 +18,6 @@ import React from 'react';
+ import { useTranslation } from 'react-i18next';
+ import { isElectron } from '../helpers/isElectron';
+ 
+-declare global {
+-  interface Window {
+-    desktopApi: any;
+-  }
+-}
+-
+ // If we're running under electron, we need to communicate any language changes.
+ const ipcRenderer = isElectron() ? window.desktopApi : null;
+ 
+diff --git a/frontend/src/plugin/lib.ts b/frontend/src/plugin/lib.ts
+index da490e775..830bc7066 100644
+--- a/frontend/src/plugin/lib.ts
++++ b/frontend/src/plugin/lib.ts
+@@ -67,6 +67,11 @@ export abstract class Plugin {
+   abstract initialize(register: Registry): boolean | void;
+ }
+ 
++export interface DesktopApi {
++  platform: NodeJS.Platform;
++  [key: string]: any;
++}
++
+ declare global {
+   interface Window {
+     pluginLib: {
+@@ -76,7 +81,7 @@ declare global {
+       [pluginId: string]: Plugin;
+     };
+     registerPlugin: (pluginId: string, pluginObj: Plugin) => void;
+-    desktopApi: any;
++    desktopApi: DesktopApi;
+   }
+ }
+ 
+-- 
+2.54.0
+
