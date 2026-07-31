@@ -703,15 +703,16 @@ restore the fork's historical Storyshot files to their pre-commit state.
 ### Derive the document title from product metadata
 
 - **Fork source:** `53917bfee`.
-- **Upstream patch:** [frontend: derive the document title from product
-  metadata](headlamp-upstream-patches/headlamp-upstream-product-document-title.patch).
+- **Upstream patch:** [frontend: include product metadata in document
+  titles](headlamp-upstream-patches/headlamp-upstream-product-document-title.patch).
 - **Downstream removal:** [drop the hard-coded AKS
   title](headlamp-upstream-patches/headlamp-downstream-remove-product-document-title-fix.patch).
-- **AKS Desktop follow-up:** None beyond the existing package metadata. Both
-  supported frontend builders use the configured `productName`; `Headlamp`
-  remains the fallback.
-- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`;
-  Vite and Rsbuild production builds with an `AKS Desktop` product-name probe.
+- **AKS Desktop follow-up:** Supply `REACT_APP_HEADLAMP_PRODUCT_NAME` during
+  frontend assembly. The normal Vite build already generates it from package
+  metadata; alternative builders must receive the same value. `Headlamp`
+  remains the runtime fallback.
+- **Upstream validation:** `npm run frontend:tsc`; `npm run frontend:lint`; the
+  focused document-title helper tests.
 - **Removal validation:** `npm run frontend:tsc`; `npm run frontend:lint`; a
   Vite production build with the default `Headlamp` title.
 
@@ -736,9 +737,10 @@ restore the fork's historical Storyshot files to their pre-commit state.
   metadata](headlamp-upstream-patches/headlamp-upstream-package-verification-names.patch).
 - **Downstream removal:** [drop hard-coded AKS verification
   names](headlamp-upstream-patches/headlamp-downstream-remove-package-verification-names-fix.patch).
-- **AKS Desktop follow-up:** None. Linux uses the configured executable or
-  package name; macOS and Windows use `productName`. Backend verification
-  accepts any successful, non-empty version output instead of branding it.
+- **AKS Desktop follow-up:** None. Each platform uses its configured
+  platform-specific executable name, then the global executable name, then the
+  platform's package-name fallback. Backend verification accepts any
+  successful, non-empty version output instead of branding it.
 - **Upstream validation:** `npm run app:tsc`; `npm run app:lint`; Bash syntax
   checks; Windows PowerShell parser check; package-metadata probes. Packaging
   verification was not run because no platform artifacts were built.

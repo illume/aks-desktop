@@ -1,27 +1,27 @@
-From dd10105d83a972f8c1cddfcbf85d3efbe2b5a666 Mon Sep 17 00:00:00 2001
+From 25ecb6e5456239b0b8140217f33b25234bd946ce Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Fri, 31 Jul 2026 17:48:04 +0000
+Date: Fri, 31 Jul 2026 17:59:00 +0000
 Subject: [PATCH] app: derive verification names from package metadata
 
 ---
- app/scripts/verify-build-linux.sh    | 27 +++++++++++----------------
- app/scripts/verify-build-mac.sh      | 26 +++++++++++---------------
- app/scripts/verify-build-windows.ps1 | 20 +++++++++-----------
- 3 files changed, 31 insertions(+), 42 deletions(-)
+ app/scripts/verify-build-linux.sh    | 26 ++++++++++++------------
+ app/scripts/verify-build-mac.sh      | 26 ++++++++++++------------
+ app/scripts/verify-build-windows.ps1 | 30 ++++++++++++++++++----------
+ 3 files changed, 45 insertions(+), 37 deletions(-)
 
 diff --git a/app/scripts/verify-build-linux.sh b/app/scripts/verify-build-linux.sh
-index 195afcb96..a79bd4f23 100755
+index 195afcb96..ad79116f5 100755
 --- a/app/scripts/verify-build-linux.sh
 +++ b/app/scripts/verify-build-linux.sh
 @@ -19,6 +19,7 @@ set -e
  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
  DIST_DIR="$APP_DIR/dist"
-+APP_EXECUTABLE_NAME=$(node -e "const p=require(process.argv[1]); process.stdout.write(p.build?.linux?.executableName || p.name)" "$APP_DIR/package.json")
++APP_EXECUTABLE_NAME=$(node -e "const p=require(process.argv[1]); process.stdout.write(p.build?.linux?.executableName || p.build?.executableName || p.name)" "$APP_DIR/package.json")
  
  echo "=== Verifying Linux Build Artifacts ==="
  echo ""
-@@ -65,27 +66,21 @@ if [ ! -z "$TARBALL" ]; then
+@@ -65,27 +66,26 @@ if [ ! -z "$TARBALL" ]; then
      exit 1
    fi
    echo "Backend version: $VERSION_OUTPUT"
@@ -29,9 +29,11 @@ index 195afcb96..a79bd4f23 100755
 -    echo "✓ Backend binary is working"
 -  else
 -    echo "✗ Backend version check failed"
--    rm -rf "$EXTRACT_DIR"
--    exit 1
--  fi
++  if [ -z "$VERSION_OUTPUT" ]; then
++    echo "✗ Backend produced no version output"
+     rm -rf "$EXTRACT_DIR"
+     exit 1
+   fi
 +  echo "✓ Backend binary is working"
    echo ""
    
@@ -54,7 +56,7 @@ index 195afcb96..a79bd4f23 100755
    
    # Create unique temporary file for output
    OUTPUT_FILE=$(mktemp)
-@@ -116,9 +111,9 @@ if [ ! -z "$TARBALL" ]; then
+@@ -116,9 +116,9 @@ if [ ! -z "$TARBALL" ]; then
    # Step 4: Verify headlamp-server is cleaned up when app closes
    echo "=== Verifying Server Cleanup After App Close ==="
  
@@ -66,7 +68,7 @@ index 195afcb96..a79bd4f23 100755
  
    # Start the app in the background (needs a virtual display on headless CI)
    if command -v xvfb-run &>/dev/null; then
-@@ -153,7 +148,7 @@ if [ ! -z "$TARBALL" ]; then
+@@ -153,7 +153,7 @@ if [ ! -z "$TARBALL" ]; then
      echo "⚠ headlamp-server did not start within 30 seconds, skipping cleanup test"
      # Kill the wrapper and any headlamp (Electron) processes we spawned
      kill -TERM "$WRAPPER_PID" 2>/dev/null || true
@@ -75,7 +77,7 @@ index 195afcb96..a79bd4f23 100755
      for pid in $ALL_HEADLAMP_PIDS; do
        if [ -z "$EXISTING_HEADLAMP_PIDS" ] || ! echo "$EXISTING_HEADLAMP_PIDS" | grep -qw "$pid"; then
          kill -TERM "$pid" 2>/dev/null || true
-@@ -169,11 +164,11 @@ if [ ! -z "$TARBALL" ]; then
+@@ -169,11 +169,11 @@ if [ ! -z "$TARBALL" ]; then
        fi
      done
    else
@@ -90,18 +92,18 @@ index 195afcb96..a79bd4f23 100755
        if [ -z "$EXISTING_HEADLAMP_PIDS" ] || ! echo "$EXISTING_HEADLAMP_PIDS" | grep -qw "$pid"; then
          ELECTRON_PID="$pid"
 diff --git a/app/scripts/verify-build-mac.sh b/app/scripts/verify-build-mac.sh
-index c913b13ef..c3f8ef571 100755
+index c913b13ef..826549d0d 100755
 --- a/app/scripts/verify-build-mac.sh
 +++ b/app/scripts/verify-build-mac.sh
 @@ -19,6 +19,7 @@ set -e
  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
  DIST_DIR="$APP_DIR/dist"
-+PRODUCT_NAME=$(node -e "const p=require(process.argv[1]); process.stdout.write(p.productName || p.name)" "$APP_DIR/package.json")
++PRODUCT_NAME=$(node -e "const p=require(process.argv[1]); process.stdout.write(p.build?.mac?.executableName || p.build?.executableName || p.productName || p.name)" "$APP_DIR/package.json")
  
  # Function to test backend binary
  test_backend() {
-@@ -31,13 +32,8 @@ test_backend() {
+@@ -31,13 +32,12 @@ test_backend() {
        return 1
      fi
      echo "Backend version: $VERSION_OUTPUT"
@@ -110,14 +112,16 @@ index c913b13ef..c3f8ef571 100755
 -      return 0
 -    else
 -      echo "✗ Backend version check failed"
--      return 1
--    fi
++    if [ -z "$VERSION_OUTPUT" ]; then
++      echo "✗ Backend produced no version output"
+       return 1
+     fi
 +    echo "✓ Backend binary is working"
 +    return 0
    else
      echo "✗ Backend server binary not found at $BACKEND_PATH"
      return 1
-@@ -48,7 +44,7 @@ test_backend() {
+@@ -48,7 +48,7 @@ test_backend() {
  test_electron_app() {
    local HEADLAMP_EXEC="$1"
    if [ -f "$HEADLAMP_EXEC" ]; then
@@ -126,7 +130,7 @@ index c913b13ef..c3f8ef571 100755
      chmod +x "$HEADLAMP_EXEC"
      
      echo "Running app with 10 second timeout..."
-@@ -80,7 +76,7 @@ test_electron_app() {
+@@ -80,7 +80,7 @@ test_electron_app() {
        return 1
      fi
    else
@@ -135,7 +139,7 @@ index c913b13ef..c3f8ef571 100755
      return 1
    fi
  }
-@@ -122,7 +118,7 @@ if [ -d "$DIST_DIR/mac" ]; then
+@@ -122,7 +122,7 @@ if [ -d "$DIST_DIR/mac" ]; then
    
    # Test Electron app
    echo "=== Verifying Electron App ==="
@@ -144,7 +148,7 @@ index c913b13ef..c3f8ef571 100755
    test_electron_app "$HEADLAMP_EXEC" || exit 1
  else
    echo "Mac build directory not found, checking DMG contents..."
-@@ -159,7 +155,7 @@ else
+@@ -159,7 +159,7 @@ else
        
        # Test Electron app
        echo "=== Verifying Electron App from DMG ==="
@@ -153,7 +157,7 @@ index c913b13ef..c3f8ef571 100755
        if ! test_electron_app "$HEADLAMP_EXEC"; then
          hdiutil detach "$MOUNT_POINT" > /dev/null 2>&1
          rm -rf "$MOUNT_POINT" || true
-@@ -202,7 +198,7 @@ test_server_cleanup() {
+@@ -202,7 +202,7 @@ test_server_cleanup() {
    local REMAINING_SERVER_PIDS
  
    EXISTING_SERVER_PIDS=$(pgrep -f headlamp-server 2>/dev/null || true)
@@ -162,7 +166,7 @@ index c913b13ef..c3f8ef571 100755
  
    # Launch the app using macOS 'open' command so it properly registers with
    # WindowServer and Electron's 'ready' event fires (direct binary execution
-@@ -211,10 +207,10 @@ test_server_cleanup() {
+@@ -211,10 +211,10 @@ test_server_cleanup() {
    echo "Launching app for server cleanup test (via open, GPU disabled for CI)..."
    open "$APP_BUNDLE" --args --disable-gpu
  
@@ -175,7 +179,7 @@ index c913b13ef..c3f8ef571 100755
      for pid in $ALL_APP_PIDS; do
        if [ -z "$EXISTING_APP_PIDS" ] || ! echo "$EXISTING_APP_PIDS" | grep -qw "$pid"; then
          ELECTRON_PID="$pid"
-@@ -228,7 +224,7 @@ test_server_cleanup() {
+@@ -228,7 +228,7 @@ test_server_cleanup() {
    done
  
    if [ -z "$ELECTRON_PID" ]; then
@@ -185,20 +189,30 @@ index c913b13ef..c3f8ef571 100755
    fi
    echo "Electron app started with PID: $ELECTRON_PID"
 diff --git a/app/scripts/verify-build-windows.ps1 b/app/scripts/verify-build-windows.ps1
-index c17c1f6e5..e885d705f 100644
+index c17c1f6e5..42d63c011 100644
 --- a/app/scripts/verify-build-windows.ps1
 +++ b/app/scripts/verify-build-windows.ps1
-@@ -18,6 +18,9 @@ $ErrorActionPreference = "Stop"
+@@ -18,6 +18,19 @@ $ErrorActionPreference = "Stop"
  $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
  $appDir = Split-Path -Parent $scriptDir
  $distDir = Join-Path $appDir "dist"
 +$appPackage = Get-Content (Join-Path $appDir "package.json") -Raw | ConvertFrom-Json
-+$productName = if ($appPackage.productName) { $appPackage.productName } else { $appPackage.name }
-+$appExecutableName = "$productName.exe"
++$appExecutableName = if ($appPackage.build.win.executableName) {
++  $appPackage.build.win.executableName
++} elseif ($appPackage.build.executableName) {
++  $appPackage.build.executableName
++} elseif ($appPackage.productName) {
++  $appPackage.productName
++} else {
++  $appPackage.name
++}
++if (-not $appExecutableName.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
++  $appExecutableName += ".exe"
++}
  
  # Function to test backend binary
  function Test-BackendBinary {
-@@ -55,12 +58,8 @@ function Test-BackendBinary {
+@@ -55,12 +68,8 @@ function Test-BackendBinary {
      exit $exitCode
    }
    Write-Host "Backend version: $versionOutput"
@@ -213,7 +227,7 @@ index c17c1f6e5..e885d705f 100644
      exit 1
    }
    Write-Host "[PASS] Backend binary is working" -ForegroundColor Green
-@@ -97,7 +96,7 @@ if (Test-Path $unpackedDir) {
+@@ -97,7 +106,7 @@ if (Test-Path $unpackedDir) {
    $backendPath = Join-Path $unpackedDir "resources\headlamp-server.exe"
    if (Test-Path $backendPath) {
      Test-BackendBinary $backendPath
@@ -222,7 +236,7 @@ index c17c1f6e5..e885d705f 100644
    } else {
      Write-Host "[FAIL] Backend server binary not found in unpacked resources" -ForegroundColor Red
      exit 1
-@@ -108,7 +107,7 @@ if (Test-Path $unpackedDir) {
+@@ -108,7 +117,7 @@ if (Test-Path $unpackedDir) {
    if ($backendPath) {
      Test-BackendBinary $backendPath.FullName
      # Try to find the app executable in the dist output
@@ -231,16 +245,16 @@ index c17c1f6e5..e885d705f 100644
    } else {
      Write-Host "[FAIL] Could not find backend binary to test in dist output" -ForegroundColor Red
      exit 1
-@@ -120,7 +119,7 @@ Write-Host ""
+@@ -120,7 +129,7 @@ Write-Host ""
  Write-Host "=== Verifying Electron App ===" -ForegroundColor Cyan
  if ($appPath -and (Test-Path $appPath)) {
    Write-Host "Testing Electron app..."
 -  Write-Host "Found Headlamp at: $appPath"
-+  Write-Host "Found $productName at: $appPath"
++  Write-Host "Found $appExecutableName at: $appPath"
    
    # Initialize tempDir outside try block so it's accessible in catch/finally
    $tempDir = $null
-@@ -200,7 +199,7 @@ if ($appPath -and (Test-Path $appPath)) {
+@@ -200,7 +209,7 @@ if ($appPath -and (Test-Path $appPath)) {
      }
    }
  } else {
@@ -249,7 +263,7 @@ index c17c1f6e5..e885d705f 100644
    exit 1
  }
  
-@@ -282,4 +281,3 @@ if ($null -eq $serverPID) {
+@@ -282,4 +291,3 @@ if ($null -eq $serverPID) {
  
  Write-Host ""
  Write-Host "[PASS] All Windows verification checks passed" -ForegroundColor Green
