@@ -103,6 +103,40 @@ Run the Headlamp TypeScript, lint, focused test, build, and packaged-runtime
 checks affected by the rebased hunks. Never edit the installed package under
 `node_modules`.
 
+### Ship static plugins
+
+Headlamp's desktop plugin manager lists plugins in the packaged `.plugins`
+directory as `shipped`. The reusable `bundle:plugins` command builds that
+directory from `package.json#headlamp.plugins` before application or container
+assembly. A plugin may use exactly one source:
+
+- a repository-relative `source` string for a workspace that must run `npm ci`
+  and `npm run build`;
+- `source: {"type": "package"}` for an exact, lockfile-verified root npm
+  dependency that already contains `dist/`; or
+- an HTTPS `archive` or local `file` with `packageName` and `sha256`, which the
+  Electron shipped-plugin installer verifies before extraction.
+
+For example, a prebuilt package declaration is:
+
+```json
+{
+  "name": "example-plugin",
+  "packageName": "@example/headlamp-plugin",
+  "source": {"type": "package"},
+  "enabledByDefault": false
+}
+```
+
+Declare `@example/headlamp-plugin` at an exact version in the root dependencies.
+npm then verifies its lockfile integrity, while the bundler verifies the package
+identity, rejects name collisions and paths outside `node_modules`, copies the
+complete distribution, and records the product's default-enabled policy.
+Workspace and package sources are staged once and reused by desktop and source
+container builds. Archive/file sources currently feed the Electron installer;
+do not use them for a cross-target product until the container fetcher shares
+the same digest-verified manifest implementation.
+
 Product identity, update policy, legal documents, plugin workspaces, defaults,
 and capability ceilings belong in the root `package.json` under `headlamp`; AKS
 behavior belongs in plugin APIs.

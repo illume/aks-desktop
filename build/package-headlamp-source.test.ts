@@ -207,12 +207,13 @@ test('packages a clean exact Headlamp commit and updates the npm contract', () =
 test('rejects a source checkout that does not match the configured commit', () => {
   const { commit, sourceDir } = createSourceCheckout();
   const rootDir = createProject(commit);
+  const otherCommit = `${commit.startsWith('a') ? 'b' : 'a'}${commit.slice(1)}`;
   assert.throws(
     () =>
       updateHeadlampSource({
         rootDir,
         sourceDir,
-        commit: `a${commit.slice(1)}`,
+        commit: otherCommit,
       }),
     /does not match/
   );

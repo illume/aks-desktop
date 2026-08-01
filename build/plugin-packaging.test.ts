@@ -9,9 +9,12 @@ import { afterEach, test } from 'node:test';
 
 import { HEADLAMP_PACKAGE_DIR } from './headlamp-path';
 
-const { copyPlugin, validatePluginConfiguration } = require(
-  path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'bundle-plugins.js')
-);
+const {
+  bundleConfiguredPlugins,
+  bundlePlugin,
+  copyPlugin,
+  validatePluginConfiguration,
+} = require(path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'bundle-plugins.js'));
 
 const tempDirs: string[] = [];
 
@@ -160,8 +163,16 @@ test('rejects case-insensitive bundle name collisions', () => {
   assert.throws(
     () =>
       validatePluginConfiguration([
-        { name: 'example', packageName: '@one/example' },
-        { name: 'Example', packageName: '@two/example' },
+        {
+          name: 'example',
+          packageName: '@one/example',
+          source: 'plugins/example',
+        },
+        {
+          name: 'Example',
+          packageName: '@two/example',
+          source: 'plugins/other-example',
+        },
       ]),
     /duplicate bundle names/
   );
@@ -171,9 +182,116 @@ test('rejects duplicate plugin package identities', () => {
   assert.throws(
     () =>
       validatePluginConfiguration([
-        { name: 'first', packageName: '@example/plugin' },
-        { name: 'second', packageName: '@example/Plugin' },
+        {
+          name: 'first',
+          packageName: '@example/plugin',
+          source: 'plugins/first',
+        },
+        {
+          name: 'second',
+          packageName: '@example/Plugin',
+          source: 'plugins/second',
+        },
       ]),
     /duplicate package identities/
+  );
+});
+
+test('copies a prebuilt npm dependency as a shipped plugin', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aks-desktop-package-'));
+  tempDirs.push(rootDir);
+  const packageName = '@example/shipped-plugin';
+  const pluginDir = path.join(rootDir, 'node_modules', packageName);
+  const pluginsDir = path.join(rootDir, '.plugins');
+  fs.mkdirSync(path.join(pluginDir, 'dist'), { recursive: true });
+  fs.writeFileSync(path.join(pluginDir, 'dist', 'main.js'), 'prebuilt bundle');
+  fs.writeFileSync(
+    path.join(pluginDir, 'package.json'),
+    JSON.stringify({ name: packageName })
+  );
+
+  bundlePlugin(rootDir, pluginsDir, {
+    name: 'shipped-plugin',
+    packageName,
+    source: { type: 'package' },
+    enabledByDefault: false,
+  });
+
+  assert.equal(
+    fs.readFileSync(path.join(pluginsDir, 'shipped-plugin', 'main.js'), 'utf8'),
+    'prebuilt bundle'
+  );
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(pluginsDir, 'shipped-plugin', 'package.json'),
+        'utf8'
+      )
+    ).headlamp.enabledByDefault,
+    false
+  );
+});
+
+test('leaves pinned archives for the Headlamp shipped-plugin installer', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aks-desktop-archive-'));
+  tempDirs.push(rootDir);
+  const pluginsDir = path.join(rootDir, '.plugins');
+  fs.writeFileSync(
+    path.join(rootDir, 'package.json'),
+    JSON.stringify({
+      headlamp: {
+        plugins: [
+          {
+            name: 'archive-plugin',
+            packageName: '@example/archive-plugin',
+            archive: 'https://example.invalid/archive-plugin.tgz',
+            sha256: 'a'.repeat(64),
+          },
+        ],
+      },
+    })
+  );
+
+  bundleConfiguredPlugins(rootDir, pluginsDir);
+
+  assert.deepEqual(fs.readdirSync(pluginsDir), []);
+});
+
+test('rejects ambiguous or unverified shipped-plugin sources', () => {
+  assert.throws(
+    () =>
+      validatePluginConfiguration([
+        {
+          name: 'ambiguous',
+          packageName: '@example/ambiguous',
+          source: 'plugins/ambiguous',
+          archive: 'https://example.invalid/ambiguous.tgz',
+          sha256: 'a'.repeat(64),
+        },
+      ]),
+    /exactly one/
+  );
+  assert.throws(
+    () =>
+      validatePluginConfiguration([
+        {
+          name: 'unverified',
+          packageName: '@example/unverified',
+          archive: 'https://example.invalid/unverified.tgz',
+        },
+      ]),
+    /SHA-256/
+  );
+  assert.throws(
+    () =>
+      validatePluginConfiguration([
+        {
+          name: 'insecure',
+          packageName: '@example/insecure',
+          archive: 'http://example.invalid/insecure.tgz',
+          sha256: 'a'.repeat(64),
+        },
+      ]),
+    /HTTPS/
   );
 });

@@ -190,11 +190,15 @@ overwrite upstream Headlamp tags.
 
 The current build has two different plugin paths:
 
-- The source package's `bundle:plugins` script builds the workspaces declared
-  by root `headlamp.plugins` and copies each `dist/` into `.plugins`.
+- The source package's `bundle:plugins` script builds declared workspaces or
+  copies exact, lockfile-verified prebuilt package dependencies, then stages each
+  `dist/` under `.plugins`. Electron's plugin manager reports this packaged
+  directory as `shipped`.
 - Headlamp's `app/app-build-manifest.json` and
-  `container/build-manifest.json` download shipped plugin archives. The current
-  fetchers do not record or verify archive digests.
+  `container/build-manifest.json` download shipped plugin archives. The patched
+  desktop installer requires SHA-256 and package identity for an external
+  product manifest; the current container fetcher does not yet share that
+  verification.
 
 Replace both with one product-owned plugin manifest. Excluding the vendored AI
 Assistant, an illustrative AKS manifest is:
