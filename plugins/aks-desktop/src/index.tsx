@@ -17,6 +17,7 @@ import {
   registerRoute,
   registerSidebarEntry,
 } from '@kinvolk/headlamp-plugin/lib';
+import * as HeadlampPlugin from '@kinvolk/headlamp-plugin/lib';
 import React from 'react';
 import { Redirect } from 'react-router-dom';
 import AccessTab from './components/AccessTab/AccessTab';
@@ -58,6 +59,29 @@ import {
   isArmManagedProject,
 } from './utils/shared/isAksProject';
 import { azureTheme } from './utils/shared/theme';
+
+const projectExtensions = HeadlampPlugin as unknown as {
+  DefaultCreateProject?: {
+    NEW_PROJECT: string;
+    FROM_YAML: string;
+  };
+  registerProjectGrouping?: (grouping: {
+    getProjectKey: (params: {
+      namespace: {
+        metadata: { labels?: Record<string, string> };
+        cluster: string;
+      };
+      projectId: string;
+    }) => string;
+  }) => void;
+};
+
+projectExtensions.registerProjectGrouping?.({
+  getProjectKey: ({ namespace, projectId }) =>
+    namespace.metadata.labels?.['headlamp.dev/project-managed-by'] === 'aks-desktop'
+      ? `${projectId}:${namespace.cluster}`
+      : projectId,
+});
 
 Headlamp.setAppMenu(menus => {
   // Find the Help menu
@@ -274,7 +298,7 @@ if (Headlamp.isRunningAsApp()) {
   // Override built-in "Use Existing Namespace(s)" with enhanced AKS version
   // that discovers both managed namespaces (via Azure Resource Graph) and regular namespaces
   registerCustomCreateProject({
-    id: 'use-existing-namespace',
+    id: projectExtensions.DefaultCreateProject?.NEW_PROJECT ?? 'use-existing-namespace',
     name: 'Use Existing Namespace(s)',
     description: 'Select namespaces to use as a project',
     component: () => <Redirect to="/projects/import-aks-projects" />,
@@ -300,7 +324,7 @@ if (Headlamp.isRunningAsApp()) {
   });
 
   registerCustomCreateProject({
-    id: 'create-namespace',
+    id: projectExtensions.DefaultCreateProject?.FROM_YAML ?? 'create-namespace',
     name: 'Create New Namespace',
     description: 'New namespace with resources as a project',
     component: () => <Redirect to="/projects/create-namespace" />,

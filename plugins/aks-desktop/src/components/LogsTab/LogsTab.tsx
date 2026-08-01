@@ -2,8 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-// @ts-ignore todo: LogsViewer is not importing
-import { LogsViewer } from '@kinvolk/headlamp-plugin/lib/CommonComponents';
+import * as CommonComponents from '@kinvolk/headlamp-plugin/lib/CommonComponents';
 import { type KubeObject } from '@kinvolk/headlamp-plugin/lib/lib/k8s/cluster';
 import { Box } from '@mui/material';
 import { visuallyHidden } from '@mui/utils';
@@ -11,6 +10,14 @@ import React from 'react';
 import { DeploymentSelector } from '../shared/DeploymentSelector';
 import { EmptyStateCard } from '../shared/EmptyStateCard';
 import { useLogsTab } from './hooks/useLogsTab';
+
+type WorkloadLogsComponent = React.ComponentType<{ item: KubeObject }>;
+
+const { WorkloadLogs, LogsViewer } = CommonComponents as unknown as {
+  WorkloadLogs?: WorkloadLogsComponent;
+  LogsViewer?: WorkloadLogsComponent;
+};
+const WorkloadLogsView = WorkloadLogs ?? LogsViewer;
 
 /**
  * Props for the {@link LogsTab} component.
@@ -68,8 +75,11 @@ const LogsTab = ({ projectResources }: LogsTabProps) => {
               />
             </Box>
           )}
-          {selectedDeployment && (
-            <LogsViewer item={selectedDeployment} key={selectedDeployment.jsonData.metadata.uid} />
+          {selectedDeployment && WorkloadLogsView && (
+            <WorkloadLogsView
+              item={selectedDeployment}
+              key={selectedDeployment.jsonData.metadata.uid}
+            />
           )}
         </>
       )}

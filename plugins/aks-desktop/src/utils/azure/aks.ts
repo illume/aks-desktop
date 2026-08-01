@@ -1,6 +1,21 @@
 import { getClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 
+interface ClusterProviderRequest {
+  subscriptionId: string;
+  resourceGroup: string;
+  clusterName: string;
+  managedNamespace?: string;
+  clusterType: 'aks' | 'arc';
+}
+
+type ClusterProviderInvoke = (
+  provider: string,
+  request: ClusterProviderRequest
+) => Promise<{ success: boolean; message: string }>;
+
+declare const clusterProviderInvoke: ClusterProviderInvoke | undefined;
+
 export interface Subscription {
   id: string;
   name: string;
@@ -108,7 +123,17 @@ export async function registerAKSCluster(
       managedNamespace ? `with managed namespace: ${managedNamespace}` : ''
     );
 
-    // Call the Electron IPC handler
+    if (typeof clusterProviderInvoke !== 'undefined') {
+      return await clusterProviderInvoke('aks-desktop.cluster', {
+        subscriptionId,
+        resourceGroup,
+        clusterName,
+        ...(managedNamespace ? { managedNamespace } : {}),
+        clusterType: 'aks',
+      });
+    }
+
+    // Compatibility path for the current downstream Headlamp host.
     const desktopApi = (window as any).desktopApi;
 
     if (!desktopApi || !desktopApi.registerAKSCluster) {

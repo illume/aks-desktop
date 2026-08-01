@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "id": "com.microsoft.aks-desktop",
+    "name": "aks-desktop",
+    "displayName": "AKS desktop",
+    "executableName": "aks-desktop",
+    "backendAppName": "AKS desktop",
+    "versionSource": "package.json",
+    "protocolScheme": "aks-desktop",
+    "checkForUpdates": false,
+    "frontendEnvironment": {
+      "name": "REACT_APP_HEADLAMP_PRODUCT_NAME",
+      "version": "REACT_APP_HEADLAMP_PRODUCT_VERSION"
+    },
+    "legalDocuments": [
+      {
+        "id": "license",
+        "title": "License",
+        "file": "LICENSE.txt"
+      },
+      {
+        "id": "notices",
+        "title": "Third-party notices",
+        "file": "NOTICE.md"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "id": "aks-desktop",
+      "source": "plugins/aks-desktop/dist",
+      "enabledByDefault": true
+    },
+    {
+      "id": "kaito",
+      "enabledByDefault": false
+    }
+  ],
+  "externalTools": [
+    {
+      "id": "azure-cli",
+      "resourcePath": "external-tools/az-cli/{platform}/bin/az{commandExtension}",
+      "sha256": "generated-during-assembly"
+    },
+    {
+      "id": "python",
+      "resourcePath": "external-tools/az-cli/{platform}/bin/python3",
+      "sha256": "generated-during-assembly"
+    },
+    {
+      "id": "az-kubelogin",
+      "resourcePath": "external-tools/bin/az-kubelogin.py",
+      "sha256": "generated-during-assembly"
+    }
+  ]
+}
