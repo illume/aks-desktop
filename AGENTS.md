@@ -8,9 +8,9 @@ Navigation guide for AI coding agents. For Headlamp plugin API examples see [`pl
 | --- | --- | --- | --- |
 | **Plugin** | `plugins/aks-desktop/` | AKS-specific UI, Azure integration, Kubernetes operations | Most changes go here |
 | **Build** | `build/` | Plugin setup, external tool bundling (Azure CLI, Python), post-build verification | Packaging, bundled tool versions, installer behavior |
-| **Headlamp fork** | `headlamp/` (submodule) | Electron shell, backend server, frontend framework | Only when plugin system cannot achieve the goal |
+| **Headlamp distribution** | `packages/headlamp/`, `build/headlamp-lock.json` | Materializes pinned upstream source and applies reviewed patches | Source/package updates and generic Headlamp changes |
 
-Headlamp fork commits must use a prefix:
+Headlamp patch commits must use a prefix:
 
 - `aksd:` -- AKS Desktop-specific changes
 - `upstreamable:` -- bug fixes, performance improvements, or features to contribute back upstream
@@ -30,7 +30,7 @@ See [`MAINTENANCE.md`](./MAINTENANCE.md) for the full fork rebase workflow.
 | Component-local types | Co-located in the component directory (e.g., `plugins/aks-desktop/src/components/DeployWizard/components/types.ts`) |
 | Plugin registration | `plugins/aks-desktop/src/index.tsx` |
 | Build / packaging | `build/` |
-| Headlamp core | `headlamp/` (commit prefix: `aksd:` or `upstreamable:`) |
+| Headlamp core | Add/update an ordered patch under `docs/headlamp-upstream-patches/`; never edit generated `headlamp/` |
 
 ## Module Boundary Rules
 
@@ -87,4 +87,4 @@ Use `registerProjectDetailsTab()` or `registerProjectOverviewSection()` in `src/
 ## Cross-References
 
 - **Headlamp plugin API examples and patterns**: [`plugins/aks-desktop/AGENTS.md`](./plugins/aks-desktop/AGENTS.md)
-- **Fork maintenance and rebase workflow**: [`MAINTENANCE.md`](./MAINTENANCE.md)
+- **Headlamp package and patch updates**: [`MAINTENANCE.md`](./MAINTENANCE.md)

@@ -1,7 +1,8 @@
 # Headlamp distribution and product builds
 
-> Research snapshot: 2026-07-30. All package names, commands, schemas, and
-> container tags described as proposed are illustrative and do not exist today.
+> Research snapshot: 2026-07-30; implementation updated 2026-08-01. Proposed
+> upstream package names and container tags remain illustrative. The local
+> `@aks-desktop/headlamp` transition package, lock, and CLI now exist.
 > The vendored `plugins/ai-assistant/` directory is outside this audit.
 
 This document expands the
@@ -314,7 +315,7 @@ products.
 | `Localize/translation-manager.mjs` | Multi-source locale overlay/merge command in the plugin toolchain | OneLoc conventions and AKS locked terms |
 | Root `build:*` scripts and downstream builder config | `assemble-desktop --product --target --output` over an exported base builder config | Thin npm aliases, signing inputs, product manifest |
 | Downstream `app/scripts/verify-build-*` changes | Cross-platform `verify-distribution` driven by artifact metadata | AKS release policy |
-| `scripts/headlamp-submodule.sh` | Nothing | Delete after source/package resolution lands |
+| `scripts/headlamp-submodule.sh` | Nothing | Removed; the package CLI resolves the locked source |
 
 The existing AKS plugin copy tests already cover scoped names, stale output, and
 path traversal; they are a useful seed for the upstream bundler. Before

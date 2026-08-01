@@ -1,8 +1,9 @@
 # Removing the Headlamp submodule
 
-> Research snapshot: 2026-07-30. Headlamp `v0.44.0` is the latest release
-> considered here. Proposed package names and manifests in this document do not
-> exist yet.
+> Research snapshot: 2026-07-30; implementation updated 2026-08-01. The
+> upstream package names described as targets remain proposals. The local
+> `@aks-desktop/headlamp` transition package and product manifest now exist in
+> this repository.
 
 ## Terminology
 
@@ -58,11 +59,42 @@ replacement for all 115 downstream non-merge commits.
 literal single-package option, derived container image, multi-plugin bundle,
 and reusable build tooling to contribute upstream.
 
+### Executable migration
+
+AKS Desktop no longer records Headlamp as a Git submodule. The root project
+depends on the local `@aks-desktop/headlamp` package, which materializes an
+ignored build workspace from:
+
+- upstream `main` commit
+  `99a230be9c9c679a70d59c219cc246c00ae2be45`;
+- the verified source digest and ordered 66-patch series in
+  [`build/headlamp-lock.json`](../build/headlamp-lock.json); and
+- AKS-owned product policy in
+  [`build/product-manifest.json`](../build/product-manifest.json).
+
+The package has no install lifecycle script. Source retrieval and patching are
+explicit:
+
+```bash
+npm install
+npm run headlamp:prepare       # verify source, extract, and apply all patches
+npm run test:headlamp-patches  # repeat the full series in a disposable tree
+npm run headlamp:assemble      # build plugins/tools and generate the manifest
+npm run headlamp:doctor        # verify source, patch, and manifest identities
+npm run build:linux            # or build:mac / build:win
+```
+
+For an offline build, set `HEADLAMP_SOURCE_ARCHIVE` to the locked archive. The
+same SHA-256 check is applied. `npm run headlamp:smoke -- --executable <path>`
+starts a packaged application in Headlamp's headless mode and requires its HTTP
+endpoint to return the application page. Structural post-build checks remain in
+`npm run test:post-build`.
+
 ## Current state
 
-### What is coupled to the submodule
+### Former submodule coupling
 
-| Consumer | Current dependency on `headlamp/` |
+| Consumer | Former dependency on `headlamp/` |
 | --- | --- |
 | `.gitmodules` | Points at the `headlamp-downstream` branch of the AKS Desktop repository. |
 | Root build scripts | Run `make app` inside the submodule. |
@@ -72,7 +104,7 @@ and reusable build tooling to contribute upstream.
 | `Localize/translation-manager.mjs` | Reads and writes Headlamp frontend locale files directly. |
 | Downstream Headlamp | Contains product identity, build targets, Electron IPC, backend, frontend, and generated translation changes. |
 
-The fork is based on upstream `v0.43.0`. It has 115 non-merge commits and a
+The retired fork was based on upstream `v0.43.0`. It has 115 non-merge commits and a
 large apparent diff; generated translations and snapshots account for much of
 the file count. A strict comparison found no patch-identical commits in current
 upstream. Several behaviors do now have semantic upstream equivalents, so the
@@ -131,89 +163,97 @@ text or feature defaults. Values needed before startup—icons, executable name,
 protocol registration, signing, and installer targets—remain assembly-time
 product configuration.
 
-An illustrative AKS product manifest is:
+The checked-in product manifest uses the schema implemented by the patch set.
+The assembly command adds platform-specific tool paths, SHA-256 digests,
+resources, and post-package verification entries:
 
 ```json
 {
-  "schemaVersion": 1,
   "product": {
-    "id": "com.microsoft.aks-desktop",
     "name": "aks-desktop",
-    "displayName": "AKS desktop",
-    "protocols": ["aks-desktop"],
-    "icons": "branding/icons",
-    "legalFiles": ["LICENSES.txt"],
-    "targets": ["darwin-arm64", "linux-x64", "win32-x64"]
-  },
-  "frontend": {
-    "publicConfig": {
-      "releaseNotes": false,
-      "noClustersMessage": "No AKS clusters added"
+    "productName": "AKS Desktop",
+    "version": "0.9.0",
+    "appId": "com.microsoft.aksdesktop",
+    "protocols": {
+      "name": "AKS Desktop",
+      "schemes": ["aks-desktop"]
     }
   },
+  "checkForUpdates": false,
   "plugins": [
     {
-      "id": "aks-desktop",
-      "source": "plugins/aks-desktop/dist",
-      "enabled": true,
-      "capabilities": [
-        "clusters:register",
-        "storage:aks-desktop",
-        "oauth:github"
-      ],
-      "commandScopes": [
-        {"tool": "az", "subcommands": ["account", "aks", "aksarc", "connectedk8s"]},
-        {"tool": "kubectl", "subcommands": ["config", "top"]}
-      ]
+      "name": "aks-desktop",
+      "packageName": "aks-desktop",
+      "enabledByDefault": true,
+      "capabilities": {
+        "runCommands": [
+          {"tool": "az", "args": ["account"], "allowTrailingArgs": true},
+          {"tool": "az", "args": ["aks"], "allowTrailingArgs": true},
+          {"command": "kubectl", "args": ["config"], "allowTrailingArgs": true}
+        ]
+      }
     }
-  ],
-  "externalTools": {
-    "az": {
-      "source": "build/output/external-tools/az",
-      "sha256": "<platform artifact digest>"
-    }
-  }
+  ]
 }
 ```
 
-This schema is a proposal. The real schema should reject unknown keys, validate
-paths and capability names, and be versioned independently from product data.
-Signing credentials, OAuth tokens, backend tokens, and connection strings must
-not appear in it.
+The manifest contains policy, never credentials. Signing credentials, OAuth
+tokens, backend tokens, and connection strings must not appear in it.
 
 ## How AKS Desktop could consume Headlamp
 
-### Immediate source distribution
+### Implemented source distribution
 
-Until packages exist, commit a small lock file instead of a Git link:
+Until upstream packages exist, AKS Desktop commits a small lock file instead of
+a Git link:
 
 ```json
 {
   "schemaVersion": 1,
-  "headlampVersion": "0.44.0",
   "source": {
-    "kind": "git",
-    "repository": "https://github.com/kubernetes-sigs/headlamp.git",
-    "ref": "refs/tags/v0.44.0",
-    "commit": "7e2f255cc256a16c39681ffea31fa16e11a11eaf",
-    "tree": "6017e6fc330b7c5be930852093b97f173c9f7765"
-  }
+    "repository": "https://github.com/kubernetes-sigs/headlamp",
+    "ref": "refs/heads/main",
+    "commit": "99a230be9c9c679a70d59c219cc246c00ae2be45",
+    "sha256": "b593a3e5b1611a598660236c12e8802f89698de54ba05d5d46175273ffdbaf55"
+  },
+  "patchSetSha256": "2383dfa886d4f965fc4e4dba08ae43484e7d9a67011d21fead3b820c6c20efdc"
 }
 ```
 
-The resolver should fetch the advertised ref into a disposable/cache repository,
-verify both the commit and Git tree object, export that tree, build unmodified
-upstream source, and assemble AKS plugins and resources around it. A moved tag
-then fails closed. GitHub's automatically generated source archives are not
-guaranteed to remain byte-identical, so their compressed-file digest should not
-be the long-term lock. A build that cannot use Git should consume a manually
-uploaded immutable source release asset with a signed checksum instead.
+The implemented resolver downloads or accepts the locked archive, verifies its
+SHA-256 digest, checks every archive path, extracts to a staging directory, and
+applies every patch in order. A changed archive fails closed. GitHub's generated
+source archives are not guaranteed to remain byte-identical, so a manually
+uploaded immutable source asset with a signed checksum is the long-term source
+input.
 
-The current `v0.44.0` tag is lightweight rather than signed. The interim phase
-therefore relies on reviewed lock-file changes and Git object verification;
-upstream signatures/provenance become mandatory for the target distribution.
+The interim phase relies on reviewed lock-file and digest changes; upstream
+signatures/provenance become mandatory for the target distribution.
 This is source consumption, not the final package API, but it removes submodule
 mechanics and the permanent fork.
+
+## Security benefits of a packaged dependency
+
+A published Headlamp distribution creates a security identity that dependency
+tools can understand. A package name and exact version appear in lockfiles,
+software bills of materials, dependency graphs, and vulnerability scanners.
+When a Headlamp advisory marks that version affected, automated tooling can
+identify every consumer, propose the fixed version, and verify that release
+integrity or provenance. One patched release can then update all consumers.
+
+A private fork commit has no equivalent ecosystem identity. General dependency
+scanners may inspect the fork's npm and Go dependencies, but they cannot infer
+that an arbitrary Git commit contains a vulnerable Headlamp release or which
+upstream release fixes it. The result is silent exposure unless maintainers
+manually correlate every Headlamp advisory with fork history.
+
+The transition package improves this boundary now: the package version is
+locked, source and patch bytes are SHA-256 verified, extraction rejects paths
+outside the workspace, and downloaded tools/plugins are digest checked. It does
+not make the local package discoverable in public advisory databases; that
+benefit arrives when upstream publishes and registers the distribution.
+Signatures, registry provenance, an SBOM, and regular vulnerability scanning
+remain release requirements rather than substitutes for review.
 
 #### Releases, forks, and local checkouts
 
@@ -442,13 +482,14 @@ rebases the same code.
   and product manifest.
 - Pin and test plugin API compatibility.
 
-### Phase 3: remove the submodule
+### Phase 3: remove the submodule (implemented)
 
-- Replace `.gitmodules`, the submodule pointer, and
-  `scripts/headlamp-submodule.sh` with the verified source lock/resolver.
-- Build a pristine verified source tree and assemble AKS Desktop externally.
-- The exit test is a successful update to a newer upstream commit without an
-  AKS patch applied inside the extracted tree.
+- `.gitmodules`, the submodule pointer, and the submodule update workflow are
+  replaced by the verified source lock and package CLI.
+- Build a verified current-upstream source tree, apply the ordered upstream
+  candidates, and assemble AKS Desktop through product and plugin manifests.
+- Validate patch application in a disposable workspace, then run TypeScript,
+  lint, focused tests, packaging checks, and the headless runtime smoke test.
 
 ### Phase 4: switch to published distributions
 

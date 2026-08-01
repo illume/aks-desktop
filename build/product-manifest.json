@@ -1,57 +1,82 @@
 {
-  "schemaVersion": 1,
   "product": {
-    "id": "com.microsoft.aks-desktop",
     "name": "aks-desktop",
-    "displayName": "AKS desktop",
-    "executableName": "aks-desktop",
-    "backendAppName": "AKS desktop",
-    "versionSource": "package.json",
-    "protocolScheme": "aks-desktop",
-    "checkForUpdates": false,
-    "frontendEnvironment": {
-      "name": "REACT_APP_HEADLAMP_PRODUCT_NAME",
-      "version": "REACT_APP_HEADLAMP_PRODUCT_VERSION"
+    "productName": "AKS Desktop",
+    "version": "0.9.0",
+    "appId": "com.microsoft.aksdesktop",
+    "artifactName": "aks-desktop-${version}-${os}-${arch}.${ext}",
+    "protocols": {
+      "name": "AKS Desktop",
+      "schemes": ["aks-desktop"]
+    }
+  },
+  "checkForUpdates": false,
+  "legalDocuments": [
+    {
+      "id": "license",
+      "title": "AKS Desktop license",
+      "file": "AKS_DESKTOP_LICENSE.txt"
     },
-    "legalDocuments": [
-      {
-        "id": "license",
-        "title": "License",
-        "file": "LICENSE.txt"
-      },
-      {
-        "id": "notices",
-        "title": "Third-party notices",
-        "file": "NOTICE.md"
-      }
-    ]
+    {
+      "id": "notices",
+      "title": "AKS Desktop notices",
+      "file": "AKS_DESKTOP_NOTICE.md"
+    }
+  ],
+  "platforms": {
+    "linux": {
+      "executableName": "aks-desktop",
+      "productName": "AKS Desktop"
+    },
+    "mac": {
+      "appId": "com.microsoft.aksdesktop",
+      "productName": "AKS Desktop"
+    },
+    "win": {
+      "productName": "AKS Desktop"
+    }
   },
   "plugins": [
     {
-      "id": "aks-desktop",
-      "source": "plugins/aks-desktop/dist",
+      "name": "aks-desktop",
+      "packageName": "aks-desktop",
+      "enabledByDefault": true,
+      "capabilities": {
+        "runCommands": [
+          { "tool": "az", "args": ["account"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["acr"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["aks"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["config"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["connectedk8s"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["extension"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["feature"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["graph"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["group"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["login"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["logout"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["role"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["version"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["vm"], "allowTrailingArgs": true },
+          { "command": "kubectl", "args": ["config"], "allowTrailingArgs": true }
+        ]
+      }
+    },
+    {
+      "name": "ai-assistant",
+      "packageName": "@headlamp-k8s/ai-assistant",
       "enabledByDefault": true
     },
     {
-      "id": "kaito",
-      "enabledByDefault": false
-    }
-  ],
-  "externalTools": [
-    {
-      "id": "azure-cli",
-      "resourcePath": "external-tools/az-cli/{platform}/bin/az{commandExtension}",
-      "sha256": "generated-during-assembly"
+      "name": "insights-plugin",
+      "packageName": "insights-plugin",
+      "enabledByDefault": true
     },
     {
-      "id": "python",
-      "resourcePath": "external-tools/az-cli/{platform}/bin/python3",
-      "sha256": "generated-during-assembly"
-    },
-    {
-      "id": "az-kubelogin",
-      "resourcePath": "external-tools/bin/az-kubelogin.py",
-      "sha256": "generated-during-assembly"
+      "name": "headlamp-kaito",
+      "packageName": "headlamp-kaito",
+      "enabledByDefault": false,
+      "archive": "https://artifacthub.io/api/v1/packages/headlamp/kaito/headlamp-kaito/0.2.1-alpha/download",
+      "sha256": "b6ef058940a92895893f531319246637fb05725bc4498d71c523b87002d5799b"
     }
   ]
 }

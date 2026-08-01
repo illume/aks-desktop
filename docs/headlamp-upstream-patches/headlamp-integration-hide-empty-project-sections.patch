@@ -1,0 +1,32 @@
+From 98f4c1e51cc114113d6932d33c58e691cd495d97 Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 12:38:26 +0000
+Subject: [PATCH] upstreamable: combine empty section filtering with project
+ extensions
+
+---
+ frontend/src/components/project/ProjectDetails.tsx | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index d55a573..a61b69c 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -332,7 +332,13 @@ function ProjectOverview({
+       </Grid>
+ 
+       {projectSections.map(section => (
+-        <Grid key={section.id} item xs={12} md={4}>
++        <Grid
++          key={section.id}
++          item
++          xs={12}
++          md={4}
++          sx={{ '&:has(.MuiCardContent-root:empty)': { display: 'none' } }}
++        >
+           <Card sx={{ height: '100%' }}>
+             <CardContent>
+               <section.component project={project} projectResources={projectResources} />
+-- 
+2.54.0
+

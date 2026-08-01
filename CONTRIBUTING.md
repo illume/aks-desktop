@@ -15,4 +15,4 @@ or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any addi
 
 ## Submodule Related Contributions
 
-Please refer to the [MAINTENANCE.md](MAINTENANCE.md) file for details on changes to the Headlamp submodule.
+Please refer to [MAINTENANCE.md](MAINTENANCE.md) for the pinned Headlamp package and patch update process.

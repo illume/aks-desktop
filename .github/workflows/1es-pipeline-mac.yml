@@ -70,7 +70,7 @@ extends:
                   versionSpec: ${{ parameters.nodeVersion }}
 
               - checkout: self
-                submodules: recursive
+                submodules: false
 
               # Cache dependencies
               - task: Cache@2
@@ -85,7 +85,7 @@ extends:
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp frontend)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | headlamp/frontend/package-lock.json'
+                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | frontend'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
@@ -94,7 +94,7 @@ extends:
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp app)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | headlamp/app/package-lock.json'
+                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | app'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
@@ -215,6 +215,7 @@ extends:
                   export npm_config_arch="$(ARCH)"
                   export npm_config_target_arch="$(ARCH)"
 
+                  npm ci
                   MAX_RETRIES=3
                   RETRY_COUNT=0
                   SUCCESS=false
@@ -564,7 +565,7 @@ extends:
                   versionSpec: ${{ parameters.nodeVersion }}
 
               - checkout: self
-                submodules: recursive
+                submodules: false
 
               # Cache dependencies
               - task: Cache@2
@@ -579,7 +580,7 @@ extends:
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp frontend)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | headlamp/frontend/package-lock.json'
+                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | frontend'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
@@ -588,7 +589,7 @@ extends:
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp app)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | headlamp/app/package-lock.json'
+                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | app'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
@@ -709,6 +710,7 @@ extends:
                   export npm_config_arch="$(ARCH)"
                   export npm_config_target_arch="$(ARCH)"
 
+                  npm ci
                   MAX_RETRIES=3
                   RETRY_COUNT=0
                   SUCCESS=false

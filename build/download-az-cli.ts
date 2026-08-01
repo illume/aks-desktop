@@ -530,4 +530,4 @@ npm run build
   }
 }
 
-main();
+main().then(() => process.exit(0));

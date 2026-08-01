@@ -91,15 +91,13 @@ extends:
                   echo "=== END NODE.JS DEBUG ==="
                 displayName: "Debug: Node.js Installation"
               - checkout: self
-                submodules: recursive
+                submodules: false
               # TODO: Remove debug logging after pipeline is stable
               - bash: |
                   echo "=== CHECKOUT DEBUG ==="
                   echo "Current working directory: $(pwd)"
                   echo "Repository contents:"
                   ls -la
-                  echo "Submodules status:"
-                  git submodule status || echo "No submodules or git not available"
                   echo "Git branch:"
                   git branch -a || echo "Git not available"
                   echo "Git commit:"
@@ -170,6 +168,7 @@ extends:
                   go env | grep -E "GOPROXY|GOSUMDB|PROXY"
                   echo "=== END GO ENVIRONMENT ==="
 
+                  npm ci
                   echo "Building AKS desktop Linux application..."
                   npm run build:linux
                   echo "✅ Build complete"

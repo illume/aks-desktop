@@ -1,0 +1,278 @@
+From e408062748b3d8a50082a122a81f84e93ad58887 Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 12:33:51 +0000
+Subject: [PATCH] upstreamable: combine listener cleanup with plugin
+ capabilities
+
+---
+ .../src/components/App/pluginManager.test.ts  | 84 +++++++++++++++++++
+ frontend/src/components/App/pluginManager.ts  | 10 +--
+ .../src/components/App/runCommand.test.ts     | 68 +++++++++++++++
+ frontend/src/components/App/runCommand.ts     | 34 +++++---
+ 4 files changed, 179 insertions(+), 17 deletions(-)
+ create mode 100644 frontend/src/components/App/pluginManager.test.ts
+ create mode 100644 frontend/src/components/App/runCommand.test.ts
+
+diff --git a/frontend/src/components/App/pluginManager.test.ts b/frontend/src/components/App/pluginManager.test.ts
+new file mode 100644
+index 0000000..3c881f9
+--- /dev/null
++++ b/frontend/src/components/App/pluginManager.test.ts
+@@ -0,0 +1,84 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { PluginManager } from './pluginManager';
++
++describe('PluginManager', () => {
++  let handleResponse: (response: string) => void;
++  const unsubscribe = vi.fn();
++  const removeListener = vi.fn();
++
++  beforeEach(() => {
++    vi.useFakeTimers();
++    unsubscribe.mockReset();
++    removeListener.mockReset();
++    window.desktopApi = {
++      send: vi.fn(),
++      receive: vi.fn((_channel, listener) => {
++        handleResponse = listener;
++        return unsubscribe;
++      }),
++      removeListener,
++    };
++  });
++
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it('unsubscribes after receiving the matching response', async () => {
++    const response = PluginManager.getStatus('operation-1');
++
++    handleResponse(JSON.stringify({ type: 'success', message: 'done', identifier: 'operation-1' }));
++
++    await expect(response).resolves.toMatchObject({ identifier: 'operation-1' });
++    expect(unsubscribe).toHaveBeenCalledOnce();
++    expect(removeListener).not.toHaveBeenCalled();
++  });
++
++  it('unsubscribes after malformed JSON', async () => {
++    const response = PluginManager.getStatus('operation-1');
++
++    handleResponse('{');
++
++    await expect(response).rejects.toBeInstanceOf(SyntaxError);
++    expect(unsubscribe).toHaveBeenCalledOnce();
++  });
++
++  it('unsubscribes after the response limit', async () => {
++    const response = PluginManager.getStatus('operation-1');
++
++    for (let index = 0; index < 10; index++) {
++      handleResponse(
++        JSON.stringify({ type: 'progress', message: 'working', identifier: `other-${index}` })
++      );
++    }
++
++    await expect(response).rejects.toThrow('Message limit exceeded');
++    expect(unsubscribe).toHaveBeenCalledOnce();
++  });
++
++  it('unsubscribes after timing out', async () => {
++    const response = PluginManager.getStatus('operation-1');
++    const rejection = expect(response).rejects.toThrow('Timeout exceeded');
++
++    await vi.advanceTimersByTimeAsync(10000);
++
++    await rejection;
++    expect(unsubscribe).toHaveBeenCalledOnce();
++  });
++});
+diff --git a/frontend/src/components/App/pluginManager.ts b/frontend/src/components/App/pluginManager.ts
+index fcf4f90..e62423f 100644
+--- a/frontend/src/components/App/pluginManager.ts
++++ b/frontend/src/components/App/pluginManager.ts
+@@ -55,27 +55,27 @@ export class PluginManager {
+           parsedResponse = JSON.parse(response);
+         } catch (error) {
+           clearTimeout(timeoutId);
+-          window.desktopApi.removeListener('plugin-manager', handleResponse);
++          unsubscribe();
+           reject(error);
+           return;
+         }
+ 
+         if (parsedResponse.identifier === identifier) {
+           clearTimeout(timeoutId);
+-          window.desktopApi.removeListener('plugin-manager', handleResponse);
++          unsubscribe();
+           resolve(parsedResponse);
+         } else if (++count >= waitCount) {
+           clearTimeout(timeoutId);
+-          window.desktopApi.removeListener('plugin-manager', handleResponse);
++          unsubscribe();
+           reject(new Error('Message limit exceeded without a matching response'));
+         }
+       };
+ 
+-      window.desktopApi.receive('plugin-manager', handleResponse);
++      const unsubscribe = window.desktopApi.receive('plugin-manager', handleResponse);
+ 
+       // Add a timeout to ensure the promise is rejected if no response is received within a reasonable time
+       const timeoutId = setTimeout(() => {
+-        window.desktopApi.removeListener('plugin-manager', handleResponse);
++        unsubscribe();
+         reject(new Error('Timeout exceeded without a matching response'));
+       }, 10000);
+     });
+diff --git a/frontend/src/components/App/runCommand.test.ts b/frontend/src/components/App/runCommand.test.ts
+new file mode 100644
+index 0000000..923fa79
+--- /dev/null
++++ b/frontend/src/components/App/runCommand.test.ts
+@@ -0,0 +1,68 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { runCommand } from './runCommand';
++
++describe('runCommand', () => {
++  beforeEach(() => {
++    window.desktopApi = {};
++  });
++
++  it('removes command listeners after the matching command exits', () => {
++    const listeners = new Map<string, (id: string, data: string | number) => void>();
++    const removers = new Map<string, ReturnType<typeof vi.fn>>();
++    const send = vi.fn();
++    const receive = vi.fn(
++      (channel: string, listener: (id: string, data: string | number) => void) => {
++        const remove = vi.fn();
++        listeners.set(channel, listener);
++        removers.set(channel, remove);
++        return remove;
++      }
++    );
++
++    runCommand('gh', ['auth', 'status'], {}, {}, send, receive);
++    const commandId = send.mock.calls[0][1].id;
++
++    listeners.get('command-exit')?.(commandId, 0);
++
++    expect([...removers.values()]).toHaveLength(3);
++    for (const remove of removers.values()) {
++      expect(remove).toHaveBeenCalledOnce();
++    }
++  });
++
++  it('keeps listeners for another command exit', () => {
++    const listeners = new Map<string, (id: string, data: string | number) => void>();
++    const removers: Array<ReturnType<typeof vi.fn>> = [];
++    const receive = vi.fn(
++      (channel: string, listener: (id: string, data: string | number) => void) => {
++        const remove = vi.fn();
++        listeners.set(channel, listener);
++        removers.push(remove);
++        return remove;
++      }
++    );
++
++    runCommand('gh', ['auth', 'status'], {}, {}, vi.fn(), receive);
++    listeners.get('command-exit')?.('another-command', 0);
++
++    for (const remove of removers) {
++      expect(remove).not.toHaveBeenCalled();
++    }
++  });
++});
+diff --git a/frontend/src/components/App/runCommand.ts b/frontend/src/components/App/runCommand.ts
+index c68e12d..23c43c8 100644
+--- a/frontend/src/components/App/runCommand.ts
++++ b/frontend/src/components/App/runCommand.ts
+@@ -66,7 +66,7 @@ export function runCommand(
+   desktopApiReceive?: (
+     channel: string,
+     listener: (cmdId: string, data: string | number) => void
+-  ) => void,
++  ) => (() => void) | void,
+   capability?: string
+ ): {
+   stdout: { on: (event: string, listener: (chunk: any) => void) => void };
+@@ -89,24 +89,34 @@ export function runCommand(
+   const id = `${new Date().getTime()}-${Math.random().toString(36)}`;
+ 
+   const stdout = new EventTarget();
+-  desktopApiReceive('command-stdout', (cmdId: string, data: string | number) => {
+-    if (cmdId === id) {
+-      const event = new CustomEvent('data', { detail: data });
+-      stdout.dispatchEvent(event);
++  const removeStdout = desktopApiReceive(
++    'command-stdout',
++    (cmdId: string, data: string | number) => {
++      if (cmdId === id) {
++        const event = new CustomEvent('data', { detail: data });
++        stdout.dispatchEvent(event);
++      }
+     }
+-  });
++  );
+ 
+   const stderr = new EventTarget();
+-  desktopApiReceive('command-stderr', (cmdId: string, data: string | number) => {
+-    if (cmdId === id) {
+-      const event = new CustomEvent('data', { detail: data });
+-      stderr.dispatchEvent(event);
++  const removeStderr = desktopApiReceive(
++    'command-stderr',
++    (cmdId: string, data: string | number) => {
++      if (cmdId === id) {
++        const event = new CustomEvent('data', { detail: data });
++        stderr.dispatchEvent(event);
++      }
+     }
+-  });
++  );
+ 
+   const exit = new EventTarget();
+-  desktopApiReceive('command-exit', (cmdId: string, code: string | number) => {
++  const removeExit = desktopApiReceive('command-exit', (cmdId: string, code: string | number) => {
+     if (cmdId === id) {
++      removeStdout?.();
++      removeStderr?.();
++      removeExit?.();
++
+       const event = new CustomEvent('exit', { detail: code });
+       exit.dispatchEvent(event);
+     }
+-- 
+2.54.0
+

@@ -2,18 +2,50 @@
 
 This document outlines the maintenance procedures for this project.
 
-## Headlamp Fork
+## Headlamp distribution
 
-AKS desktop uses Headlamp as a base project. We maintain a fork of Headlamp to
-implement features and fixes that are specific to AKS desktop. This fork is kept as a branch
-`headlamp-downstream`, and is set up as a git submodule in this project's repository. This
-ensures flexibility.
+AKS Desktop consumes the local `@aks-desktop/headlamp` transition package. It
+does not use a Headlamp Git submodule. The package verifies the pinned upstream
+source and applies the ordered patch series from
+[`build/headlamp-lock.json`](build/headlamp-lock.json) into the ignored
+`headlamp/` build workspace.
+
+To validate or update the distribution:
+
+```bash
+npm install
+npm run test:headlamp-patches
+npm run headlamp:prepare
+npm run headlamp:assemble
+npm run headlamp:doctor
+```
+
+An update must change the full upstream commit, source archive URL and digest,
+ordered patch list, and patch-set digest together. Validate the series on a
+disposable workspace before building. Product identity, update policy, legal
+documents, plugin defaults, and capability ceilings belong in
+`build/product-manifest.json`; AKS behavior belongs in plugin APIs. Do not edit
+the generated `headlamp/` workspace.
 
 See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
 [distribution builds](docs/headlamp-distribution-builds.md), and
-[commit audit](docs/headlamp-fork-commit-audit.md) for the plan to remove this fork.
+[commit audit](docs/headlamp-fork-commit-audit.md).
 
-This fork is meant to be kept in sync with the upstream Headlamp project as much as possible,
+## Retired Headlamp fork workflow
+
+The section below records the old fork process for historical patch
+reconciliation only. Do not recreate the submodule or use it for current
+builds.
+
+AKS Desktop previously maintained the `headlamp-downstream` branch as a Git
+submodule for product-specific features and fixes.
+
+See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
+[distribution builds](docs/headlamp-distribution-builds.md), and
+[commit audit](docs/headlamp-fork-commit-audit.md) for the migration that
+replaced this fork.
+
+The fork was kept in sync with the upstream Headlamp project as much as possible,
 meaning the downstream changes we make should be minimal and focused on AKS desktop-specific needs
 that do not make sense to contribute back upstream.
 

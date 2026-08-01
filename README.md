@@ -20,7 +20,7 @@ To run AKS desktop locally, follow these steps:
 1. Clone the repository:
 
    ```bash
-   git clone --recurse-submodules https://github.com/Azure/aks-desktop.git
+   git clone https://github.com/Azure/aks-desktop.git
    ```
 
 2. Navigate to the project directory:
@@ -32,32 +32,11 @@ To run AKS desktop locally, follow these steps:
 3. Install the dependencies:
 
    ```bash
-   ./scripts/headlamp-submodule.sh --reset
    npm install
    npm run install:all
    ```
 
-4. Check for the resource folder:
-
-   Ensure that the `resources` folder exists in the `headlamp/app` directory.
-   If `headlamp/app/resources` does not exist, run the following command from the root directory.
-
-   ```bash
-   npm run plugin:setup
-   ```
-
-5. Build the Headlamp backend server:
-
-   Navigate to the `headlamp` directory and build the backend server
-
-   ```bash
-   cd headlamp
-   make backend
-   ```
-
-6. Start the application at the root directory:
-
-   Navigate back to the root directory and start the application in development mode:
+4. Start the application:
 
    ```bash
    npm run dev
@@ -70,7 +49,7 @@ To get started with AKS desktop, follow these steps:
 1. Clone the repository:
 
    ```bash
-   git clone --recurse-submodules https://github.com/Azure/aks-desktop.git
+   git clone https://github.com/Azure/aks-desktop.git
    ```
 
 2. Navigate to the project directory:
@@ -82,7 +61,6 @@ To get started with AKS desktop, follow these steps:
 3. Install the dependencies:
 
    ```bash
-   ./scripts/headlamp-submodule.sh --reset
    npm install
    npm run install:all
    ```

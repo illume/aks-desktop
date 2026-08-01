@@ -1,0 +1,299 @@
+From 612be22c572dc3fffbe7fd57047996a6ac711edf Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 12:39:09 +0000
+Subject: [PATCH] upstreamable: combine project creation and grouping
+ extensions
+
+---
+ .../project/NewProjectPopup.test.tsx          |  37 +++++-
+ .../components/project/NewProjectPopup.tsx    | 124 +++++++++++++-----
+ .../plugin/__snapshots__/pluginLib.snapshot   |   4 +
+ frontend/src/plugin/registry.tsx              |   2 +
+ frontend/src/redux/projectsSlice.ts           |   6 +
+ 5 files changed, 135 insertions(+), 38 deletions(-)
+
+diff --git a/frontend/src/components/project/NewProjectPopup.test.tsx b/frontend/src/components/project/NewProjectPopup.test.tsx
+index 3ceaa49..799bb00 100644
+--- a/frontend/src/components/project/NewProjectPopup.test.tsx
++++ b/frontend/src/components/project/NewProjectPopup.test.tsx
+@@ -18,7 +18,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+ import React from 'react';
+ import { vi } from 'vitest';
+ 
+-const { MockKubeObject, mockApply, mockHistoryPush } = vi.hoisted(() => {
++const { MockKubeObject, mockApply, mockHistoryPush, mockUseTypedSelector } = vi.hoisted(() => {
+   class MockKubeObject {
+     jsonData: any;
+     static kind = '';
+@@ -34,7 +34,8 @@ const { MockKubeObject, mockApply, mockHistoryPush } = vi.hoisted(() => {
+   }
+   const mockApply = vi.fn().mockResolvedValue({});
+   const mockHistoryPush = vi.fn();
+-  return { MockKubeObject, mockApply, mockHistoryPush };
++  const mockUseTypedSelector = vi.fn().mockReturnValue({});
++  return { MockKubeObject, mockApply, mockHistoryPush, mockUseTypedSelector };
+ });
+ 
+ vi.mock('../../lib/k8s/KubeObject', () => ({ KubeObject: MockKubeObject }));
+@@ -71,12 +72,13 @@ vi.mock('react-i18next', async () => {
+   };
+ });
+ vi.mock('../../redux/hooks', () => ({
+-  useTypedSelector: vi.fn().mockReturnValue({}),
++  useTypedSelector: mockUseTypedSelector,
+ }));
+ vi.mock('@iconify/react', () => ({
+   Icon: () => <span />,
+ }));
+ 
++import { DefaultCreateProject } from '../../redux/projectsSlice';
+ import { TestContext } from '../../test';
+ import { NewProjectPopup } from './NewProjectPopup';
+ import { PROJECT_ID_LABEL } from './projectUtils';
+@@ -86,6 +88,7 @@ describe('NewProjectPopup', () => {
+ 
+   beforeEach(() => {
+     vi.clearAllMocks();
++    mockUseTypedSelector.mockReturnValue({});
+     (MockKubeObject.useList as any).mockReturnValue({ items: [], errors: [], isLoading: false });
+   });
+ 
+@@ -225,4 +228,32 @@ describe('NewProjectPopup', () => {
+     expect(mockOnClose).toHaveBeenCalled();
+     expect(mockHistoryPush).toHaveBeenCalledWith(expect.stringContaining('create-yaml'));
+   });
++
++  test.each([
++    [DefaultCreateProject.NEW_PROJECT, 'New Project'],
++    [DefaultCreateProject.FROM_YAML, 'New Project from YAML'],
++  ])('lets a plugin replace the %s option in place', (id, builtInLabel) => {
++    const CustomProject = ({ onBack }: { onBack: () => void }) => (
++      <button onClick={onBack}>Custom project content</button>
++    );
++    mockUseTypedSelector.mockReturnValue({
++      [id]: {
++        id,
++        name: 'Managed project',
++        description: 'Create a managed project',
++        icon: 'mdi:folder-star',
++        component: CustomProject,
++      },
++    });
++
++    render(
++      <TestContext>
++        <NewProjectPopup open onClose={mockOnClose} />
++      </TestContext>
++    );
++
++    expect(screen.queryByText(builtInLabel)).not.toBeInTheDocument();
++    fireEvent.click(screen.getByText('Managed project'));
++    expect(screen.getByText('Custom project content')).toBeInTheDocument();
++  });
+ });
+diff --git a/frontend/src/components/project/NewProjectPopup.tsx b/frontend/src/components/project/NewProjectPopup.tsx
+index 3e87917..4505b08 100644
+--- a/frontend/src/components/project/NewProjectPopup.tsx
++++ b/frontend/src/components/project/NewProjectPopup.tsx
+@@ -39,6 +39,7 @@ import { KubeObjectInterface } from '../../lib/k8s/KubeObject';
+ import Namespace from '../../lib/k8s/namespace';
+ import { createRouteURL } from '../../lib/router/createRouteURL';
+ import { useTypedSelector } from '../../redux/hooks';
++import { DefaultCreateProject } from '../../redux/projectsSlice';
+ import { PROJECT_ID_LABEL, toKubernetesName } from './projectUtils';
+ /**
+  * A styled button for selecting a project type.
+@@ -354,6 +355,15 @@ export function NewProjectPopup({ open, onClose }: { open: boolean; onClose: ()
+   const customCreateProject = Object.values(
+     useTypedSelector(state => state.projects.customCreateProject)
+   );
++  const customNewProject = customCreateProject.find(
++    it => it.id === DefaultCreateProject.NEW_PROJECT
++  );
++  const customProjectFromYaml = customCreateProject.find(
++    it => it.id === DefaultCreateProject.FROM_YAML
++  );
++  const additionalCreateProjects = customCreateProject.filter(
++    it => it.id !== DefaultCreateProject.NEW_PROJECT && it.id !== DefaultCreateProject.FROM_YAML
++  );
+ 
+   const [projectStep, setProjectStep] = useState<string | undefined>();
+   const selectedCustomProject = customCreateProject.find(it => it.id === projectStep);
+@@ -380,42 +390,84 @@ export function NewProjectPopup({ open, onClose }: { open: boolean; onClose: ()
+               </Trans>
+             </Typography>
+             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+-              <ProjectTypeButton
+-                index={index++}
+-                icon={
+-                  <Icon
+-                    icon="mdi:folder-add"
+-                    width="100%"
+-                    height="100%"
+-                    color={theme.palette.text.secondary}
+-                  />
+-                }
+-                title={<Trans>New Project</Trans>}
+-                description={<Trans>Create a new project</Trans>}
+-                onClick={() => {
+-                  setProjectStep('new-project');
+-                }}
+-              />
++              {customNewProject ? (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    typeof customNewProject.icon === 'string' ? (
++                      <Icon
++                        icon={customNewProject.icon}
++                        width="100%"
++                        height="100%"
++                        color={theme.palette.text.secondary}
++                      />
++                    ) : (
++                      <customNewProject.icon />
++                    )
++                  }
++                  title={customNewProject.name}
++                  description={customNewProject.description}
++                  onClick={() => setProjectStep(customNewProject.id)}
++                />
++              ) : (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    <Icon
++                      icon="mdi:folder-add"
++                      width="100%"
++                      height="100%"
++                      color={theme.palette.text.secondary}
++                    />
++                  }
++                  title={<Trans>New Project</Trans>}
++                  description={<Trans>Create a new project</Trans>}
++                  onClick={() => {
++                    setProjectStep(DefaultCreateProject.NEW_PROJECT);
++                  }}
++                />
++              )}
+ 
+-              <ProjectTypeButton
+-                index={index++}
+-                icon={
+-                  <Icon
+-                    icon="mdi:file-document-add"
+-                    width="100%"
+-                    height="100%"
+-                    color={theme.palette.text.secondary}
+-                  />
+-                }
+-                title={<Trans>New Project from YAML</Trans>}
+-                description={<Trans>Deploy a new application from YAML</Trans>}
+-                onClick={() => {
+-                  onClose();
+-                  history.push(createRouteURL('projectCreateYaml'));
+-                }}
+-              />
++              {customProjectFromYaml ? (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    typeof customProjectFromYaml.icon === 'string' ? (
++                      <Icon
++                        icon={customProjectFromYaml.icon}
++                        width="100%"
++                        height="100%"
++                        color={theme.palette.text.secondary}
++                      />
++                    ) : (
++                      <customProjectFromYaml.icon />
++                    )
++                  }
++                  title={customProjectFromYaml.name}
++                  description={customProjectFromYaml.description}
++                  onClick={() => setProjectStep(customProjectFromYaml.id)}
++                />
++              ) : (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    <Icon
++                      icon="mdi:file-document-add"
++                      width="100%"
++                      height="100%"
++                      color={theme.palette.text.secondary}
++                    />
++                  }
++                  title={<Trans>New Project from YAML</Trans>}
++                  description={<Trans>Deploy a new application from YAML</Trans>}
++                  onClick={() => {
++                    onClose();
++                    history.push(createRouteURL('projectCreateYaml'));
++                  }}
++                />
++              )}
+ 
+-              {customCreateProject.map(it => (
++              {additionalCreateProjects.map(it => (
+                 <ProjectTypeButton
+                   index={index++}
+                   icon={
+@@ -444,7 +496,9 @@ export function NewProjectPopup({ open, onClose }: { open: boolean; onClose: ()
+           </DialogActions>
+         </>
+       )}
+-      {projectStep === 'new-project' && <ProjectFromExistingNamespace onBack={handleBack} />}
++      {projectStep === DefaultCreateProject.NEW_PROJECT && (
++        <ProjectFromExistingNamespace onBack={handleBack} />
++      )}
+       {selectedCustomProject && <selectedCustomProject.component onBack={handleBack} />}
+     </Dialog>
+   );
+diff --git a/frontend/src/plugin/__snapshots__/pluginLib.snapshot b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+index da6f3a3..968ec1e 100644
+--- a/frontend/src/plugin/__snapshots__/pluginLib.snapshot
++++ b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+@@ -376,6 +376,10 @@
+     "SETTINGS": "SETTINGS",
+     "USER": "USER",
+   },
++  "DefaultCreateProject": {
++    "FROM_YAML": "headlamp.projects.from-yaml",
++    "NEW_PROJECT": "headlamp.projects.new-project",
++  },
+   "DefaultDetailsViewSection": {
+     "BACK_LINK": "BACK_LINK",
+     "CHILDREN": "CHILDREN",
+diff --git a/frontend/src/plugin/registry.tsx b/frontend/src/plugin/registry.tsx
+index f704144..931809b 100644
+--- a/frontend/src/plugin/registry.tsx
++++ b/frontend/src/plugin/registry.tsx
+@@ -123,6 +123,8 @@ import {
+   setPluginSettingsComponent,
+ } from './pluginsSlice';
+ 
++export { DefaultCreateProject } from '../redux/projectsSlice';
++
+ export interface SectionFuncProps {
+   title: string;
+   component: (props: { resource: any }) => ReactNode;
+diff --git a/frontend/src/redux/projectsSlice.ts b/frontend/src/redux/projectsSlice.ts
+index 2768e0e..86c8eda 100644
+--- a/frontend/src/redux/projectsSlice.ts
++++ b/frontend/src/redux/projectsSlice.ts
+@@ -46,6 +46,12 @@ export interface ProjectGrouping {
+   getProjectKey: (params: { namespace: ProjectNamespace; projectId: string }) => string;
+ }
+ 
++/** IDs plugins can register to replace Headlamp's built-in project creation options. */
++export const DefaultCreateProject = {
++  NEW_PROJECT: 'headlamp.projects.new-project',
++  FROM_YAML: 'headlamp.projects.from-yaml',
++} as const;
++
+ /** Define custom way to create new Projects */
+ export interface CustomCreateProject {
+   id: string;
+-- 
+2.54.0
+

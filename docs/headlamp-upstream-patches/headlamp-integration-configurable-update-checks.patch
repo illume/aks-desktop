@@ -1,0 +1,138 @@
+From d9f438255fa449ed28bcfc9221fd734b7cf6f660 Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 12:37:58 +0000
+Subject: [PATCH] upstreamable: combine update policy with product manifest
+
+---
+ app/electron/main.ts              |  3 ++-
+ app/electron/update-check.test.ts | 44 +++++++++++++++++++++++++++++++
+ app/electron/update-check.ts      | 41 ++++++++++++++++++++++++++++
+ 3 files changed, 87 insertions(+), 1 deletion(-)
+ create mode 100644 app/electron/update-check.test.ts
+ create mode 100644 app/electron/update-check.ts
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index ee993db..8916d86 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -75,6 +75,7 @@ import {
+   isTrayIconEnabled,
+   setTrayIconEnabled,
+ } from './tray';
++import { readUpdateCheckSetting } from './update-check';
+ import windowSize from './windowSize';
+ 
+ if (process.env.APPIMAGE) {
+@@ -198,11 +199,11 @@ let actualPort = defaultPort; // Will be updated when backend starts
+ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS) || 100); // Maximum number of ports to try
+ 
+ const useExternalServer = process.env.EXTERNAL_SERVER || false;
+-const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
+ const productManifestPath = path.join(
+   isDev ? path.resolve('./') : process.resourcesPath,
+   'app-build-manifest.json'
+ );
++const shouldCheckForUpdates = readUpdateCheckSetting(productManifestPath);
+ const protocolScheme = readProtocolScheme(productManifestPath);
+ 
+ // make it global so that it doesn't get garbage collected
+diff --git a/app/electron/update-check.test.ts b/app/electron/update-check.test.ts
+new file mode 100644
+index 0000000..88e0ee9
+--- /dev/null
++++ b/app/electron/update-check.test.ts
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import { isUpdateCheckEnabled, readUpdateCheckSetting } from './update-check';
++
++describe('isUpdateCheckEnabled', () => {
++  it('enables update checks by default', () => {
++    expect(isUpdateCheckEnabled({}, {})).toBe(true);
++  });
++
++  it('uses the environment setting when product metadata omits the setting', () => {
++    expect(isUpdateCheckEnabled({}, { HEADLAMP_CHECK_FOR_UPDATES: 'false' })).toBe(false);
++  });
++
++  it('prefers packaged product metadata over the environment', () => {
++    expect(
++      isUpdateCheckEnabled({ checkForUpdates: false }, { HEADLAMP_CHECK_FOR_UPDATES: 'true' })
++    ).toBe(false);
++  });
++});
++
++describe('readUpdateCheckSetting', () => {
++  it('falls back to the environment when the manifest cannot be read', () => {
++    expect(
++      readUpdateCheckSetting('/path/that/does/not/exist', {
++        HEADLAMP_CHECK_FOR_UPDATES: 'false',
++      })
++    ).toBe(false);
++  });
++});
+diff --git a/app/electron/update-check.ts b/app/electron/update-check.ts
+new file mode 100644
+index 0000000..c921287
+--- /dev/null
++++ b/app/electron/update-check.ts
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import fs from 'node:fs';
++
++export function isUpdateCheckEnabled(
++  buildManifest: unknown,
++  environment: NodeJS.ProcessEnv = process.env
++): boolean {
++  if (typeof buildManifest === 'object' && buildManifest !== null) {
++    const configuredValue = (buildManifest as { checkForUpdates?: unknown }).checkForUpdates;
++    if (typeof configuredValue === 'boolean') {
++      return configuredValue;
++    }
++  }
++  return environment.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
++}
++
++export function readUpdateCheckSetting(
++  manifestPath: string,
++  environment: NodeJS.ProcessEnv = process.env
++): boolean {
++  try {
++    return isUpdateCheckEnabled(JSON.parse(fs.readFileSync(manifestPath, 'utf8')), environment);
++  } catch {
++    return isUpdateCheckEnabled({}, environment);
++  }
++}
+-- 
+2.54.0
+

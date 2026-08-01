@@ -14,8 +14,9 @@ standard technical abbreviations.
 - Baseline: upstream `v0.43.0`, commit
   `2ca733d234a5eca4159ccd28279c0f8787fbb6e3`.
 - Distance: 117 commits, comprising 115 non-merge commits and two merges.
-- Compared with upstream `v0.44.0` and upstream `main` at
-  `506465d78ca162f65e46c57fab7b014fd771d047`.
+- Compared with upstream `v0.44.0` and most recently validated as an integrated
+  series on upstream `main` at
+  `99a230be9c9c679a70d59c219cc246c00ae2be45`.
 - `git cherry` found all 115 downstream patches unmatched on upstream `main`;
   a strict `git range-diff` found no matches either. Subject similarity is
   therefore not treated as proof that a patch landed.
@@ -37,6 +38,7 @@ Every audited commit has a primary disposition:
 | AKS-owned work | 7 rows: 3 configuration changes and 4 plugin changes |
 | No independent submission | 47 rows: 36 folds and 11 removals |
 | Patch artifacts | 69 upstream candidates and 69 matching fork cleanups, all linked from 63 ledger rows |
+| Executable migration | 66 ordered patches locked by [`build/headlamp-lock.json`](../build/headlamp-lock.json); overlapping candidates are replaced by integration patches |
 | Unresolved classifications | None |
 | Open product decisions | Row 43: confirm the supported AKS Desktop architectures before declaring package targets |
 
