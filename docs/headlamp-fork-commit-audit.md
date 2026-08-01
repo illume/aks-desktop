@@ -38,6 +38,7 @@ Every audited commit has a primary disposition:
 | No independent submission | 47 rows: 36 folds and 11 removals |
 | Patch artifacts | 69 upstream candidates and 69 matching fork cleanups, all linked from 63 ledger rows |
 | Unresolved classifications | None |
+| Open product decisions | Row 43: confirm the supported AKS Desktop architectures before declaring package targets |
 
 These are mutually exclusive counts based on the leading decision in each row.
 A combined decision such as **Upstream extension + AKS plugin** is counted as
@@ -80,14 +81,15 @@ The replacement names used in the ledger mean:
 
 ## Required application order
 
-The chains below are independent unless one explicitly refers to another.
-Arrows mean “must precede”; they do not mean the patches belong in one pull
-request.
+The chains below are independent unless one explicitly refers to another. They
+record semantic prerequisites, not a guarantee that every mailbox patch applies
+sequentially without rebasing. Arrows mean “must precede”; they do not mean the
+patches belong in one pull request.
 
 | Chain | Order |
 | --- | --- |
 | Ordered fixes | Apply the four row 68 patches and the five row 92 patches in their listed order. Apply row 86 before row 98. |
-| Build and plugin manifests | Row 47 → row 23 → row 2 product metadata → row 41 platform metadata → row 43 targets → row 32 resources → row 31 verification. |
+| Build and plugin manifests | Rows 47 and 23 were authored against the same baseline and overlap in `setup-plugins.js`; reconcile them first, preserving both `enabledByDefault` and external-manifest selection. Then apply row 2 product metadata → row 41 platform metadata → row 43 targets → row 32 resources → row 31 verification. |
 | Privileged capabilities | In row 23, apply the external manifest before packaged-plugin identity. In row 106, apply command capabilities → explicit prefixes → option isolation; then row 22 verified tools → row 19 cluster providers. Apply row 19 product policy only after packaged identity, option isolation, and cluster providers; apply row 82 provider context last. |
 | OAuth sign-in | Rows 96 (product protocol) and 78 (secure storage) → row 79 provider registry. |
 | Fork cleanup | Complete the row's AKS configuration or plugin migration first, then pair its cleanup with the upstream replacement. Never ship a cleanup alone. |
