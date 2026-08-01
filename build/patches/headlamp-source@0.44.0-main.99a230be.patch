@@ -23,10 +23,10 @@ index 3507d10ec09f7affb8ece0443402b82ec67de6a1..0d24f07f02584157a36d7ec9943a3329
      "tsc": "npm --prefix source run frontend:tsc && npm --prefix source run app:tsc",
 diff --git a/scripts/bundle-plugins.js b/scripts/bundle-plugins.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..d985a0ae3406db2ce35797e8bf22d71aea3223df
+index 0000000000000000000000000000000000000000..2480c5858162213f0d5a212ca2baa1e852bcf4d6
 --- /dev/null
 +++ b/scripts/bundle-plugins.js
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,139 @@
 +const { spawnSync } = require('node:child_process');
 +const fs = require('node:fs');
 +const path = require('node:path');
@@ -129,6 +129,13 @@ index 0000000000000000000000000000000000000000..d985a0ae3406db2ce35797e8bf22d71a
 +  });
 +  if (new Set(bundleNames).size !== bundleNames.length) {
 +    throw new Error('headlamp.plugins contains duplicate bundle names');
++  }
++  const packageNames = plugins.map(plugin => {
++    resolveLegacyPluginDir('/plugins', plugin.packageName);
++    return plugin.packageName.toLowerCase();
++  });
++  if (new Set(packageNames).size !== packageNames.length) {
++    throw new Error('headlamp.plugins contains duplicate package identities');
 +  }
 +}
 +

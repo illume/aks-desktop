@@ -166,3 +166,14 @@ test('rejects case-insensitive bundle name collisions', () => {
     /duplicate bundle names/
   );
 });
+
+test('rejects duplicate plugin package identities', () => {
+  assert.throws(
+    () =>
+      validatePluginConfiguration([
+        { name: 'first', packageName: '@example/plugin' },
+        { name: 'second', packageName: '@example/Plugin' },
+      ]),
+    /duplicate package identities/
+  );
+});
