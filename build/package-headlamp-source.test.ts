@@ -8,6 +8,7 @@ import { afterEach, test } from 'node:test';
 import {
   headlampSourceVersion,
   updateHeadlampSource,
+  validateTrackedSourcePath,
 } from './package-headlamp-source';
 
 const tempDirs: string[] = [];
@@ -216,5 +217,34 @@ test('rejects a source checkout that does not match the configured commit', () =
         commit: otherCommit,
       }),
     /does not match/
+  );
+});
+
+test('rejects source paths that escape on POSIX or Windows', () => {
+  for (const unsafePath of [
+    '../outside',
+    '..\\outside',
+    '/absolute',
+    'C:\\absolute',
+  ]) {
+    assert.throws(
+      () => validateTrackedSourcePath(unsafePath),
+      /Unsafe Headlamp source path/
+    );
+  }
+  assert.doesNotThrow(() => validateTrackedSourcePath('frontend/src/index.ts'));
+});
+
+test('rejects tracked symlinks that npm would omit from the package', () => {
+  const { sourceDir } = createSourceCheckout();
+  fs.symlinkSync('Dockerfile', path.join(sourceDir, 'Dockerfile.link'));
+  run('git', ['add', 'Dockerfile.link'], sourceDir);
+  run('git', ['commit', '-qm', 'add symlink'], sourceDir);
+  const commit = run('git', ['rev-parse', 'HEAD'], sourceDir);
+  const rootDir = createProject(commit);
+
+  assert.throws(
+    () => updateHeadlampSource({ rootDir, sourceDir }),
+    /tracked symbolic link/
   );
 });

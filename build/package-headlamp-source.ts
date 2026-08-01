@@ -147,18 +147,24 @@ function verifySourceCheckout(sourceDir: string, commit: string): void {
   }
 }
 
+export function validateTrackedSourcePath(relativeFile: string): void {
+  const normalizedPath = relativeFile.replaceAll('\\', '/');
+  if (
+    path.posix.isAbsolute(normalizedPath) ||
+    path.win32.isAbsolute(relativeFile) ||
+    normalizedPath === '..' ||
+    normalizedPath.startsWith('../')
+  ) {
+    throw new Error(`Unsafe Headlamp source path: ${relativeFile}`);
+  }
+}
+
 function copyTrackedSource(sourceDir: string, destination: string): void {
   const files = run('git', ['ls-files', '-z'], sourceDir)
     .split('\0')
     .filter(Boolean);
   for (const relativeFile of files) {
-    if (
-      path.isAbsolute(relativeFile) ||
-      relativeFile === '..' ||
-      relativeFile.startsWith(`..${path.sep}`)
-    ) {
-      throw new Error(`Unsafe Headlamp source path: ${relativeFile}`);
-    }
+    validateTrackedSourcePath(relativeFile);
     const source = path.join(sourceDir, relativeFile);
     const target = path.join(destination, relativeFile);
     const stat = fs.lstatSync(source);
@@ -167,13 +173,14 @@ function copyTrackedSource(sourceDir: string, destination: string): void {
         `Headlamp source contains an uninitialized submodule: ${relativeFile}`
       );
     }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
     if (stat.isSymbolicLink()) {
-      fs.symlinkSync(fs.readlinkSync(source), target);
-    } else {
-      fs.copyFileSync(source, target);
-      fs.chmodSync(target, stat.mode);
+      throw new Error(
+        `Headlamp source contains a tracked symbolic link: ${relativeFile}`
+      );
     }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(source, target);
+    fs.chmodSync(target, stat.mode);
   }
 }
 
