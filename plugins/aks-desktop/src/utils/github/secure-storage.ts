@@ -14,22 +14,6 @@ interface DesktopApiSecureStorage {
   secureStorageDelete(key: string): Promise<{ success: boolean; error?: string }>;
 }
 
-interface PluginSecureStorage {
-  save(key: string, value: string): Promise<{ success: boolean; error?: string }>;
-  load(key: string): Promise<{ success: boolean; value?: string | null; error?: string }>;
-  delete(key: string): Promise<{ success: boolean; error?: string }>;
-}
-
-declare const pluginSecureStorage: PluginSecureStorage | undefined;
-
-function getPluginSecureStorage(): PluginSecureStorage | null {
-  return typeof pluginSecureStorage === 'undefined' ? null : pluginSecureStorage;
-}
-
-function pluginStorageKey(key: string): string {
-  return key.startsWith('aks-desktop:') ? key.slice('aks-desktop:'.length) : key;
-}
-
 function getDesktopApi(): DesktopApiSecureStorage | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const api = (window as any).desktopApi as DesktopApiSecureStorage | undefined;
@@ -49,15 +33,6 @@ function getDesktopApi(): DesktopApiSecureStorage | null {
  * Returns true on success, false if unavailable or failed.
  */
 export const secureStorageSave = async (key: string, value: string): Promise<boolean> => {
-  const pluginStorage = getPluginSecureStorage();
-  if (pluginStorage) {
-    try {
-      return (await pluginStorage.save(pluginStorageKey(key), value)).success;
-    } catch {
-      return false;
-    }
-  }
-
   const api = getDesktopApi();
   if (!api) return false;
   try {
@@ -73,16 +48,6 @@ export const secureStorageSave = async (key: string, value: string): Promise<boo
  * Returns the plaintext string, or null if unavailable/not found/failed.
  */
 export const secureStorageLoad = async (key: string): Promise<string | null> => {
-  const pluginStorage = getPluginSecureStorage();
-  if (pluginStorage) {
-    try {
-      const result = await pluginStorage.load(pluginStorageKey(key));
-      return result.success ? result.value ?? null : null;
-    } catch {
-      return null;
-    }
-  }
-
   const api = getDesktopApi();
   if (!api) return null;
   try {
@@ -101,15 +66,6 @@ export const secureStorageLoad = async (key: string): Promise<string | null> => 
  * Returns true on success, false if unavailable or failed.
  */
 export const secureStorageDelete = async (key: string): Promise<boolean> => {
-  const pluginStorage = getPluginSecureStorage();
-  if (pluginStorage) {
-    try {
-      return (await pluginStorage.delete(pluginStorageKey(key))).success;
-    } catch {
-      return false;
-    }
-  }
-
   const api = getDesktopApi();
   if (!api) return false;
   try {
