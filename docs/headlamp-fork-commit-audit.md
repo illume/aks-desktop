@@ -26,6 +26,29 @@ The order below is the chronological inventory generated from the commit graph.
 Commits on the two merged side branches are included. Same-day topology can
 produce a different display order without changing the set.
 
+## Status at a glance
+
+Every audited commit has a primary disposition:
+
+| Measure | Result |
+| --- | --- |
+| Classified inventory | 115 of 115 non-merge commits |
+| Upstream work | 61 rows: 37 fixes and 24 extensions |
+| AKS-owned work | 7 rows: 3 configuration changes and 4 plugin changes |
+| No independent submission | 47 rows: 36 folds and 11 removals |
+| Patch artifacts | 69 upstream candidates and 69 matching fork cleanups, all linked from 63 ledger rows |
+| Unresolved classifications | None |
+
+These are mutually exclusive counts based on the leading decision in each row.
+A combined decision such as **Upstream extension + AKS plugin** is counted as
+upstream work but still has the stated AKS migration.
+
+A linked patch is a candidate implementation against the commits recorded
+above, not evidence of upstream acceptance. Rebase it onto the intended
+submission base and rerun its checks before opening a pull request. The
+downstream patches are migration aids: when a rebase can omit the original fork
+commit, prefer that over applying a cleanup patch.
+
 ## Decision labels and replacement areas
 
 The ledger uses full labels rather than abbreviations so each row can be read
@@ -39,7 +62,6 @@ without repeatedly consulting a key.
 | **AKS plugin** | Move to the AKS plugin or provider after the required generic extension exists. |
 | **Fold** | Squash into the named feature or commit; it is not an independent change. |
 | **Remove** | Obsolete or supplied by current upstream; confirm with behavior tests after rebase. |
-| **Needs decision** | Product intent or upstream overlap is unclear; make the stated decision during rebase. |
 
 The replacement names used in the ledger mean:
 
@@ -56,9 +78,25 @@ The replacement names used in the ledger mean:
 | **Project extensions** | Supported project extension hooks; AKS project policy remains in the plugin. |
 | **Translations** | Supported locale extension/overlay; generated AKS strings remain outside core. |
 
+## Required application order
+
+The chains below are independent unless one explicitly refers to another.
+Arrows mean “must precede”; they do not mean the patches belong in one pull
+request.
+
+| Chain | Order |
+| --- | --- |
+| Ordered fixes | Apply the four row 68 patches and the five row 92 patches in their listed order. Apply row 86 before row 98. |
+| Build and plugin manifests | Row 47 → row 23 → row 2 product metadata → row 41 platform metadata → row 43 targets → row 32 resources → row 31 verification. |
+| Privileged capabilities | In row 23, apply the external manifest before packaged-plugin identity. In row 106, apply command capabilities → explicit prefixes → option isolation; then row 22 verified tools → row 19 cluster providers. Apply row 19 product policy only after packaged identity, option isolation, and cluster providers; apply row 82 provider context last. |
+| OAuth sign-in | Rows 96 (product protocol) and 78 (secure storage) → row 79 provider registry. |
+| Fork cleanup | Complete the row's AKS configuration or plugin migration first, then pair its cleanup with the upstream replacement. Never ship a cleanup alone. |
+
 ## Commit ledger
 
-Ready patches are linked in their audited commit rows, next to the matching fork cleanup and any required AKS Desktop change. Rows 68 and 92 contain ordered patch groups. Apply row 98 after row 86; row 23 after row 47; then apply build-manifest product metadata, platform metadata, targets, resources, and verification in that order. Apply verified external tools after command capabilities, OAuth after protocol and secure storage, and cluster providers after command capabilities and verified tools. In the capability chain, apply packaged-plugin identity after the external manifest; explicit command prefixes and option isolation after command capabilities; product capability policy after identity, command isolation, and cluster providers; and kubeconfig provider context last. Never ship a fork cleanup without its upstream replacement.
+Candidate patches are linked next to the matching cleanup and any required AKS
+Desktop migration. This audit describes those migrations but does not implement
+AKS plugin changes.
 
 | # | Commit | Decision / replacement area | What to do |
 | ---: | --- | --- | --- |
@@ -197,28 +235,25 @@ These comparisons prevent over-aggressive deletion based on similar subjects:
 | `6f13c6288` EditorDialog zoom | `7e07f4180` DataField zoom | Different components and layout failures. |
 | `badc4713b` list-plugins execution | `144f95847` plugin script execution | Upstream Electron `main.ts` still uses a shell string for `list-plugins`. |
 
-## Suggested upstream batches
+## Suggested upstream submission lanes
 
-| Batch | Commits | Notes |
+These lanes cover all 61 rows whose primary decision is an upstream fix or
+extension. A lane is a review area, not a request to combine its rows into one
+pull request; prefer small, independently testable submissions.
+
+| Lane | Ledger rows | Submission guidance |
 | --- | --- | --- |
-| Command/desktop correctness | `ac7319372`, `db7e2db03`, `642809609`, `10c313f02`, `badc4713b` | Keep separate from AKS permissions; small pull requests may review better. Row 20 is already supplied upstream. |
-| Project extensions | `5e79994e5`, `5fae2b773`, `2fd768195`, `22a5008a2` | Complete the overview, opaque grouping-key, replaceable creation-choice, and header extension APIs. |
-| Plugin support | `2ce445ee1`, `edcdb2ba4`, `dd6cf9ae4`, `adbf7f039` | Defaults, source maps/types, and static serving. |
-| Plugin host capabilities | `076a7feda`, `fa1dcf6d1` | Submit namespaced secure storage and manifest-declared command scopes separately; both bind package identities to opaque main-process capabilities. |
-| Kubernetes/query/table | `00320948b`, `06f1208e6`, `5f7ade8ca`, `d709d2ddf`, `013129c89`, `a6e5b073a`, `0b63e2251` | Submit the ready query, table, column-selector, story, and mock patches separately. |
-| Cluster and backend identity | `bd39620b1`, `148b45e3c` | Submit the successful-deletion reload and generic runtime application-name patches separately. |
-| Product metadata and verification | `d484bcd0f`, `4d854f759`, `d68693b04`, `067bf68f3`, `53917bfee`, `86a4ce067`, `3c9d0b941`, `fcad69534` | Submit the update configuration, legal-document interface, product version, document title, package protocol, and package-derived verification patches separately. |
-| Accessibility/theme | `12b579560`, `46e6c031b`, `d9748fb0c`, `a1769847c`, `0570f3a31`, `0badba5aa`, `4b6197255`, `6f13c6288` | Product-neutral; regenerate current snapshots/translations. |
-| Workload logs and translations | `024ec74a7`, `0f537cf57`, `2f54e5cde`, `44e78118a`, `26d8e68de`, `903360924`, `ee162d9af` | Submit the embeddable workload-log API separately from the eight generic locale packs; migrate AKS rendering and strings into the plugin. |
+| Command broker and desktop correctness | 1, 11, 13, 21, 66, 74, 92, 106, 114 | Rows 1, 11, and 13 are policy requirements covered by the row 106 capability design rather than separate submissions. Keep the standalone fixes separate from privileged command APIs. |
+| Product and build manifests | 2, 4, 5, 31, 32, 34, 37, 41, 43, 51, 73, 96, 105, 112 | Submit the small product-neutral fixes separately. Preserve the ordered manifest chain in the application-order table. |
+| Plugin packaging and host capabilities | 19, 22, 23, 47, 60, 78, 79, 82, 85 | Keep identity, command, storage, OAuth, tool, and cluster-provider security boundaries independently reviewable. |
+| Project and frontend extensions | 25, 28, 30, 35, 50, 52, 75, 87, 91 | Migrate the AKS empty state, logs, grouping, translations, and creation choices before their cleanup patches. |
+| Kubernetes, queries, tables, and stories | 46, 58, 59, 65, 68, 69, 84, 101, 102 | Row 68 is four ordered mock-handler patches; the other fixes can be submitted independently. |
+| Accessibility, theme, and zoom | 42, 57, 71, 86, 93, 94, 95, 97, 98, 99, 100 | Apply row 86 before row 98; otherwise keep the fixes independent and regenerate affected snapshots or translations. |
 
-Rows 30, 75, and 87 now have ready upstream and downstream patch pairs. During
-the rebase, migrate inline logs, product translations, and project-creation
-choices to the documented plugin APIs before dropping their fork commits.
-Current upstream behavior resolves the earlier PATH-handling and
-severity-narration questions in rows 10 and 89.
-
-Command execution, secure storage, project grouping, cluster registration, and
-OAuth sign-in now have ready design patches but still need upstream review
-agreement. Product identity and the remaining project extension interfaces
-also need agreement before AKS can consume a pristine distribution. The ledger
-is not a request to upstream every downstream commit verbatim.
+The patch inventory being complete does not mean the fork can be removed yet.
+The generic extension designs still need upstream agreement, the row-specific
+AKS migrations need implementation and validation, and all fold/remove
+decisions need behavior checks during rebase. Completion is the pristine-source
+build defined by the strategy's
+[migration exit criteria](headlamp-packaging.md#migration-plan-and-exit-criteria),
+not merely applying every patch in this report.

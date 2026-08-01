@@ -394,8 +394,9 @@ Generic correctness, accessibility, table, theme, source-map, and backend fixes
 should be contributed upstream without AKS switches. Headlamp `v0.44.0` supplies
 comparable workload-log functionality through its exported Activity API, but
 not the downstream inline `LogsViewer` interface. The
-[commit audit](headlamp-fork-commit-audit.md#logsviewer-reassessment) describes
-the product decision and AKS plugin migration required before removing it.
+[commit audit](headlamp-fork-commit-audit.md#commit-ledger), particularly row
+30, describes the product decision and AKS plugin migration required before
+removing it.
 
 ## Alternatives
 
