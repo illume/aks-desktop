@@ -48,6 +48,7 @@ export function patchSetDigest(lock, root = repositoryRoot) {
 }
 
 export function validateArchiveEntries(entries) {
+  let archiveRoot;
   for (const entry of entries) {
     if (!entry || path.posix.isAbsolute(entry) || entry.includes('\\')) {
       throw new Error(`Unsafe source archive entry: ${entry}`);
@@ -55,6 +56,18 @@ export function validateArchiveEntries(entries) {
     const parts = entry.split('/');
     if (parts.includes('..') || parts[0] === '.') {
       throw new Error(`Unsafe source archive entry: ${entry}`);
+    }
+    archiveRoot ||= parts[0];
+    if (parts[0] !== archiveRoot) {
+      throw new Error(`Source archive has multiple roots: ${archiveRoot}, ${parts[0]}`);
+    }
+  }
+}
+
+export function validateArchiveEntryTypes(listing) {
+  for (const entry of listing) {
+    if (entry && entry[0] !== '-' && entry[0] !== 'd') {
+      throw new Error(`Source archive contains a link or special file: ${entry}`);
     }
   }
 }
@@ -152,6 +165,7 @@ export async function materialize({
   const archive = await sourceArchive(lock, archiveOverride);
   const entries = run('tar', ['-tzf', archive]).split(/\r?\n/).filter(Boolean);
   validateArchiveEntries(entries);
+  validateArchiveEntryTypes(run('tar', ['-tvzf', archive]).split(/\r?\n/).filter(Boolean));
   const staging = `${workspace}.staging-${process.pid}`;
   rmSync(staging, { recursive: true, force: true });
   mkdirSync(staging, { recursive: true });
@@ -217,7 +231,7 @@ function toolRecord(id, file, packagedPath, verificationPath = packagedPath) {
   };
 }
 
-export function generateManifest() {
+function createManifest() {
   verifyWorkspace();
   const template = readJson(path.join(repositoryRoot, 'build', 'product-manifest.json'));
   const platform = platformName();
@@ -256,13 +270,33 @@ export function generateManifest() {
     sha256: tool.platforms[platform].sha256,
     platforms: [{ darwin: 'mac', win32: 'win' }[platform] || platform],
   }));
+  return template;
+}
+
+export function generateManifest() {
+  const manifest = createManifest();
   mkdirSync(path.dirname(generatedManifestPath), { recursive: true });
-  writeFileSync(generatedManifestPath, `${JSON.stringify(template, null, 2)}\n`);
+  writeFileSync(generatedManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`Generated ${generatedManifestPath}`);
 }
 
-function make(target) {
+export function verifyGeneratedManifest() {
+  if (!existsSync(generatedManifestPath)) {
+    throw new Error(`Generated product manifest is missing: ${generatedManifestPath}`);
+  }
+  const expected = `${JSON.stringify(createManifest(), null, 2)}\n`;
+  if (readFileSync(generatedManifestPath, 'utf8') !== expected) {
+    throw new Error(
+      'Generated product manifest is stale or has been modified; run npm run headlamp:manifest'
+    );
+  }
+}
+
+async function make(target) {
   verifyWorkspace();
+  if (!target) {
+    throw new Error('Pass a Headlamp make target');
+  }
   if (!existsSync(generatedManifestPath)) {
     throw new Error('Run npm run headlamp:manifest after staging plugins and external tools');
   }
@@ -271,7 +305,16 @@ function make(target) {
     env: { ...process.env, HEADLAMP_BUILD_MANIFEST: generatedManifestPath },
     stdio: 'inherit',
   });
-  child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+  await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`make ${target} exited with ${code ?? signal}`));
+      }
+    });
+  });
 }
 
 function descendantProcessIds(rootPid) {
@@ -318,12 +361,16 @@ async function terminateProcessTree(child) {
 
 export async function smoke({
   executable,
+  dist,
   port = 4466,
   timeout = 30_000,
   disableSandbox = false,
 } = {}) {
+  executable ||= resolvePackagedExecutable(dist);
   if (!executable) {
-    throw new Error('Pass a packaged executable with --executable');
+    throw new Error(
+      'Pass a packaged executable with --executable or its distribution directory with --dist'
+    );
   }
   const args = ['--headless', '--disable-gpu', '--port', String(port)];
   if (disableSandbox) {
@@ -334,11 +381,18 @@ export async function smoke({
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';
+  let spawnError;
+  child.once('error', error => {
+    spawnError = error;
+  });
   child.stdout.on('data', chunk => (output += chunk));
   child.stderr.on('data', chunk => (output += chunk));
   try {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
+      if (spawnError) {
+        throw new Error(`Could not start AKS Desktop: ${spawnError.message}`);
+      }
       if (child.exitCode !== null) {
         throw new Error(`AKS Desktop exited before becoming ready:\n${output}`);
       }
@@ -357,6 +411,50 @@ export async function smoke({
   } finally {
     await terminateProcessTree(child);
   }
+}
+
+export function packagedExecutableCandidates(
+  dist,
+  manifest = readJson(path.join(repositoryRoot, 'build', 'product-manifest.json')),
+  platform = process.platform,
+  architecture = process.arch
+) {
+  if (!dist) return [];
+  const productName = manifest.product?.productName;
+  const platformName = { darwin: 'mac', linux: 'linux', win32: 'win' }[platform];
+  const executableName =
+    manifest.platforms?.[platformName]?.executableName || productName || manifest.product?.name;
+  if (!executableName) return [];
+
+  if (platform === 'darwin') {
+    const otherArchitecture = architecture === 'arm64' ? 'x64' : 'arm64';
+    return [`mac-${architecture}`, `mac-${otherArchitecture}`, 'mac-universal', 'mac'].map(
+      directory =>
+        path.resolve(dist, directory, `${productName}.app`, 'Contents', 'MacOS', executableName)
+    );
+  }
+  if (platform === 'win32') {
+    return [`win-${architecture}-unpacked`, 'win-unpacked'].map(directory =>
+      path.resolve(dist, directory, `${executableName}.exe`)
+    );
+  }
+  if (platform === 'linux') {
+    return [`linux-${architecture}-unpacked`, 'linux-unpacked'].map(directory =>
+      path.resolve(dist, directory, executableName)
+    );
+  }
+  return [];
+}
+
+export function resolvePackagedExecutable(dist) {
+  const candidates = packagedExecutableCandidates(dist);
+  const executable = candidates.find(
+    candidate => existsSync(candidate) && statSync(candidate).isFile()
+  );
+  if (!executable && dist) {
+    throw new Error(`Packaged executable was not found; checked: ${candidates.join(', ')}`);
+  }
+  return executable;
 }
 
 function option(args, name) {
@@ -382,22 +480,24 @@ async function main(args) {
     generateManifest();
   } else if (command === 'doctor') {
     const { lock } = verifyWorkspace();
-    if (!existsSync(generatedManifestPath)) {
-      throw new Error(`Generated product manifest is missing: ${generatedManifestPath}`);
-    }
-    console.log(`Headlamp source, ${lock.patches.length} patches, and product manifest are consistent.`);
+    verifyGeneratedManifest();
+    console.log(
+      `Headlamp source, ${lock.patches.length} patches, and product manifest are consistent.`
+    );
   } else if (command === 'make') {
-    make(rest[0]);
+    await make(rest[0]);
   } else if (command === 'smoke') {
     await smoke({
       executable: option(rest, '--executable'),
+      dist: option(rest, '--dist'),
       port: Number(option(rest, '--port') || 4466),
       timeout: Number(option(rest, '--timeout') || 30_000),
       disableSandbox: rest.includes('--no-sandbox'),
     });
   } else {
     console.error(
-      'Usage: aks-headlamp <prepare|verify-patches|manifest|doctor|make TARGET|smoke --executable PATH [--no-sandbox]>'
+      'Usage: aks-headlamp <prepare|verify-patches|manifest|doctor|make TARGET|' +
+        'smoke (--executable PATH|--dist DIR) [--no-sandbox]>'
     );
     process.exitCode = 2;
   }
@@ -405,6 +505,7 @@ async function main(args) {
 
 if (
   process.argv[1] &&
+  existsSync(process.argv[1]) &&
   fileURLToPath(import.meta.url) === realpathSync(process.argv[1])
 ) {
   main(process.argv.slice(2)).catch(error => {

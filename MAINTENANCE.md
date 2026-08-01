@@ -20,6 +20,12 @@ npm run headlamp:assemble
 npm run headlamp:doctor
 ```
 
+Use Node.js 22 or newer, matching `.nvmrc` and the pinned upstream Headlamp
+engine. After a platform build, run `npm run test:distribution` to verify the
+packaged tools and start the packaged application in headless mode. Linux CI
+must append `-- --no-sandbox`; normal application launches never disable the
+sandbox.
+
 An update must change the full upstream commit, source archive URL and digest,
 ordered patch list, and patch-set digest together. Validate the series on a
 disposable workspace before building. Product identity, update policy, legal

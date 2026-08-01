@@ -15,6 +15,9 @@ Please download the latest release for your platform from the [Releases](https:/
 
 ## Development
 
+AKS desktop requires Node.js 22 or newer. The repository's `.nvmrc` selects the
+tested major version.
+
 To run AKS desktop locally, follow these steps:
 
 1. Clone the repository:

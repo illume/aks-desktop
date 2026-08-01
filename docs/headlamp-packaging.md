@@ -76,21 +76,24 @@ The package has no install lifecycle script. Source retrieval and patching are
 explicit:
 
 ```bash
+nvm use                         # Node.js 22, required by the pinned upstream tree
 npm install
 npm run headlamp:prepare       # verify source, extract, and apply all patches
 npm run test:headlamp-patches  # repeat the full series in a disposable tree
 npm run headlamp:assemble      # build plugins/tools and generate the manifest
-npm run headlamp:doctor        # verify source, patch, and manifest identities
+npm run headlamp:doctor        # verify source, patches, policy, and tool digests
 npm run build:linux            # or build:mac / build:win
+npm run test:distribution      # inspect and start the packaged application
 ```
 
 For an offline build, set `HEADLAMP_SOURCE_ARCHIVE` to the locked archive. The
-same SHA-256 check is applied. `npm run headlamp:smoke -- --executable <path>`
-starts a packaged application in Headlamp's headless mode and requires its HTTP
-endpoint to return the application page. Structural post-build checks remain in
-`npm run test:post-build`. Unpacked Linux CI trees may add `--no-sandbox`
-because the sandbox helper receives its production owner/mode only when the
-package is installed; this flag is never added to normal application launches.
+same SHA-256 check is applied. `npm run test:distribution` resolves the current
+platform's executable from the product manifest, verifies packaged resources,
+starts the application in Headlamp's headless mode, and requires its HTTP
+endpoint to return the application page. Unpacked Linux CI trees append
+`-- --no-sandbox` because the sandbox helper receives its production owner/mode
+only when the package is installed; this flag is never added to normal
+application launches.
 
 ## Current state
 
@@ -218,7 +221,7 @@ a Git link:
     "commit": "99a230be9c9c679a70d59c219cc246c00ae2be45",
     "sha256": "b593a3e5b1611a598660236c12e8802f89698de54ba05d5d46175273ffdbaf55"
   },
-  "patchSetSha256": "b01660d8356d20d6b3e4c972187fff3952c0c1926b65735326708f5284c34bfd"
+  "patchSetSha256": "f68a6cdb7efb0af42df9e4125e0b3c683ecdfccd51d1848b334343699eada923"
 }
 ```
 
@@ -251,9 +254,11 @@ manually correlate every Headlamp advisory with fork history.
 
 The transition package improves this boundary now: the package version is
 locked, source and patch bytes are SHA-256 verified, extraction rejects paths
-outside the workspace, and downloaded tools/plugins are digest checked. It does
-not make the local package discoverable in public advisory databases; that
-benefit arrives when upstream publishes and registers the distribution.
+outside the workspace, and downloaded external tools are digest checked. The
+current Insights plugin wrapper still needs the archive-digest migration
+described in the distribution design. The local package is not discoverable in
+public advisory databases; that benefit arrives when upstream publishes and
+registers the distribution.
 Signatures, registry provenance, an SBOM, and regular vulnerability scanning
 remain release requirements rather than substitutes for review.
 
@@ -266,7 +271,8 @@ These source choices serve different purposes:
 | --- | --- | --- |
 | Normal release | Canonical repository and a release tag | Pin and verify the commit and tree, as above. |
 | Temporary fork | Fork repository and branch, tag, or pull-request ref | Pin and verify the reviewed commit and tree; never build a floating ref. |
-| Published source asset | Manually attached release archive | Require an immutable URL, SHA-256, and preferably a signature/provenance. Do not use GitHub's generated source archive as the lock. |
+| Current transition | GitHub commit archive | Pin its SHA-256 and fail closed if GitHub regenerates different bytes; review a replacement lock rather than accepting new bytes automatically. |
+| Published source asset | Manually attached release archive | Require an immutable URL, SHA-256, and preferably a signature/provenance. Use this instead of a generated archive for releases once upstream publishes it. |
 | Local development | Developer-only path override | Permit dirty files for iteration, print the commit and dirty state, and reject this mode in CI and release builds. |
 
 For example, testing a temporary fork changes only the Git identity in the
@@ -490,8 +496,9 @@ rebases the same code.
   replaced by the verified source lock and package CLI.
 - Build a verified current-upstream source tree, apply the ordered upstream
   candidates, and assemble AKS Desktop through product and plugin manifests.
-- Validate patch application in a disposable workspace, then run TypeScript,
-  lint, focused tests, packaging checks, and the headless runtime smoke test.
+- CI validates patch application in a disposable workspace. Platform build
+  workflows then run TypeScript, lint, focused tests, packaged-resource checks,
+  and the headless runtime smoke test.
 
 ### Phase 4: switch to published distributions
 

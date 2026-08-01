@@ -11,7 +11,7 @@ resources:
 parameters:
   - name: nodeVersion
     type: string
-    default: 20.x
+    default: 22.x
   - name: goVersion
     type: string
     default: 1.26.3
@@ -170,7 +170,9 @@ extends:
 
                   npm ci
                   echo "Building AKS desktop Linux application..."
-                  npm run build:linux
+                  if ! npm run build:linux || ! npm run test:distribution -- --no-sandbox; then
+                    exit 1
+                  fi
                   echo "✅ Build complete"
 
                   echo "=== POST-BUILD DEBUG ==="

@@ -18,6 +18,14 @@ test("declares AKS product identity and policy outside Headlamp", () => {
       productName: manifest.product.productName,
       appId: manifest.product.appId,
       protocols: manifest.product.protocols,
+      executableNames: Object.fromEntries(
+        Object.entries(manifest.platforms).map(
+          ([platform, metadata]: [string, { executableName: string }]) => [
+            platform,
+            metadata.executableName,
+          ],
+        ),
+      ),
       checkForUpdates: manifest.checkForUpdates,
     },
     {
@@ -25,6 +33,11 @@ test("declares AKS product identity and policy outside Headlamp", () => {
       productName: "AKS Desktop",
       appId: "com.microsoft.aksdesktop",
       protocols: { name: "AKS Desktop", schemes: ["aks-desktop"] },
+      executableNames: {
+        linux: "aks-desktop",
+        mac: "aks-desktop",
+        win: "aks-desktop",
+      },
       checkForUpdates: false,
     },
   );

@@ -66,7 +66,7 @@ for (const plugin of PLUGINS) {
   console.log('==========================================');
 
   // Build the plugin
-  execSync('npm install && npm run build', { stdio: 'inherit' });
+  execSync('npm ci && npm run build', { stdio: 'inherit' });
 
   console.log(`Copying built files for plugin: ${pluginName}`);
   const pluginsDir = path.join(ROOT_DIR, 'headlamp', '.plugins');

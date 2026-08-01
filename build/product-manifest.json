@@ -28,7 +28,11 @@
       "executableName": "aks-desktop"
     },
     "mac": {
-      "appId": "com.microsoft.aksdesktop"
+      "appId": "com.microsoft.aksdesktop",
+      "executableName": "aks-desktop"
+    },
+    "win": {
+      "executableName": "aks-desktop"
     }
   },
   "plugins": [

@@ -16,15 +16,16 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.dirname(SCRIPT_DIR);
 const CURRENT_PLATFORM = process.platform;
 
-// Read product name from headlamp app package.json
-const HEADLAMP_PACKAGE_JSON = path.join(ROOT_DIR, 'headlamp', 'app', 'package.json');
+// Read the assembled application name from the product manifest.
+const PRODUCT_MANIFEST = path.join(ROOT_DIR, 'build', 'product-manifest.json');
 let PRODUCT_NAME = 'AKS desktop'; // Default fallback
+let PRODUCT_CONFIG: Record<string, any> = {};
 
 try {
-  const packageJson = JSON.parse(fs.readFileSync(HEADLAMP_PACKAGE_JSON, 'utf-8'));
-  PRODUCT_NAME = packageJson.productName || PRODUCT_NAME;
+  PRODUCT_CONFIG = JSON.parse(fs.readFileSync(PRODUCT_MANIFEST, 'utf-8'));
+  PRODUCT_NAME = PRODUCT_CONFIG.product?.productName || PRODUCT_NAME;
 } catch (error) {
-  console.warn(`Warning: Could not read product name from ${HEADLAMP_PACKAGE_JSON}, using default: ${PRODUCT_NAME}`);
+  console.warn(`Warning: Could not read product name from ${PRODUCT_MANIFEST}, using default: ${PRODUCT_NAME}`);
 }
 
 // Determine the correct build output directory based on platform
@@ -36,7 +37,8 @@ if (CURRENT_PLATFORM === 'win32') {
   // For macOS, electron-builder creates architecture-specific directories
   // Try to find the actual build directory
   const distDir = path.join(ROOT_DIR, 'headlamp', 'app', 'dist');
-  const possibleDirs = ['mac-arm64', 'mac-x64', 'mac'];
+  const otherArchitecture = process.arch === 'arm64' ? 'x64' : 'arm64';
+  const possibleDirs = [`mac-${process.arch}`, `mac-${otherArchitecture}`, 'mac'];
 
   for (const dir of possibleDirs) {
     const fullPath = path.join(distDir, dir);
@@ -57,12 +59,13 @@ if (CURRENT_PLATFORM === 'win32') {
 const BUILD_DIST_DIR = path.join(ROOT_DIR, 'headlamp', 'app', 'dist', PLATFORM_DIR);
 
 // On macOS, the app is bundled in a .app directory structure
-let EXTERNAL_TOOLS_DIR: string;
+let RESOURCES_DIR: string;
 if (CURRENT_PLATFORM === 'darwin') {
-  EXTERNAL_TOOLS_DIR = path.join(BUILD_DIST_DIR, `${PRODUCT_NAME}.app`, 'Contents', 'Resources', 'external-tools');
+  RESOURCES_DIR = path.join(BUILD_DIST_DIR, `${PRODUCT_NAME}.app`, 'Contents', 'Resources');
 } else {
-  EXTERNAL_TOOLS_DIR = path.join(BUILD_DIST_DIR, 'resources', 'external-tools');
+  RESOURCES_DIR = path.join(BUILD_DIST_DIR, 'resources');
 }
+const EXTERNAL_TOOLS_DIR = path.join(RESOURCES_DIR, 'external-tools');
 
 interface TestResult {
   name: string;
@@ -118,6 +121,63 @@ function addResult(name: string, passed: boolean, message: string) {
   } else {
     logError(`${name}: ${message}`);
   }
+}
+
+function testProductAssembly(): void {
+  const manifestPath = path.join(RESOURCES_DIR, 'app-build-manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    addResult('Product manifest', false, `Not found at ${manifestPath}`);
+    return;
+  }
+
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const identityMatches =
+    manifest.product?.name === PRODUCT_CONFIG.product?.name &&
+    manifest.product?.productName === PRODUCT_CONFIG.product?.productName;
+  addResult(
+    'Product manifest',
+    identityMatches,
+    identityMatches ? `Packaged ${manifest.product.productName}` : 'Packaged identity does not match'
+  );
+
+  const plugins = Array.isArray(manifest.plugins) ? manifest.plugins : [];
+  const expectedPlugins = Array.isArray(PRODUCT_CONFIG.plugins) ? PRODUCT_CONFIG.plugins : [];
+  const invalidPlugins = plugins.filter((plugin: { name: string; packageName: string }) => {
+    const pluginPackage = path.join(RESOURCES_DIR, '.plugins', plugin.name, 'package.json');
+    return (
+      !fs.existsSync(pluginPackage) ||
+      JSON.parse(fs.readFileSync(pluginPackage, 'utf8')).name !== plugin.packageName
+    );
+  });
+  const pluginsMatch = invalidPlugins.length === 0 && plugins.length === expectedPlugins.length;
+  addResult(
+    'Product plugins',
+    pluginsMatch,
+    pluginsMatch
+      ? `Found all ${plugins.length} declared plugins`
+      : `Expected ${expectedPlugins.length}, found ${plugins.length}; invalid: ${
+          invalidPlugins.map((plugin: { name: string }) => plugin.name).join(', ') || 'none'
+        }`
+  );
+
+  const legalDocuments = Array.isArray(manifest.legalDocuments) ? manifest.legalDocuments : [];
+  const expectedDocuments = Array.isArray(PRODUCT_CONFIG.legalDocuments)
+    ? PRODUCT_CONFIG.legalDocuments
+    : [];
+  const missingDocuments = legalDocuments.filter(
+    (document: { file: string }) => !fs.existsSync(path.join(RESOURCES_DIR, document.file))
+  );
+  const documentsMatch =
+    missingDocuments.length === 0 && legalDocuments.length === expectedDocuments.length;
+  addResult(
+    'Legal documents',
+    documentsMatch,
+    documentsMatch
+      ? `Found all ${legalDocuments.length} declared documents`
+      : `Expected ${expectedDocuments.length}, found ${legalDocuments.length}; missing: ${
+          missingDocuments.map((document: { file: string }) => document.file).join(', ') || 'none'
+        }`
+  );
 }
 
 /**
@@ -561,6 +621,7 @@ function main(): void {
   }
 
   // Run all tests
+  testProductAssembly();
   testExternalToolsDir();
   testAzureCliStructure();
   testAzureCliExecutable();

@@ -10,7 +10,7 @@ resources:
 parameters:
   - name: nodeVersion
     type: string
-    default: 20.x
+    default: 22.x
   - name: goVersion
     type: string
     default: 1.26.3
@@ -223,7 +223,7 @@ extends:
                   while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
                     echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES for $(ARCH)..."
 
-                    if npm run build:mac; then
+                    if npm run build:mac && npm run test:distribution; then
                       SUCCESS=true
                       echo "✅ Build complete for $(ARCH_DISPLAY)"
                     else
@@ -718,7 +718,7 @@ extends:
                   while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
                     echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES for $(ARCH)..."
 
-                    if npm run build:mac; then
+                    if npm run build:mac && npm run test:distribution; then
                       SUCCESS=true
                       echo "✅ Build complete for $(ARCH_DISPLAY)"
                     else
