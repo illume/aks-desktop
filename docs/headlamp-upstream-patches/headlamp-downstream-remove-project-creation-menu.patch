@@ -1,0 +1,1240 @@
+From 88b7b00d110f9d90204f492db319d2960b4da482 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Sat, 1 Aug 2026 05:38:09 +0000
+Subject: [PATCH] Revert "project: Update project creation menu"
+
+This reverts commit 2fd7681958bf84fef64a6b4b0202c7967af32df2.
+---
+ frontend/src/components/App/icons.ts          |  3 ---
+ .../NewProjectPopup.Default.stories.storyshot | 10 +++----
+ ...pup.WithExistingProjects.stories.storyshot | 10 +++----
+ frontend/src/i18n/locales/ar/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/bn/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/cs/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/de/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/en/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/es/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/fr/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/he/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/hi/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/hu/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/id/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/it/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/ja/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/ko/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/nl/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/pl/translation.json | 26 ++++++++-----------
+ .../src/i18n/locales/pt-BR/translation.json   | 26 ++++++++-----------
+ .../src/i18n/locales/pt-PT/translation.json   | 26 ++++++++-----------
+ frontend/src/i18n/locales/ru/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/sv/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/ta/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/tr/translation.json | 26 ++++++++-----------
+ frontend/src/i18n/locales/ur/translation.json | 26 ++++++++-----------
+ .../src/i18n/locales/zh-Hans/translation.json | 26 ++++++++-----------
+ .../src/i18n/locales/zh-Hant/translation.json | 26 ++++++++-----------
+ 28 files changed, 285 insertions(+), 388 deletions(-)
+
+diff --git a/frontend/src/components/App/icons.ts b/frontend/src/components/App/icons.ts
+index 8d58d4085..314ceb426 100644
+--- a/frontend/src/components/App/icons.ts
++++ b/frontend/src/components/App/icons.ts
+@@ -476,9 +476,6 @@ const mdiIcons = {
+     'folder-open': {
+       body: '\u003Cpath fill="currentColor" d="M19 20H4a2 2 0 0 1-2-2V6c0-1.11.89-2 2-2h6l2 2h7a2 2 0 0 1 2 2H4v10l2.14-8h17.07l-2.28 8.5c-.23.87-1.01 1.5-1.93 1.5"/\u003E',
+     },
+-    'folder-open-outline': {
+-      body: '\u003Cpath fill="currentColor" d="M6.1 10L4 18V8h17a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h15c.9 0 1.7-.6 1.9-1.5l2.3-8.5zM19 18H6l1.6-6h13z"/\u003E',
+-    },
+     sitemap: {
+       body: '<path fill="currentColor" d="M9 2v6H5V2h4m3 11V9h2v4H9m6 0v-4h2v4h-2M5 16h4v6H5v-6m10 0h4v6h-4v-6M11 2v6h2V2h-2m4 0v6h2V2h-2m-8 7v4H5v2h14v-2h-2V9H7m4 7v6h2v-6h-2z"/>',
+     },
+diff --git a/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot b/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot
+index 3f582f8c3..c8670b05f 100644
+--- a/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot
++++ b/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot
+@@ -42,7 +42,7 @@
+           <p
+             class="MuiTypography-root MuiTypography-body2 css-1enx7tw-MuiTypography-root"
+           >
+-            A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.
++            Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.
+           </p>
+           <div
+             class="MuiBox-root css-1821gv5"
+@@ -61,12 +61,12 @@
+                 <span
+                   class="MuiTypography-root MuiTypography-h6 css-16yif3g-MuiTypography-root"
+                 >
+-                  Use Existing Namespace
++                  New Project
+                 </span>
+                 <p
+                   class="MuiTypography-root MuiTypography-body2 css-11zj6ou-MuiTypography-root"
+                 >
+-                  Select an existing namespace to use as a project
++                  Create a new project
+                 </p>
+               </div>
+               <span
+@@ -87,12 +87,12 @@
+                 <span
+                   class="MuiTypography-root MuiTypography-h6 css-16yif3g-MuiTypography-root"
+                 >
+-                  Create New Namespace
++                  New Project from YAML
+                 </span>
+                 <p
+                   class="MuiTypography-root MuiTypography-body2 css-11zj6ou-MuiTypography-root"
+                 >
+-                  Create a new namespace and use it as a project
++                  Deploy a new application from YAML
+                 </p>
+               </div>
+               <span
+diff --git a/frontend/src/components/project/__snapshots__/NewProjectPopup.WithExistingProjects.stories.storyshot b/frontend/src/components/project/__snapshots__/NewProjectPopup.WithExistingProjects.stories.storyshot
+index 3f582f8c3..c8670b05f 100644
+--- a/frontend/src/components/project/__snapshots__/NewProjectPopup.WithExistingProjects.stories.storyshot
++++ b/frontend/src/components/project/__snapshots__/NewProjectPopup.WithExistingProjects.stories.storyshot
+@@ -42,7 +42,7 @@
+           <p
+             class="MuiTypography-root MuiTypography-body2 css-1enx7tw-MuiTypography-root"
+           >
+-            A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.
++            Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.
+           </p>
+           <div
+             class="MuiBox-root css-1821gv5"
+@@ -61,12 +61,12 @@
+                 <span
+                   class="MuiTypography-root MuiTypography-h6 css-16yif3g-MuiTypography-root"
+                 >
+-                  Use Existing Namespace
++                  New Project
+                 </span>
+                 <p
+                   class="MuiTypography-root MuiTypography-body2 css-11zj6ou-MuiTypography-root"
+                 >
+-                  Select an existing namespace to use as a project
++                  Create a new project
+                 </p>
+               </div>
+               <span
+@@ -87,12 +87,12 @@
+                 <span
+                   class="MuiTypography-root MuiTypography-h6 css-16yif3g-MuiTypography-root"
+                 >
+-                  Create New Namespace
++                  New Project from YAML
+                 </span>
+                 <p
+                   class="MuiTypography-root MuiTypography-body2 css-11zj6ou-MuiTypography-root"
+                 >
+-                  Create a new namespace and use it as a project
++                  Deploy a new application from YAML
+                 </p>
+               </div>
+               <span
+diff --git a/frontend/src/i18n/locales/ar/translation.json b/frontend/src/i18n/locales/ar/translation.json
+index 168c38062..6dc64e2d1 100644
+--- a/frontend/src/i18n/locales/ar/translation.json
++++ b/frontend/src/i18n/locales/ar/translation.json
+@@ -735,28 +735,24 @@
+   "e.g. 8080": "مثال: 8080",
+   "Global Default": "الافتراضي العام",
+   "Preemption Policy": "سياسة الاستباق",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "اسم المشروع",
+   "A project with this name already exists": "يوجد مشروع بهذا الاسم بالفعل",
+   "Enter a name for your new project.": "أدخل اسمًا لمشروعك الجديد",
+   "Clusters": "الكتل",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "لا توجد كتل متاحة",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "جارٍ الإنشاء",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "إنشاء مشروع",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "عنوان URL مطلوب",
+   "Failed to load from URL: {{error}}": "فشل التحميل من عنوان URL: {{error}}",
+   "Error processing files: {{error}}": "خطأ أثناء معالجة الملفات: {{error}}",
+diff --git a/frontend/src/i18n/locales/bn/translation.json b/frontend/src/i18n/locales/bn/translation.json
+index 04ce11978..e935ce7be 100644
+--- a/frontend/src/i18n/locales/bn/translation.json
++++ b/frontend/src/i18n/locales/bn/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "যেমন 8080",
+   "Global Default": "Global Default",
+   "Preemption Policy": "Preemption নীতি",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "প্রকল্প নাম",
+   "A project with this name already exists": "এই নামের একটি প্রকল্প ইতিমধ্যে বিদ্যমান",
+   "Enter a name for your new project.": "আপনার নতুন প্রকল্পের জন্য একটি নাম লিখুন।",
+   "Clusters": "Clusters",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "কোনো উপলব্ধ Cluster নেই",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "তৈরি হচ্ছে",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "একটি প্রকল্প তৈরি করুন",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "URL প্রয়োজন",
+   "Failed to load from URL: {{error}}": "URL থেকে লোড করতে ব্যর্থ: {{error}}",
+   "Error processing files: {{error}}": "ফাইল প্রক্রিয়া করতে Error: {{error}}",
+diff --git a/frontend/src/i18n/locales/cs/translation.json b/frontend/src/i18n/locales/cs/translation.json
+index 3bd300c75..321718926 100644
+--- a/frontend/src/i18n/locales/cs/translation.json
++++ b/frontend/src/i18n/locales/cs/translation.json
+@@ -725,28 +725,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/de/translation.json b/frontend/src/i18n/locales/de/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/de/translation.json
++++ b/frontend/src/i18n/locales/de/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/en/translation.json b/frontend/src/i18n/locales/en/translation.json
+index 2c8213913..211d0ddb8 100644
+--- a/frontend/src/i18n/locales/en/translation.json
++++ b/frontend/src/i18n/locales/en/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "e.g. 8080",
+   "Global Default": "Global Default",
+   "Preemption Policy": "Preemption Policy",
+-  "Use Existing Namespace": "Use Existing Namespace",
+-  "Select a cluster and an existing namespace to use as a project.": "Select a cluster and an existing namespace to use as a project.",
++  "Create new project": "Create new project",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "To create a new project pick which clusters you want to include and then select existing or create a new namespace",
+   "Project Name": "Project Name",
+   "A project with this name already exists": "A project with this name already exists",
+   "Enter a name for your new project.": "Enter a name for your new project.",
+   "Clusters": "Clusters",
+-  "Select one or more clusters": "Select one or more clusters",
++  "Select one or more clusters for this project": "Select one or more clusters for this project",
+   "No available clusters": "No available clusters",
+-  "Select an existing namespace": "Select an existing namespace",
+-  "Choose a namespace from the selected clusters": "Choose a namespace from the selected clusters",
+-  "Select a cluster first": "Select a cluster first",
+-  "No namespaces found on selected clusters": "No namespaces found on selected clusters",
++  "Type or select a namespace": "Type or select a namespace",
++  "Select existing or type to create a new namespace": "Select existing or type to create a new namespace",
++  "No available namespaces - you can type a custom name": "No available namespaces - you can type a custom name",
+   "Creating": "Creating",
+-  "Create New Namespace": "Create New Namespace",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "Create a new namespace on one or more clusters and set it up as a project.",
+-  "Namespace Name": "Namespace Name",
+-  "A namespace with this name already exists on one or more selected clusters": "A namespace with this name already exists on one or more selected clusters",
+-  "Enter a name for the new namespace": "Enter a name for the new namespace",
+-  "Select an existing namespace to use as a project": "Select an existing namespace to use as a project",
+-  "Create a new namespace and use it as a project": "Create a new namespace and use it as a project",
+   "Create a Project": "Create a Project",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.",
++  "New Project": "New Project",
++  "Create a new project": "Create a new project",
++  "New Project from YAML": "New Project from YAML",
++  "Deploy a new application from YAML": "Deploy a new application from YAML",
+   "URL is required": "URL is required",
+   "Failed to load from URL: {{error}}": "Failed to load from URL: {{error}}",
+   "Error processing files: {{error}}": "Error processing files: {{error}}",
+diff --git a/frontend/src/i18n/locales/es/translation.json b/frontend/src/i18n/locales/es/translation.json
+index 5ac971053..fc3204ef6 100644
+--- a/frontend/src/i18n/locales/es/translation.json
++++ b/frontend/src/i18n/locales/es/translation.json
+@@ -720,28 +720,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/fr/translation.json b/frontend/src/i18n/locales/fr/translation.json
+index 5ac971053..fc3204ef6 100644
+--- a/frontend/src/i18n/locales/fr/translation.json
++++ b/frontend/src/i18n/locales/fr/translation.json
+@@ -720,28 +720,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/he/translation.json b/frontend/src/i18n/locales/he/translation.json
+index 1a75508e8..4e111a8ed 100644
+--- a/frontend/src/i18n/locales/he/translation.json
++++ b/frontend/src/i18n/locales/he/translation.json
+@@ -720,28 +720,24 @@
+   "e.g. 8080": "e.g. 8080",
+   "Global Default": "Global Default",
+   "Preemption Policy": "Preemption Policy",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "Project Name",
+   "A project with this name already exists": "A project with this name already exists",
+   "Enter a name for your new project.": "Enter a name for your new project.",
+   "Clusters": "Clusters",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "No available clusters",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "Creating",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "Create a Project",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "URL is required",
+   "Failed to load from URL: {{error}}": "Failed to load from URL: {{error}}",
+   "Error processing files: {{error}}": "Error processing files: {{error}}",
+diff --git a/frontend/src/i18n/locales/hi/translation.json b/frontend/src/i18n/locales/hi/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/hi/translation.json
++++ b/frontend/src/i18n/locales/hi/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/hu/translation.json b/frontend/src/i18n/locales/hu/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/hu/translation.json
++++ b/frontend/src/i18n/locales/hu/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/id/translation.json b/frontend/src/i18n/locales/id/translation.json
+index 3c9d02344..525c1894a 100644
+--- a/frontend/src/i18n/locales/id/translation.json
++++ b/frontend/src/i18n/locales/id/translation.json
+@@ -710,28 +710,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/it/translation.json b/frontend/src/i18n/locales/it/translation.json
+index 5ac971053..fc3204ef6 100644
+--- a/frontend/src/i18n/locales/it/translation.json
++++ b/frontend/src/i18n/locales/it/translation.json
+@@ -720,28 +720,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/ja/translation.json b/frontend/src/i18n/locales/ja/translation.json
+index 3c9d02344..525c1894a 100644
+--- a/frontend/src/i18n/locales/ja/translation.json
++++ b/frontend/src/i18n/locales/ja/translation.json
+@@ -710,28 +710,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/ko/translation.json b/frontend/src/i18n/locales/ko/translation.json
+index 3c9d02344..525c1894a 100644
+--- a/frontend/src/i18n/locales/ko/translation.json
++++ b/frontend/src/i18n/locales/ko/translation.json
+@@ -710,28 +710,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/nl/translation.json b/frontend/src/i18n/locales/nl/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/nl/translation.json
++++ b/frontend/src/i18n/locales/nl/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/pl/translation.json b/frontend/src/i18n/locales/pl/translation.json
+index 3bd300c75..321718926 100644
+--- a/frontend/src/i18n/locales/pl/translation.json
++++ b/frontend/src/i18n/locales/pl/translation.json
+@@ -725,28 +725,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/pt-BR/translation.json b/frontend/src/i18n/locales/pt-BR/translation.json
+index 5ac971053..fc3204ef6 100644
+--- a/frontend/src/i18n/locales/pt-BR/translation.json
++++ b/frontend/src/i18n/locales/pt-BR/translation.json
+@@ -720,28 +720,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/pt-PT/translation.json b/frontend/src/i18n/locales/pt-PT/translation.json
+index 5ac971053..fc3204ef6 100644
+--- a/frontend/src/i18n/locales/pt-PT/translation.json
++++ b/frontend/src/i18n/locales/pt-PT/translation.json
+@@ -720,28 +720,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/ru/translation.json b/frontend/src/i18n/locales/ru/translation.json
+index 3bd300c75..321718926 100644
+--- a/frontend/src/i18n/locales/ru/translation.json
++++ b/frontend/src/i18n/locales/ru/translation.json
+@@ -725,28 +725,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/sv/translation.json b/frontend/src/i18n/locales/sv/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/sv/translation.json
++++ b/frontend/src/i18n/locales/sv/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/ta/translation.json b/frontend/src/i18n/locales/ta/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/ta/translation.json
++++ b/frontend/src/i18n/locales/ta/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/tr/translation.json b/frontend/src/i18n/locales/tr/translation.json
+index 0a0e3b34b..d8c9eaa86 100644
+--- a/frontend/src/i18n/locales/tr/translation.json
++++ b/frontend/src/i18n/locales/tr/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/ur/translation.json b/frontend/src/i18n/locales/ur/translation.json
+index d9f86f7f8..1959b022d 100644
+--- a/frontend/src/i18n/locales/ur/translation.json
++++ b/frontend/src/i18n/locales/ur/translation.json
+@@ -715,28 +715,24 @@
+   "e.g. 8080": "مثلاً 8080",
+   "Global Default": "عالمی ڈیفالٹ",
+   "Preemption Policy": "پری ایمپشن پالیسی",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "پروجیکٹ کا نام",
+   "A project with this name already exists": "اس نام کا پروجیکٹ پہلے سے موجود ہے",
+   "Enter a name for your new project.": "اپنے نئے پروجیکٹ کے لیے نام درج کریں",
+   "Clusters": "کلسٹرز",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "کوئی دستیاب کلسٹر نہیں",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "بنایا جا رہا ہے",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "پروجیکٹ بنائیں",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "URL درکار ہے",
+   "Failed to load from URL: {{error}}": "URL سے لوڈ کرنے میں ناکامی: {{error}}",
+   "Error processing files: {{error}}": "فائلوں پر عملدرآمد میں خرابی: {{error}}",
+diff --git a/frontend/src/i18n/locales/zh-Hans/translation.json b/frontend/src/i18n/locales/zh-Hans/translation.json
+index 3c9d02344..525c1894a 100644
+--- a/frontend/src/i18n/locales/zh-Hans/translation.json
++++ b/frontend/src/i18n/locales/zh-Hans/translation.json
+@@ -710,28 +710,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+diff --git a/frontend/src/i18n/locales/zh-Hant/translation.json b/frontend/src/i18n/locales/zh-Hant/translation.json
+index 3c9d02344..525c1894a 100644
+--- a/frontend/src/i18n/locales/zh-Hant/translation.json
++++ b/frontend/src/i18n/locales/zh-Hant/translation.json
+@@ -710,28 +710,24 @@
+   "e.g. 8080": "",
+   "Global Default": "",
+   "Preemption Policy": "",
+-  "Use Existing Namespace": "",
+-  "Select a cluster and an existing namespace to use as a project.": "",
++  "Create new project": "",
++  "To create a new project pick which clusters you want to include and then select existing or create a new namespace": "",
+   "Project Name": "",
+   "A project with this name already exists": "",
+   "Enter a name for your new project.": "",
+   "Clusters": "",
+-  "Select one or more clusters": "",
++  "Select one or more clusters for this project": "",
+   "No available clusters": "",
+-  "Select an existing namespace": "",
+-  "Choose a namespace from the selected clusters": "",
+-  "Select a cluster first": "",
+-  "No namespaces found on selected clusters": "",
++  "Type or select a namespace": "",
++  "Select existing or type to create a new namespace": "",
++  "No available namespaces - you can type a custom name": "",
+   "Creating": "",
+-  "Create New Namespace": "",
+-  "Create a new namespace on one or more clusters and set it up as a project.": "",
+-  "Namespace Name": "",
+-  "A namespace with this name already exists on one or more selected clusters": "",
+-  "Enter a name for the new namespace": "",
+-  "Select an existing namespace to use as a project": "",
+-  "Create a new namespace and use it as a project": "",
+   "Create a Project": "",
+-  "A project groups one or more namespaces across your clusters, making it easy to view and manage related resources in one place.": "",
++  "Project is a collection of Kubernetes resources. You can use projects to organize your resources, for example, by environment, team, or application.": "",
++  "New Project": "",
++  "Create a new project": "",
++  "New Project from YAML": "",
++  "Deploy a new application from YAML": "",
+   "URL is required": "",
+   "Failed to load from URL: {{error}}": "",
+   "Error processing files: {{error}}": "",
+-- 
+2.54.0
+
