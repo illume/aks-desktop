@@ -11,7 +11,7 @@ resources:
 parameters:
   - name: nodeVersion
     type: string
-    default: 22.x
+    default: 22.22.2
   - name: goVersion
     type: string
     default: 1.26.3
@@ -122,6 +122,7 @@ extends:
                   go env | grep -E "GOPROXY|GOSUMDB|PROXY"
                   echo "=== END GO ENVIRONMENT ==="
 
+                  npm install --global npm@12.0.2
                   npm ci
                   echo "Building AKS desktop Windows application..."
                   if ! npm run build:win-ci || ! npm run test:distribution; then
@@ -132,8 +133,8 @@ extends:
                   echo "=== POST-BUILD DEBUG ==="
                   echo "Checking for build outputs..."
                   find . -name "*.exe" -type f 2>/dev/null || echo "No .exe files found"
-                  echo "headlamp/app/dist contents:"
-                  ls -la headlamp/app/dist/ 2>/dev/null || echo "headlamp/app/dist not found"
+                  echo "Headlamp app dist contents:"
+                  ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ 2>/dev/null || echo "Headlamp app dist not found"
                   echo "=== END POST-BUILD DEBUG ==="
                 displayName: "Build AKS desktop (Windows)"
 
@@ -149,18 +150,18 @@ extends:
                   echo "All .exe files in current directory:"
                   find . -name "*.exe" -type f 2>/dev/null || echo "No .exe files found"
 
-                  echo "headlamp/app/dist directory contents:"
-                  ls -la headlamp/app/dist/ 2>/dev/null || echo "headlamp/app/dist directory not found"
+                  echo "Headlamp app dist directory contents:"
+                  ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ 2>/dev/null || echo "Headlamp app dist directory not found"
 
                   echo "=== COPY EXECUTABLE DEBUG END ==="
 
                   echo "Finding built .exe file..."
-                  EXE_PATH=$(find headlamp/app/dist -type f -name "aks-desktop-*-win-x64.exe" -print -quit)
+                  EXE_PATH=$(find node_modules/@headlamp-k8s/headlamp-source/source/app/dist -type f -name "aks-desktop-*-win-x64.exe" -print -quit)
 
                   if [ -z "$EXE_PATH" ]; then
-                    echo "❌ No aks-desktop .exe file found in headlamp/app/dist!" >&2
-                    echo "Listing headlamp/app/dist contents:"
-                    ls -la headlamp/app/dist/ || echo "headlamp/app/dist directory not found"
+                    echo "❌ No aks-desktop .exe file found in the Headlamp app dist!" >&2
+                    echo "Listing Headlamp app dist contents:"
+                    ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ || echo "Headlamp app dist directory not found"
                     exit 1
                   fi
 

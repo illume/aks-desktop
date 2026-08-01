@@ -10,7 +10,7 @@ resources:
 parameters:
   - name: nodeVersion
     type: string
-    default: 22.x
+    default: 22.22.2
   - name: goVersion
     type: string
     default: 1.26.3
@@ -85,20 +85,20 @@ extends:
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp frontend)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | frontend'
+                  key: 'npm | "$(Agent.OS)" | package-lock.json | headlamp-frontend'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
-                  path: 'headlamp/frontend/node_modules'
+                  path: 'node_modules/@headlamp-k8s/headlamp-source/source/frontend/node_modules'
 
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp app)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | app'
+                  key: 'npm | "$(Agent.OS)" | package-lock.json | headlamp-app'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
-                  path: 'headlamp/app/node_modules'
+                  path: 'node_modules/@headlamp-k8s/headlamp-source/source/app/node_modules'
 
               - task: Cache@2
                 displayName: 'Cache Go modules'
@@ -170,8 +170,9 @@ extends:
                   set -e
                   echo "Updating package.json to build for $(ARCH)..."
 
-                  # Navigate to headlamp/app directory
-                  cd headlamp/app
+                  npm install --global npm@12.0.2
+                  npm ci
+                  cd node_modules/@headlamp-k8s/headlamp-source/source/app
 
                   # Use Node.js to safely modify the JSON
                   node -e "
@@ -191,7 +192,6 @@ extends:
                   echo "Verifying package.json mac.target configuration:"
                   grep -A 5 '"mac"' package.json | grep -A 3 '"arch"' || echo "Configuration updated"
 
-                  cd ../..
                 displayName: "Configure Architecture in package.json ($(ARCH))"
 
               # Build application
@@ -199,7 +199,7 @@ extends:
                   set -e
                   echo "Building AKS desktop application for $(ARCH_DISPLAY)..."
 
-                  cp $(AKSDesktopProvisionProfile.secureFilePath) ./headlamp/app/mac/aks-desktop.provisionprofile
+                  cp $(AKSDesktopProvisionProfile.secureFilePath) ./node_modules/@headlamp-k8s/headlamp-source/source/app/mac/aks-desktop.provisionprofile
 
                   export NODE_OPTIONS="--max-old-space-size=4096"
                   export GOPROXY="https://proxy.golang.org,direct"
@@ -215,7 +215,6 @@ extends:
                   export npm_config_arch="$(ARCH)"
                   export npm_config_target_arch="$(ARCH)"
 
-                  npm ci
                   MAX_RETRIES=3
                   RETRY_COUNT=0
                   SUCCESS=false
@@ -244,11 +243,11 @@ extends:
                   set -e
                   echo "Copying built DMGs to staging directory..."
 
-                  DMG_FILES=$(find headlamp/app/dist -type f -name "aks-desktop*.dmg")
+                  DMG_FILES=$(find node_modules/@headlamp-k8s/headlamp-source/source/app/dist -type f -name "aks-desktop*.dmg")
 
                   if [ -z "$DMG_FILES" ]; then
-                    echo "❌ No DMG found in headlamp/app/dist!"
-                    ls -la headlamp/app/dist/ || echo "headlamp/app/dist not found"
+                    echo "❌ No DMG found in the Headlamp app dist!"
+                    ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ || echo "Headlamp app dist not found"
                     exit 1
                   fi
 
@@ -580,20 +579,20 @@ extends:
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp frontend)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | frontend'
+                  key: 'npm | "$(Agent.OS)" | package-lock.json | headlamp-frontend'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
-                  path: 'headlamp/frontend/node_modules'
+                  path: 'node_modules/@headlamp-k8s/headlamp-source/source/frontend/node_modules'
 
               - task: Cache@2
                 displayName: 'Cache npm dependencies (headlamp app)'
                 inputs:
-                  key: 'npm | "$(Agent.OS)" | build/headlamp-lock.json | app'
+                  key: 'npm | "$(Agent.OS)" | package-lock.json | headlamp-app'
                   restoreKeys: |
                     npm | "$(Agent.OS)" |
                     npm |
-                  path: 'headlamp/app/node_modules'
+                  path: 'node_modules/@headlamp-k8s/headlamp-source/source/app/node_modules'
 
               - task: Cache@2
                 displayName: 'Cache Go modules'
@@ -665,8 +664,9 @@ extends:
                   set -e
                   echo "Updating package.json to build for $(ARCH)..."
 
-                  # Navigate to headlamp/app directory
-                  cd headlamp/app
+                  npm install --global npm@12.0.2
+                  npm ci
+                  cd node_modules/@headlamp-k8s/headlamp-source/source/app
 
                   # Use Node.js to safely modify the JSON
                   node -e "
@@ -686,7 +686,6 @@ extends:
                   echo "Verifying package.json mac.target configuration:"
                   grep -A 5 '"mac"' package.json | grep -A 3 '"arch"' || echo "Configuration updated"
 
-                  cd ../..
                 displayName: "Configure Architecture in package.json ($(ARCH))"
 
               # Build application
@@ -694,7 +693,7 @@ extends:
                   set -e
                   echo "Building AKS desktop application for $(ARCH_DISPLAY)..."
 
-                  cp $(AKSDesktopProvisionProfile.secureFilePath) ./headlamp/app/mac/aks-desktop.provisionprofile
+                  cp $(AKSDesktopProvisionProfile.secureFilePath) ./node_modules/@headlamp-k8s/headlamp-source/source/app/mac/aks-desktop.provisionprofile
 
                   export NODE_OPTIONS="--max-old-space-size=4096"
                   export GOPROXY="https://proxy.golang.org,direct"
@@ -710,7 +709,6 @@ extends:
                   export npm_config_arch="$(ARCH)"
                   export npm_config_target_arch="$(ARCH)"
 
-                  npm ci
                   MAX_RETRIES=3
                   RETRY_COUNT=0
                   SUCCESS=false
@@ -739,11 +737,11 @@ extends:
                   set -e
                   echo "Copying built DMGs to staging directory..."
 
-                  DMG_FILES=$(find headlamp/app/dist -type f -name "aks-desktop*.dmg")
+                  DMG_FILES=$(find node_modules/@headlamp-k8s/headlamp-source/source/app/dist -type f -name "aks-desktop*.dmg")
 
                   if [ -z "$DMG_FILES" ]; then
-                    echo "❌ No DMG found in headlamp/app/dist!"
-                    ls -la headlamp/app/dist/ || echo "headlamp/app/dist not found"
+                    echo "❌ No DMG found in the Headlamp app dist!"
+                    ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ || echo "Headlamp app dist not found"
                     exit 1
                   fi
 

@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "22.22.2"
 
 jobs:
   plugin-packaging:
@@ -27,7 +27,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --global npm@12.0.2 && npm ci
 
       - name: Run plugin packaging tests
         run: npm run test:build
@@ -46,12 +46,12 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --global npm@12.0.2 && npm ci
 
       - name: Test the package CLI
         run: npm run test:headlamp-package
 
-      - name: Apply the complete patch series
+      - name: Verify the npm-native Headlamp patch
         run: npm run test:headlamp-patches
 
   find_changed_plugins:

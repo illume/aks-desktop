@@ -38,7 +38,7 @@ Every audited commit has a primary disposition:
 | AKS-owned work | 7 rows: 3 configuration changes and 4 plugin changes |
 | No independent submission | 47 rows: 36 folds and 11 removals |
 | Patch artifacts | 69 upstream candidates and 69 matching fork cleanups, all linked from 63 ledger rows |
-| Executable migration | 66 ordered patches locked by [`build/headlamp-lock.json`](../build/headlamp-lock.json); overlapping candidates are replaced by integration patches |
+| Executable migration | The 66 validated patches are consolidated into the root-owned [npm patch](../build/patches/headlamp-source@0.44.0-main.99a230be.patch); npm locks package and patch integrity |
 | Unresolved classifications | None |
 | Open product decisions | Row 43: confirm the supported AKS Desktop architectures before declaring package targets |
 

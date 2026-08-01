@@ -4,213 +4,48 @@ This document outlines the maintenance procedures for this project.
 
 ## Headlamp distribution
 
-AKS Desktop consumes the local `@aks-desktop/headlamp` transition package. It
-does not use a Headlamp Git submodule. The package verifies the pinned upstream
-source and applies the ordered patch series from
-[`build/headlamp-lock.json`](build/headlamp-lock.json) into the ignored
-`headlamp/` build workspace.
+AKS Desktop depends on `@headlamp-k8s/headlamp-source`, an npm package containing
+the complete pinned Headlamp source tree and npm scripts for applications and
+containers. The package records upstream base tag `v0.44.0` and commit
+`99a230be9c9c679a70d59c219cc246c00ae2be45`. npm verifies the package integrity
+from `package-lock.json` and applies the root-owned patch declared by
+`patchedDependencies`; there is no submodule or custom patch applicator.
 
 To validate or update the distribution:
 
 ```bash
-npm install
-npm run test:headlamp-patches
-npm run headlamp:prepare
-npm run headlamp:assemble
-npm run headlamp:doctor
+nvm use                         # Node.js version required by npm 12
+npm ci                          # verify the source package and apply its patch
+npm run headlamp:install        # explicitly install the source build toolchain
+npm run test:headlamp-patches   # inspect npm's patch and package contract
+npm run headlamp:assemble       # stage plugins, tools, and product configuration
+npm run headlamp:doctor         # verify the generated product manifest
 ```
 
-Use Node.js 22 or newer, matching `.nvmrc` and the pinned upstream Headlamp
-engine. After a platform build, run `npm run test:distribution` to verify the
-packaged tools and start the packaged application in headless mode. Linux CI
-must append `-- --no-sandbox`; normal application launches never disable the
-sandbox.
+The repository requires npm 12 or newer because native dependency patches are
+part of installation and are not lifecycle scripts. The source package itself
+has no install lifecycle script; `headlamp:install` is an explicit command and
+permits only the build dependencies reviewed in the consumer patch. Build with
+`npm run build:linux`, `npm run build:mac`, `npm run build:win`, or
+`npm run build:container`. After an application build,
+`npm run test:distribution` verifies packaged tools and starts the application
+in headless mode. Linux CI appends `-- --no-sandbox`; normal launches never
+disable the sandbox.
 
-An update must change the full upstream commit, source archive URL and digest,
-ordered patch list, and patch-set digest together. Validate the series on a
-disposable workspace before building. Product identity, update policy, legal
-documents, plugin defaults, and capability ceilings belong in
-`build/product-manifest.json`; AKS behavior belongs in plugin APIs. Do not edit
-the generated `headlamp/` workspace.
+An update changes the exact dependency version, package artifact, lockfile, and
+native patch together. Use `npm patch update` after the package is published;
+until then, refresh the local package artifact and regenerate the same root
+patch. Product identity, update policy, legal documents, plugin defaults, and
+capability ceilings belong in `build/product-manifest.json`; AKS behavior
+belongs in plugin APIs. Do not edit the installed package under `node_modules`.
 
 See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
 [distribution builds](docs/headlamp-distribution-builds.md), and
 [commit audit](docs/headlamp-fork-commit-audit.md).
 
-## Retired Headlamp fork workflow
-
-The section below records the old fork process for historical patch
-reconciliation only. Do not recreate the submodule or use it for current
-builds.
-
-AKS Desktop previously maintained the `headlamp-downstream` branch as a Git
-submodule for product-specific features and fixes.
-
-See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
-[distribution builds](docs/headlamp-distribution-builds.md), and
-[commit audit](docs/headlamp-fork-commit-audit.md) for the migration that
-replaced this fork.
-
-The fork was kept in sync with the upstream Headlamp project as much as possible,
-meaning the downstream changes we make should be minimal and focused on AKS desktop-specific needs
-that do not make sense to contribute back upstream.
-
-### Types of Changes
-
-We aim to keep our downstream changes to a minimum. Before implementing a change, we evaluate whether it can be achieved through configuration or customization options provided by Headlamp. If a feature can be implemented without modifying the core codebase, e.g. by leveraging Headlamp's plugin system, we prefer that approach.
-
-Our downstream changes to the Headlamp project can be categorized into two types:
-
-1. **AKS desktop Only**: These are changes that are specific to AKS desktop and do not make sense to contribute back to the Headlamp project. Examples include:
-
-- Custom branding or theming specific to AKS desktop.
-- Features that are tightly coupled with AKS desktop's architecture or user experience.
-
-We can lower the number of these changes by leveraging Headlamp's plugin system and configuration options wherever possible. When something is not possible through these means, we do implement them downstream and
-we work with upstream to understand if such changes can be made possible by expanding the plugin system or adding configuration options.
-
-2. **Upstreamable Contributions**: These are changes that are beneficial to the broader Headlamp community and can be contributed back upstream. Examples include:
-
-- Bug fixes that address issues in the Headlamp project.
-- Performance improvements or optimizations.
-- New features that enhance the overall functionality of Headlamp and are not specific to AKS desktop.
-
-We actively seek to contribute these changes back to the Headlamp project through pull requests in a timely manner. The quicker we can get these changes merged upstream, the less they will deviate from the main codebase and the lower the maintenance burden we have to carry downstream.
-
-### Git Commit Conventions
-
-To help with the maintenance of our Headlamp fork, we follow specific git commit conventions to clearly indicate the nature of each change. This helps in identifying which changes are AKS desktop specific and which are intended for upstream contribution.
-
-1. **AKS desktop Specific Changes**: These commits should be prefixed with `aksd:` to indicate that they are specific to the AKS desktop fork. For example:
-
-```
-aksd: Add custom branding for AKS desktop
-```
-
-2. **Upstream Contributions**: These commits should be prefixed with `upstreamable:` to indicate that they are intended for contribution back to the Headlamp project. For example:
-
-```
-upstreamable: Avoid crash in Headlamp plugin system
-```
-
-By following these conventions, we can maintain clarity in our commit history and facilitate the process of syncing with the upstream Headlamp project.
-
-### Syncing with Upstream
-
-To keep our fork in sync with the upstream Headlamp project, we regularly rebase our Headlamp fork against the latest upstream release. This helps to minimize merge conflicts and ensures that we are benefiting from the latest features and fixes in Headlamp.
-
-When rebasing, we carefully review each commit to ensure that our downstream changes do not conflict with upstream changes. Upstreamable changes done since the last rebase, should hopefully be already merged upstream, but if not, we will need to reapply them on top of the latest upstream changes.
-
-Ideally, we aim to rebase our fork regularly **up to 2 weeks** after the new upstream release.
-
-#### Rebasing Steps
-
-This section illustrates the steps to rebase our Headlamp fork against the latest upstream release.
-
-0. **Set up a remote for the upstream Headlamp repository** (if not already done):
-
-```bash
-git remote add headlamp-repo https://github.com/kubernetes-sigs/headlamp.git
-```
-
-1. **Move to a new branch based on the new Headlamp version**:
-
-```bash
-git fetch headlamp-repo
-git checkout -b new-headlamp-downstream headlamp-repo/vX.Y.Z
-```
-
-2. **Check what is the last common commit with upstream in our current fork**:
-
-```bash
-git merge-base headlamp-downstream vX.Y.Z # Headlamp's latest release tag, fetched from the previous step
-```
-
-This command will output a commit hash, e.g. `abc1234`. This is the last common commit between our fork and the upstream release.
-
-3. **Cherry-pick all our downstream changes since that commit**:
-   First, keep a list of the commits that will be cherry-picked at hand. This is useful if you will need to skip some commits or pause the process for a while. You can get this list by running:
-
-```bash
-git log --oneline abc1234..headlamp-downstream # Replace abc1234 with the actual commit hash from the previous step
-```
-
-Then, start the cherry-pick process:
-
-```bash
-git cherry-pick abc1234..headlamp-downstream # Replace abc1234 with the actual commit hash from the previous step
-```
-
-This command will apply all commits from our current `headlamp-downstream` branch that are not in the upstream release.
-
-4. **Resolve any conflicts**:
-   If there are any conflicts during the cherry-pick process, Git will pause and allow you to resolve them. You can use your preferred text editor or IDE to fix the conflicts, then use:
-
-```bash
-git cherry-pick --continue
-```
-
-If a commit cannot be applied because it's functionality is already present upstream (just in a different form), you can skip it using:
-
-```bash
-git cherry-pick --skip
-```
-
-_Important:_ Why do we use `cherry-pick` instead of `rebase`? Because `rebase` does the above automatically but, if there are conflicts and we choose to leave the fixing for later, it leaves the branch in a state that is hard to recover from, or we end up calling `cherry-pick --abort`, losing the progress on previously rebased commits. With `cherry-pick`, if we need to leave fixing conflicts for later, we can just abort the cherry-pick and return to our original branch.
-
-#### Finalizing the Rebase
-
-Once all commits have been successfully cherry-picked and any conflicts resolved, we need to finalize the rebase process. This typically involves:
-
-1. **Create a testing branch**:
-
-```bash
-git checkout -b test-new-headlamp-version
-```
-
-2. **Update the submodule in the main repository**:
-   Assuming we have our new `new-headlamp-downstream` branch ready after the rebase, we need to update the submodule reference in the main repository to point to this new branch. From the root of the main repository, run:
-
-```bash
-cd headlamp # The directory where the Headlamp submodule is located
-git checkout new-headlamp-downstream
-cd ../..
-git add ./headlamp
-git commit -m "Update Headlamp submodule to rebased on vX.Y.Z"
-git push origin test-new-headlamp-version
-```
-
-3. **Test the changes**:
-   Thoroughly test the changes in the `test-new-headlamp-version` branch to ensure that everything is functioning as expected with the new Headlamp version.
-
-4. **Merge into main branch**:
-   Once testing is complete and everything is verified to be working correctly, update the `headlamp-downstream` branch to point to the new changes:
-
-```bash
-git push origin +new-headlamp-downstream:headlamp-downstream
-```
-
-And then merge the `test-new-headlamp-version` branch into the main branch (e.g., `main` or `master`):
-
-```bash
-git checkout main
-git merge test-new-headlamp-version
-git push origin main
-```
-
-5. **Clean up**:
-   After the merge, you can delete the temporary branches created during the rebase process:
-
-```bash
-git branch -d new-headlamp-downstream
-git branch -d test-new-headlamp-version
-```
-
-By following these steps, we ensure that our Headlamp fork remains up-to-date with the latest upstream changes while preserving our AKS desktop-specific modifications.
-
 ## Code Quality
 
-For for downstream changes in the Headlamp fork, and for changes in the main repository, we
+For Headlamp patches and changes in the main repository, we
 should all follow best practices to ensure high code quality and maintainability. This includes:
 
 Follow atomic commits and PRs, with clear messages, and keep changes small and focused. This
@@ -236,12 +71,16 @@ As bugs are fixed, there should be a test covering that bug fix.
 
 ## Translations
 
-Translation strings from `headlamp/frontend/` and `plugins/aks-desktop/` are managed via OneLocBuild. English source files are collected into `Localize/locales/en/`, and OneLocBuild produces translated files into `Localize/locales/{lang}/`. The `Localize/LocProject.json` file configures this pipeline.
+Translation strings from the installed Headlamp source package and
+`plugins/aks-desktop/` are managed via OneLocBuild. English source files are
+collected into `Localize/locales/en/`, and OneLocBuild produces translated files
+into `Localize/locales/{lang}/`. The `Localize/LocProject.json` file configures
+this pipeline.
 
 ### Workflow
 
-1. **Collect English keys**: Run `npm run i18n:collect` to copy English locale files from `headlamp/frontend/` and `plugins/aks-desktop/` into `Localize/locales/en/`. These are the source files OneLocBuild uses.
+1. **Collect English keys**: Run `npm run i18n:collect` to copy English locale files from the installed Headlamp source package and `plugins/aks-desktop/` into `Localize/locales/en/`. These are the source files OneLocBuild uses.
 
 2. **Translate**: OneLocBuild picks up the English files and produces translated files in `Localize/locales/{lang}/` for each target language.
 
-3. **Distribute**: Run `npm run i18n:distribute` to copy translated files from `Localize/locales/` back to the source locale directories (`headlamp/frontend/src/i18n/locales/` and `plugins/aks-desktop/locales/`), fully replacing their content.
+3. **Distribute**: Run `npm run i18n:distribute` to copy translated files from `Localize/locales/` back to the installed Headlamp source and plugin locale directories, fully replacing their content for the build.

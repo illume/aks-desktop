@@ -1,0 +1,195 @@
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import test from 'node:test';
+
+import {
+  HEADLAMP_PACKAGE_DIR,
+  HEADLAMP_SOURCE_DIR,
+  ROOT_DIR,
+} from './headlamp-path';
+import { packagedExecutableCandidates } from './smoke-headlamp';
+
+const VERSION = '0.44.0-main.99a230be';
+const packageManifest = JSON.parse(
+  fs.readFileSync(path.join(HEADLAMP_PACKAGE_DIR, 'package.json'), 'utf8')
+);
+const rootManifest = JSON.parse(
+  fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8')
+);
+const packageLock = JSON.parse(
+  fs.readFileSync(path.join(ROOT_DIR, 'package-lock.json'), 'utf8')
+);
+
+test('the installed package is a complete pinned source distribution', () => {
+  assert.equal(fs.lstatSync(HEADLAMP_PACKAGE_DIR).isSymbolicLink(), false);
+  assert.equal(packageManifest.name, '@headlamp-k8s/headlamp-source');
+  assert.equal(packageManifest.version, VERSION);
+  assert.equal(packageManifest.headlampSource.baseTag, 'v0.44.0');
+  assert.equal(
+    packageManifest.headlampSource.commit,
+    '99a230be9c9c679a70d59c219cc246c00ae2be45'
+  );
+  for (const file of [
+    'package.json',
+    'Dockerfile',
+    'Dockerfile.plugins',
+    'backend/go.mod',
+    'frontend/package-lock.json',
+    'app/package-lock.json',
+  ]) {
+    assert.equal(fs.statSync(path.join(HEADLAMP_SOURCE_DIR, file)).isFile(), true);
+  }
+});
+
+test('npm owns and verifies the Headlamp patch', () => {
+  const selector = `@headlamp-k8s/headlamp-source@${VERSION}`;
+  const patchPath = 'build/patches/headlamp-source@0.44.0-main.99a230be.patch';
+  assert.equal(rootManifest.patchedDependencies[selector], patchPath);
+  const lockEntry =
+    packageLock.packages['node_modules/@headlamp-k8s/headlamp-source'];
+  assert.equal(lockEntry.version, VERSION);
+  assert.equal(lockEntry.patched.path, patchPath);
+  assert.match(lockEntry.patched.integrity, /^sha512-/);
+  assert.equal(
+    fs.statSync(
+      path.join(HEADLAMP_SOURCE_DIR, 'app', 'scripts', 'build-manifest.js')
+    ).isFile(),
+    true
+  );
+});
+
+test('the source package exports app and container build scripts', () => {
+  for (const script of [
+    'build',
+    'build:app',
+    'build:app:linux',
+    'build:app:mac',
+    'build:app:win',
+    'build:container',
+    'build:plugins-container',
+  ]) {
+    assert.equal(typeof packageManifest.scripts[script], 'string');
+  }
+});
+
+test('source builds use explicit, reviewed install scripts', () => {
+  for (const lifecycle of ['preinstall', 'install', 'postinstall']) {
+    assert.equal(packageManifest.scripts[lifecycle], undefined);
+  }
+  assert.equal(
+    packageManifest.scripts['install:all'],
+    'npm --prefix source run install:all'
+  );
+
+  const appManifest = JSON.parse(
+    fs.readFileSync(path.join(HEADLAMP_SOURCE_DIR, 'app', 'package.json'), 'utf8')
+  );
+  assert.deepEqual(appManifest.allowScripts, {
+    '@bitdisaster/exe-icon-extractor': true,
+    electron: true,
+    'electron-winstaller': true,
+    esbuild: true,
+  });
+
+  const frontendManifest = JSON.parse(
+    fs.readFileSync(
+      path.join(HEADLAMP_SOURCE_DIR, 'frontend', 'package.json'),
+      'utf8'
+    )
+  );
+  assert.equal(frontendManifest.dependencies.tsx, '4.23.1');
+  assert.deepEqual(frontendManifest.allowScripts, {
+    'esbuild@0.25.12': true,
+    'esbuild@0.28.1': true,
+  });
+  assert.match(frontendManifest.scripts.postbuild, /^tsx /);
+});
+
+test('container builds do not require repository metadata', () => {
+  const dockerfile = fs.readFileSync(
+    path.join(HEADLAMP_SOURCE_DIR, 'Dockerfile'),
+    'utf8'
+  );
+  assert.doesNotMatch(dockerfile, /COPY \.git/);
+  assert.match(dockerfile, /ARG HEADLAMP_SOURCE_COMMIT/);
+  assert.match(dockerfile, /ARG HEADLAMP_BUILD_MANIFEST/);
+  assert.match(
+    packageManifest.scripts['build:container'],
+    /--build-arg HEADLAMP_SOURCE_COMMIT=99a230be/
+  );
+  assert.match(
+    packageManifest.scripts['build:container'],
+    /--build-arg HEADLAMP_BUILD_MANIFEST/
+  );
+});
+
+test('frontend identity comes from package and product metadata', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-identity-'));
+  try {
+    const manifestPath = path.join(directory, 'product.json');
+    const outputPath = path.join(directory, '.env');
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        product: { version: '1.2.3', productName: 'Example Desktop' },
+      })
+    );
+    const result = spawnSync(
+      process.execPath,
+      [path.join(HEADLAMP_SOURCE_DIR, 'frontend', 'make-env.js'), outputPath],
+      {
+        cwd: path.join(HEADLAMP_SOURCE_DIR, 'frontend'),
+        env: {
+          ...process.env,
+          HEADLAMP_BUILD_MANIFEST: manifestPath,
+          HEADLAMP_SOURCE_COMMIT: '0123456789abcdef',
+        },
+        encoding: 'utf8',
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const environment = fs.readFileSync(outputPath, 'utf8');
+    assert.match(environment, /^REACT_APP_HEADLAMP_VERSION=1\.2\.3$/m);
+    assert.match(
+      environment,
+      /^REACT_APP_HEADLAMP_GIT_VERSION=0123456789abcdef$/m
+    );
+    assert.match(
+      environment,
+      /^REACT_APP_HEADLAMP_PRODUCT_NAME=Example Desktop$/m
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('packaged executable paths come from product metadata', () => {
+  const manifest = {
+    product: { name: 'fallback', productName: 'Example Desktop' },
+    platforms: {
+      linux: { executableName: 'example' },
+      mac: { executableName: 'example' },
+      win: { executableName: 'example' },
+    },
+  };
+  assert.ok(
+    packagedExecutableCandidates('/dist', manifest, 'linux').includes(
+      path.resolve('/dist/linux-unpacked/example')
+    )
+  );
+  assert.ok(
+    packagedExecutableCandidates('/dist', manifest, 'win32').includes(
+      path.resolve('/dist/win-unpacked/example.exe')
+    )
+  );
+  assert.ok(
+    packagedExecutableCandidates('/dist', manifest, 'darwin').every(candidate =>
+      candidate.endsWith(
+        path.join('Example Desktop.app', 'Contents', 'MacOS', 'example')
+      )
+    )
+  );
+});

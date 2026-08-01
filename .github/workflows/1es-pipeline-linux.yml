@@ -11,7 +11,7 @@ resources:
 parameters:
   - name: nodeVersion
     type: string
-    default: 22.x
+    default: 22.22.2
   - name: goVersion
     type: string
     default: 1.26.3
@@ -106,25 +106,6 @@ extends:
                 displayName: "Debug: Checkout"
               - bash: |
                   set -e
-                  echo "=== INSTALL MAKE START ==="
-                  if command -v make >/dev/null 2>&1; then
-                    echo "make is already installed, skipping install."
-                  else
-                    echo "make not found, installing via tdnf..."
-                    if [ "$(id -u)" -eq 0 ]; then
-                      tdnf install -y make
-                    else
-                      sudo -n tdnf install -y make
-                    fi
-                    echo "make installed successfully."
-                  fi
-
-                  echo "make version:"
-                  make --version | head -n 1
-                  echo "=== INSTALL MAKE END ==="
-                displayName: "Install make build tool"
-              - bash: |
-                  set -e
                   echo "=== INSTALL BINUTILS START ==="
                   if command -v ld >/dev/null 2>&1; then
                     echo "binutils is already installed, skipping install."
@@ -168,6 +149,7 @@ extends:
                   go env | grep -E "GOPROXY|GOSUMDB|PROXY"
                   echo "=== END GO ENVIRONMENT ==="
 
+                  npm install --global npm@12.0.2
                   npm ci
                   echo "Building AKS desktop Linux application..."
                   if ! npm run build:linux || ! npm run test:distribution -- --no-sandbox; then
@@ -178,8 +160,8 @@ extends:
                   echo "=== POST-BUILD DEBUG ==="
                   echo "Checking for build outputs..."
                   find . -name "*.deb" -type f 2>/dev/null || echo "No .deb files found"
-                  echo "headlamp/app/dist contents:"
-                  ls -la headlamp/app/dist/ 2>/dev/null || echo "headlamp/app/dist not found"
+                  echo "Headlamp app dist contents:"
+                  ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ 2>/dev/null || echo "Headlamp app dist not found"
                   echo "=== END POST-BUILD DEBUG ==="
                 displayName: "Build AKS desktop (Linux)"
 
@@ -198,18 +180,18 @@ extends:
                   echo "All .tar.gz files in current directory:"
                   find . -name "*.tar.gz" -type f 2>/dev/null || echo "No .tar.gz files found"
 
-                  echo "headlamp/app/dist directory contents:"
-                  ls -la headlamp/app/dist/ 2>/dev/null || echo "headlamp/app/dist directory not found"
+                  echo "Headlamp app dist directory contents:"
+                  ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ 2>/dev/null || echo "Headlamp app dist directory not found"
 
                   echo "=== COPY EXECUTABLE DEBUG END ==="
 
                   echo "Finding built .deb file..."
-                  DEB_PATH=$(find headlamp/app/dist -type f -name "aks-desktop*.deb" -print -quit)
+                  DEB_PATH=$(find node_modules/@headlamp-k8s/headlamp-source/source/app/dist -type f -name "aks-desktop*.deb" -print -quit)
 
                   if [ -z "$DEB_PATH" ]; then
-                    echo "❌ No aks-desktop .deb file found in headlamp/app/dist!" >&2
-                    echo "Listing headlamp/app/dist contents:"
-                    ls -la headlamp/app/dist/ || echo "headlamp/app/dist directory not found"
+                    echo "❌ No aks-desktop .deb file found in the Headlamp app dist!" >&2
+                    echo "Listing Headlamp app dist contents:"
+                    ls -la node_modules/@headlamp-k8s/headlamp-source/source/app/dist/ || echo "Headlamp app dist directory not found"
                     exit 1
                   fi
 
@@ -218,10 +200,10 @@ extends:
                   echo "File permissions: $(ls -la "$DEB_PATH")"
 
                   echo "Finding built .tar.gz files..."
-                  TARGZ_FILES=$(find headlamp/app/dist -type f -name "aks-desktop*.tar.gz" 2>/dev/null || true)
+                  TARGZ_FILES=$(find node_modules/@headlamp-k8s/headlamp-source/source/app/dist -type f -name "aks-desktop*.tar.gz" 2>/dev/null || true)
 
                   if [ -z "$TARGZ_FILES" ]; then
-                    echo "No aks-desktop .tar.gz files found in headlamp/app/dist"
+                    echo "No aks-desktop .tar.gz files found in the Headlamp app dist"
                   else
                     echo "Found tar.gz files:"
                     echo "$TARGZ_FILES" | while read -r file; do

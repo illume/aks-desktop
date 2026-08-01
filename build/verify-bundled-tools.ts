@@ -11,6 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
+import { HEADLAMP_DIST_DIR } from './headlamp-path';
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.dirname(SCRIPT_DIR);
@@ -36,7 +37,7 @@ if (CURRENT_PLATFORM === 'win32') {
 } else if (CURRENT_PLATFORM === 'darwin') {
   // For macOS, electron-builder creates architecture-specific directories
   // Try to find the actual build directory
-  const distDir = path.join(ROOT_DIR, 'headlamp', 'app', 'dist');
+  const distDir = HEADLAMP_DIST_DIR;
   const otherArchitecture = process.arch === 'arm64' ? 'x64' : 'arm64';
   const possibleDirs = [`mac-${process.arch}`, `mac-${otherArchitecture}`, 'mac'];
 
@@ -56,7 +57,7 @@ if (CURRENT_PLATFORM === 'win32') {
   PLATFORM_DIR = 'linux-unpacked';
 }
 
-const BUILD_DIST_DIR = path.join(ROOT_DIR, 'headlamp', 'app', 'dist', PLATFORM_DIR);
+const BUILD_DIST_DIR = path.join(HEADLAMP_DIST_DIR, PLATFORM_DIR);
 
 // On macOS, the app is bundled in a .app directory structure
 let RESOURCES_DIR: string;

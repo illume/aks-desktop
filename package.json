@@ -3,21 +3,27 @@
   "version": "0.9.0",
   "description": "AKS desktop - Headlamp Plugin Monorepo",
   "private": true,
+  "packageManager": "npm@12.0.2",
+  "engines": {
+    "node": ">=22.22.2",
+    "npm": ">=12.0.0"
+  },
   "scripts": {
-    "build": "npm run headlamp:assemble && aks-headlamp make app",
-    "build:linux": "npm run headlamp:assemble && aks-headlamp make app-linux",
-    "build:mac": "npm run headlamp:assemble && aks-headlamp make app-mac",
-    "build:win": "npm run headlamp:assemble && aks-headlamp make app-win",
+    "build": "npm run headlamp:install && npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:app",
+    "build:linux": "npm run headlamp:install && npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:app:linux",
+    "build:mac": "npm run headlamp:install && npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:app:mac",
+    "build:win": "npm run headlamp:install && npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:app:win",
     "build:win-ci": "npm run build:win",
-    "build:unpacked": "npm run headlamp:assemble && aks-headlamp make app-build",
-    "build:unpacked:linux": "npm run headlamp:assemble && aks-headlamp make app-build",
-    "build:unpacked:mac": "npm run headlamp:assemble && aks-headlamp make app-build",
-    "build:unpacked:win": "npm run headlamp:assemble && aks-headlamp make app-build",
+    "build:unpacked": "npm run headlamp:install && npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:app:unpacked",
+    "build:unpacked:linux": "npm run build:unpacked",
+    "build:unpacked:mac": "npm run build:unpacked",
+    "build:unpacked:win": "npm run build:unpacked",
+    "build:container": "npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:container",
     "test:build": "tsx --test build/*.test.ts",
-    "test:headlamp-package": "npm --prefix packages/headlamp test",
-    "test:headlamp-patches": "aks-headlamp verify-patches",
+    "test:headlamp-package": "tsx --test build/headlamp-package.test.ts",
+    "test:headlamp-patches": "npm patch ls && npm run test:headlamp-package",
     "test:post-build": "tsx ./build/verify-bundled-tools.ts",
-    "test:distribution": "npm run test:post-build && aks-headlamp smoke --dist headlamp/app/dist",
+    "test:distribution": "npm run test:post-build && npm run headlamp:smoke",
     "plugin:setup": "tsx ./build/setup-plugins.ts",
     "plugin:install": "cd plugins/aks-desktop && npm install",
     "plugin:build": "cd plugins/aks-desktop && npm run build",
@@ -33,17 +39,16 @@
     "ai-assistant:test": "cd plugins/ai-assistant && npm test",
     "ai-assistant:lint": "cd plugins/ai-assistant && npm run lint",
     "ai-assistant:format": "cd plugins/ai-assistant && npm run format",
-    "headlamp:prepare": "aks-headlamp prepare",
-    "headlamp:manifest": "aks-headlamp manifest",
-    "headlamp:assemble": "npm run headlamp:prepare && npm run plugin:setup && npm run headlamp:manifest",
-    "headlamp:doctor": "aks-headlamp doctor",
-    "headlamp:smoke": "aks-headlamp smoke",
-    "headlamp:install": "npm run headlamp:prepare && npm --prefix headlamp/frontend install && npm --prefix headlamp/app install",
-    "headlamp:build": "npm run headlamp:prepare && aks-headlamp make backend && aks-headlamp make frontend",
+    "headlamp:manifest": "tsx ./build/generate-headlamp-manifest.ts",
+    "headlamp:assemble": "npm run plugin:setup && npm run headlamp:manifest",
+    "headlamp:doctor": "npm run test:headlamp-package && tsx ./build/generate-headlamp-manifest.ts --check",
+    "headlamp:smoke": "tsx ./build/smoke-headlamp.ts",
+    "headlamp:install": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run install:all",
+    "headlamp:build": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run build",
     "install:all": "npm run headlamp:install && npm run plugin:install && npm run ai-assistant:install",
     "build:all": "npm run headlamp:build && npm run plugin:build && npm run ai-assistant:build",
-    "predev": "npm run headlamp:assemble",
-    "dev": "concurrently --kill-others --names \"PLUGIN,AI-ASSISTANT,BACKEND,FRONTEND,APP\" -c \"cyan,blue,green,yellow,magenta\" \"npm run plugin:start\" \"npm run ai-assistant:start\" \"aks-headlamp make run-backend\" \"aks-headlamp make run-frontend\" \"aks-headlamp make run-only-app\"",
+    "predev": "npm run headlamp:install && npm run headlamp:assemble",
+    "dev": "cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json concurrently --kill-others --names \"PLUGIN,AI-ASSISTANT,BACKEND,FRONTEND,APP\" -c \"cyan,blue,green,yellow,magenta\" \"npm run plugin:start\" \"npm run ai-assistant:start\" \"npm --prefix node_modules/@headlamp-k8s/headlamp-source run start:backend\" \"npm --prefix node_modules/@headlamp-k8s/headlamp-source run start:frontend\" \"npm --prefix node_modules/@headlamp-k8s/headlamp-source run start:app\"",
     "prepare": "husky",
     "knip": "knip",
     "i18n:collect": "node Localize/translation-manager.mjs collect",
@@ -75,14 +80,18 @@
     }
   },
   "devDependencies": {
-    "@aks-desktop/headlamp": "file:packages/headlamp",
+    "@headlamp-k8s/headlamp-source": "0.44.0-main.99a230be",
     "@types/node": "^26.1.1",
     "concurrently": "^9.1.2",
+    "cross-env": "10.1.0",
     "husky": "^9.0.0",
     "knip": "^6.24.0",
     "lint-staged": "^17.0.8",
     "tsx": "^4.23.1",
     "typescript": "^6.0.3"
+  },
+  "patchedDependencies": {
+    "@headlamp-k8s/headlamp-source@0.44.0-main.99a230be": "build/patches/headlamp-source@0.44.0-main.99a230be.patch"
   },
   "lint-staged": {
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx}": [
@@ -110,5 +119,8 @@
     "plugin"
   ],
   "author": "Microsoft",
-  "license": "MIT"
+  "license": "MIT",
+  "allowScripts": {
+    "esbuild": false
+  }
 }

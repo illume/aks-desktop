@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Collects translation keys from plugins/aks-desktop, plugins/ai-assistant,
-// and headlamp/frontend into JSON files for the translation team, and
+// and the installed Headlamp source into JSON files for the translation team, and
 // distributes completed translations back to the source locale directories.
 //
 // Usage:
@@ -22,7 +22,10 @@ const OUTPUT_DIR = path.join(ROOT, 'Localize/locales');
 const SOURCES = [
   {
     name: 'frontend',
-    localesDir: path.join(ROOT, 'headlamp/frontend/src/i18n/locales'),
+    localesDir: path.join(
+      ROOT,
+      'node_modules/@headlamp-k8s/headlamp-source/source/frontend/src/i18n/locales'
+    ),
     namespaces: ['translation', 'glossary', 'app'],
   },
   {

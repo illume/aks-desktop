@@ -1,8 +1,9 @@
 # Headlamp distribution and product builds
 
 > Research snapshot: 2026-07-30; implementation updated 2026-08-01. Proposed
-> upstream package names and container tags remain illustrative. The local
-> `@aks-desktop/headlamp` transition package, lock, and CLI now exist.
+> upstream package name remains a publication prototype. The local
+> `@headlamp-k8s/headlamp-source` artifact and npm-native consumer patch now
+> exercise the design.
 > The vendored `plugins/ai-assistant/` directory is outside this audit.
 
 This document expands the
@@ -144,19 +145,27 @@ Do not expose an unrestricted server-side command broker to imitate Electron.
 ### Option 2: build the upstream Dockerfile with AKS inputs
 
 Use this when the frontend must be rebuilt or a generic upstream change has not
-yet reached a release:
+yet reached a release. This is the implemented prototype:
 
-1. Resolve and verify the pinned upstream Git commit/tree.
+1. Install the exact source-bearing npm package and let npm verify and apply the
+   consumer patch.
 2. Build the plugin bundle once and stage it as the upstream `.plugins` input,
    or add it to the final `/headlamp/static-plugins` layer.
-3. Supply only non-secret frontend build values. Pass backend secrets and
-   `HEADLAMP_CONFIG_*` at deployment time.
+3. Pass the product manifest and package-recorded source commit as Docker build
+   arguments. The Dockerfile does not copy `.git`; the generated frontend
+   records the manifest's product name/version and the pinned commit.
 4. Build the upstream Dockerfile for the required Linux architectures.
-5. Stop carrying this source-build difference when runtime product
+5. Run the image as its non-root user and require its HTTP endpoint and staged
+   plugins to pass smoke checks.
+6. Stop carrying this source-build difference when runtime product
    configuration or the required upstream API is released.
 
 Do not `sed` files inside an already-built image: it is brittle, invalidates
 precompression metadata, and obscures provenance.
+
+`npm run build:container` implements these steps for the local platform. The
+manifest contains public build configuration only. Pass backend secrets and
+`HEADLAMP_CONFIG_*` at deployment time.
 
 ### Publish and verify
 
@@ -182,7 +191,7 @@ overwrite upstream Headlamp tags.
 The current build has two different plugin paths:
 
 - `build/setup-plugins.ts` hard-codes local plugin workspaces and copies each
-  `dist/` into `headlamp/.plugins`.
+  `dist/` into the installed source package's `.plugins`.
 - Headlamp's `app/app-build-manifest.json` and
   `container/build-manifest.json` download shipped plugin archives. The current
   fetchers do not record or verify archive digests.
@@ -308,14 +317,14 @@ products.
 | --- | --- | --- |
 | `build/plugin-packaging.ts` and its tests | Safe plugin bundle/extract library with canonical-ID validation, collision rejection, and clean output | Plugin list and permissions |
 | `build/setup-plugins.ts` | `bundle-plugins --manifest` instead of a hard-coded workspace list | AKS plugin manifest |
-| `headlamp/app/scripts/setup-plugins.js` and `container/fetch-plugins.sh` | One checksum-verifying manifest implementation for desktop and container builds | Product-selected archives/defaults |
+| Source-package `app/scripts/setup-plugins.js` and `container/fetch-plugins.sh` | One checksum-verifying manifest implementation for desktop and container builds | Product-selected archives/defaults |
 | `build/setup-external-tools.ts` | Platform-aware external-resource staging API | Azure CLI/kubelogin declarations |
 | Generic parts of `build/download-az-cli.ts` | Required-digest downloader, redirect policy, safe archive extraction, cache, and platform selector | Azure CLI/Python installation and extensions |
 | `build/verify-bundled-tools.ts` | Electron output-layout resolver and manifest-driven resource/executable verifier | Azure-specific invocation probes |
 | `Localize/translation-manager.mjs` | Multi-source locale overlay/merge command in the plugin toolchain | OneLoc conventions and AKS locked terms |
 | Root `build:*` scripts and downstream builder config | `assemble-desktop --product --target --output` over an exported base builder config | Thin npm aliases, signing inputs, product manifest |
 | Downstream `app/scripts/verify-build-*` changes | Cross-platform `verify-distribution` driven by artifact metadata | AKS release policy |
-| `scripts/headlamp-submodule.sh` | Nothing | Removed; the package CLI resolves the locked source |
+| `scripts/headlamp-submodule.sh` | Nothing | Removed; npm installs the exact source package |
 
 The existing AKS plugin copy tests already cover scoped names, stale output, and
 path traversal; they are a useful seed for the upstream bundler. Before

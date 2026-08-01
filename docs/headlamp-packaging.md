@@ -1,9 +1,9 @@
 # Removing the Headlamp submodule
 
-> Research snapshot: 2026-07-30; implementation updated 2026-08-01. The
-> upstream package names described as targets remain proposals. The local
-> `@aks-desktop/headlamp` transition package and product manifest now exist in
-> this repository.
+> Research snapshot: 2026-07-30; implementation updated 2026-08-01.
+> `@headlamp-k8s/headlamp-source` is a local publication prototype; the package
+> name is not yet an upstream release. The npm-native consumer patch and product
+> manifest are implemented in this repository.
 
 ## Terminology
 
@@ -28,11 +28,11 @@
 
 ## Recommendation
 
-Do not replace the submodule with an official Headlamp installer. Installers are
-finished applications: they do not provide a supported way to inject AKS
-Desktop's plugins, external tools, identity, or Electron main-process services.
-Also do not remove the fork until the command, cluster-registration, storage,
-and OAuth capabilities listed below have replacement APIs.
+Do not replace the former submodule with an official Headlamp installer.
+Installers are finished applications: they do not provide a supported way to
+inject AKS Desktop's plugins, external tools, identity, or Electron main-process
+services. The implemented source package and consumer patch provide the required
+extension APIs while those changes are prepared for upstream submission.
 
 Use this two-step dependency strategy:
 
@@ -62,38 +62,43 @@ and reusable build tooling to contribute upstream.
 ### Executable migration
 
 AKS Desktop no longer records Headlamp as a Git submodule. The root project
-depends on the local `@aks-desktop/headlamp` package, which materializes an
-ignored build workspace from:
+depends on exact version `0.44.0-main.99a230be` of
+`@headlamp-k8s/headlamp-source`. The package contains the complete source tree
+and npm scripts for web/backend, desktop application, and container builds. It
+records:
 
-- upstream `main` commit
+- base release tag `v0.44.0` and upstream `main` commit
   `99a230be9c9c679a70d59c219cc246c00ae2be45`;
-- the verified source digest and ordered 66-patch series in
-  [`build/headlamp-lock.json`](../build/headlamp-lock.json); and
+- package integrity and the root-owned npm patch in
+  [`package-lock.json`](../package-lock.json); and
 - AKS-owned product policy in
   [`build/product-manifest.json`](../build/product-manifest.json).
 
-The package has no install lifecycle script. Source retrieval and patching are
-explicit:
+The source package has no install lifecycle script. npm 12 applies
+[`build/patches/headlamp-source@0.44.0-main.99a230be.patch`](../build/patches/headlamp-source@0.44.0-main.99a230be.patch)
+during installation because the root `package.json` declares it in
+`patchedDependencies`. npm stores the patch hash in lockfile version 4 and
+fails installation if the package, patch, or selector differs.
 
 ```bash
-nvm use                         # Node.js 22, required by the pinned upstream tree
-npm install
-npm run headlamp:prepare       # verify source, extract, and apply all patches
-npm run test:headlamp-patches  # repeat the full series in a disposable tree
+nvm use                         # Node.js 22.22.2
+npm ci                          # verify package integrity and apply the npm patch
+npm run headlamp:install        # explicitly install the source build toolchain
+npm run test:headlamp-patches  # inspect npm's patch and source-package contract
 npm run headlamp:assemble      # build plugins/tools and generate the manifest
-npm run headlamp:doctor        # verify source, patches, policy, and tool digests
+npm run headlamp:doctor        # verify package, policy, and tool digests
 npm run build:linux            # or build:mac / build:win
+npm run build:container        # build the manifest-configured server image
 npm run test:distribution      # inspect and start the packaged application
 ```
 
-For an offline build, set `HEADLAMP_SOURCE_ARCHIVE` to the locked archive. The
-same SHA-256 check is applied. `npm run test:distribution` resolves the current
-platform's executable from the product manifest, verifies packaged resources,
-starts the application in Headlamp's headless mode, and requires its HTTP
-endpoint to return the application page. Unpacked Linux CI trees append
-`-- --no-sandbox` because the sandbox helper receives its production owner/mode
-only when the package is installed; this flag is never added to normal
-application launches.
+This PR carries the exact package tarball only until the source package is
+published. The dependency remains a registry-style exact version, so publishing
+changes the lockfile's `resolved` location rather than the consumer or patch
+contract. `npm run test:distribution` resolves the current platform's executable
+from the product manifest, verifies packaged resources, starts Headlamp in
+headless mode, and requires its HTTP endpoint to return the application page.
+Unpacked Linux CI trees append `-- --no-sandbox`; normal launches never do.
 
 ## Current state
 
@@ -209,33 +214,66 @@ tokens, backend tokens, and connection strings must not appear in it.
 
 ### Implemented source distribution
 
-Until upstream packages exist, AKS Desktop commits a small lock file instead of
-a Git link:
+The source package keeps upstream files below `source/` so its own package
+metadata does not rewrite Headlamp's root `package.json`:
 
-```json
+```text
+@headlamp-k8s/headlamp-source/
+├── package.json                 # package identity and build entry points
+├── LICENSE
+└── source/                      # complete pristine Headlamp source
+    ├── app/
+    ├── backend/
+    ├── frontend/
+    ├── Dockerfile
+    └── package.json
+```
+
+The wrapper delegates to Headlamp's npm scripts rather than Make:
+
+```jsonc
 {
-  "schemaVersion": 1,
-  "source": {
-    "repository": "https://github.com/kubernetes-sigs/headlamp",
-    "ref": "refs/heads/main",
-    "commit": "99a230be9c9c679a70d59c219cc246c00ae2be45",
-    "sha256": "b593a3e5b1611a598660236c12e8802f89698de54ba05d5d46175273ffdbaf55"
+  "scripts": {
+    "build": "npm --prefix source run build",
+    "build:app:linux": "npm --prefix source run app:package:linux",
+    "build:app:mac": "npm --prefix source run app:package:mac",
+    "build:app:win": "npm --prefix source run app:package:win",
+    "build:container": "docker buildx build ... --build-arg HEADLAMP_SOURCE_COMMIT=<commit> --build-arg HEADLAMP_BUILD_MANIFEST -f source/Dockerfile source"
   },
-  "patchSetSha256": "f68a6cdb7efb0af42df9e4125e0b3c683ecdfccd51d1848b334343699eada923"
+  "headlampSource": {
+    "baseTag": "v0.44.0",
+    "commit": "99a230be9c9c679a70d59c219cc246c00ae2be45"
+  }
 }
 ```
 
-The implemented resolver downloads or accepts the locked archive, verifies its
-SHA-256 digest, checks every archive path, extracts to a staging directory, and
-applies every patch in order. A changed archive fails closed. GitHub's generated
-source archives are not guaranteed to remain byte-identical, so a manually
-uploaded immutable source asset with a signed checksum is the long-term source
-input.
+The consumer owns the patch:
 
-The interim phase relies on reviewed lock-file and digest changes; upstream
-signatures/provenance become mandatory for the target distribution.
-This is source consumption, not the final package API, but it removes submodule
-mechanics and the permanent fork.
+```json
+{
+  "devDependencies": {
+    "@headlamp-k8s/headlamp-source": "0.44.0-main.99a230be"
+  },
+  "patchedDependencies": {
+    "@headlamp-k8s/headlamp-source@0.44.0-main.99a230be":
+      "build/patches/headlamp-source@0.44.0-main.99a230be.patch"
+  }
+}
+```
+
+Native patches are root-only consumer state and are stripped when an npm package
+is published. This is intentional: a reusable source package stays pristine,
+while AKS Desktop or another product can own a different patch at its top level.
+Once upstream changes land, update the exact source package and shrink or remove
+the consumer patch.
+
+Installation is also explicit. `npm ci` verifies and patches the source archive
+but runs no source-package lifecycle hook. `npm run headlamp:install` invokes the
+package's build-toolchain script. npm 12 blocks dependency install scripts unless
+the patched Headlamp project manifests approve them. The frontend approvals are
+version-pinned; Headlamp's app lock omits registry URLs, so npm permits only
+name-scoped approvals there, with the committed app lockfile fixing the selected
+versions. Test-only Husky and Mock Service Worker scripts remain blocked.
 
 ## Security benefits of a packaged dependency
 
@@ -252,13 +290,12 @@ that an arbitrary Git commit contains a vulnerable Headlamp release or which
 upstream release fixes it. The result is silent exposure unless maintainers
 manually correlate every Headlamp advisory with fork history.
 
-The transition package improves this boundary now: the package version is
-locked, source and patch bytes are SHA-256 verified, extraction rejects paths
-outside the workspace, and downloaded external tools are digest checked. The
-current Insights plugin wrapper still needs the archive-digest migration
-described in the distribution design. The local package is not discoverable in
-public advisory databases; that benefit arrives when upstream publishes and
-registers the distribution.
+The prototype improves this boundary now: package and patch integrity are
+lockfile records enforced by npm even with lifecycle scripts disabled, and
+downloaded external tools are digest checked. Install-script permissions are
+reviewed consumer-patch state instead of an unrestricted package lifecycle hook.
+The current local package is not discoverable in public advisory databases; that
+benefit arrives when upstream publishes and registers the same package identity.
 Signatures, registry provenance, an SBOM, and regular vulnerability scanning
 remain release requirements rather than substitutes for review.
 
@@ -271,7 +308,7 @@ These source choices serve different purposes:
 | --- | --- | --- |
 | Normal release | Canonical repository and a release tag | Pin and verify the commit and tree, as above. |
 | Temporary fork | Fork repository and branch, tag, or pull-request ref | Pin and verify the reviewed commit and tree; never build a floating ref. |
-| Current transition | GitHub commit archive | Pin its SHA-256 and fail closed if GitHub regenerates different bytes; review a replacement lock rather than accepting new bytes automatically. |
+| Current transition | Source-bearing npm package | Exact-pin its version, package integrity, base tag, commit, and npm-native consumer patch. |
 | Published source asset | Manually attached release archive | Require an immutable URL, SHA-256, and preferably a signature/provenance. Use this instead of a generated archive for releases once upstream publishes it. |
 | Local development | Developer-only path override | Permit dirty files for iteration, print the commit and dirty state, and reject this mode in CI and release builds. |
 

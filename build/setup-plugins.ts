@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { copyShippedPlugin } from './plugin-packaging';
+import { HEADLAMP_SOURCE_DIR } from './headlamp-path';
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.dirname(SCRIPT_DIR);
@@ -17,8 +18,7 @@ console.log('Checking external tools...');
 console.log('==========================================');
 
 const externalToolsDir = path.join(
-  ROOT_DIR,
-  'headlamp',
+  HEADLAMP_SOURCE_DIR,
   'app',
   'resources',
   'external-tools'
@@ -36,11 +36,9 @@ if (!fs.existsSync(externalToolsDir)) {
   console.log(`To re-setup, remove: ${externalToolsDir}`);
 }
 
-// Ensure we are in the repository with the headlamp directory
-if (!fs.existsSync(path.join(ROOT_DIR, 'headlamp'))) {
-  console.log("Error: Headlamp repository directory 'headlamp' not found.");
-  console.log(`Root directory: ${ROOT_DIR}`);
-  console.log(fs.readdirSync(ROOT_DIR));
+// Ensure the source package is installed.
+if (!fs.existsSync(HEADLAMP_SOURCE_DIR)) {
+  console.log('Error: The Headlamp source package is not installed.');
   process.exit(1);
 }
 
@@ -69,7 +67,7 @@ for (const plugin of PLUGINS) {
   execSync('npm ci && npm run build', { stdio: 'inherit' });
 
   console.log(`Copying built files for plugin: ${pluginName}`);
-  const pluginsDir = path.join(ROOT_DIR, 'headlamp', '.plugins');
+  const pluginsDir = path.join(HEADLAMP_SOURCE_DIR, '.plugins');
   const targetDir = copyShippedPlugin(pluginDir, pluginsDir, pluginName);
 
   console.log(`Plugin ${pluginName} has been built and copied to ${targetDir}`);
@@ -79,4 +77,4 @@ for (const plugin of PLUGINS) {
 console.log(
   'Listing contents of headlamp .plugins directory after copying plugins'
 );
-console.log(fs.readdirSync(path.join(ROOT_DIR, 'headlamp', '.plugins')));
+console.log(fs.readdirSync(path.join(HEADLAMP_SOURCE_DIR, '.plugins')));
