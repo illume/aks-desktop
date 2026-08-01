@@ -25,15 +25,10 @@
   ],
   "platforms": {
     "linux": {
-      "executableName": "aks-desktop",
-      "productName": "AKS Desktop"
+      "executableName": "aks-desktop"
     },
     "mac": {
-      "appId": "com.microsoft.aksdesktop",
-      "productName": "AKS Desktop"
-    },
-    "win": {
-      "productName": "AKS Desktop"
+      "appId": "com.microsoft.aksdesktop"
     }
   },
   "plugins": [
@@ -46,6 +41,7 @@
           { "tool": "az", "args": ["account"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["acr"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["aks"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["alerts-management"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["config"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["connectedk8s"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["extension"], "allowTrailingArgs": true },
@@ -54,6 +50,7 @@
           { "tool": "az", "args": ["group"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["login"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["logout"], "allowTrailingArgs": true },
+          { "tool": "az", "args": ["monitor"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["role"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["version"], "allowTrailingArgs": true },
           { "tool": "az", "args": ["vm"], "allowTrailingArgs": true },
@@ -70,13 +67,6 @@
       "name": "insights-plugin",
       "packageName": "insights-plugin",
       "enabledByDefault": true
-    },
-    {
-      "name": "headlamp-kaito",
-      "packageName": "headlamp-kaito",
-      "enabledByDefault": false,
-      "archive": "https://artifacthub.io/api/v1/packages/headlamp/kaito/headlamp-kaito/0.2.1-alpha/download",
-      "sha256": "b6ef058940a92895893f531319246637fb05725bc4498d71c523b87002d5799b"
     }
   ]
 }

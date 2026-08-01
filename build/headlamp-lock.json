@@ -7,7 +7,7 @@
     "archive": "https://github.com/kubernetes-sigs/headlamp/archive/99a230be9c9c679a70d59c219cc246c00ae2be45.tar.gz",
     "sha256": "b593a3e5b1611a598660236c12e8802f89698de54ba05d5d46175273ffdbaf55"
   },
-  "patchSetSha256": "2383dfa886d4f965fc4e4dba08ae43484e7d9a67011d21fead3b820c6c20efdc",
+  "patchSetSha256": "b01660d8356d20d6b3e4c972187fff3952c0c1926b65735326708f5284c34bfd",
   "patches": [
     "docs/headlamp-upstream-patches/headlamp-upstream-external-plugin-manifest.patch",
     "docs/headlamp-upstream-patches/headlamp-integration-default-disabled-plugins.patch",

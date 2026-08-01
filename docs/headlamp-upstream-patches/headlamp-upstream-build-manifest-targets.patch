@@ -100,7 +100,7 @@ index 0aaa363b3..2a081a8c1 100644
 +
  describe('platform metadata', () => {
    it('overrides only product-facing platform fields', () => {
-     const defaults = { linux: { category: 'Network', productName: 'Headlamp' } };
+     const defaults = { linux: { category: 'Network', executableName: 'headlamp' } };
 diff --git a/app/scripts/build-manifest.js b/app/scripts/build-manifest.js
 index 2f061b640..3f6e69d1c 100644
 --- a/app/scripts/build-manifest.js
@@ -153,4 +153,3 @@ index 2f061b640..3f6e69d1c 100644
    DEFAULT_MANIFEST_FILE,
 -- 
 2.54.0
-

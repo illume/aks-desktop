@@ -274,11 +274,63 @@ function make(target) {
   child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
 }
 
-export async function smoke({ executable, port = 4466, timeout = 30_000 } = {}) {
+function descendantProcessIds(rootPid) {
+  const result = spawnSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8' });
+  if (result.status !== 0) return [];
+  const children = new Map();
+  for (const line of result.stdout.trim().split(/\r?\n/)) {
+    const [pid, parent] = line.trim().split(/\s+/).map(Number);
+    children.set(parent, [...(children.get(parent) || []), pid]);
+  }
+  const descendants = [];
+  const visit = pid => {
+    for (const child of children.get(pid) || []) {
+      visit(child);
+      descendants.push(child);
+    }
+  };
+  visit(rootPid);
+  return descendants;
+}
+
+async function terminateProcessTree(child) {
+  if (!child.pid) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    const processIds = [...descendantProcessIds(child.pid), child.pid];
+    for (const pid of processIds) {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {}
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+    for (const pid of processIds) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+  }
+  child.stdout.destroy();
+  child.stderr.destroy();
+  child.unref();
+}
+
+export async function smoke({
+  executable,
+  port = 4466,
+  timeout = 30_000,
+  disableSandbox = false,
+} = {}) {
   if (!executable) {
     throw new Error('Pass a packaged executable with --executable');
   }
-  const child = spawn(executable, ['--headless', '--disable-gpu', '--port', String(port)], {
+  const args = ['--headless', '--disable-gpu', '--port', String(port)];
+  if (disableSandbox) {
+    args.unshift('--no-sandbox');
+  }
+  const child = spawn(executable, args, {
+    detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';
@@ -303,7 +355,7 @@ export async function smoke({ executable, port = 4466, timeout = 30_000 } = {}) 
     }
     throw new Error(`AKS Desktop did not become ready within ${timeout}ms:\n${output}`);
   } finally {
-    child.kill();
+    await terminateProcessTree(child);
   }
 }
 
@@ -341,10 +393,11 @@ async function main(args) {
       executable: option(rest, '--executable'),
       port: Number(option(rest, '--port') || 4466),
       timeout: Number(option(rest, '--timeout') || 30_000),
+      disableSandbox: rest.includes('--no-sandbox'),
     });
   } else {
     console.error(
-      'Usage: aks-headlamp <prepare|verify-patches|manifest|doctor|make TARGET|smoke --executable PATH>'
+      'Usage: aks-headlamp <prepare|verify-patches|manifest|doctor|make TARGET|smoke --executable PATH [--no-sandbox]>'
     );
     process.exitCode = 2;
   }

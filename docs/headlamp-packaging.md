@@ -88,7 +88,9 @@ For an offline build, set `HEADLAMP_SOURCE_ARCHIVE` to the locked archive. The
 same SHA-256 check is applied. `npm run headlamp:smoke -- --executable <path>`
 starts a packaged application in Headlamp's headless mode and requires its HTTP
 endpoint to return the application page. Structural post-build checks remain in
-`npm run test:post-build`.
+`npm run test:post-build`. Unpacked Linux CI trees may add `--no-sandbox`
+because the sandbox helper receives its production owner/mode only when the
+package is installed; this flag is never added to normal application launches.
 
 ## Current state
 
@@ -216,7 +218,7 @@ a Git link:
     "commit": "99a230be9c9c679a70d59c219cc246c00ae2be45",
     "sha256": "b593a3e5b1611a598660236c12e8802f89698de54ba05d5d46175273ffdbaf55"
   },
-  "patchSetSha256": "2383dfa886d4f965fc4e4dba08ae43484e7d9a67011d21fead3b820c6c20efdc"
+  "patchSetSha256": "b01660d8356d20d6b3e4c972187fff3952c0c1926b65735326708f5284c34bfd"
 }
 ```
 

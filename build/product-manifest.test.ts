@@ -44,12 +44,9 @@ test("references packaged legal documents", () => {
 });
 
 test("declares plugin defaults and external tool integrity generation", () => {
-  assert.equal(
-    manifest.plugins.find(
-      (plugin: { packageName: string }) =>
-        plugin.packageName === "headlamp-kaito",
-    )?.enabledByDefault,
-    false,
+  assert.deepEqual(
+    manifest.plugins.map((plugin: { packageName: string }) => plugin.packageName),
+    ["aks-desktop", "@headlamp-k8s/ai-assistant", "insights-plugin"],
   );
   const aksPlugin = manifest.plugins.find(
     (plugin: { packageName: string }) =>

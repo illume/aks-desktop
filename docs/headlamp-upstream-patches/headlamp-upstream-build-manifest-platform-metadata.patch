@@ -77,15 +77,15 @@ index 9a173fa72..0aaa363b3 100644
  
 +describe('platform metadata', () => {
 +  it('overrides only product-facing platform fields', () => {
-+    const defaults = { linux: { category: 'Network', productName: 'Headlamp' } };
++    const defaults = { linux: { category: 'Network', executableName: 'headlamp' } };
 +    expect(
 +      applyPlatformMetadata(defaults, {
-+        platforms: { linux: { productName: 'Example Desktop', icon: '/product/icon.png' } },
++        platforms: { linux: { executableName: 'example', icon: '/product/icon.png' } },
 +      })
 +    ).toEqual({
 +      linux: {
 +        category: 'Network',
-+        productName: 'Example Desktop',
++        executableName: 'example',
 +        icon: '/product/icon.png',
 +      },
 +    });
@@ -124,7 +124,7 @@ index b2bbb41c7..2f061b640 100644
 +    'bundleVersion',
 +    'executableName',
 +    'icon',
-+    'productName',
++    'artifactName',
 +  ]);
 +  const result = { ...config };
 +  for (const platform of ['linux', 'mac', 'win']) {
@@ -158,4 +158,3 @@ index b2bbb41c7..2f061b640 100644
    loadBuildManifest,
 -- 
 2.54.0
-
