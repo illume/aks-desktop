@@ -10,6 +10,8 @@ containers. The package records upstream base tag `v0.44.0` and commit
 `99a230be9c9c679a70d59c219cc246c00ae2be45`. npm verifies the package integrity
 from `package-lock.json` and applies the root-owned patch declared by
 `patchedDependencies`; there is no submodule or custom patch applicator.
+The same tag, branch, repository, and full commit are the single source of truth
+in `package.json#headlampSource`.
 
 To validate or update the distribution:
 
@@ -32,13 +34,78 @@ permits only the build dependencies reviewed in the consumer patch. Build with
 in headless mode. Linux CI appends `-- --no-sandbox`; normal launches never
 disable the sandbox.
 
-An update changes the exact dependency version, package artifact, lockfile, and
-native patch together. Use `npm patch update` after the package is published;
-until then, refresh the local package artifact and regenerate the same root
-patch. Product identity, update policy, legal documents, plugin workspaces,
-defaults, and capability ceilings belong in the root `package.json` under
-`headlamp`; AKS behavior belongs in plugin APIs. Do not edit the installed
-package under `node_modules`.
+### Test or adopt another Headlamp commit
+
+Check out the exact configured commit in a clean Headlamp worktree. To probe a
+new commit without editing the configuration first, pass its full SHA:
+
+```bash
+git -C /path/to/headlamp checkout <full-commit-sha>
+npm ci
+npm run headlamp:source -- \
+  --source /path/to/headlamp \
+  --commit <full-commit-sha>
+npm ci
+npm run test:headlamp-patches
+npm run test:build
+```
+
+`headlamp:source` verifies the clean worktree's `HEAD`, packages only Git-tracked
+files, derives the package version from the base tag and SHA, and updates the
+package artifact, exact dependency, patch selector, and both lockfile integrity
+records. It does not apply the patch; the second `npm ci` is the authoritative
+npm-native patch check. Update `baseTag` in `package.json#headlampSource` when
+the upstream release baseline changes. Delete the superseded package and patch
+only after the replacement passes.
+
+The
+[`Headlamp main compatibility`](.github/workflows/headlamp-main-compatibility.yml)
+workflow resolves `main` to a full SHA every day, prepares that source package,
+lets npm apply the AKS patch, builds an unpacked AKS Desktop application, runs
+TypeScript and lint checks, and starts the packaged application in headless
+mode. It never changes the committed pin.
+
+### Update a patch after a conflict
+
+If `npm ci` reports that the patch does not apply, keep the newly generated
+package and use the previous patch as a reviewed starting point. The package is
+local until `@headlamp-k8s/headlamp-source` is published, so npm cannot fetch its
+clean baseline for `npm patch update`; this maintenance-only rebase uses Git,
+while normal installs continue to use npm as the only patch applicator:
+
+```bash
+work=$(mktemp -d)
+mkdir "$work/edit"
+tar -xzf packages/headlamp-k8s-headlamp-source-<new-version>.tgz \
+  -C "$work/edit" --strip-components=1
+git -C "$work/edit" init
+git -C "$work/edit" add -A
+git -C "$work/edit" \
+  -c user.name=patch -c user.email=patch@example.invalid \
+  commit -m baseline
+git -C "$work/edit" apply --reject \
+  "$PWD/build/patches/headlamp-source@<previous-version>.patch" || true
+```
+
+Resolve every `*.rej` against the new source and remove the reject files. Then
+generate the reviewed npm patch and refresh its lockfile integrity:
+
+```bash
+git -C "$work/edit" add -N .
+git -C "$work/edit" diff --binary --full-index HEAD -- \
+  > "build/patches/headlamp-source@<new-version>.patch"
+npm run headlamp:source -- --source /path/to/headlamp
+npm ci
+npm run test:headlamp-patches
+```
+
+Run the Headlamp TypeScript, lint, focused test, build, and packaged-runtime
+checks affected by the rebased hunks. Never edit the installed package under
+`node_modules`.
+
+Product identity, update policy, legal documents, plugin workspaces, defaults,
+and capability ceilings belong in the root `package.json` under `headlamp`; AKS
+behavior belongs in plugin APIs.
 
 See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
 [distribution builds](docs/headlamp-distribution-builds.md), and

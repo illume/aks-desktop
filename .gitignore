@@ -250,6 +250,7 @@ PublishScripts/
 **/[Pp]ackages/*
 !packages/
 !packages/headlamp-k8s-headlamp-source-*.tgz
+.headlamp-main/
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
 # Uncomment if necessary however generally it will be regenerated when needed

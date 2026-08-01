@@ -42,6 +42,7 @@
     "headlamp:manifest": "tsx ./build/generate-headlamp-manifest.ts",
     "headlamp:assemble": "npm run headlamp:tools && npm run plugin:setup && npm run headlamp:manifest",
     "headlamp:doctor": "npm run test:headlamp-package && tsx ./build/generate-headlamp-manifest.ts --check",
+    "headlamp:source": "tsx ./build/package-headlamp-source.ts",
     "headlamp:smoke": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run smoke:app --",
     "headlamp:tools": "tsx ./build/setup-external-tools.ts",
     "headlamp:install": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run install:all",
@@ -79,6 +80,12 @@
         }
       }
     }
+  },
+  "headlampSource": {
+    "repository": "https://github.com/kubernetes-sigs/headlamp.git",
+    "ref": "refs/heads/main",
+    "baseTag": "v0.44.0",
+    "commit": "99a230be9c9c679a70d59c219cc246c00ae2be45"
   },
   "headlamp": {
     "product": {

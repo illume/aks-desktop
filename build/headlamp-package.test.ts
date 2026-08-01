@@ -10,7 +10,7 @@ import {
   HEADLAMP_SOURCE_DIR,
   ROOT_DIR,
 } from './headlamp-path';
-const VERSION = '0.44.0-main.99a230be';
+import { headlampSourceVersion } from './package-headlamp-source';
 const packageManifest = JSON.parse(
   fs.readFileSync(path.join(HEADLAMP_PACKAGE_DIR, 'package.json'), 'utf8')
 );
@@ -20,6 +20,7 @@ const rootManifest = JSON.parse(
 const packageLock = JSON.parse(
   fs.readFileSync(path.join(ROOT_DIR, 'package-lock.json'), 'utf8')
 );
+const VERSION = headlampSourceVersion(rootManifest.headlampSource);
 const { packagedExecutableCandidates } = require(
   path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'smoke-app.js')
 );
@@ -29,10 +30,17 @@ test('the installed package is a complete pinned source distribution', () => {
   assert.equal(packageManifest.name, '@headlamp-k8s/headlamp-source');
   assert.equal(packageManifest.version, VERSION);
   assert.deepEqual(packageManifest.files, ['source', 'scripts']);
-  assert.equal(packageManifest.headlampSource.baseTag, 'v0.44.0');
+  assert.equal(
+    packageManifest.repository.url,
+    rootManifest.headlampSource.repository
+  );
+  assert.equal(
+    packageManifest.headlampSource.baseTag,
+    rootManifest.headlampSource.baseTag
+  );
   assert.equal(
     packageManifest.headlampSource.commit,
-    '99a230be9c9c679a70d59c219cc246c00ae2be45'
+    rootManifest.headlampSource.commit
   );
   for (const file of [
     'package.json',
@@ -48,7 +56,7 @@ test('the installed package is a complete pinned source distribution', () => {
 
 test('npm owns and verifies the Headlamp patch', () => {
   const selector = `@headlamp-k8s/headlamp-source@${VERSION}`;
-  const patchPath = 'build/patches/headlamp-source@0.44.0-main.99a230be.patch';
+  const patchPath = `build/patches/headlamp-source@${VERSION}.patch`;
   assert.equal(rootManifest.patchedDependencies[selector], patchPath);
   const lockEntry =
     packageLock.packages['node_modules/@headlamp-k8s/headlamp-source'];
@@ -126,7 +134,9 @@ test('container builds do not require repository metadata', () => {
   assert.match(dockerfile, /ARG HEADLAMP_BUILD_MANIFEST/);
   assert.match(
     packageManifest.scripts['build:container'],
-    /--build-arg HEADLAMP_SOURCE_COMMIT=99a230be/
+    new RegExp(
+      `--build-arg HEADLAMP_SOURCE_COMMIT=${rootManifest.headlampSource.commit}`
+    )
   );
   assert.match(
     packageManifest.scripts['build:container'],
@@ -194,10 +204,11 @@ test('packaged executable paths come from product metadata', () => {
     )
   );
   assert.ok(
-    packagedExecutableCandidates('/dist', manifest, 'darwin').every(candidate =>
-      candidate.endsWith(
-        path.join('Example Desktop.app', 'Contents', 'MacOS', 'example')
-      )
+    packagedExecutableCandidates('/dist', manifest, 'darwin').every(
+      (candidate: string) =>
+        candidate.endsWith(
+          path.join('Example Desktop.app', 'Contents', 'MacOS', 'example')
+        )
     )
   );
 });
