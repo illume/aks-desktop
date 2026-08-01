@@ -1,6 +1,6 @@
-From 007e711e417840ada294c7388265cb07b895c881 Mon Sep 17 00:00:00 2001
+From d270ae410cccd6cce6bb185e6bc45d7c1483328f Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Sat, 1 Aug 2026 05:33:48 +0000
+Date: Sat, 1 Aug 2026 05:56:33 +0000
 Subject: [PATCH] aksd: replace fork LogsViewer with workload logs
 
 ---
@@ -13,7 +13,8 @@ Subject: [PATCH] aksd: replace fork LogsViewer with workload logs
  .../common/LogsViewer/ParsedLog.tsx           |  98 -----
  .../common/LogsViewer/SeveritySelector.tsx    | 115 ------
  .../components/common/LogsViewer/index.tsx    |  21 -
- .../components/common/Resource/LogsButton.tsx |  43 +-
+ .../common/Resource/LogsButton.test.tsx       |  16 +-
+ .../components/common/Resource/LogsButton.tsx |  57 ++-
  frontend/src/components/common/index.test.ts  |   1 -
  frontend/src/components/common/index.ts       |   1 -
  frontend/src/components/pod/Details.tsx       |  15 +-
@@ -40,8 +41,8 @@ Subject: [PATCH] aksd: replace fork LogsViewer with workload logs
  .../src/i18n/locales/zh-Hans/translation.json |   1 -
  .../src/i18n/locales/zh-Hant/translation.json |   1 -
  frontend/src/lib/k8s/api/v2/fetchLogs.tsx     | 197 ---------
- .../plugin/__snapshots__/pluginLib.snapshot   |   1 -
- 37 files changed, 57 insertions(+), 1327 deletions(-)
+ .../plugin/__snapshots__/pluginLib.snapshot   |   3 +-
+ 38 files changed, 81 insertions(+), 1335 deletions(-)
  delete mode 100644 frontend/src/components/common/LogsViewer/AnsiText.css
  delete mode 100644 frontend/src/components/common/LogsViewer/AnsiText.tsx
  delete mode 100644 frontend/src/components/common/LogsViewer/LogDisplay.css
@@ -1203,8 +1204,42 @@ index 887457ad7..000000000
 -export * from './LogsViewer';
 -import { LogsViewer } from './LogsViewer';
 -export default LogsViewer;
+diff --git a/frontend/src/components/common/Resource/LogsButton.test.tsx b/frontend/src/components/common/Resource/LogsButton.test.tsx
+index a0387123b..c0bb05341 100644
+--- a/frontend/src/components/common/Resource/LogsButton.test.tsx
++++ b/frontend/src/components/common/Resource/LogsButton.test.tsx
+@@ -23,7 +23,7 @@ import Job from '../../../lib/k8s/job';
+ import Pod from '../../../lib/k8s/pod';
+ import StatefulSet from '../../../lib/k8s/statefulSet';
+ import { TestContext } from '../../../test';
+-import { launchWorkloadLogs, LogsButton } from './LogsButton';
++import { launchWorkloadLogs, LogsButton, WorkloadLogs } from './LogsButton';
+ 
+ const {
+   MockKubeObject,
+@@ -492,6 +492,20 @@ describe.skip('LogsButton', () => {
+     });
+   });
+ 
++  it('renders workload logs inline without launching an Activity', async () => {
++    mockClusterFetch.mockResolvedValue({ json: async () => ({ items: [mockPodData] }) });
++
++    render(
++      <TestContext>
++        <WorkloadLogs item={new Deployment(deploymentData as any)} />
++      </TestContext>
++    );
++
++    await waitFor(() => expect(mockClusterFetch).toHaveBeenCalled());
++    expect(screen.getByTestId('mock-log-viewer')).toBeInTheDocument();
++    expect(mockActivityLaunch).not.toHaveBeenCalled();
++  });
++
+   it('launchWorkloadLogs ignores non-loggable workloads safely (cross-bundle check)', () => {
+     class UnknownWorkload extends MockKubeObject {
+       static kind = 'Unknown';
 diff --git a/frontend/src/components/common/Resource/LogsButton.tsx b/frontend/src/components/common/Resource/LogsButton.tsx
-index 2895608dd..30e0a43ae 100644
+index 5a7f88cb5..30e0a43ae 100644
 --- a/frontend/src/components/common/Resource/LogsButton.tsx
 +++ b/frontend/src/components/common/Resource/LogsButton.tsx
 @@ -14,8 +14,6 @@
@@ -1232,15 +1267,37 @@ index 2895608dd..30e0a43ae 100644
  import {
    EventStatus,
    HeadlampEvent,
-@@ -49,6 +49,7 @@ import {
+@@ -49,14 +49,13 @@ import {
    useEventCallback,
  } from '../../../redux/headlampEventSlice';
  import { Activity } from '../../activity/Activity';
 +import { useLocalStorageState } from '../../globalSearch/useLocalStorageState';
  import ActionButton from '../ActionButton';
+-import { LogsViewer } from '../LogsViewer/LogsViewer';
  import { LogViewer } from '../LogViewer';
  import { LightTooltip } from '../Tooltip';
-@@ -104,8 +105,11 @@ export function WorkloadLogs({ item }: WorkloadLogsProps) {
+ import { ALL_SEVERITIES, filterLogsBySeverity, LogSeverity } from './logSeverityFilter';
+ 
+-// Component props interface
+-interface LogsButtonProps {
++export interface WorkloadLogsProps {
+   item: KubeObject | null;
+ }
+ 
+@@ -92,8 +91,10 @@ const PaddedFormControlLabel = styled(FormControlLabel)(({ theme }) => ({
+   paddingRight: theme.spacing(2),
+ }));
+ 
+-// eslint-disable-next-line no-unused-vars
+-function LogsButtonContent({ item }: LogsButtonProps) {
++/**
++ * Workload log controls and output for embedding outside the Activity view.
++ */
++export function WorkloadLogs({ item }: WorkloadLogsProps) {
+   const [pods, setPods] = useState<Pod[]>([]);
+   const [selectedPodIndex, setSelectedPodIndex] = useState<number | 'all'>('all');
+   const [selectedContainer, setSelectedContainer] = useState('');
+@@ -104,8 +105,11 @@ function LogsButtonContent({ item }: LogsButtonProps) {
    });
    const [allPodLogs, setAllPodLogs] = useState<{ [podName: string]: string[] }>({});
  
@@ -1254,7 +1311,7 @@ index 2895608dd..30e0a43ae 100644
    const [lines, setLines] = useState<number>(100);
    const [showPrevious, setShowPrevious] = React.useState<boolean>(false);
    const [showReconnectButton, setShowReconnectButton] = useState(false);
-@@ -147,6 +151,7 @@ export function WorkloadLogs({ item }: WorkloadLogsProps) {
+@@ -147,6 +151,7 @@ function LogsButtonContent({ item }: LogsButtonProps) {
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [selectedSeverities]);
    const { t } = useTranslation(['glossary', 'translation']);
@@ -1262,7 +1319,7 @@ index 2895608dd..30e0a43ae 100644
    const { enqueueSnackbar } = useSnackbar();
  
    const clearLogs = React.useCallback(() => {
-@@ -231,7 +236,7 @@ export function WorkloadLogs({ item }: WorkloadLogsProps) {
+@@ -231,7 +236,7 @@ function LogsButtonContent({ item }: LogsButtonProps) {
          console.error('Error fetching pods:', error);
          enqueueSnackbar(
            t('translation|Failed to fetch pods: {{error}}', {
@@ -1271,7 +1328,7 @@ index 2895608dd..30e0a43ae 100644
            }),
            {
              variant: 'error',
-@@ -490,8 +495,10 @@ export function WorkloadLogs({ item }: WorkloadLogsProps) {
+@@ -490,8 +495,10 @@ function LogsButtonContent({ item }: LogsButtonProps) {
      >
        {/* Pod selection dropdown */}
        <FormControl sx={{ minWidth: 200 }}>
@@ -1283,7 +1340,7 @@ index 2895608dd..30e0a43ae 100644
            value={selectedPodIndex}
            onChange={event => {
              setSelectedPodIndex(event.target.value as number | 'all');
-@@ -510,8 +517,12 @@ export function WorkloadLogs({ item }: WorkloadLogsProps) {
+@@ -510,8 +517,12 @@ function LogsButtonContent({ item }: LogsButtonProps) {
  
        {/* Container selection dropdown */}
        <FormControl sx={{ minWidth: 200 }}>
@@ -1297,7 +1354,7 @@ index 2895608dd..30e0a43ae 100644
            value={selectedContainer}
            onChange={event => {
              setSelectedContainer(event.target.value);
-@@ -533,21 +544,29 @@ export function WorkloadLogs({ item }: WorkloadLogsProps) {
+@@ -533,21 +544,29 @@ function LogsButtonContent({ item }: LogsButtonProps) {
  
        {/* Lines selector */}
        <FormControl sx={{ minWidth: 120 }}>
@@ -1331,7 +1388,7 @@ index 2895608dd..30e0a43ae 100644
            multiple
            value={selectedSeverities}
            onChange={event => {
-@@ -670,7 +689,7 @@ export function launchWorkloadLogs(
+@@ -670,11 +689,11 @@ export function launchWorkloadLogs(
    }
    Activity.launch({
      id: 'logs-' + item.metadata.uid,
@@ -1340,6 +1397,20 @@ index 2895608dd..30e0a43ae 100644
      icon: <Icon icon="mdi:file-document-box-outline" width="100%" height="100%" />,
      cluster: item.cluster,
      location: 'full',
+-    content: <LogsViewer item={item} />,
++    content: <WorkloadLogs item={item} />,
+   });
+   dispatchHeadlampEvent?.({
+     type: HeadlampEventType.LOGS,
+@@ -684,7 +703,7 @@ export function launchWorkloadLogs(
+   });
+ }
+ 
+-export function LogsButton({ item }: LogsButtonProps) {
++export function LogsButton({ item }: WorkloadLogsProps) {
+   const { t } = useTranslation();
+   const dispatchHeadlampEvent = useEventCallback();
+ 
 diff --git a/frontend/src/components/common/index.test.ts b/frontend/src/components/common/index.test.ts
 index 41bb7d3c9..b5b8c84bf 100644
 --- a/frontend/src/components/common/index.test.ts
@@ -1913,7 +1984,7 @@ index 93bde9158..000000000
 -  return { logs, error };
 -};
 diff --git a/frontend/src/plugin/__snapshots__/pluginLib.snapshot b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
-index be3134212..58de8736e 100644
+index f25ecbb60..58de8736e 100644
 --- a/frontend/src/plugin/__snapshots__/pluginLib.snapshot
 +++ b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
 @@ -92,7 +92,6 @@
@@ -1924,6 +1995,22 @@ index be3134212..58de8736e 100644
      "MainInfoSection": [Function],
      "MatchExpressions": [Function],
      "MetadataDictGrid": [Function],
+@@ -202,6 +201,7 @@
+       "ViewDialog": [Function],
+       "VolumeMounts": [Function],
+       "VolumeSection": [Function],
++      "WorkloadLogs": [Function],
+       "addResourceTableColumnsProcessor": [Function],
+       "buildLabelRows": [Function],
+       "getA8RMetadata": [Function],
+@@ -273,6 +273,7 @@
+     "ViewDialog": [Function],
+     "VolumeMounts": [Function],
+     "VolumeSection": [Function],
++    "WorkloadLogs": [Function],
+     "addResourceTableColumnsProcessor": [Function],
+     "buildLabelRows": [Function],
+     "getA8RMetadata": [Function],
 -- 
 2.54.0
 

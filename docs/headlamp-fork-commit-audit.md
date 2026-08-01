@@ -75,13 +75,12 @@ patches because tool IDs extend those declared command scopes.
 The OAuth-provider patches follow the product-protocol and secure-storage
 patches. The cluster-provider patches follow the verified external-tool patches
 and therefore the command-capability patches on which tool scopes depend.
-The workload-log, project-creation, and locale cleanup patches follow their
-matching upstream patches.
-**Do not ship a removal patch by itself:** that would temporarily restore the
-old bug. During a rebase, prefer to drop the original fork commit after
-selecting an upstream base that contains the matching fix. Use the removal
-patch only when a normal cleanup commit is needed, and include the upstream fix
-in the same branch update.
+The downstream replacements for rows 30, 75, and 87 are self-contained and
+apply directly to the audited tip. **Do not ship any pure removal patch by
+itself:** that would temporarily restore the old bug. During a rebase, prefer to
+drop the original fork commit after selecting an upstream base that contains
+the matching fix. Use a removal patch only when a normal cleanup commit is
+needed, and include the upstream fix in the same branch update.
 
 ### Row 114 — Run `list-plugins` without a shell
 
@@ -947,7 +946,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
   `26d8e68de`, and `903360924`.
 - **Upstream patch:** [frontend: export embeddable workload
   logs](headlamp-upstream-patches/headlamp-upstream-embeddable-workload-logs.patch).
-- **Downstream removal:** [replace the duplicate
+- **Downstream replacement:** [replace the duplicate
   `LogsViewer`](headlamp-upstream-patches/headlamp-downstream-remove-logs-viewer.patch).
 - **AKS Desktop follow-up:** Change
   `plugins/aks-desktop/src/components/LogsTab/LogsTab.tsx` to render the
@@ -965,7 +964,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Fork source:** `2fd768195`.
 - **Upstream patch:** [frontend: expose stable, replaceable project creation
   choices](headlamp-upstream-patches/headlamp-upstream-replaceable-project-creation.patch).
-- **Downstream removal:** [remove the core project-menu
+- **Downstream replacement:** [replace the core project-menu
   rewrite](headlamp-upstream-patches/headlamp-downstream-remove-project-creation-menu.patch).
 - **AKS Desktop follow-up:** Import `DefaultCreateProject` from the plugin
   library. Register the AKS "Use Existing Namespace(s)" flow with
@@ -985,7 +984,7 @@ restore the fork's historical Storyshot files to their pre-commit state.
 - **Upstream patch:** [frontend: add Czech, Hungarian, Indonesian, Dutch,
   Polish, Brazilian Portuguese, Swedish, and Turkish
   locales](headlamp-upstream-patches/headlamp-upstream-generic-locale-packs.patch).
-- **Downstream removal:** [remove the fork-wide locale
+- **Downstream replacement:** [replace the fork-wide locale
   rewrite](headlamp-upstream-patches/headlamp-downstream-remove-locale-rewrite.patch).
 - **AKS Desktop follow-up:** Keep AKS and Azure strings in
   `plugins/aks-desktop` translation resources. Do not add a host-wide product

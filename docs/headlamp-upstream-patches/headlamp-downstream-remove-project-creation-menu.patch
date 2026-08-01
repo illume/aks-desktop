@@ -1,39 +1,43 @@
-From 88b7b00d110f9d90204f492db319d2960b4da482 Mon Sep 17 00:00:00 2001
+From c138365ef9d3cbb1ccaaeb621ba9c2fdb3112ce3 Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
-Date: Sat, 1 Aug 2026 05:38:09 +0000
-Subject: [PATCH] Revert "project: Update project creation menu"
+Date: Sat, 1 Aug 2026 05:56:38 +0000
+Subject: [PATCH] aksd: replace project menu rewrite with extension points
 
-This reverts commit 2fd7681958bf84fef64a6b4b0202c7967af32df2.
 ---
- frontend/src/components/App/icons.ts          |  3 ---
- .../NewProjectPopup.Default.stories.storyshot | 10 +++----
- ...pup.WithExistingProjects.stories.storyshot | 10 +++----
- frontend/src/i18n/locales/ar/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/bn/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/cs/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/de/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/en/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/es/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/fr/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/he/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/hi/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/hu/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/id/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/it/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/ja/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/ko/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/nl/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/pl/translation.json | 26 ++++++++-----------
- .../src/i18n/locales/pt-BR/translation.json   | 26 ++++++++-----------
- .../src/i18n/locales/pt-PT/translation.json   | 26 ++++++++-----------
- frontend/src/i18n/locales/ru/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/sv/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/ta/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/tr/translation.json | 26 ++++++++-----------
- frontend/src/i18n/locales/ur/translation.json | 26 ++++++++-----------
- .../src/i18n/locales/zh-Hans/translation.json | 26 ++++++++-----------
- .../src/i18n/locales/zh-Hant/translation.json | 26 ++++++++-----------
- 28 files changed, 285 insertions(+), 388 deletions(-)
+ frontend/src/components/App/icons.ts          |   3 -
+ .../project/NewProjectPopup.test.tsx          |  69 ++-
+ .../components/project/NewProjectPopup.tsx    | 485 +++++++-----------
+ .../NewProjectPopup.Default.stories.storyshot |  10 +-
+ ...pup.WithExistingProjects.stories.storyshot |  10 +-
+ frontend/src/i18n/locales/ar/translation.json |  26 +-
+ frontend/src/i18n/locales/bn/translation.json |  26 +-
+ frontend/src/i18n/locales/cs/translation.json |  26 +-
+ frontend/src/i18n/locales/de/translation.json |  26 +-
+ frontend/src/i18n/locales/en/translation.json |  26 +-
+ frontend/src/i18n/locales/es/translation.json |  26 +-
+ frontend/src/i18n/locales/fr/translation.json |  26 +-
+ frontend/src/i18n/locales/he/translation.json |  26 +-
+ frontend/src/i18n/locales/hi/translation.json |  26 +-
+ frontend/src/i18n/locales/hu/translation.json |  26 +-
+ frontend/src/i18n/locales/id/translation.json |  26 +-
+ frontend/src/i18n/locales/it/translation.json |  26 +-
+ frontend/src/i18n/locales/ja/translation.json |  26 +-
+ frontend/src/i18n/locales/ko/translation.json |  26 +-
+ frontend/src/i18n/locales/nl/translation.json |  26 +-
+ frontend/src/i18n/locales/pl/translation.json |  26 +-
+ .../src/i18n/locales/pt-BR/translation.json   |  26 +-
+ .../src/i18n/locales/pt-PT/translation.json   |  26 +-
+ frontend/src/i18n/locales/ru/translation.json |  26 +-
+ frontend/src/i18n/locales/sv/translation.json |  26 +-
+ frontend/src/i18n/locales/ta/translation.json |  26 +-
+ frontend/src/i18n/locales/tr/translation.json |  26 +-
+ frontend/src/i18n/locales/ur/translation.json |  26 +-
+ .../src/i18n/locales/zh-Hans/translation.json |  26 +-
+ .../src/i18n/locales/zh-Hant/translation.json |  26 +-
+ .../plugin/__snapshots__/pluginLib.snapshot   |   4 +
+ frontend/src/plugin/registry.tsx              |   2 +
+ frontend/src/redux/projectsSlice.ts           |   6 +
+ 33 files changed, 535 insertions(+), 704 deletions(-)
 
 diff --git a/frontend/src/components/App/icons.ts b/frontend/src/components/App/icons.ts
 index 8d58d4085..314ceb426 100644
@@ -49,6 +53,809 @@ index 8d58d4085..314ceb426 100644
      sitemap: {
        body: '<path fill="currentColor" d="M9 2v6H5V2h4m3 11V9h2v4H9m6 0v-4h2v4h-2M5 16h4v6H5v-6m10 0h4v6h-4v-6M11 2v6h2V2h-2m4 0v6h2V2h-2m-8 7v4H5v2h14v-2h-2V9H7m4 7v6h2v-6h-2z"/>',
      },
+diff --git a/frontend/src/components/project/NewProjectPopup.test.tsx b/frontend/src/components/project/NewProjectPopup.test.tsx
+index c03509779..799bb0012 100644
+--- a/frontend/src/components/project/NewProjectPopup.test.tsx
++++ b/frontend/src/components/project/NewProjectPopup.test.tsx
+@@ -18,7 +18,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+ import React from 'react';
+ import { vi } from 'vitest';
+ 
+-const { MockKubeObject, mockApply, mockHistoryPush } = vi.hoisted(() => {
++const { MockKubeObject, mockApply, mockHistoryPush, mockUseTypedSelector } = vi.hoisted(() => {
+   class MockKubeObject {
+     jsonData: any;
+     static kind = '';
+@@ -34,7 +34,8 @@ const { MockKubeObject, mockApply, mockHistoryPush } = vi.hoisted(() => {
+   }
+   const mockApply = vi.fn().mockResolvedValue({});
+   const mockHistoryPush = vi.fn();
+-  return { MockKubeObject, mockApply, mockHistoryPush };
++  const mockUseTypedSelector = vi.fn().mockReturnValue({});
++  return { MockKubeObject, mockApply, mockHistoryPush, mockUseTypedSelector };
+ });
+ 
+ vi.mock('../../lib/k8s/KubeObject', () => ({ KubeObject: MockKubeObject }));
+@@ -71,12 +72,13 @@ vi.mock('react-i18next', async () => {
+   };
+ });
+ vi.mock('../../redux/hooks', () => ({
+-  useTypedSelector: vi.fn().mockReturnValue({}),
++  useTypedSelector: mockUseTypedSelector,
+ }));
+ vi.mock('@iconify/react', () => ({
+   Icon: () => <span />,
+ }));
+ 
++import { DefaultCreateProject } from '../../redux/projectsSlice';
+ import { TestContext } from '../../test';
+ import { NewProjectPopup } from './NewProjectPopup';
+ import { PROJECT_ID_LABEL } from './projectUtils';
+@@ -86,6 +88,7 @@ describe('NewProjectPopup', () => {
+ 
+   beforeEach(() => {
+     vi.clearAllMocks();
++    mockUseTypedSelector.mockReturnValue({});
+     (MockKubeObject.useList as any).mockReturnValue({ items: [], errors: [], isLoading: false });
+   });
+ 
+@@ -97,8 +100,8 @@ describe('NewProjectPopup', () => {
+     );
+ 
+     expect(screen.getByText('Create a Project')).toBeInTheDocument();
+-    expect(screen.getByText('Use Existing Namespace')).toBeInTheDocument();
+-    expect(screen.getByText('Create New Namespace')).toBeInTheDocument();
++    expect(screen.getByText('New Project')).toBeInTheDocument();
++    expect(screen.getByText('New Project from YAML')).toBeInTheDocument();
+   });
+ 
+   test('navigates to New Project step when clicked', () => {
+@@ -108,8 +111,8 @@ describe('NewProjectPopup', () => {
+       </TestContext>
+     );
+ 
+-    fireEvent.click(screen.getByText('Create New Namespace'));
+-    expect(screen.getByText('Create New Namespace')).toBeInTheDocument();
++    fireEvent.click(screen.getByText('New Project'));
++    expect(screen.getByText('Create new project')).toBeInTheDocument();
+     expect(screen.getByLabelText(/Project Name/i)).toBeInTheDocument();
+   });
+ 
+@@ -120,7 +123,7 @@ describe('NewProjectPopup', () => {
+       </TestContext>
+     );
+ 
+-    fireEvent.click(screen.getByText('Create New Namespace'));
++    fireEvent.click(screen.getByText('New Project'));
+ 
+     const createBtn = screen.getByRole('button', { name: 'Create' });
+     expect(createBtn).toBeDisabled();
+@@ -134,7 +137,7 @@ describe('NewProjectPopup', () => {
+     fireEvent.click(screen.getByText('cluster-1'));
+ 
+     // Fill namespace (freeSolo Autocomplete)
+-    const nsInput = screen.getByLabelText('Namespace Name');
++    const nsInput = screen.getByLabelText('Namespace');
+     fireEvent.change(nsInput, { target: { value: 'my-ns' } });
+     fireEvent.keyDown(nsInput, { key: 'Enter' });
+ 
+@@ -163,7 +166,7 @@ describe('NewProjectPopup', () => {
+       </TestContext>
+     );
+ 
+-    fireEvent.click(screen.getByText('Create New Namespace'));
++    fireEvent.click(screen.getByText('New Project'));
+ 
+     fireEvent.change(screen.getByLabelText(/Project Name/i), {
+       target: { value: 'existing-project' },
+@@ -179,7 +182,7 @@ describe('NewProjectPopup', () => {
+       </TestContext>
+     );
+ 
+-    fireEvent.click(screen.getByText('Create New Namespace'));
++    fireEvent.click(screen.getByText('New Project'));
+ 
+     fireEvent.change(screen.getByLabelText(/Project Name/i), { target: { value: 'new-project' } });
+ 
+@@ -187,7 +190,7 @@ describe('NewProjectPopup', () => {
+     fireEvent.mouseDown(clusterInput);
+     fireEvent.click(screen.getByText('cluster-1'));
+ 
+-    const nsInput = screen.getByLabelText('Namespace Name');
++    const nsInput = screen.getByLabelText('Namespace');
+     fireEvent.change(nsInput, { target: { value: 'new-ns' } });
+     fireEvent.keyDown(nsInput, { key: 'Enter' });
+ 
+@@ -209,8 +212,48 @@ describe('NewProjectPopup', () => {
+       </TestContext>
+     );
+ 
+-    fireEvent.click(screen.getByText('Create New Namespace'));
++    fireEvent.click(screen.getByText('New Project'));
+     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+     expect(screen.getByText('Create a Project')).toBeInTheDocument();
+   });
++
++  test('navigates to YAML creation when clicked', () => {
++    render(
++      <TestContext>
++        <NewProjectPopup open onClose={mockOnClose} />
++      </TestContext>
++    );
++
++    fireEvent.click(screen.getByText('New Project from YAML'));
++    expect(mockOnClose).toHaveBeenCalled();
++    expect(mockHistoryPush).toHaveBeenCalledWith(expect.stringContaining('create-yaml'));
++  });
++
++  test.each([
++    [DefaultCreateProject.NEW_PROJECT, 'New Project'],
++    [DefaultCreateProject.FROM_YAML, 'New Project from YAML'],
++  ])('lets a plugin replace the %s option in place', (id, builtInLabel) => {
++    const CustomProject = ({ onBack }: { onBack: () => void }) => (
++      <button onClick={onBack}>Custom project content</button>
++    );
++    mockUseTypedSelector.mockReturnValue({
++      [id]: {
++        id,
++        name: 'Managed project',
++        description: 'Create a managed project',
++        icon: 'mdi:folder-star',
++        component: CustomProject,
++      },
++    });
++
++    render(
++      <TestContext>
++        <NewProjectPopup open onClose={mockOnClose} />
++      </TestContext>
++    );
++
++    expect(screen.queryByText(builtInLabel)).not.toBeInTheDocument();
++    fireEvent.click(screen.getByText('Managed project'));
++    expect(screen.getByText('Custom project content')).toBeInTheDocument();
++  });
+ });
+diff --git a/frontend/src/components/project/NewProjectPopup.tsx b/frontend/src/components/project/NewProjectPopup.tsx
+index 5a67bdf92..4505b0885 100644
+--- a/frontend/src/components/project/NewProjectPopup.tsx
++++ b/frontend/src/components/project/NewProjectPopup.tsx
+@@ -28,6 +28,7 @@ import {
+   Typography,
+   useTheme,
+ } from '@mui/material';
++import { uniq } from 'lodash';
+ import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+ import { Trans, useTranslation } from 'react-i18next';
+ import { useHistory } from 'react-router';
+@@ -36,18 +37,10 @@ import { apply } from '../../lib/k8s/api/v1/apply';
+ import { ApiError } from '../../lib/k8s/api/v2/ApiError';
+ import { KubeObjectInterface } from '../../lib/k8s/KubeObject';
+ import Namespace from '../../lib/k8s/namespace';
+-import { createRouteURL } from '../../lib/router';
++import { createRouteURL } from '../../lib/router/createRouteURL';
+ import { useTypedSelector } from '../../redux/hooks';
+-import { CustomCreateProject } from '../../redux/projectsSlice';
++import { DefaultCreateProject } from '../../redux/projectsSlice';
+ import { PROJECT_ID_LABEL, toKubernetesName } from './projectUtils';
+-
+-/**
+- * Well-known IDs for built-in project creation options.
+- * Plugins can override these by registering a customCreateProject with the same ID.
+- */
+-export const BUILTIN_USE_EXISTING_NAMESPACE_ID = 'use-existing-namespace';
+-export const BUILTIN_CREATE_NAMESPACE_ID = 'create-namespace';
+-
+ /**
+  * A styled button for selecting a project type.
+  */
+@@ -108,37 +101,16 @@ function ProjectTypeButton({
+ }
+ 
+ /**
+- * Converts spaces to dashes on keypress for Kubernetes name fields.
+- */
+-function spaceToDashKeyDown(
+-  event: React.KeyboardEvent<HTMLInputElement>,
+-  value: string,
+-  setValue: (v: string) => void
+-) {
+-  if (event.key === ' ') {
+-    event.preventDefault();
+-    const target = event.target as HTMLInputElement;
+-    const start = target.selectionStart || 0;
+-    const end = target.selectionEnd || 0;
+-    const newValue = value.substring(0, start) + '-' + value.substring(end);
+-    setValue(newValue);
+-    setTimeout(() => {
+-      target.setSelectionRange(start + 1, start + 1);
+-    }, 0);
+-  }
+-}
+-
+-/**
+- * "Use Existing Namespace(s)" — select from existing namespaces on registered clusters
+- * and label them as a project.
++ * Popup content for creating a new Project from existing or new namespace
+  */
+-function UseExistingNamespaceDialog({ onBack }: { onBack: () => void }) {
++function ProjectFromExistingNamespace({ onBack }: { onBack: () => void }) {
+   const { t } = useTranslation();
+   const history = useHistory();
+ 
+   const [projectName, setProjectName] = useState('');
+   const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
+-  const [selectedNamespace, setSelectedNamespace] = useState<string | null>(null);
++  const [selectedNamespace, setSelectedNamespace] = useState<string>();
++  const [typedNamespace, setTypedNamespace] = useState('');
+ 
+   const [isCreating, setIsCreating] = useState(false);
+   const [error, setError] = useState<ApiError>();
+@@ -153,28 +125,16 @@ function UseExistingNamespaceDialog({ onBack }: { onBack: () => void }) {
+     const result = new Set<string>();
+     for (const ns of namespaces) {
+       const labelValue = ns.metadata.labels?.[PROJECT_ID_LABEL];
+-      if (!labelValue) continue;
++      if (!labelValue) {
++        continue;
++      }
+       result.add(labelValue);
+       result.add(toKubernetesName(labelValue));
+     }
+     return result;
+   }, [namespaces]);
+ 
+-  // Only show namespaces that exist on every selected cluster
+-  const availableNamespaces = useMemo(() => {
+-    if (!namespaces || selectedClusters.length === 0) return [];
+-    const namesByCluster = new Map<string, Set<string>>();
+-    for (const cluster of selectedClusters) {
+-      namesByCluster.set(cluster, new Set());
+-    }
+-    for (const ns of namespaces) {
+-      namesByCluster.get(ns.cluster)?.add(ns.metadata.name);
+-    }
+-    const sets = Array.from(namesByCluster.values());
+-    if (sets.length === 0) return [];
+-    return [...sets[0]].filter(name => sets.every(s => s.has(name))).sort();
+-  }, [namespaces, selectedClusters]);
+-
++  // Check if project name already exists (using normalized form to match existing entries)
+   const projectNameExists =
+     projectName.length > 0 && existingProjectNames.has(toKubernetesName(projectName));
+   const namespaceToProjectMap = useMemo(() => {
+@@ -189,31 +149,36 @@ function UseExistingNamespaceDialog({ onBack }: { onBack: () => void }) {
+     return map;
+   }, [namespaces]);
+ 
+-  const effectiveNamespace = selectedNamespace;
++  const effectiveNamespace = selectedNamespace || toKubernetesName(typedNamespace);
+   const isNamespaceAlreadyAssigned = effectiveNamespace
+     ? namespaceToProjectMap.has(effectiveNamespace)
+     : false;
+ 
+   const isReadyToCreate =
+-    selectedClusters.length > 0 &&
+-    selectedNamespace &&
++    selectedClusters.length &&
++    (selectedNamespace || typedNamespace) &&
+     projectName &&
+     !projectNameExists &&
+     !isNamespaceAlreadyAssigned;
+ 
+   useEffect(() => {
+     if (selectedNamespace && namespaceToProjectMap.has(selectedNamespace)) {
+-      setSelectedNamespace(null);
++      setSelectedNamespace(undefined);
+     }
+   }, [selectedNamespace, namespaceToProjectMap]);
+ 
++  /**
++   * Creates or updates namespaces for the project
++   */
+   const handleCreate = async () => {
+     if (!isReadyToCreate || isCreating) return;
+ 
+     setIsCreating(true);
+     try {
+       const existingNamespaces = namespaces?.filter(it => it.metadata.name === selectedNamespace);
++      const clustersWithExistingNamespace = existingNamespaces?.map(it => it.cluster) ?? [];
+       if (existingNamespaces && existingNamespaces.length > 0) {
++        // Update all existing namespaces with the same name across selected clusters
+         await Promise.all(
+           existingNamespaces.map(namespace =>
+             namespace.patch({
+@@ -227,177 +192,16 @@ function UseExistingNamespaceDialog({ onBack }: { onBack: () => void }) {
+         );
+       }
+ 
+-      history.push('/projects');
+-    } catch (e: any) {
+-      setError(e);
+-    } finally {
+-      setIsCreating(false);
+-    }
+-  };
+-
+-  return (
+-    <>
+-      <DialogTitle sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+-        <Icon icon="mdi:folder-open-outline" />
+-        {t('Use Existing Namespace')}
+-      </DialogTitle>
+-      <DialogContent
+-        sx={{
+-          p: 3,
+-          minWidth: '25rem',
+-          display: 'flex',
+-          flexDirection: 'column',
+-          gap: 3,
+-          minHeight: '20rem',
+-        }}
+-      >
+-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: '25rem' }}>
+-          <Trans>Select a cluster and an existing namespace to use as a project.</Trans>
+-        </Typography>
+-        <TextField
+-          label={t('translation|Project Name')}
+-          value={projectName}
+-          onChange={event => setProjectName(event.target.value.toLowerCase())}
+-          onBlur={event => setProjectName(toKubernetesName(event.target.value))}
+-          onKeyDown={event =>
+-            spaceToDashKeyDown(
+-              event as React.KeyboardEvent<HTMLInputElement>,
+-              projectName,
+-              setProjectName
+-            )
+-          }
+-          error={projectNameExists}
+-          helperText={
+-            projectNameExists
+-              ? t('A project with this name already exists')
+-              : t('translation|Enter a name for your new project.')
+-          }
+-          autoComplete="off"
+-          fullWidth
+-        />
+-        <Autocomplete
+-          fullWidth
+-          multiple
+-          options={clusters.map(it => it.name)}
+-          value={selectedClusters}
+-          onChange={(e, newValue) => setSelectedClusters(newValue)}
+-          renderInput={params => (
+-            <TextField
+-              {...params}
+-              label={t('Clusters')}
+-              variant="outlined"
+-              size="small"
+-              helperText={t('Select one or more clusters')}
+-            />
+-          )}
+-          noOptionsText={t('No available clusters')}
+-          disabled={clusters.length === 0}
+-        />
+-        <Autocomplete
+-          fullWidth
+-          options={availableNamespaces}
+-          value={selectedNamespace}
+-          onChange={(event, newValue) => setSelectedNamespace(newValue)}
+-          renderInput={params => (
+-            <TextField
+-              {...params}
+-              label={t('Namespace')}
+-              placeholder={t('Select an existing namespace')}
+-              helperText={t('Choose a namespace from the selected clusters')}
+-              variant="outlined"
+-              size="small"
+-            />
+-          )}
+-          noOptionsText={
+-            selectedClusters.length === 0
+-              ? t('Select a cluster first')
+-              : t('No namespaces found on selected clusters')
+-          }
+-          disabled={selectedClusters.length === 0}
+-        />
+-        {error && (
+-          <Alert severity="error" sx={{ maxWidth: '25rem' }}>
+-            {error?.message}
+-          </Alert>
+-        )}
+-      </DialogContent>
+-      <DialogActions>
+-        <Button variant="contained" color="secondary" onClick={onBack}>
+-          <Trans>Cancel</Trans>
+-        </Button>
+-        <Button
+-          variant="contained"
+-          onClick={handleCreate}
+-          disabled={isCreating || !isReadyToCreate}
+-        >
+-          {isCreating ? <Trans>Creating</Trans> : <Trans>Create</Trans>}
+-        </Button>
+-      </DialogActions>
+-    </>
+-  );
+-}
+-
+-/**
+- * "Create New Namespace" — create a new namespace on registered clusters
+- * and set it up as a project.
+- */
+-function CreateNamespaceDialog({ onBack }: { onBack: () => void }) {
+-  const { t } = useTranslation();
+-  const history = useHistory();
+-
+-  const [projectName, setProjectName] = useState('');
+-  const [selectedClusters, setSelectedClusters] = useState<string[]>([]);
+-  const [namespaceName, setNamespaceName] = useState('');
+-
+-  const [isCreating, setIsCreating] = useState(false);
+-  const [error, setError] = useState<ApiError>();
+-
+-  const clusters = Object.values(useClustersConf() ?? {});
+-  const { items: namespaces } = Namespace.useList({
+-    clusters: selectedClusters,
+-  });
+-
+-  const existingProjectNames = useMemo(() => {
+-    if (!namespaces) return new Set<string>();
+-    const result = new Set<string>();
+-    for (const ns of namespaces) {
+-      const labelValue = ns.metadata.labels?.[PROJECT_ID_LABEL];
+-      if (!labelValue) continue;
+-      result.add(labelValue);
+-      result.add(toKubernetesName(labelValue));
+-    }
+-    return result;
+-  }, [namespaces]);
+-
+-  const existingNamespaceNames = useMemo(() => {
+-    if (!namespaces) return new Set<string>();
+-    return new Set(namespaces.map(it => it.metadata.name));
+-  }, [namespaces]);
+-
+-  const projectNameExists =
+-    projectName.length > 0 && existingProjectNames.has(toKubernetesName(projectName));
+-
+-  const k8sName = toKubernetesName(namespaceName);
+-  const namespaceAlreadyExists = k8sName.length > 0 && existingNamespaceNames.has(k8sName);
+-
+-  const isReadyToCreate =
+-    selectedClusters.length > 0 &&
+-    namespaceName.length > 0 &&
+-    !namespaceAlreadyExists &&
+-    projectName &&
+-    !projectNameExists;
+-
+-  const handleCreate = async () => {
+-    if (!isReadyToCreate || isCreating) return;
+-
+-    setIsCreating(true);
+-    try {
+-      for (const cluster of selectedClusters) {
++      // Create new namespace in all selected clusters that don't already have it
++      const clustersWithoutNamespace = selectedClusters.filter(
++        it => !clustersWithExistingNamespace.includes(it)
++      );
++      for (const cluster of clustersWithoutNamespace) {
+         const namespace = {
+           kind: 'Namespace',
+           apiVersion: 'v1',
+           metadata: {
+-            name: k8sName,
++            name: toKubernetesName(typedNamespace),
+             labels: {
+               [PROJECT_ID_LABEL]: projectName,
+             },
+@@ -418,7 +222,7 @@ function CreateNamespaceDialog({ onBack }: { onBack: () => void }) {
+     <>
+       <DialogTitle sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+         <Icon icon="mdi:folder-add" />
+-        {t('Create New Namespace')}
++        {t('Create new project')}
+       </DialogTitle>
+       <DialogContent
+         sx={{
+@@ -431,20 +235,39 @@ function CreateNamespaceDialog({ onBack }: { onBack: () => void }) {
+         }}
+       >
+         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: '25rem' }}>
+-          <Trans>Create a new namespace on one or more clusters and set it up as a project.</Trans>
++          <Trans>
++            To create a new project pick which clusters you want to include and then select existing
++            or create a new namespace
++          </Trans>
+         </Typography>
+         <TextField
+           label={t('translation|Project Name')}
+           value={projectName}
+-          onChange={event => setProjectName(event.target.value.toLowerCase())}
+-          onBlur={event => setProjectName(toKubernetesName(event.target.value))}
+-          onKeyDown={event =>
+-            spaceToDashKeyDown(
+-              event as React.KeyboardEvent<HTMLInputElement>,
+-              projectName,
+-              setProjectName
+-            )
+-          }
++          onChange={event => {
++            const inputValue = event.target.value.toLowerCase();
++            setProjectName(inputValue);
++          }}
++          onBlur={event => {
++            // Convert to Kubernetes name when user finishes typing (loses focus)
++            const converted = toKubernetesName(event.target.value);
++            setProjectName(converted);
++          }}
++          onKeyDown={event => {
++            // Convert spaces to dashes immediately when space is pressed
++            if (event.key === ' ') {
++              event.preventDefault();
++              const target = event.target as HTMLInputElement;
++              const start = target.selectionStart || 0;
++              const end = target.selectionEnd || 0;
++              const currentValue = projectName;
++              const newValue = currentValue.substring(0, start) + '-' + currentValue.substring(end);
++              setProjectName(newValue);
++              // Set cursor position after the inserted dash
++              setTimeout(() => {
++                target.setSelectionRange(start + 1, start + 1);
++              }, 0);
++            }
++          }}
+           error={projectNameExists}
+           helperText={
+             projectNameExists
+@@ -459,39 +282,44 @@ function CreateNamespaceDialog({ onBack }: { onBack: () => void }) {
+           multiple
+           options={clusters.map(it => it.name)}
+           value={selectedClusters}
+-          onChange={(e, newValue) => setSelectedClusters(newValue)}
++          onChange={(e, newValue) => {
++            setSelectedClusters(newValue);
++          }}
+           renderInput={params => (
+             <TextField
+               {...params}
+               label={t('Clusters')}
+               variant="outlined"
+               size="small"
+-              helperText={t('Select one or more clusters')}
++              helperText={t('Select one or more clusters for this project')}
+             />
+           )}
+           noOptionsText={t('No available clusters')}
+           disabled={clusters.length === 0}
+         />
+-        <TextField
+-          label={t('Namespace Name')}
+-          value={namespaceName}
+-          onChange={event => setNamespaceName(event.target.value.toLowerCase())}
+-          onBlur={event => setNamespaceName(toKubernetesName(event.target.value))}
+-          onKeyDown={event =>
+-            spaceToDashKeyDown(
+-              event as React.KeyboardEvent<HTMLInputElement>,
+-              namespaceName,
+-              setNamespaceName
+-            )
+-          }
+-          error={namespaceAlreadyExists}
+-          helperText={
+-            namespaceAlreadyExists
+-              ? t('A namespace with this name already exists on one or more selected clusters')
+-              : t('Enter a name for the new namespace')
+-          }
+-          autoComplete="off"
++        <Autocomplete
+           fullWidth
++          freeSolo
++          options={uniq(namespaces?.map(it => it.metadata.name)) ?? []}
++          value={selectedNamespace}
++          onChange={(event, newValue) => {
++            setSelectedNamespace(newValue ?? undefined);
++          }}
++          onInputChange={(e, v) => {
++            setTypedNamespace(v);
++          }}
++          getOptionDisabled={option => namespaceToProjectMap.has(option)}
++          renderInput={params => (
++            <TextField
++              {...params}
++              label={t('Namespace')}
++              placeholder={t('Type or select a namespace')}
++              helperText={t('Select existing or type to create a new namespace')}
++              variant="outlined"
++              size="small"
++            />
++          )}
++          noOptionsText={t('No available namespaces - you can type a custom name')}
+         />
+         {error && (
+           <Alert severity="error" sx={{ maxWidth: '25rem' }}>
+@@ -515,58 +343,30 @@ function CreateNamespaceDialog({ onBack }: { onBack: () => void }) {
+   );
+ }
+ 
+-/**
+- * Returns the merged list of project creation options.
+- * Built-in defaults are included unless a plugin has registered an override with the same ID.
+- */
+-function useCreateProjectOptions(): CustomCreateProject[] {
+-  const { t } = useTranslation();
+-  const pluginOptions = useTypedSelector(state => state.projects.customCreateProject);
+-
+-  return useMemo(() => {
+-    const builtinDefaults: CustomCreateProject[] = [
+-      {
+-        id: BUILTIN_USE_EXISTING_NAMESPACE_ID,
+-        name: t('Use Existing Namespace'),
+-        description: t('Select an existing namespace to use as a project'),
+-        icon: 'mdi:folder-open-outline',
+-        component: UseExistingNamespaceDialog,
+-      },
+-      {
+-        id: BUILTIN_CREATE_NAMESPACE_ID,
+-        name: t('Create New Namespace'),
+-        description: t('Create a new namespace and use it as a project'),
+-        icon: 'mdi:folder-add',
+-        component: CreateNamespaceDialog,
+-      },
+-    ];
+-
+-    // Merge: plugin registrations override built-ins with the same ID
+-    const merged = new Map<string, CustomCreateProject>();
+-    for (const builtin of builtinDefaults) {
+-      merged.set(builtin.id, builtin);
+-    }
+-    for (const plugin of Object.values(pluginOptions)) {
+-      merged.set(plugin.id, plugin);
+-    }
+-
+-    return Array.from(merged.values());
+-  }, [pluginOptions, t]);
+-}
+-
+ /**
+  * A dialog for creating a new project.
+- * Shows built-in options (Use Existing Namespace, Create New Namespace) plus any
+- * custom options registered by plugins. Plugins can override built-in options by
+- * registering with the same well-known ID.
++ * It provides several options for creating a project, such as from a namespace,
++ * auto-detection, from YAML, or a custom project.
+  */
+ export function NewProjectPopup({ open, onClose }: { open: boolean; onClose: () => void }) {
++  const history = useHistory();
+   const theme = useTheme();
+   const { t } = useTranslation();
+-  const createProjectOptions = useCreateProjectOptions();
++  const customCreateProject = Object.values(
++    useTypedSelector(state => state.projects.customCreateProject)
++  );
++  const customNewProject = customCreateProject.find(
++    it => it.id === DefaultCreateProject.NEW_PROJECT
++  );
++  const customProjectFromYaml = customCreateProject.find(
++    it => it.id === DefaultCreateProject.FROM_YAML
++  );
++  const additionalCreateProjects = customCreateProject.filter(
++    it => it.id !== DefaultCreateProject.NEW_PROJECT && it.id !== DefaultCreateProject.FROM_YAML
++  );
+ 
+   const [projectStep, setProjectStep] = useState<string | undefined>();
+-  const selectedOption = createProjectOptions.find(it => it.id === projectStep);
++  const selectedCustomProject = customCreateProject.find(it => it.id === projectStep);
+ 
+   const handleBack = useCallback(() => {
+     setProjectStep(undefined);
+@@ -585,14 +385,90 @@ export function NewProjectPopup({ open, onClose }: { open: boolean; onClose: ()
+           <DialogContent sx={{ maxWidth: '540px' }}>
+             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+               <Trans>
+-                A project groups one or more namespaces across your clusters, making it easy to view
+-                and manage related resources in one place.
++                Project is a collection of Kubernetes resources. You can use projects to organize
++                your resources, for example, by environment, team, or application.
+               </Trans>
+             </Typography>
+             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+-              {createProjectOptions.map(it => (
++              {customNewProject ? (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    typeof customNewProject.icon === 'string' ? (
++                      <Icon
++                        icon={customNewProject.icon}
++                        width="100%"
++                        height="100%"
++                        color={theme.palette.text.secondary}
++                      />
++                    ) : (
++                      <customNewProject.icon />
++                    )
++                  }
++                  title={customNewProject.name}
++                  description={customNewProject.description}
++                  onClick={() => setProjectStep(customNewProject.id)}
++                />
++              ) : (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    <Icon
++                      icon="mdi:folder-add"
++                      width="100%"
++                      height="100%"
++                      color={theme.palette.text.secondary}
++                    />
++                  }
++                  title={<Trans>New Project</Trans>}
++                  description={<Trans>Create a new project</Trans>}
++                  onClick={() => {
++                    setProjectStep(DefaultCreateProject.NEW_PROJECT);
++                  }}
++                />
++              )}
++
++              {customProjectFromYaml ? (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    typeof customProjectFromYaml.icon === 'string' ? (
++                      <Icon
++                        icon={customProjectFromYaml.icon}
++                        width="100%"
++                        height="100%"
++                        color={theme.palette.text.secondary}
++                      />
++                    ) : (
++                      <customProjectFromYaml.icon />
++                    )
++                  }
++                  title={customProjectFromYaml.name}
++                  description={customProjectFromYaml.description}
++                  onClick={() => setProjectStep(customProjectFromYaml.id)}
++                />
++              ) : (
++                <ProjectTypeButton
++                  index={index++}
++                  icon={
++                    <Icon
++                      icon="mdi:file-document-add"
++                      width="100%"
++                      height="100%"
++                      color={theme.palette.text.secondary}
++                    />
++                  }
++                  title={<Trans>New Project from YAML</Trans>}
++                  description={<Trans>Deploy a new application from YAML</Trans>}
++                  onClick={() => {
++                    onClose();
++                    history.push(createRouteURL('projectCreateYaml'));
++                  }}
++                />
++              )}
++
++              {additionalCreateProjects.map(it => (
+                 <ProjectTypeButton
+-                  key={it.id}
+                   index={index++}
+                   icon={
+                     typeof it.icon === 'string' ? (
+@@ -620,7 +496,10 @@ export function NewProjectPopup({ open, onClose }: { open: boolean; onClose: ()
+           </DialogActions>
+         </>
+       )}
+-      {selectedOption && <selectedOption.component onBack={handleBack} />}
++      {projectStep === DefaultCreateProject.NEW_PROJECT && (
++        <ProjectFromExistingNamespace onBack={handleBack} />
++      )}
++      {selectedCustomProject && <selectedCustomProject.component onBack={handleBack} />}
+     </Dialog>
+   );
+ }
 diff --git a/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot b/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot
 index 3f582f8c3..c8670b05f 100644
 --- a/frontend/src/components/project/__snapshots__/NewProjectPopup.Default.stories.storyshot
@@ -1235,6 +2042,51 @@ index 3c9d02344..525c1894a 100644
    "URL is required": "",
    "Failed to load from URL: {{error}}": "",
    "Error processing files: {{error}}": "",
+diff --git a/frontend/src/plugin/__snapshots__/pluginLib.snapshot b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+index f25ecbb60..48030e0c8 100644
+--- a/frontend/src/plugin/__snapshots__/pluginLib.snapshot
++++ b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+@@ -320,6 +320,10 @@
+     "SETTINGS": "SETTINGS",
+     "USER": "USER",
+   },
++  "DefaultCreateProject": {
++    "FROM_YAML": "headlamp.projects.from-yaml",
++    "NEW_PROJECT": "headlamp.projects.new-project",
++  },
+   "DefaultDetailsViewSection": {
+     "BACK_LINK": "BACK_LINK",
+     "CHILDREN": "CHILDREN",
+diff --git a/frontend/src/plugin/registry.tsx b/frontend/src/plugin/registry.tsx
+index 82cff595d..6d517ce9b 100644
+--- a/frontend/src/plugin/registry.tsx
++++ b/frontend/src/plugin/registry.tsx
+@@ -117,6 +117,8 @@ import {
+   setPluginSettingsComponent,
+ } from './pluginsSlice';
+ 
++export { DefaultCreateProject } from '../redux/projectsSlice';
++
+ export interface SectionFuncProps {
+   title: string;
+   component: (props: { resource: any }) => ReactNode;
+diff --git a/frontend/src/redux/projectsSlice.ts b/frontend/src/redux/projectsSlice.ts
+index b1af23e9e..70f62586d 100644
+--- a/frontend/src/redux/projectsSlice.ts
++++ b/frontend/src/redux/projectsSlice.ts
+@@ -30,6 +30,12 @@ export interface ProjectDefinition {
+   clusters: string[];
+ }
+ 
++/** IDs plugins can register to replace Headlamp's built-in project creation options. */
++export const DefaultCreateProject = {
++  NEW_PROJECT: 'headlamp.projects.new-project',
++  FROM_YAML: 'headlamp.projects.from-yaml',
++} as const;
++
+ /** Define custom way to create new Projects */
+ export interface CustomCreateProject {
+   id: string;
 -- 
 2.54.0
 
