@@ -1,0 +1,211 @@
+From 58e1a500cef376b00b4c2c465da07f242c066bc6 Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 07:32:15 +0000
+Subject: [PATCH] aksd: replace product-specific tool verification
+
+---
+ app/electron/build-manifest.test.ts | 47 +++++++++++++++++++++++++++
+ app/scripts/after-pack.js           | 40 +++++------------------
+ app/scripts/build-manifest.js       | 49 +++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+), 33 deletions(-)
+
+diff --git a/app/electron/build-manifest.test.ts b/app/electron/build-manifest.test.ts
+index 277cc558f..dde530235 100644
+--- a/app/electron/build-manifest.test.ts
++++ b/app/electron/build-manifest.test.ts
+@@ -31,6 +31,7 @@ const {
+   DEFAULT_MANIFEST_FILE,
+   loadBuildManifest,
+   resolveBuildManifestPath,
++  verifyPackagedResources,
+ } = require('../scripts/build-manifest');
+ const {
+   downloadFile,
+@@ -85,6 +86,52 @@ describe('build manifest selection', () => {
+   });
+ });
+ 
++describe('packaged resource verification', () => {
++  it('accepts regular files with matching digests', () => {
++    const file = temporaryFile('bundled tool');
++    const directory = path.dirname(file);
++    const digest = crypto.createHash('sha256').update('bundled tool').digest('hex');
++    expect(() =>
++      verifyPackagedResources(
++        directory,
++        { verify: [{ path: 'manifest.json', sha256: digest, platforms: ['mac'] }] },
++        'mas'
++      )
++    ).not.toThrow();
++  });
++
++  it('rejects path traversal and digest mismatches', () => {
++    const file = temporaryFile('bundled tool');
++    const directory = path.dirname(file);
++    expect(() =>
++      verifyPackagedResources(
++        directory,
++        { verify: [{ path: '../tool', sha256: '0'.repeat(64) }] },
++        'linux'
++      )
++    ).toThrow('escapes the resources directory');
++    expect(() =>
++      verifyPackagedResources(
++        directory,
++        { verify: [{ path: 'manifest.json', sha256: '0'.repeat(64) }] },
++        'linux'
++      )
++    ).toThrow('SHA-256 mismatch');
++  });
++
++  it('filters verification by packaged platform', () => {
++    expect(() =>
++      verifyPackagedResources(
++        '/missing',
++        {
++          verify: [{ path: 'tool.exe', sha256: '0'.repeat(64), platforms: ['win'] }],
++        },
++        'darwin'
++      )
++    ).not.toThrow();
++  });
++});
++
+ describe('build resources', () => {
+   it('resolves common and platform resources relative to the manifest', () => {
+     const manifestFile = '/product/build.json';
+diff --git a/app/scripts/after-pack.js b/app/scripts/after-pack.js
+index 5f2269e93..26bb226cc 100644
+--- a/app/scripts/after-pack.js
++++ b/app/scripts/after-pack.js
+@@ -2,49 +2,23 @@
+ 
+ 'use strict';
+ 
+-const child_process = require('node:child_process');
+ const fs = require('node:fs');
+ const path = require('node:path');
++const { loadBuildManifest, verifyPackagedResources } = require('./build-manifest');
+ 
+ exports.default = async context => {
++  const resourcesDirectory = context.packager?.getResourcesDir
++    ? context.packager.getResourcesDir(context.appOutDir)
++    : path.join(context.appOutDir, 'resources');
++
+   if (fs.existsSync('.env')) {
+     console.info('Copying .env file to app resources directory!');
+     try {
+-      fs.copyFileSync('.env', path.join(context.appOutDir, 'resources', '.env'));
++      fs.copyFileSync('.env', path.join(resourcesDirectory, '.env'));
+     } catch (err) {
+       console.error('Failed to copy .env after pack:', err);
+     }
+   }
+ 
+-  // Run post-build verification to ensure external tools are bundled correctly
+-  console.log('\n========================================');
+-  console.log('Running post-build verification tests...');
+-  console.log('========================================\n');
+-
+-  const verifyScript = path.join(__dirname, '../../../build/verify-bundled-tools.ts');
+-
+-  if (fs.existsSync(verifyScript)) {
+-    try {
+-      // Run the verification script using tsx
+-      const result = child_process.spawnSync('npx', ['--yes', 'tsx', verifyScript], {
+-        stdio: 'inherit',
+-        cwd: path.join(__dirname, '../../..'),
+-        shell: true,
+-      });
+-
+-      if (result.status !== 0) {
+-        console.error('\n❌ Post-build verification FAILED!');
+-        console.error('The bundled external tools are not correctly configured.');
+-        process.exit(1);
+-      }
+-
+-      console.log('\n✅ Post-build verification PASSED!');
+-    } catch (err) {
+-      console.error('Failed to run post-build verification:', err);
+-      console.error('⚠️  Continuing build, but external tools may not be bundled correctly.');
+-    }
+-  } else {
+-    console.warn('⚠️  Post-build verification script not found at:', verifyScript);
+-    console.warn('Skipping verification. External tools may not be bundled correctly.');
+-  }
++  verifyPackagedResources(resourcesDirectory, loadBuildManifest(), context.electronPlatformName);
+ };
+diff --git a/app/scripts/build-manifest.js b/app/scripts/build-manifest.js
+index 88b083fbe..cdc2ef8aa 100644
+--- a/app/scripts/build-manifest.js
++++ b/app/scripts/build-manifest.js
+@@ -1,5 +1,6 @@
+ 'use strict';
+ 
++const crypto = require('node:crypto');
+ const fs = require('node:fs');
+ const path = require('node:path');
+ 
+@@ -14,6 +15,53 @@ function loadBuildManifest(manifestFile = resolveBuildManifestPath()) {
+   return JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+ }
+ 
++function verifyPackagedResources(resourcesDirectory, manifest, platform) {
++  const verification = manifest.verify;
++  if (verification === undefined) {
++    return;
++  }
++  if (!Array.isArray(verification)) {
++    throw new Error('Build manifest verify must be an array');
++  }
++
++  const platformName = { darwin: 'mac', mas: 'mac', win32: 'win' }[platform] || platform;
++  const root = path.resolve(resourcesDirectory);
++  for (const [index, entry] of verification.entries()) {
++    if (
++      !entry ||
++      typeof entry.path !== 'string' ||
++      typeof entry.sha256 !== 'string' ||
++      (entry.platforms !== undefined &&
++        (!Array.isArray(entry.platforms) ||
++          entry.platforms.some(value => !['linux', 'mac', 'win'].includes(value))))
++    ) {
++      throw new Error(`Invalid build manifest verify[${index}]`);
++    }
++    if (entry.platforms && !entry.platforms.includes(platformName)) {
++      continue;
++    }
++    if (!/^[a-f0-9]{64}$/i.test(entry.sha256)) {
++      throw new Error(`Invalid SHA-256 for packaged resource ${entry.path}`);
++    }
++
++    const resource = path.resolve(root, entry.path);
++    if (resource !== root && !resource.startsWith(`${root}${path.sep}`)) {
++      throw new Error(`Packaged resource escapes the resources directory: ${entry.path}`);
++    }
++    const stat = fs.lstatSync(resource);
++    if (!stat.isFile() || stat.isSymbolicLink()) {
++      throw new Error(`Packaged resource is not a regular file: ${entry.path}`);
++    }
++    const actualDigest = crypto
++      .createHash('sha256')
++      .update(fs.readFileSync(resource))
++      .digest('hex');
++    if (actualDigest.toLowerCase() !== entry.sha256.toLowerCase()) {
++      throw new Error(`SHA-256 mismatch for packaged resource ${entry.path}`);
++    }
++  }
++}
++
+ function applyBuildResources(config, manifest, manifestFile = resolveBuildManifestPath()) {
+   const resources = manifest.resources;
+   if (resources === undefined) {
+@@ -183,4 +231,5 @@ module.exports = {
+   DEFAULT_MANIFEST_FILE,
+   loadBuildManifest,
+   resolveBuildManifestPath,
++  verifyPackagedResources,
+ };
+-- 
+2.54.0
+

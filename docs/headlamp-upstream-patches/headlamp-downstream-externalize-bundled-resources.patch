@@ -1,0 +1,228 @@
+From bfb1cfc3073114fa4f8f55a2ee9b08e4c7df169a Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 07:31:22 +0000
+Subject: [PATCH] aksd: externalize bundled tool resources
+
+---
+ app/electron-builder.config.js      | 39 +++++++++++---------
+ app/electron/build-manifest.test.ts | 25 +++++++++++++
+ app/package.json                    | 12 -------
+ app/scripts/build-manifest.js       | 55 +++++++++++++++++++++++++++++
+ 4 files changed, 102 insertions(+), 29 deletions(-)
+
+diff --git a/app/electron-builder.config.js b/app/electron-builder.config.js
+index 7087cf192..d07eaf100 100644
+--- a/app/electron-builder.config.js
++++ b/app/electron-builder.config.js
+@@ -3,6 +3,7 @@
+ const packageJson = require('./package.json');
+ const path = require('node:path');
+ const {
++  applyBuildResources,
+   applyBuildTargets,
+   applyPlatformMetadata,
+   applyProductMetadata,
+@@ -16,26 +17,30 @@ const defaultManifest = path.resolve(DEFAULT_MANIFEST_FILE);
+ 
+ const manifest = loadBuildManifest(manifestFile);
+ 
+-module.exports = applyBuildTargets(
+-  applyPlatformMetadata(
+-    applyProductMetadata(
+-      {
+-        ...packageJson.build,
+-        extraResources: packageJson.build.extraResources.map(resource => {
+-          if (path.resolve(__dirname, resource.from) !== defaultManifest) {
+-            return resource;
+-          }
++module.exports = applyBuildResources(
++  applyBuildTargets(
++    applyPlatformMetadata(
++      applyProductMetadata(
++        {
++          ...packageJson.build,
++          extraResources: packageJson.build.extraResources.map(resource => {
++            if (path.resolve(__dirname, resource.from) !== defaultManifest) {
++              return resource;
++            }
+ 
+-          return {
+-            ...resource,
+-            from: manifestFile,
+-            to: 'app-build-manifest.json',
+-          };
+-        }),
+-      },
++            return {
++              ...resource,
++              from: manifestFile,
++              to: 'app-build-manifest.json',
++            };
++          }),
++        },
++        manifest
++      ),
+       manifest
+     ),
+     manifest
+   ),
+-  manifest
++  manifest,
++  manifestFile
+ );
+diff --git a/app/electron/build-manifest.test.ts b/app/electron/build-manifest.test.ts
+index 2a081a8c1..277cc558f 100644
+--- a/app/electron/build-manifest.test.ts
++++ b/app/electron/build-manifest.test.ts
+@@ -24,6 +24,7 @@ import { afterEach, describe, expect, it } from 'vitest';
+ 
+ const require = createRequire(import.meta.url);
+ const {
++  applyBuildResources,
+   applyBuildTargets,
+   applyPlatformMetadata,
+   applyProductMetadata,
+@@ -84,6 +85,30 @@ describe('build manifest selection', () => {
+   });
+ });
+ 
++describe('build resources', () => {
++  it('resolves common and platform resources relative to the manifest', () => {
++    const manifestFile = '/product/build.json';
++    const config = applyBuildResources(
++      { extraResources: [{ from: '/headlamp/frontend' }], mac: {} },
++      {
++        resources: {
++          common: [{ from: './shared', to: 'shared' }],
++          mac: [{ from: './tools/mac', to: 'tools' }],
++        },
++      },
++      manifestFile
++    );
++    expect(config.extraResources).toContainEqual({ from: '/product/shared', to: 'shared' });
++    expect(config.mac.extraResources).toEqual([{ from: '/product/tools/mac', to: 'tools' }]);
++  });
++
++  it('rejects unsupported resource options', () => {
++    expect(() =>
++      applyBuildResources({}, { resources: { common: [{ from: 'tools', unsafe: true }] } })
++    ).toThrow('Invalid build manifest resources.common[0]');
++  });
++});
++
+ describe('build targets', () => {
+   it('replaces platform targets without changing other platform settings', () => {
+     expect(
+diff --git a/app/package.json b/app/package.json
+index 35c19d7e0..77d369e22 100644
+--- a/app/package.json
++++ b/app/package.json
+@@ -97,10 +97,6 @@
+       "extraResources": [
+         {
+           "from": "../backend/headlamp-server"
+-        },
+-        {
+-          "from": "./resources/external-tools",
+-          "to": "external-tools"
+         }
+       ],
+       "icon": "build/icons/android-chrome-512x512.png",
+@@ -130,10 +126,6 @@
+       "extraResources": [
+         {
+           "from": "../backend/headlamp-server"
+-        },
+-        {
+-          "from": "./resources/external-tools",
+-          "to": "external-tools"
+         }
+       ],
+       "icon": "build/icons/icon.icns"
+@@ -148,10 +140,6 @@
+       "extraResources": [
+         {
+           "from": "../backend/headlamp-server.exe"
+-        },
+-        {
+-          "from": "./resources/external-tools",
+-          "to": "external-tools"
+         }
+       ]
+     },
+diff --git a/app/scripts/build-manifest.js b/app/scripts/build-manifest.js
+index 3f6e69d1c..88b083fbe 100644
+--- a/app/scripts/build-manifest.js
++++ b/app/scripts/build-manifest.js
+@@ -14,6 +14,60 @@ function loadBuildManifest(manifestFile = resolveBuildManifestPath()) {
+   return JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+ }
+ 
++function applyBuildResources(config, manifest, manifestFile = resolveBuildManifestPath()) {
++  const resources = manifest.resources;
++  if (resources === undefined) {
++    return config;
++  }
++  if (!resources || typeof resources !== 'object' || Array.isArray(resources)) {
++    throw new Error('Build manifest resources must be an object');
++  }
++
++  const resolveResources = (entries, group) => {
++    if (!Array.isArray(entries)) {
++      throw new Error(`Build manifest resources.${group} must be an array`);
++    }
++    return entries.map((entry, index) => {
++      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
++        throw new Error(`Invalid build manifest resources.${group}[${index}]`);
++      }
++      const keys = Object.keys(entry);
++      if (
++        typeof entry.from !== 'string' ||
++        keys.some(key => !['filter', 'from', 'to'].includes(key)) ||
++        (entry.to !== undefined && typeof entry.to !== 'string') ||
++        (entry.filter !== undefined &&
++          (!Array.isArray(entry.filter) || entry.filter.some(value => typeof value !== 'string')))
++      ) {
++        throw new Error(`Invalid build manifest resources.${group}[${index}]`);
++      }
++      return {
++        ...entry,
++        from: path.resolve(path.dirname(manifestFile), entry.from),
++      };
++    });
++  };
++
++  const result = { ...config };
++  if (resources.common !== undefined) {
++    result.extraResources = [
++      ...(config.extraResources || []),
++      ...resolveResources(resources.common, 'common'),
++    ];
++  }
++  for (const platform of ['linux', 'mac', 'win']) {
++    if (resources[platform] === undefined) continue;
++    result[platform] = {
++      ...config[platform],
++      extraResources: [
++        ...(config[platform]?.extraResources || []),
++        ...resolveResources(resources[platform], platform),
++      ],
++    };
++  }
++  return result;
++}
++
+ function applyBuildTargets(config, manifest) {
+   const targets = manifest.targets;
+   if (targets === undefined) {
+@@ -122,6 +176,7 @@ function applyProductMetadata(config, manifest) {
+ }
+ 
+ module.exports = {
++  applyBuildResources,
+   applyBuildTargets,
+   applyPlatformMetadata,
+   applyProductMetadata,
+-- 
+2.54.0
+
