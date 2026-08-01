@@ -1,15 +1,15 @@
-From 395b3ff590616208d99ef7bd23305dfda5603fdb Mon Sep 17 00:00:00 2001
+From b338277bafebd96ab9e0e0e5a8bf24f57a74a4ac Mon Sep 17 00:00:00 2001
 From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
 Date: Sat, 1 Aug 2026 07:08:38 +0000
 Subject: [PATCH] upstreamable: verify external plugin manifests
 
 ---
- app/electron-builder.config.js      |  23 ++++++
- app/electron/build-manifest.test.ts | 119 ++++++++++++++++++++++++++++
+ app/electron-builder.config.js      |  23 +++++
+ app/electron/build-manifest.test.ts | 151 ++++++++++++++++++++++++++++
  app/package.json                    |   4 +-
- app/scripts/build-manifest.js       |  21 +++++
- app/scripts/setup-plugins.js        |  74 ++++++++++++++---
- 5 files changed, 229 insertions(+), 12 deletions(-)
+ app/scripts/build-manifest.js       |  21 ++++
+ app/scripts/setup-plugins.js        |  87 ++++++++++++++--
+ 5 files changed, 274 insertions(+), 12 deletions(-)
  create mode 100644 app/electron-builder.config.js
  create mode 100644 app/electron/build-manifest.test.ts
  create mode 100644 app/scripts/build-manifest.js
@@ -45,10 +45,10 @@ index 000000000..4a1093830
 +};
 diff --git a/app/electron/build-manifest.test.ts b/app/electron/build-manifest.test.ts
 new file mode 100644
-index 000000000..c9c7668f2
+index 000000000..d4b280ecc
 --- /dev/null
 +++ b/app/electron/build-manifest.test.ts
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,151 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -79,7 +79,11 @@ index 000000000..c9c7668f2
 +  loadBuildManifest,
 +  resolveBuildManifestPath,
 +} = require('../scripts/build-manifest');
-+const { downloadFile, verifyArchiveDigest } = require('../scripts/setup-plugins');
++const {
++  downloadFile,
++  validatePluginSource,
++  verifyArchiveDigest,
++} = require('../scripts/setup-plugins');
 +
 +const temporaryDirectories: string[] = [];
 +
@@ -129,6 +133,34 @@ index 000000000..c9c7668f2
 +});
 +
 +describe('plugin archive integrity', () => {
++  it('requires digests for remote archives in external manifests', () => {
++    expect(() =>
++      validatePluginSource(
++        { name: 'example', archive: 'https://plugins.example/plugin.tar.gz' },
++        true
++      )
++    ).toThrow('must declare a SHA-256 digest');
++    expect(() =>
++      validatePluginSource(
++        {
++          name: 'example',
++          archive: 'https://plugins.example/plugin.tar.gz',
++          sha256: '0'.repeat(64),
++        },
++        true
++      )
++    ).not.toThrow();
++  });
++
++  it('keeps the bundled default manifest backward compatible', () => {
++    expect(() =>
++      validatePluginSource(
++        { name: 'example', archive: 'https://plugins.example/plugin.tar.gz' },
++        false
++      )
++    ).not.toThrow();
++  });
++
 +  it('accepts a matching SHA-256 digest', () => {
 +    const archive = temporaryFile('plugin archive');
 +    const digest = crypto.createHash('sha256').update('plugin archive').digest('hex');
@@ -218,22 +250,33 @@ index 000000000..45d390f8b
 +  resolveBuildManifestPath,
 +};
 diff --git a/app/scripts/setup-plugins.js b/app/scripts/setup-plugins.js
-index 0393bdbef..53af4fae1 100644
+index 0393bdbef..604956192 100644
 --- a/app/scripts/setup-plugins.js
 +++ b/app/scripts/setup-plugins.js
-@@ -5,11 +5,31 @@ const glob = require('glob');
+@@ -5,11 +5,42 @@ const glob = require('glob');
  var zlib = require('zlib');
  const os = require('os');
  const https = require('https');
 +const crypto = require('node:crypto');
-+const { loadBuildManifest, resolveBuildManifestPath } = require('./build-manifest');
++const {
++  DEFAULT_MANIFEST_FILE,
++  loadBuildManifest,
++  resolveBuildManifestPath,
++} = require('./build-manifest');
  
  const PLUGIN_FOLDER = path.join(__dirname, '../../.plugins');
 -const MANIFEST_FILE = path.join(__dirname, '../app-build-manifest.json');
 +const MANIFEST_FILE = resolveBuildManifestPath();
 +const manifest = loadBuildManifest(MANIFEST_FILE);
++const externalManifest = MANIFEST_FILE !== DEFAULT_MANIFEST_FILE;
  
 -const manifest = require(MANIFEST_FILE);
++function validatePluginSource(plugin, requireDigest = externalManifest) {
++  if (plugin.archive && requireDigest && plugin.sha256 === undefined) {
++    throw new Error(`External plugin archive ${plugin.name} must declare a SHA-256 digest`);
++  }
++}
++
 +function verifyArchiveDigest(archivePath, expectedDigest) {
 +  if (expectedDigest === undefined) {
 +    return;
@@ -255,7 +298,7 @@ index 0393bdbef..53af4fae1 100644
  
  async function extractArchive(
    name,
-@@ -80,10 +100,26 @@ async function extractArchive(
+@@ -80,10 +111,26 @@ async function extractArchive(
    await p;
  }
  
@@ -284,7 +327,7 @@ index 0393bdbef..53af4fae1 100644
          // Image will be stored at this path
          if (res.statusCode >= 200 && res.statusCode < 300) {
            const filePath = fs.createWriteStream(path);
-@@ -99,8 +135,15 @@ function downloadFile(url, path) {
+@@ -99,8 +146,15 @@ function downloadFile(url, path) {
            });
          } else if (res.headers.location) {
            // Server responded with a redirect, fetch the resource at the new location
@@ -302,7 +345,7 @@ index 0393bdbef..53af4fae1 100644
          }
        })
        .on('error', err => {
-@@ -109,7 +152,7 @@ function downloadFile(url, path) {
+@@ -109,7 +163,7 @@ function downloadFile(url, path) {
    });
  }
  
@@ -311,7 +354,7 @@ index 0393bdbef..53af4fae1 100644
    // Download the archive and extract it into the plugins' location
    const archiveName = url.split('/').pop();
    // Create the plugin folder if it doesn't exist
-@@ -125,6 +168,7 @@ async function fetchArchive(name, url) {
+@@ -125,6 +179,7 @@ async function fetchArchive(name, url) {
    console.log('Downloading archive', url, 'to', archivePath, '...');
  
    await downloadFile(url, archivePath);
@@ -319,12 +362,13 @@ index 0393bdbef..53af4fae1 100644
  
    console.log('...done');
  
-@@ -139,16 +183,17 @@ async function main() {
+@@ -139,16 +194,18 @@ async function main() {
    // Fetch the plugins from the manifest
    if (!!plugins) {
      for (const plugin of plugins) {
 -      const { name, archive, file } = plugin;
 +      const { name, archive, file, sha256 } = plugin;
++      validatePluginSource(plugin);
  
        console.log('Setting up plugin', name, 'from', archive || file, '...');
  
@@ -339,7 +383,7 @@ index 0393bdbef..53af4fae1 100644
          await extractArchive(name, absPath);
        }
      }
-@@ -157,4 +202,13 @@ async function main() {
+@@ -157,4 +214,14 @@ async function main() {
    process.exit(0);
  }
  
@@ -352,6 +396,7 @@ index 0393bdbef..53af4fae1 100644
 +  downloadFile,
 +  fetchArchive,
 +  main,
++  validatePluginSource,
 +  verifyArchiveDigest,
 +};
 -- 
