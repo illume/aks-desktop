@@ -23,7 +23,7 @@
     "test:headlamp-package": "tsx --test build/headlamp-package.test.ts",
     "test:headlamp-patches": "npm patch ls && npm run test:headlamp-package",
     "test:post-build": "tsx ./build/verify-bundled-tools.ts",
-    "test:distribution": "npm run test:post-build && npm run headlamp:smoke",
+    "test:distribution": "npm run test:post-build && npm run headlamp:smoke --",
     "plugin:setup": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run bundle:plugins",
     "plugin:install": "cd plugins/aks-desktop && npm install",
     "plugin:build": "cd plugins/aks-desktop && npm run build",

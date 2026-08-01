@@ -9,7 +9,7 @@ import { afterEach, test } from 'node:test';
 
 import { HEADLAMP_PACKAGE_DIR } from './headlamp-path';
 
-const { copyPlugin } = require(
+const { copyPlugin, validatePluginConfiguration } = require(
   path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'bundle-plugins.js')
 );
 
@@ -112,4 +112,57 @@ test('rejects a plugin whose package identity does not match', () => {
     /Plugin package mismatch/
   );
   assert.equal(fs.existsSync(path.join(pluginsDir, 'expected-plugin')), false);
+});
+
+test('preserves staged bundles when package names overlap bundle names', () => {
+  const first = createPlugin('@example/first');
+  const secondRoot = path.dirname(first.pluginDir);
+  const secondPluginDir = path.join(secondRoot, 'second');
+  fs.mkdirSync(path.join(secondPluginDir, 'dist'), { recursive: true });
+  fs.writeFileSync(path.join(secondPluginDir, 'dist', 'main.js'), 'second bundle');
+  fs.writeFileSync(
+    path.join(secondPluginDir, 'package.json'),
+    JSON.stringify({ name: 'first' })
+  );
+
+  copyPlugin(
+    first.pluginDir,
+    first.pluginsDir,
+    {
+      name: 'first',
+      packageName: '@example/first',
+      source: 'plugins/first',
+    },
+    false
+  );
+  copyPlugin(
+    secondPluginDir,
+    first.pluginsDir,
+    {
+      name: 'second',
+      packageName: 'first',
+      source: 'plugins/second',
+    },
+    false
+  );
+
+  assert.equal(
+    fs.readFileSync(path.join(first.pluginsDir, 'first', 'main.js'), 'utf8'),
+    'plugin bundle'
+  );
+  assert.equal(
+    fs.readFileSync(path.join(first.pluginsDir, 'second', 'main.js'), 'utf8'),
+    'second bundle'
+  );
+});
+
+test('rejects case-insensitive bundle name collisions', () => {
+  assert.throws(
+    () =>
+      validatePluginConfiguration([
+        { name: 'example', packageName: '@one/example' },
+        { name: 'Example', packageName: '@two/example' },
+      ]),
+    /duplicate bundle names/
+  );
 });

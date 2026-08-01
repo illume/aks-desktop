@@ -28,6 +28,7 @@ test('the installed package is a complete pinned source distribution', () => {
   assert.equal(fs.lstatSync(HEADLAMP_PACKAGE_DIR).isSymbolicLink(), false);
   assert.equal(packageManifest.name, '@headlamp-k8s/headlamp-source');
   assert.equal(packageManifest.version, VERSION);
+  assert.deepEqual(packageManifest.files, ['source', 'scripts']);
   assert.equal(packageManifest.headlampSource.baseTag, 'v0.44.0');
   assert.equal(
     packageManifest.headlampSource.commit,
@@ -76,6 +77,10 @@ test('the source package exports app and container build scripts', () => {
   ]) {
     assert.equal(typeof packageManifest.scripts[script], 'string');
   }
+  assert.match(
+    rootManifest.scripts['test:distribution'],
+    /npm run headlamp:smoke --$/
+  );
 });
 
 test('source builds use explicit, reviewed install scripts', () => {
