@@ -1,0 +1,271 @@
+From 4356f2e9059ae0b24538e3a7a33c0b21e054faf6 Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 09:36:03 +0000
+Subject: [PATCH] aksd: require explicit command scope prefixes
+
+---
+ app/electron/preload.ts                       |  7 ++++-
+ app/electron/runCmd.test.ts                   | 30 +++++++++++++++++--
+ app/electron/runCmd.ts                        | 21 ++++++++-----
+ .../src/plugin/commandCapabilities.test.ts    | 29 ++++++++++++++----
+ frontend/src/plugin/commandCapabilities.ts    |  5 ++++
+ 5 files changed, 76 insertions(+), 16 deletions(-)
+
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index 45de91bcc..bc701763d 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -107,7 +107,12 @@ contextBridge.exposeInMainWorld('desktopApi', {
+     register: (
+       registrations: Array<{
+         pluginName: string;
+-        scopes: Array<{ command?: string; tool?: string; args: string[] }>;
++        scopes: Array<{
++          command?: string;
++          tool?: string;
++          args: string[];
++          allowTrailingArgs?: boolean;
++        }>;
+       }>
+     ) => ipcRenderer.invoke('register-plugin-command-capabilities', registrations),
+   },
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index f09ed4d8e..a9b6bb463 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -125,7 +125,7 @@ describe('plugin command capabilities', () => {
+     const { capabilities, scopeByCapability } = createCommandCapabilities([
+       {
+         pluginName: '@example/plugin',
+-        scopes: [{ command: 'kubectl', args: ['get'] }],
++        scopes: [{ command: 'kubectl', args: ['get'], allowTrailingArgs: true }],
+       },
+     ]);
+     const capability = capabilities['@example/plugin'][0].capability;
+@@ -158,6 +158,29 @@ describe('plugin command capabilities', () => {
+     ).toEqual([false, 'Command is outside its declared plugin scope']);
+   });
+ 
++  it('requires trailing arguments to be explicitly authorized', () => {
++    const { capabilities, scopeByCapability } = createCommandCapabilities([
++      {
++        pluginName: '@example/plugin',
++        scopes: [{ command: 'kubectl', args: ['get'] }],
++      },
++    ]);
++
++    expect(
++      checkCommandCapability(
++        {
++          id: '1',
++          command: 'kubectl',
++          args: ['get', 'pods'],
++          options: {},
++          permissionSecrets: {},
++          capability: capabilities['@example/plugin'][0].capability,
++        },
++        scopeByCapability
++      )
++    ).toEqual([false, 'Command is outside its declared plugin scope']);
++  });
++
+   it('ignores malformed and duplicate scopes', () => {
+     const { capabilities } = createCommandCapabilities([
+       {
+@@ -167,6 +190,7 @@ describe('plugin command capabilities', () => {
+           { command: 'kubectl', args: ['get'] },
+           { command: '../shell', args: [] },
+           { command: 'scriptjs', args: ['plugin/script.js'] },
++          { command: 'kubectl', args: ['get'], allowTrailingArgs: 'yes' },
+         ],
+       },
+     ]);
+@@ -491,7 +515,7 @@ describe('handleRunCommand - child process error event', () => {
+     const { capabilities, scopeByCapability } = createCommandCapabilities([
+       {
+         pluginName: '@example/plugin',
+-        scopes: [{ command: 'kubectl', args: ['get'] }],
++        scopes: [{ command: 'kubectl', args: ['get'], allowTrailingArgs: true }],
+       },
+     ]);
+     dialogMock.mockReturnValue(0);
+@@ -532,7 +556,7 @@ describe('handleRunCommand - child process error event', () => {
+       [
+         {
+           pluginName: '@example/plugin',
+-          scopes: [{ tool: 'example-cli', args: ['account'] }],
++          scopes: [{ tool: 'example-cli', args: ['account'], allowTrailingArgs: true }],
+         },
+       ],
+       new Map([['example-cli', '/resources/bin/example']])
+diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
+index 6f8b1e8e3..5a3152fbe 100644
+--- a/app/electron/runCmd.ts
++++ b/app/electron/runCmd.ts
+@@ -51,6 +51,7 @@ interface PluginCommandScope {
+   command?: string;
+   tool?: string;
+   args: string[];
++  allowTrailingArgs?: boolean;
+ }
+ 
+ interface PluginCommandCapability extends PluginCommandScope {
+@@ -83,7 +84,7 @@ function validCommandScope(
+   if (typeof scope !== 'object' || scope === null) {
+     return false;
+   }
+-  const { command, tool, args } = scope as Partial<PluginCommandScope>;
++  const { command, tool, args, allowTrailingArgs } = scope as Partial<PluginCommandScope>;
+   const hasCommand = typeof command === 'string';
+   const hasTool = typeof tool === 'string';
+   return (
+@@ -98,6 +99,7 @@ function validCommandScope(
+         externalTools.has(tool))) &&
+     Array.isArray(args) &&
+     args.length <= MAX_ARGUMENTS &&
++    (allowTrailingArgs === undefined || typeof allowTrailingArgs === 'boolean') &&
+     args.every(
+       argument =>
+         typeof argument === 'string' &&
+@@ -141,7 +143,12 @@ export function createCommandCapabilities(
+       if (!validCommandScope(scope, externalTools)) {
+         continue;
+       }
+-      const scopeKey = JSON.stringify([scope.command, scope.tool, scope.args]);
++      const scopeKey = JSON.stringify([
++        scope.command,
++        scope.tool,
++        scope.args,
++        scope.allowTrailingArgs === true,
++      ]);
+       if (seenScopes.has(scopeKey)) {
+         continue;
+       }
+@@ -175,11 +182,11 @@ function getCommandCapabilityScope(
+     typeof commandData.capability === 'string'
+       ? scopeByCapability.get(commandData.capability)
+       : undefined;
+-  if (
+-    !scope ||
+-    (scope.command ?? scope.tool) !== commandData.command ||
+-    !scope.args.every((argument, index) => argument === commandData.args[index])
+-  ) {
++  const argsMatch =
++    scope &&
++    (scope.allowTrailingArgs === true || scope.args.length === commandData.args.length) &&
++    scope.args.every((argument, index) => argument === commandData.args[index]);
++  if (!scope || (scope.command ?? scope.tool) !== commandData.command || !argsMatch) {
+     return undefined;
+   }
+   return scope;
+diff --git a/frontend/src/plugin/commandCapabilities.test.ts b/frontend/src/plugin/commandCapabilities.test.ts
+index 012f952b4..4746946bb 100644
+--- a/frontend/src/plugin/commandCapabilities.test.ts
++++ b/frontend/src/plugin/commandCapabilities.test.ts
+@@ -18,15 +18,18 @@ import { describe, expect, it } from 'vitest';
+ import { findCommandCapability, getDeclaredCommandScopes } from './commandCapabilities';
+ 
+ describe('getDeclaredCommandScopes', () => {
+-  it('reads exact command and argument-prefix scopes', () => {
++  it('reads exact and explicit argument-prefix scopes', () => {
+     expect(
+       getDeclaredCommandScopes({
+         headlamp: {
+-          runCommands: [{ command: 'kubectl', args: ['get'] }, { command: 'az' }],
++          runCommands: [
++            { command: 'kubectl', args: ['get'], allowTrailingArgs: true },
++            { command: 'az' },
++          ],
+         },
+       })
+     ).toEqual([
+-      { command: 'kubectl', args: ['get'] },
++      { command: 'kubectl', args: ['get'], allowTrailingArgs: true },
+       { command: 'az', args: [] },
+     ]);
+   });
+@@ -39,6 +42,7 @@ describe('getDeclaredCommandScopes', () => {
+             { command: '../shell', args: [] },
+             { command: 'kubectl', args: 'get' },
+             { command: 'az', tool: 'azure-cli', args: [] },
++            { command: 'kubectl', args: ['get'], allowTrailingArgs: 'yes' },
+             { command: 'az', args: ['account'] },
+             { tool: 'azure-cli', args: ['account'] },
+           ],
+@@ -53,15 +57,30 @@ describe('getDeclaredCommandScopes', () => {
+ 
+ describe('findCommandCapability', () => {
+   const capabilities = [
+-    { command: 'kubectl', args: ['get'], capability: 'get-capability' },
++    {
++      command: 'kubectl',
++      args: ['get'],
++      allowTrailingArgs: true,
++      capability: 'get-capability',
++    },
+     { command: 'kubectl', args: ['delete'], capability: 'delete-capability' },
+-    { tool: 'azure-cli', args: ['account'], capability: 'tool-capability' },
++    {
++      tool: 'azure-cli',
++      args: ['account'],
++      allowTrailingArgs: true,
++      capability: 'tool-capability',
++    },
+   ];
+ 
+   it('matches a declared argument prefix', () => {
+     expect(findCommandCapability(capabilities, 'kubectl', ['get', 'pods'])).toBe('get-capability');
+   });
+ 
++  it('requires an exact argument match by default', () => {
++    expect(findCommandCapability(capabilities, 'kubectl', ['delete', 'pods'])).toBeUndefined();
++    expect(findCommandCapability(capabilities, 'kubectl', ['delete'])).toBe('delete-capability');
++  });
++
+   it('rejects a command outside the declared scope', () => {
+     expect(findCommandCapability(capabilities, 'kubectl', ['apply', '-f', 'pod.yaml'])).toBe(
+       undefined
+diff --git a/frontend/src/plugin/commandCapabilities.ts b/frontend/src/plugin/commandCapabilities.ts
+index 7e2137285..19df442a4 100644
+--- a/frontend/src/plugin/commandCapabilities.ts
++++ b/frontend/src/plugin/commandCapabilities.ts
+@@ -24,6 +24,7 @@ export interface PluginCommandScope {
+   command?: string;
+   tool?: string;
+   args: string[];
++  allowTrailingArgs?: boolean;
+ }
+ 
+ export interface PluginCommandCapability extends PluginCommandScope {
+@@ -38,10 +39,12 @@ function isValidScope(scope: unknown): scope is PluginCommandScope {
+     command,
+     tool,
+     args = [],
++    allowTrailingArgs,
+   } = scope as {
+     command?: unknown;
+     tool?: unknown;
+     args?: unknown;
++    allowTrailingArgs?: unknown;
+   };
+   const hasCommand = typeof command === 'string';
+   const hasTool = typeof tool === 'string';
+@@ -51,6 +54,7 @@ function isValidScope(scope: unknown): scope is PluginCommandScope {
+       (hasTool && tool.length <= MAX_COMMAND_LENGTH && VALID_COMMAND.test(tool))) &&
+     Array.isArray(args) &&
+     args.length <= MAX_ARGUMENTS &&
++    (allowTrailingArgs === undefined || typeof allowTrailingArgs === 'boolean') &&
+     args.every(
+       arg => typeof arg === 'string' && arg.length <= MAX_ARGUMENT_LENGTH && !arg.includes('\0')
+     )
+@@ -80,6 +84,7 @@ export function findCommandCapability(
+   return capabilities.find(
+     scope =>
+       (scope.command ?? scope.tool) === command &&
++      (scope.allowTrailingArgs === true || scope.args.length === args.length) &&
+       scope.args.every((argument, index) => argument === args[index])
+   )?.capability;
+ }
+-- 
+2.54.0
+

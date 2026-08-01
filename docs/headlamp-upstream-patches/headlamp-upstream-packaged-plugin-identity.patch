@@ -1,0 +1,117 @@
+From 4396487fba9771e9e5752255c173360cfdb787a9 Mon Sep 17 00:00:00 2001
+From: GitHub Copilot <copilot@github.com>
+Date: Sat, 1 Aug 2026 09:33:12 +0000
+Subject: [PATCH] upstreamable: verify packaged plugin identities
+
+---
+ app/electron/build-manifest.test.ts | 21 +++++++++++++++++++++
+ app/scripts/setup-plugins.js        | 23 ++++++++++++++++++++++-
+ 2 files changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/app/electron/build-manifest.test.ts b/app/electron/build-manifest.test.ts
+index d4b280ecc..18ee93d8c 100644
+--- a/app/electron/build-manifest.test.ts
++++ b/app/electron/build-manifest.test.ts
+@@ -32,6 +32,7 @@ const {
+   downloadFile,
+   validatePluginSource,
+   verifyArchiveDigest,
++  verifyPluginIdentity,
+ } = require('../scripts/setup-plugins');
+ 
+ const temporaryDirectories: string[] = [];
+@@ -93,6 +94,7 @@ describe('plugin archive integrity', () => {
+       validatePluginSource(
+         {
+           name: 'example',
++          packageName: '@example/plugin',
+           archive: 'https://plugins.example/plugin.tar.gz',
+           sha256: '0'.repeat(64),
+         },
+@@ -101,6 +103,25 @@ describe('plugin archive integrity', () => {
+     ).not.toThrow();
+   });
+ 
++  it('requires and verifies packaged plugin identities', () => {
++    expect(() =>
++      validatePluginSource(
++        {
++          name: 'example',
++          archive: 'https://plugins.example/plugin.tar.gz',
++          sha256: '0'.repeat(64),
++        },
++        true
++      )
++    ).toThrow('must declare a valid package name');
++
++    const packageJson = temporaryFile('{"name":"@example/plugin"}');
++    expect(() => verifyPluginIdentity(packageJson, '@example/plugin')).not.toThrow();
++    expect(() => verifyPluginIdentity(packageJson, '@other/plugin')).toThrow(
++      'Plugin package name mismatch'
++    );
++  });
++
+   it('keeps the bundled default manifest backward compatible', () => {
+     expect(() =>
+       validatePluginSource(
+diff --git a/app/scripts/setup-plugins.js b/app/scripts/setup-plugins.js
+index 005781f06..55f13dc51 100644
+--- a/app/scripts/setup-plugins.js
++++ b/app/scripts/setup-plugins.js
+@@ -16,11 +16,30 @@ const PLUGIN_FOLDER = path.join(__dirname, '../../.plugins');
+ const MANIFEST_FILE = resolveBuildManifestPath();
+ const manifest = loadBuildManifest(MANIFEST_FILE);
+ const externalManifest = MANIFEST_FILE !== DEFAULT_MANIFEST_FILE;
++const VALID_PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
+ 
+ function validatePluginSource(plugin, requireDigest = externalManifest) {
+   if (plugin.archive && requireDigest && plugin.sha256 === undefined) {
+     throw new Error(`External plugin archive ${plugin.name} must declare a SHA-256 digest`);
+   }
++  if (
++    requireDigest &&
++    (typeof plugin.packageName !== 'string' || !VALID_PACKAGE_NAME.test(plugin.packageName))
++  ) {
++    throw new Error(`External plugin ${plugin.name} must declare a valid package name`);
++  }
++}
++
++function verifyPluginIdentity(packageJsonPath, expectedPackageName) {
++  if (expectedPackageName === undefined) {
++    return;
++  }
++  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
++  if (packageJson.name !== expectedPackageName) {
++    throw new Error(
++      `Plugin package name mismatch: expected ${expectedPackageName}, got ${packageJson.name}`
++    );
++  }
+ }
+ 
+ function verifyArchiveDigest(archivePath, expectedDigest) {
+@@ -194,7 +213,7 @@ async function main() {
+   // Fetch the plugins from the manifest
+   if (!!plugins) {
+     for (const plugin of plugins) {
+-      const { name, archive, file, enabledByDefault, sha256 } = plugin;
++      const { name, packageName, archive, file, enabledByDefault, sha256 } = plugin;
+       validatePluginSource(plugin);
+ 
+       console.log('Setting up plugin', name, 'from', archive || file, '...');
+@@ -211,6 +230,7 @@ async function main() {
+ 
+       const pluginFolder = path.join(PLUGIN_FOLDER, name);
+       const packageJsonPath = path.join(pluginFolder, 'package.json');
++      verifyPluginIdentity(packageJsonPath, packageName);
+ 
+       if (enabledByDefault !== undefined && fs.existsSync(packageJsonPath)) {
+         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+@@ -236,4 +256,5 @@ module.exports = {
+   main,
+   validatePluginSource,
+   verifyArchiveDigest,
++  verifyPluginIdentity,
+ };
+-- 
+2.54.0
+
