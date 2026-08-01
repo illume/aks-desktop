@@ -1,0 +1,453 @@
+From 75bf6358d31adba049c3598eb18a952e277c7936 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Sat, 1 Aug 2026 07:10:06 +0000
+Subject: [PATCH] aksd: externalize verified plugin bundle policy
+
+---
+ app/app-build-manifest.json         |  14 ++--
+ app/electron-builder.config.js      |  94 ++++------------------
+ app/electron/build-manifest.test.ts | 119 ++++++++++++++++++++++++++++
+ app/package.json                    |   2 +-
+ app/scripts/build-manifest.js       |  21 +++++
+ app/scripts/setup-plugins.js        |  74 ++++++++++++++---
+ 6 files changed, 231 insertions(+), 93 deletions(-)
+ create mode 100644 app/electron/build-manifest.test.ts
+ create mode 100644 app/scripts/build-manifest.js
+
+diff --git a/app/app-build-manifest.json b/app/app-build-manifest.json
+index 06226af19..b444c77c3 100644
+--- a/app/app-build-manifest.json
++++ b/app/app-build-manifest.json
+@@ -1,13 +1,17 @@
+ {
++  "proxy-urls": ["https://artifacthub.io/*"],
+   "plugins": [
+     {
+-      "name": "prometheus",
+-      "archive": "https://github.com/headlamp-k8s/plugins/releases/download/prometheus-0.9.0/prometheus-0.9.0.tar.gz"
++      "name": "app-catalog",
++      "archive": "https://github.com/headlamp-k8s/plugins/releases/download/app-catalog-0.9.1/app-catalog-0.9.1.tar.gz"
++    },
++    {
++      "name": "plugin-catalog",
++      "archive": "https://github.com/headlamp-k8s/plugins/releases/download/plugin-catalog-0.4.4/headlamp-k8s-plugin-catalog-0.4.4.tar.gz"
+     },
+     {
+-      "name": "kaito",
+-      "archive": "https://github.com/kaito-project/headlamp-kaito/releases/download/0.0.7/headlamp-kaito-0.0.7.tar.gz",
+-      "enabled": false
++      "name": "prometheus",
++      "archive": "https://github.com/headlamp-k8s/plugins/releases/download/prometheus-0.9.1/prometheus-0.9.1.tar.gz"
+     }
+   ]
+ }
+diff --git a/app/electron-builder.config.js b/app/electron-builder.config.js
+index fe74d128e..4a1093830 100644
+--- a/app/electron-builder.config.js
++++ b/app/electron-builder.config.js
+@@ -1,83 +1,23 @@
+-// Portions (c) Microsoft Corp.
++'use strict';
+ 
+-const fs = require('fs');
+-const path = require('path');
++const packageJson = require('./package.json');
++const path = require('node:path');
++const { DEFAULT_MANIFEST_FILE, resolveBuildManifestPath } = require('./scripts/build-manifest');
+ 
+-// Read AKS desktop version from the root package.json
+-// Try multiple possible locations to handle different working directory contexts
+-let aksDesktopVersion;
+-const possiblePaths = [
+-  path.join(__dirname, '../../package.json'), // Normal case: from headlamp/app in monorepo
+-  path.join(__dirname, '../package.json'), // Standalone headlamp: use headlamp's package.json
+-  path.join(process.cwd(), '../../package.json'), // Relative to current working directory
+-  path.join(__dirname, '../../../package.json'), // In case we're in a nested context
+-];
++const manifestFile = resolveBuildManifestPath();
++const defaultManifest = path.resolve(DEFAULT_MANIFEST_FILE);
+ 
+-let foundPath = null;
+-for (const pkgPath of possiblePaths) {
+-  try {
+-    if (fs.existsSync(pkgPath)) {
+-      const aksDesktopPackageJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+-      aksDesktopVersion = aksDesktopPackageJson.version;
+-      foundPath = pkgPath;
+-      console.log(`Successfully read AKS desktop version ${aksDesktopVersion} from ${pkgPath}`);
+-      break;
++module.exports = {
++  ...packageJson.build,
++  extraResources: packageJson.build.extraResources.map(resource => {
++    if (path.resolve(__dirname, resource.from) !== defaultManifest) {
++      return resource;
+     }
+-  } catch (e) {
+-    // Continue to next path
+-  }
+-}
+-
+-if (!aksDesktopVersion) {
+-  console.error('Could not read AKS desktop version from package.json');
+-  console.error('Tried the following paths:');
+-  possiblePaths.forEach(p => console.error(`  - ${p}`));
+-  console.error(`__dirname: ${__dirname}`);
+-  console.error(`process.cwd(): ${process.cwd()}`);
+-  process.exit(1);
+-}
+ 
+-// Read the base package.json to get the build configuration
+-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+-
+-// Override the build configuration with the AKS desktop version
+-const config = {
+-  ...packageJson.build,
+-  buildVersion: aksDesktopVersion,
+-  // Use buildVersion in artifact names
+-  artifactName: '${name}-' + aksDesktopVersion + '-${os}-${arch}.${ext}',
+-  // Override Mac-specific version settings
+-  mac: {
+-    ...packageJson.build.mac,
+-    // Set CFBundleShortVersionString and CFBundleVersion to use AKS desktop version
+-    // This ensures the Mac app shows the correct version in Finder, About dialog, etc.
+-    bundleShortVersion: aksDesktopVersion,
+-    bundleVersion: aksDesktopVersion,
+-  },
++    return {
++      ...resource,
++      from: manifestFile,
++      to: 'app-build-manifest.json',
++    };
++  }),
+ };
+-
+-// Override the deb artifactName as well
+-if (config.deb) {
+-  config.deb = {
+-    ...config.deb,
+-    artifactName: '${name}_' + aksDesktopVersion + '-1_${arch}.${ext}',
+-  };
+-}
+-
+-// Override productName for Linux builds to avoid spaces in installation path
+-if (
+-  process.argv.includes('--linux') &&
+-  !process.argv.includes('--win') &&
+-  !process.argv.includes('--mac')
+-) {
+-  config.productName = 'AKS-Desktop';
+-}
+-
+-// On non-Mac platforms, ensure dmg-license is truly optional by not including Mac targets during --dir builds
+-// This prevents electron-builder from trying to validate Mac-specific dependencies on Linux/Windows
+-if (process.env.npm_lifecycle_event === 'build' && process.platform !== 'darwin') {
+-  // For unpacked builds on non-Mac, don't include Mac configuration
+-  delete config.mac;
+-}
+-
+-module.exports = config;
+diff --git a/app/electron/build-manifest.test.ts b/app/electron/build-manifest.test.ts
+new file mode 100644
+index 000000000..c9c7668f2
+--- /dev/null
++++ b/app/electron/build-manifest.test.ts
+@@ -0,0 +1,119 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import nock from 'nock';
++import crypto from 'node:crypto';
++import fs from 'node:fs';
++import { createRequire } from 'node:module';
++import os from 'node:os';
++import path from 'node:path';
++import { afterEach, describe, expect, it } from 'vitest';
++
++const require = createRequire(import.meta.url);
++const {
++  DEFAULT_MANIFEST_FILE,
++  loadBuildManifest,
++  resolveBuildManifestPath,
++} = require('../scripts/build-manifest');
++const { downloadFile, verifyArchiveDigest } = require('../scripts/setup-plugins');
++
++const temporaryDirectories: string[] = [];
++
++afterEach(() => {
++  nock.cleanAll();
++  delete process.env.HEADLAMP_BUILD_MANIFEST;
++  delete require.cache[require.resolve('../electron-builder.config')];
++  temporaryDirectories
++    .splice(0)
++    .forEach(directory => fs.rmSync(directory, { recursive: true, force: true }));
++});
++
++function temporaryFile(contents: string): string {
++  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-build-manifest-'));
++  temporaryDirectories.push(directory);
++  const file = path.join(directory, 'manifest.json');
++  fs.writeFileSync(file, contents);
++  return file;
++}
++
++describe('build manifest selection', () => {
++  it('uses Headlamp defaults when no product manifest is configured', () => {
++    expect(resolveBuildManifestPath({}, '/product')).toBe(DEFAULT_MANIFEST_FILE);
++  });
++
++  it('resolves an external product manifest from the build directory', () => {
++    expect(
++      resolveBuildManifestPath({ HEADLAMP_BUILD_MANIFEST: './product.json' }, '/product')
++    ).toBe('/product/product.json');
++  });
++
++  it('loads the selected manifest', () => {
++    const manifestFile = temporaryFile('{"plugins":[{"name":"example"}]}');
++    expect(loadBuildManifest(manifestFile)).toEqual({ plugins: [{ name: 'example' }] });
++  });
++
++  it('packages the selected manifest under the runtime filename', () => {
++    const manifestFile = temporaryFile('{"plugins":[]}');
++    process.env.HEADLAMP_BUILD_MANIFEST = manifestFile;
++
++    const config = require('../electron-builder.config');
++    expect(config.extraResources).toContainEqual({
++      from: manifestFile,
++      to: 'app-build-manifest.json',
++    });
++  });
++});
++
++describe('plugin archive integrity', () => {
++  it('accepts a matching SHA-256 digest', () => {
++    const archive = temporaryFile('plugin archive');
++    const digest = crypto.createHash('sha256').update('plugin archive').digest('hex');
++    expect(() => verifyArchiveDigest(archive, digest)).not.toThrow();
++  });
++
++  describe('plugin archive download', () => {
++    it('rejects unsuccessful responses instead of hanging', async () => {
++      const destination = temporaryFile('');
++      nock('https://plugins.example').get('/missing.tar.gz').reply(404);
++
++      await expect(
++        downloadFile('https://plugins.example/missing.tar.gz', destination)
++      ).rejects.toThrow('status 404');
++    });
++
++    it('rejects redirects that downgrade to plain HTTP', async () => {
++      const destination = temporaryFile('');
++      nock('https://plugins.example')
++        .get('/plugin.tar.gz')
++        .reply(302, undefined, { Location: 'http://plugins.example/plugin.tar.gz' });
++
++      await expect(
++        downloadFile('https://plugins.example/plugin.tar.gz', destination)
++      ).rejects.toThrow('must use HTTPS');
++    });
++  });
++
++  it('rejects mismatched and malformed digests', () => {
++    const archive = temporaryFile('plugin archive');
++    expect(() => verifyArchiveDigest(archive, '0'.repeat(64))).toThrow('SHA-256 mismatch');
++    expect(() => verifyArchiveDigest(archive, 'not-a-digest')).toThrow('Invalid SHA-256');
++  });
++
++  it('keeps manifests without digests backward compatible', () => {
++    const archive = temporaryFile('plugin archive');
++    expect(() => verifyArchiveDigest(archive, undefined)).not.toThrow();
++  });
++});
+diff --git a/app/package.json b/app/package.json
+index f14835eee..c74794572 100644
+--- a/app/package.json
++++ b/app/package.json
+@@ -23,7 +23,7 @@
+     "i18n-check": "npm run i18n -- --fail-on-update",
+     "lint": "cd .. && npm run frontend:lint",
+     "lint-fix": "cd .. && npm run frontend:lint:fix",
+-    "package": "npm run build && electron-builder build --config electron-builder.config.js --publish never",
++    "package": "npm run build && electron-builder --config electron-builder.config.js build --publish never",
+     "package-msi": "npm run build && node windows/msi/build.js",
+     "start": "node scripts/start.js",
+     "star": "node scripts/start.js --star",
+diff --git a/app/scripts/build-manifest.js b/app/scripts/build-manifest.js
+new file mode 100644
+index 000000000..45d390f8b
+--- /dev/null
++++ b/app/scripts/build-manifest.js
+@@ -0,0 +1,21 @@
++'use strict';
++
++const fs = require('node:fs');
++const path = require('node:path');
++
++const DEFAULT_MANIFEST_FILE = path.join(__dirname, '../app-build-manifest.json');
++
++function resolveBuildManifestPath(env = process.env, cwd = process.cwd()) {
++  const configuredPath = env.HEADLAMP_BUILD_MANIFEST;
++  return configuredPath ? path.resolve(cwd, configuredPath) : DEFAULT_MANIFEST_FILE;
++}
++
++function loadBuildManifest(manifestFile = resolveBuildManifestPath()) {
++  return JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
++}
++
++module.exports = {
++  DEFAULT_MANIFEST_FILE,
++  loadBuildManifest,
++  resolveBuildManifestPath,
++};
+diff --git a/app/scripts/setup-plugins.js b/app/scripts/setup-plugins.js
+index 2f497e927..5faa33a34 100644
+--- a/app/scripts/setup-plugins.js
++++ b/app/scripts/setup-plugins.js
+@@ -7,11 +7,31 @@ const glob = require('glob');
+ var zlib = require('zlib');
+ const os = require('os');
+ const https = require('https');
++const crypto = require('node:crypto');
++const { loadBuildManifest, resolveBuildManifestPath } = require('./build-manifest');
+ 
+ const PLUGIN_FOLDER = path.join(__dirname, '../../.plugins');
+-const MANIFEST_FILE = path.join(__dirname, '../app-build-manifest.json');
++const MANIFEST_FILE = resolveBuildManifestPath();
++const manifest = loadBuildManifest(MANIFEST_FILE);
+ 
+-const manifest = require(MANIFEST_FILE);
++function verifyArchiveDigest(archivePath, expectedDigest) {
++  if (expectedDigest === undefined) {
++    return;
++  }
++  if (!/^[a-f0-9]{64}$/i.test(expectedDigest)) {
++    throw new Error(`Invalid SHA-256 digest for plugin archive: ${expectedDigest}`);
++  }
++
++  const actualDigest = crypto
++    .createHash('sha256')
++    .update(fs.readFileSync(archivePath))
++    .digest('hex');
++  if (actualDigest.toLowerCase() !== expectedDigest.toLowerCase()) {
++    throw new Error(
++      `Plugin archive SHA-256 mismatch: expected ${expectedDigest}, got ${actualDigest}`
++    );
++  }
++}
+ 
+ async function extractArchive(
+   name,
+@@ -82,10 +102,26 @@ async function extractArchive(
+   await p;
+ }
+ 
+-function downloadFile(url, path) {
++function downloadFile(url, path, redirectCount = 0) {
+   return new Promise((resolve, reject) => {
++    let parsedUrl;
++    try {
++      parsedUrl = new URL(url);
++    } catch {
++      reject(new Error(`Invalid plugin archive URL: ${url}`));
++      return;
++    }
++    if (parsedUrl.protocol !== 'https:') {
++      reject(new Error(`Plugin archive URL must use HTTPS: ${url}`));
++      return;
++    }
++    if (redirectCount > 5) {
++      reject(new Error(`Too many redirects while downloading plugin archive: ${url}`));
++      return;
++    }
++
+     https
+-      .get(url, res => {
++      .get(parsedUrl, res => {
+         // Image will be stored at this path
+         if (res.statusCode >= 200 && res.statusCode < 300) {
+           const filePath = fs.createWriteStream(path);
+@@ -101,8 +137,15 @@ function downloadFile(url, path) {
+           });
+         } else if (res.headers.location) {
+           // Server responded with a redirect, fetch the resource at the new location
+-          console.log('Redirecting to ', res.headers.location);
+-          downloadFile(res.headers.location, path).then(resolve).catch(reject);
++          const redirectUrl = new URL(res.headers.location, parsedUrl).toString();
++          console.log('Redirecting to ', redirectUrl);
++          res.resume();
++          downloadFile(redirectUrl, path, redirectCount + 1)
++            .then(resolve)
++            .catch(reject);
++        } else {
++          res.resume();
++          reject(new Error(`Plugin archive download failed with status ${res.statusCode}: ${url}`));
+         }
+       })
+       .on('error', err => {
+@@ -111,7 +154,7 @@ function downloadFile(url, path) {
+   });
+ }
+ 
+-async function fetchArchive(name, url) {
++async function fetchArchive(name, url, sha256) {
+   // Download the archive and extract it into the plugins' location
+   const archiveName = url.split('/').pop();
+   // Create the plugin folder if it doesn't exist
+@@ -127,6 +170,7 @@ async function fetchArchive(name, url) {
+   console.log('Downloading archive', url, 'to', archivePath, '...');
+ 
+   await downloadFile(url, archivePath);
++  verifyArchiveDigest(archivePath, sha256);
+ 
+   console.log('...done');
+ 
+@@ -141,16 +185,17 @@ async function main() {
+   // Fetch the plugins from the manifest
+   if (!!plugins) {
+     for (const plugin of plugins) {
+-      const { name, archive, file, enabled } = plugin;
++      const { name, archive, file, enabled, sha256 } = plugin;
+ 
+       console.log('Setting up plugin', name, 'from', archive || file, '...');
+ 
+       if (!!archive) {
+-        await fetchArchive(name, archive);
++        await fetchArchive(name, archive, sha256);
+       }
+ 
+       if (!!file) {
+         const absPath = path.join(path.dirname(MANIFEST_FILE), file);
++        verifyArchiveDigest(absPath, sha256);
+         await extractArchive(name, absPath);
+       }
+ 
+@@ -174,4 +219,13 @@ async function main() {
+   process.exit(0);
+ }
+ 
+-main();
++if (require.main === module) {
++  main();
++}
++
++module.exports = {
++  downloadFile,
++  fetchArchive,
++  main,
++  verifyArchiveDigest,
++};
+-- 
+2.54.0
+
