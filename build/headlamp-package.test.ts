@@ -10,8 +10,6 @@ import {
   HEADLAMP_SOURCE_DIR,
   ROOT_DIR,
 } from './headlamp-path';
-import { packagedExecutableCandidates } from './smoke-headlamp';
-
 const VERSION = '0.44.0-main.99a230be';
 const packageManifest = JSON.parse(
   fs.readFileSync(path.join(HEADLAMP_PACKAGE_DIR, 'package.json'), 'utf8')
@@ -21,6 +19,9 @@ const rootManifest = JSON.parse(
 );
 const packageLock = JSON.parse(
   fs.readFileSync(path.join(ROOT_DIR, 'package-lock.json'), 'utf8')
+);
+const { packagedExecutableCandidates } = require(
+  path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'smoke-app.js')
 );
 
 test('the installed package is a complete pinned source distribution', () => {
@@ -70,6 +71,8 @@ test('the source package exports app and container build scripts', () => {
     'build:app:win',
     'build:container',
     'build:plugins-container',
+    'bundle:plugins',
+    'smoke:app',
   ]) {
     assert.equal(typeof packageManifest.scripts[script], 'string');
   }

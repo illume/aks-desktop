@@ -24,7 +24,7 @@
     "test:headlamp-patches": "npm patch ls && npm run test:headlamp-package",
     "test:post-build": "tsx ./build/verify-bundled-tools.ts",
     "test:distribution": "npm run test:post-build && npm run headlamp:smoke",
-    "plugin:setup": "tsx ./build/setup-plugins.ts",
+    "plugin:setup": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run bundle:plugins",
     "plugin:install": "cd plugins/aks-desktop && npm install",
     "plugin:build": "cd plugins/aks-desktop && npm run build",
     "plugin:start": "cd plugins/aks-desktop && npm start",
@@ -40,9 +40,10 @@
     "ai-assistant:lint": "cd plugins/ai-assistant && npm run lint",
     "ai-assistant:format": "cd plugins/ai-assistant && npm run format",
     "headlamp:manifest": "tsx ./build/generate-headlamp-manifest.ts",
-    "headlamp:assemble": "npm run plugin:setup && npm run headlamp:manifest",
+    "headlamp:assemble": "npm run headlamp:tools && npm run plugin:setup && npm run headlamp:manifest",
     "headlamp:doctor": "npm run test:headlamp-package && tsx ./build/generate-headlamp-manifest.ts --check",
-    "headlamp:smoke": "tsx ./build/smoke-headlamp.ts",
+    "headlamp:smoke": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run smoke:app --",
+    "headlamp:tools": "tsx ./build/setup-external-tools.ts",
     "headlamp:install": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run install:all",
     "headlamp:build": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run build",
     "install:all": "npm run headlamp:install && npm run plugin:install && npm run ai-assistant:install",
@@ -78,6 +79,188 @@
         }
       }
     }
+  },
+  "headlamp": {
+    "product": {
+      "name": "aks-desktop",
+      "productName": "AKS Desktop",
+      "appId": "com.microsoft.aksdesktop",
+      "artifactName": "aks-desktop-${version}-${os}-${arch}.${ext}",
+      "protocols": {
+        "name": "AKS Desktop",
+        "schemes": [
+          "aks-desktop"
+        ]
+      }
+    },
+    "checkForUpdates": false,
+    "legalDocuments": [
+      {
+        "id": "license",
+        "title": "AKS Desktop license",
+        "file": "AKS_DESKTOP_LICENSE.txt"
+      },
+      {
+        "id": "notices",
+        "title": "AKS Desktop notices",
+        "file": "AKS_DESKTOP_NOTICE.md"
+      }
+    ],
+    "platforms": {
+      "linux": {
+        "executableName": "aks-desktop"
+      },
+      "mac": {
+        "appId": "com.microsoft.aksdesktop",
+        "executableName": "aks-desktop"
+      },
+      "win": {
+        "executableName": "aks-desktop"
+      }
+    },
+    "plugins": [
+      {
+        "name": "aks-desktop",
+        "packageName": "aks-desktop",
+        "source": "plugins/aks-desktop",
+        "enabledByDefault": true,
+        "capabilities": {
+          "runCommands": [
+            {
+              "tool": "az",
+              "args": [
+                "account"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "acr"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "aks"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "alerts-management"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "config"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "connectedk8s"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "extension"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "feature"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "graph"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "group"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "login"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "logout"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "monitor"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "role"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "version"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "tool": "az",
+              "args": [
+                "vm"
+              ],
+              "allowTrailingArgs": true
+            },
+            {
+              "command": "kubectl",
+              "args": [
+                "config"
+              ],
+              "allowTrailingArgs": true
+            }
+          ]
+        }
+      },
+      {
+        "name": "ai-assistant",
+        "packageName": "@headlamp-k8s/ai-assistant",
+        "source": "plugins/ai-assistant",
+        "enabledByDefault": true
+      },
+      {
+        "name": "insights-plugin",
+        "packageName": "insights-plugin",
+        "source": "plugins/insights-plugin",
+        "enabledByDefault": true
+      }
+    ]
   },
   "devDependencies": {
     "@headlamp-k8s/headlamp-source": "0.44.0-main.99a230be",

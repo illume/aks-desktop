@@ -7,7 +7,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, test } from 'node:test';
 
-import { copyShippedPlugin } from './plugin-packaging';
+import { HEADLAMP_PACKAGE_DIR } from './headlamp-path';
+
+const { copyPlugin } = require(
+  path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'bundle-plugins.js')
+);
 
 const tempDirs: string[] = [];
 
@@ -44,7 +48,11 @@ test('copies a scoped plugin to a direct shipped-plugin directory', () => {
   fs.mkdirSync(existingTargetDir, { recursive: true });
   fs.writeFileSync(path.join(existingTargetDir, 'stale.js'), 'stale bundle');
 
-  const targetDir = copyShippedPlugin(pluginDir, pluginsDir, packageName);
+  const targetDir = copyPlugin(pluginDir, pluginsDir, {
+    name: 'ai-assistant',
+    packageName,
+    source: 'plugins/ai-assistant',
+  });
 
   assert.equal(targetDir, path.join(pluginsDir, 'ai-assistant'));
   assert.equal(fs.existsSync(path.join(targetDir, 'main.js')), true);
@@ -62,13 +70,17 @@ test('preserves the directory name for an unscoped plugin', () => {
   const packageName = 'aks-desktop';
   const { pluginDir, pluginsDir } = createPlugin(packageName);
 
-  const targetDir = copyShippedPlugin(pluginDir, pluginsDir, packageName);
+  const targetDir = copyPlugin(pluginDir, pluginsDir, {
+    name: packageName,
+    packageName,
+    source: `plugins/${packageName}`,
+  });
 
   assert.equal(targetDir, path.join(pluginsDir, packageName));
   assert.equal(fs.existsSync(path.join(targetDir, 'main.js')), true);
 });
 
-test('rejects plugin paths outside the shipped-plugin directory', () => {
+test('rejects unsafe plugin bundle names', () => {
   const packageName = '../outside';
   const { pluginDir, pluginsDir } = createPlugin(packageName);
   const outsideDir = path.join(path.dirname(pluginsDir), 'outside');
@@ -76,8 +88,28 @@ test('rejects plugin paths outside the shipped-plugin directory', () => {
   fs.writeFileSync(path.join(outsideDir, 'sentinel'), 'keep');
 
   assert.throws(
-    () => copyShippedPlugin(pluginDir, pluginsDir, packageName),
-    /Plugin path must stay within/
+    () =>
+      copyPlugin(pluginDir, pluginsDir, {
+        name: packageName,
+        packageName,
+        source: 'plugins/outside',
+      }),
+    /Invalid plugin bundle name/
   );
   assert.equal(fs.existsSync(path.join(outsideDir, 'sentinel')), true);
+});
+
+test('rejects a plugin whose package identity does not match', () => {
+  const { pluginDir, pluginsDir } = createPlugin('unexpected-plugin');
+
+  assert.throws(
+    () =>
+      copyPlugin(pluginDir, pluginsDir, {
+        name: 'expected-plugin',
+        packageName: 'expected-plugin',
+        source: 'plugins/expected-plugin',
+      }),
+    /Plugin package mismatch/
+  );
+  assert.equal(fs.existsSync(path.join(pluginsDir, 'expected-plugin')), false);
 });

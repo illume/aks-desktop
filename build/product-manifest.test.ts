@@ -6,10 +6,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";
 
+import { createProductTemplate } from "./generate-headlamp-manifest";
+
 const rootDir = path.resolve(__dirname, "..");
-const manifest = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "product-manifest.json"), "utf8"),
+const project = JSON.parse(
+  fs.readFileSync(path.join(rootDir, "package.json"), "utf8"),
 );
+const manifest = createProductTemplate();
 
 test("declares AKS product identity and policy outside Headlamp", () => {
   assert.deepEqual(
@@ -41,11 +44,7 @@ test("declares AKS product identity and policy outside Headlamp", () => {
       checkForUpdates: false,
     },
   );
-  assert.equal(
-    manifest.product.version,
-    JSON.parse(fs.readFileSync(path.join(rootDir, "package.json"), "utf8"))
-      .version,
-  );
+  assert.equal(manifest.product.version, project.version);
 });
 
 test("references packaged legal documents", () => {
@@ -60,6 +59,18 @@ test("declares plugin defaults and external tool integrity generation", () => {
   assert.deepEqual(
     manifest.plugins.map((plugin: { packageName: string }) => plugin.packageName),
     ["aks-desktop", "@headlamp-k8s/ai-assistant", "insights-plugin"],
+  );
+  assert.deepEqual(
+    project.headlamp.plugins.map((plugin: { source: string }) => plugin.source),
+    [
+      "plugins/aks-desktop",
+      "plugins/ai-assistant",
+      "plugins/insights-plugin",
+    ],
+  );
+  assert.equal(
+    manifest.plugins.some((plugin: { source?: string }) => "source" in plugin),
+    false,
   );
   const aksPlugin = manifest.plugins.find(
     (plugin: { packageName: string }) =>

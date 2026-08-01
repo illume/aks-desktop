@@ -54,10 +54,20 @@ function toolRecord(
   };
 }
 
-export function createManifest() {
-  const template = JSON.parse(
-    fs.readFileSync(path.join(ROOT_DIR, 'build', 'product-manifest.json'), 'utf8')
+export function createProductTemplate() {
+  const project = JSON.parse(
+    fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8')
   );
+  const { plugins, ...template } = project.headlamp;
+  template.product.version = project.version;
+  template.plugins = plugins.map(
+    ({ source: _source, ...plugin }: { source: string }) => plugin
+  );
+  return template;
+}
+
+export function createManifest() {
+  const template = createProductTemplate();
   const platform = platformName();
   if (!platform) {
     throw new Error(`Unsupported build platform: ${process.platform}`);
@@ -133,8 +143,10 @@ export function verifyManifest(): void {
   console.log('Headlamp source package and product manifest are consistent.');
 }
 
-if (process.argv.includes('--check')) {
-  verifyManifest();
-} else {
-  generateManifest();
+if (require.main === module) {
+  if (process.argv.includes('--check')) {
+    verifyManifest();
+  } else {
+    generateManifest();
+  }
 }

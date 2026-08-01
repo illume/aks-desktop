@@ -64,15 +64,16 @@ and reusable build tooling to contribute upstream.
 AKS Desktop no longer records Headlamp as a Git submodule. The root project
 depends on exact version `0.44.0-main.99a230be` of
 `@headlamp-k8s/headlamp-source`. The package contains the complete source tree
-and npm scripts for web/backend, desktop application, and container builds. It
+and npm scripts for web/backend, desktop application, container builds,
+manifest-driven plugin bundling, and packaged-application smoke tests. It
 records:
 
 - base release tag `v0.44.0` and upstream `main` commit
   `99a230be9c9c679a70d59c219cc246c00ae2be45`;
 - package integrity and the root-owned npm patch in
   [`package-lock.json`](../package-lock.json); and
-- AKS-owned product policy in
-  [`build/product-manifest.json`](../build/product-manifest.json).
+- AKS-owned product policy and plugin workspaces in the root
+  [`package.json`](../package.json) under `headlamp`.
 
 The source package has no install lifecycle script. npm 12 applies
 [`build/patches/headlamp-source@0.44.0-main.99a230be.patch`](../build/patches/headlamp-source@0.44.0-main.99a230be.patch)
@@ -108,7 +109,7 @@ Unpacked Linux CI trees append `-- --no-sandbox`; normal launches never do.
 | --- | --- |
 | `.gitmodules` | Points at the `headlamp-downstream` branch of the AKS Desktop repository. |
 | Root build scripts | Run `make app` inside the submodule. |
-| `build/setup-plugins.ts` | Builds AKS plugins and copies them to `headlamp/.plugins`. |
+| `build/setup-plugins.ts` | Built AKS plugins and copied them to `headlamp/.plugins`. |
 | `build/setup-external-tools.ts` | Writes Azure CLI and Python into `headlamp/app/resources/external-tools`. |
 | Build verification | Reads `headlamp/app/package.json` and `headlamp/app/dist`. |
 | `Localize/translation-manager.mjs` | Reads and writes Headlamp frontend locale files directly. |
@@ -173,9 +174,9 @@ text or feature defaults. Values needed before startup—icons, executable name,
 protocol registration, signing, and installer targets—remain assembly-time
 product configuration.
 
-The checked-in product manifest uses the schema implemented by the patch set.
-The assembly command adds platform-specific tool paths, SHA-256 digests,
-resources, and post-package verification entries:
+The root `headlamp` configuration uses the schema implemented by the patch set.
+The assembly command derives the package version and adds platform-specific tool
+paths, SHA-256 digests, resources, and post-package verification entries:
 
 ```json
 {

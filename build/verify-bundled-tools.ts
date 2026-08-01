@@ -18,12 +18,14 @@ const ROOT_DIR = path.dirname(SCRIPT_DIR);
 const CURRENT_PLATFORM = process.platform;
 
 // Read the assembled application name from the product manifest.
-const PRODUCT_MANIFEST = path.join(ROOT_DIR, 'build', 'product-manifest.json');
+const PRODUCT_MANIFEST = path.join(ROOT_DIR, 'package.json');
 let PRODUCT_NAME = 'AKS desktop'; // Default fallback
 let PRODUCT_CONFIG: Record<string, any> = {};
 
 try {
-  PRODUCT_CONFIG = JSON.parse(fs.readFileSync(PRODUCT_MANIFEST, 'utf-8'));
+  const project = JSON.parse(fs.readFileSync(PRODUCT_MANIFEST, 'utf-8'));
+  PRODUCT_CONFIG = project.headlamp;
+  PRODUCT_CONFIG.product.version = project.version;
   PRODUCT_NAME = PRODUCT_CONFIG.product?.productName || PRODUCT_NAME;
 } catch (error) {
   console.warn(`Warning: Could not read product name from ${PRODUCT_MANIFEST}, using default: ${PRODUCT_NAME}`);

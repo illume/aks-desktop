@@ -17,7 +17,7 @@ This directory contains the plugins for the AKS desktop application.
 To build all plugins, use the build script from the root directory:
 
 ```bash
-npx tsx ./build/setup-plugins.ts
+npm run plugin:setup
 ```
 
 This script will for each plugin:

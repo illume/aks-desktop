@@ -35,9 +35,10 @@ disable the sandbox.
 An update changes the exact dependency version, package artifact, lockfile, and
 native patch together. Use `npm patch update` after the package is published;
 until then, refresh the local package artifact and regenerate the same root
-patch. Product identity, update policy, legal documents, plugin defaults, and
-capability ceilings belong in `build/product-manifest.json`; AKS behavior
-belongs in plugin APIs. Do not edit the installed package under `node_modules`.
+patch. Product identity, update policy, legal documents, plugin workspaces,
+defaults, and capability ceilings belong in the root `package.json` under
+`headlamp`; AKS behavior belongs in plugin APIs. Do not edit the installed
+package under `node_modules`.
 
 See the [Headlamp packaging strategy](docs/headlamp-packaging.md), detailed
 [distribution builds](docs/headlamp-distribution-builds.md), and

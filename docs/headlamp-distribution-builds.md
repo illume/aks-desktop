@@ -190,8 +190,8 @@ overwrite upstream Headlamp tags.
 
 The current build has two different plugin paths:
 
-- `build/setup-plugins.ts` hard-codes local plugin workspaces and copies each
-  `dist/` into the installed source package's `.plugins`.
+- The source package's `bundle:plugins` script builds the workspaces declared
+  by root `headlamp.plugins` and copies each `dist/` into `.plugins`.
 - Headlamp's `app/app-build-manifest.json` and
   `container/build-manifest.json` download shipped plugin archives. The current
   fetchers do not record or verify archive digests.
@@ -315,12 +315,11 @@ products.
 
 | Current code | Upstream reusable tool | What remains in AKS |
 | --- | --- | --- |
-| `build/plugin-packaging.ts` and its tests | Safe plugin bundle/extract library with canonical-ID validation, collision rejection, and clean output | Plugin list and permissions |
-| `build/setup-plugins.ts` | `bundle-plugins --manifest` instead of a hard-coded workspace list | AKS plugin manifest |
+| Source-package `scripts/bundle-plugins.js` and its consumer tests | Safe plugin workspace bundler with package-identity validation, collision rejection, and clean output | Plugin list and permissions in root `package.json` |
 | Source-package `app/scripts/setup-plugins.js` and `container/fetch-plugins.sh` | One checksum-verifying manifest implementation for desktop and container builds | Product-selected archives/defaults |
 | `build/setup-external-tools.ts` | Platform-aware external-resource staging API | Azure CLI/kubelogin declarations |
 | Generic parts of `build/download-az-cli.ts` | Required-digest downloader, redirect policy, safe archive extraction, cache, and platform selector | Azure CLI/Python installation and extensions |
-| `build/verify-bundled-tools.ts` | Electron output-layout resolver and manifest-driven resource/executable verifier | Azure-specific invocation probes |
+| Source-package `scripts/smoke-app.js` and `build/verify-bundled-tools.ts` | Electron output-layout resolver and manifest-driven resource/executable verifier | Azure-specific invocation probes |
 | `Localize/translation-manager.mjs` | Multi-source locale overlay/merge command in the plugin toolchain | OneLoc conventions and AKS locked terms |
 | Root `build:*` scripts and downstream builder config | `assemble-desktop --product --target --output` over an exported base builder config | Thin npm aliases, signing inputs, product manifest |
 | Downstream `app/scripts/verify-build-*` changes | Cross-platform `verify-distribution` driven by artifact metadata | AKS release policy |
