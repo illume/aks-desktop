@@ -21,6 +21,9 @@ const ROOT_DIR = path.dirname(SCRIPT_DIR);
 const { appDir: HEADLAMP_APP_DIR } = require(
   '../packages/headlamp-source/scripts/paths.ts'
 ).resolveInstalledHeadlampPaths(ROOT_DIR);
+const { copyDirectoryContents, removePathPattern } = require(
+  '../packages/headlamp-source/scripts/file-operations.ts'
+);
 const EXTERNAL_TOOLS_DIR = path.join(HEADLAMP_APP_DIR, 'resources', 'external-tools');
 const AZ_CLI_DIR = path.join(EXTERNAL_TOOLS_DIR, 'az-cli');
 const PACKAGE_JSON_PATH = path.join(ROOT_DIR, 'package.json');
@@ -323,7 +326,7 @@ async function installAzCliWithPython(platform: string): Promise<void> {
 
   // Copy Python and Azure CLI to target
   console.log(`Copying bundled Python and Azure CLI to ${TARGET_DIR}...`);
-  execSync(`cp -R "${pythonRoot}/"* "${TARGET_DIR}/"`, { stdio: 'inherit' });
+  copyDirectoryContents(pythonRoot, TARGET_DIR);
 
   // Copy Azure CLI packages from venv to bundled Python's site-packages
   const pythonVersion = execSync(`"${pythonBin}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"`, { encoding: 'utf-8' }).trim();
@@ -332,7 +335,7 @@ async function installAzCliWithPython(platform: string): Promise<void> {
 
   if (fs.existsSync(venvSitePackages)) {
     console.log('Copying Azure CLI packages...');
-    execSync(`cp -R "${venvSitePackages}/"* "${targetSitePackages}/"`, { stdio: 'inherit' });
+    copyDirectoryContents(venvSitePackages, targetSitePackages);
   }
 
   // Copy Azure CLI extensions
@@ -340,8 +343,7 @@ async function installAzCliWithPython(platform: string): Promise<void> {
   const targetExtensionsDir = path.join(TARGET_DIR, 'cliextensions');
   if (fs.existsSync(venvExtensionsDir)) {
     console.log('Copying Azure CLI extensions...');
-    fs.mkdirSync(targetExtensionsDir, { recursive: true });
-    execSync(`cp -R "${venvExtensionsDir}/"* "${targetExtensionsDir}/"`, { stdio: 'inherit' });
+    copyDirectoryContents(venvExtensionsDir, targetExtensionsDir);
   }
 
   // Create wrapper script
@@ -393,7 +395,7 @@ exec "$SCRIPT_DIR/python3" -m azure.cli "$@"
 
   for (const dir of cleanupDirs) {
     try {
-      execSync(`rm -rf ${dir}`, { stdio: 'pipe' });
+      removePathPattern(dir);
     } catch (error) {
       // Ignore errors - directory might not exist
     }
@@ -423,7 +425,7 @@ exec "$SCRIPT_DIR/python3" -m azure.cli "$@"
 
   for (const dir of stdlibCleanup) {
     try {
-      execSync(`rm -rf ${dir}`, { stdio: 'pipe' });
+      removePathPattern(dir);
     } catch (error) {
       // Ignore errors
     }
