@@ -46,36 +46,30 @@ const temporaryRoot =
   process.env.TMPDIR ||
   process.env.TEMP ||
   '/tmp';
-const npmToolDirectory = path.join(temporaryRoot, 'npm-12');
+const npmToolDirectory = fs.mkdtempSync(path.join(temporaryRoot, 'npm-12-'));
 const systemNpm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npmBinDirectory = path.join(npmToolDirectory, 'node_modules', '.bin');
 const npmCli = path.join(npmToolDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
-let installedVersion = '';
-if (fs.existsSync(npmCli)) {
-  installedVersion = run(process.execPath, [npmCli, '--version'], { capture: true });
+const globalNpmRoot = run(systemNpm, ['root', '--global'], {
+  capture: true,
+  shell: process.platform === 'win32',
+});
+const systemNpmCli = path.join(globalNpmRoot, 'npm', 'bin', 'npm-cli.js');
+if (!fs.existsSync(systemNpmCli)) {
+  throw new Error(`Cannot find the system npm CLI at ${systemNpmCli}`);
 }
-if (installedVersion !== npmVersion) {
-  const globalNpmRoot = run(systemNpm, ['root', '--global'], {
-    capture: true,
-    shell: process.platform === 'win32',
-  });
-  const systemNpmCli = path.join(globalNpmRoot, 'npm', 'bin', 'npm-cli.js');
-  if (!fs.existsSync(systemNpmCli)) {
-    throw new Error(`Cannot find the system npm CLI at ${systemNpmCli}`);
-  }
-  run(process.execPath, [
-    systemNpmCli,
-    'install',
-    '--prefix',
-    npmToolDirectory,
-    '--no-save',
-    '--ignore-scripts',
-    '--no-audit',
-    '--no-fund',
-    `npm@${npmVersion}`,
-  ]);
-}
+run(process.execPath, [
+  systemNpmCli,
+  'install',
+  '--prefix',
+  npmToolDirectory,
+  '--no-save',
+  '--ignore-scripts',
+  '--no-audit',
+  '--no-fund',
+  `npm@${npmVersion}`,
+]);
 
 process.env.PATH = `${npmBinDirectory}${path.delimiter}${process.env.PATH || ''}`;
 
