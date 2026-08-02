@@ -5,22 +5,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 
-const ROOT_DIR = path.resolve(__dirname, '..');
+const PACKAGE_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = path.resolve(PACKAGE_DIR, '..', '..');
 const {
   packageDir: HEADLAMP_PACKAGE_DIR,
   sourceDir: HEADLAMP_SOURCE_DIR,
-} = require('../packages/headlamp-source/scripts/paths.ts').resolveInstalledHeadlampPaths(
-  ROOT_DIR
-);
+} = require('../scripts/paths.ts').resolveInstalledHeadlampPaths(ROOT_DIR);
 
 const { composePatchSeries } = require(
-  path.join(
-    ROOT_DIR,
-    'packages',
-    'headlamp-source',
-    'scripts',
-    'compose-patches.ts'
-  )
+  path.join(PACKAGE_DIR, 'scripts', 'compose-patches.ts')
 );
 const packageManifest = JSON.parse(
   fs.readFileSync(path.join(HEADLAMP_PACKAGE_DIR, 'package.json'), 'utf8')

@@ -43,6 +43,7 @@
     "source:prepare": "tsx scripts/update-source.ts --prepare",
     "source:update": "tsx scripts/update-source.ts",
     "test:helpers": "npm run tsc:helpers && tsx --test test/*.test.ts",
+    "test:package": "npm run tsc:helpers && tsx --test test/headlamp-package.test.ts",
     "tsc:helpers": "tsc --noEmit -p tsconfig.json",
     "test": "npm --prefix source test",
     "lint": "npm --prefix source run lint",
