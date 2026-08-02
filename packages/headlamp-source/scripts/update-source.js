@@ -121,23 +121,37 @@ function materializeHeadlampSource(packageDir, sourceDir, commit) {
   const resolvedSourceDir = fs.realpathSync(sourceDir);
   verifySourceCheckout(resolvedSourceDir, commit);
   const temporarySource = fs.mkdtempSync(path.join(packageDir, '.source-'));
+  const temporaryMarker = `${temporarySource}.commit`;
+  const source = path.join(packageDir, 'source');
+  const marker = path.join(packageDir, SOURCE_MARKER);
+  let sourceInstalled = false;
   try {
     copyTrackedSource(resolvedSourceDir, temporarySource);
-    fs.rmSync(path.join(packageDir, 'source'), { recursive: true, force: true });
-    fs.renameSync(temporarySource, path.join(packageDir, 'source'));
-    fs.writeFileSync(path.join(packageDir, SOURCE_MARKER), `${commit}\n`);
+    fs.writeFileSync(temporaryMarker, `${commit}\n`);
+    fs.rmSync(source, { recursive: true, force: true });
+    fs.renameSync(temporarySource, source);
+    sourceInstalled = true;
+    fs.rmSync(marker, { recursive: true, force: true });
+    fs.renameSync(temporaryMarker, marker);
   } catch (error) {
     fs.rmSync(temporarySource, { recursive: true, force: true });
+    fs.rmSync(temporaryMarker, { force: true });
+    if (sourceInstalled) {
+      fs.rmSync(source, { recursive: true, force: true });
+    }
     throw error;
   }
 }
 
 function sourceIsMaterialized(packageDir, commit) {
   const marker = path.join(packageDir, SOURCE_MARKER);
-  if (
-    !fs.existsSync(marker) ||
-    fs.readFileSync(marker, 'utf8').trim() !== commit
-  ) {
+  let materializedCommit;
+  try {
+    materializedCommit = fs.readFileSync(marker, 'utf8').trim();
+  } catch {
+    return false;
+  }
+  if (materializedCommit !== commit) {
     return false;
   }
   return REQUIRED_SOURCE_PATHS.every(required =>

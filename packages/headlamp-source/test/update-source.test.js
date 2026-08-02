@@ -202,6 +202,24 @@ test('materializes the configured commit without tracking upstream source', () =
   });
 });
 
+test('replaces an invalid generated source marker', () => {
+  const { commit, sourceDir } = createSourceCheckout();
+  const { packageDir, rootDir } = createProject(commit);
+  fs.mkdirSync(path.join(packageDir, '.source-commit'));
+
+  assert.deepEqual(
+    prepareHeadlampSource({ rootDir, packageDir, sourceDir }),
+    {
+      packageDir,
+      prepared: true,
+    }
+  );
+  assert.equal(
+    fs.readFileSync(path.join(packageDir, '.source-commit'), 'utf8').trim(),
+    commit
+  );
+});
+
 test('rejects a checkout that does not match the configured commit', () => {
   const { commit, sourceDir } = createSourceCheckout();
   const { packageDir, rootDir } = createProject(commit);
