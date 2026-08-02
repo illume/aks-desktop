@@ -1,0 +1,12 @@
+diff --git a/source/app/package.json b/source/app/package.json
+index 079e68373..00b590380 100644
+--- a/source/app/package.json
++++ b/source/app/package.json
+@@ -93,7 +93,6 @@
+           ]
+         }
+       ],
+-      "executableName": "headlamp",
+       "maintainer": "Kinvolk <hello@kinvolk.io>",
+       "category": "Network",
+       "extraResources": [

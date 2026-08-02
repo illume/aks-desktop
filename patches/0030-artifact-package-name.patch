@@ -1,0 +1,13 @@
+diff --git a/source/app/package.json b/source/app/package.json
+index 079e68373..af8e879ba 100644
+--- a/source/app/package.json
++++ b/source/app/package.json
+@@ -38,7 +38,7 @@
+     "beforeBuild": "./scripts/build-backend.js",
+     "afterPack": "./scripts/after-pack.js",
+     "asar": false,
+-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
++    "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
+     "protocols": {
+       "name": "headlamp-protocol",
+       "schemes": [

@@ -1,0 +1,41 @@
+diff --git a/source/frontend/src/components/common/Resource/EditorDialog.tsx b/source/frontend/src/components/common/Resource/EditorDialog.tsx
+index 0181b8f87..cb4d1608f 100644
+--- a/source/frontend/src/components/common/Resource/EditorDialog.tsx
++++ b/source/frontend/src/components/common/Resource/EditorDialog.tsx
+@@ -637,8 +637,9 @@ export default function EditorDialog(props: EditorDialogProps) {
+       {uploadFiles ? <UploadDialog setUploadFiles={setUploadFiles} setCode={setCode} /> : ''}
+       <DialogContent
+         sx={{
++          minHeight: '400px',
+           height: '80%',
+-          overflowY: 'hidden',
++          overflowY: 'auto',
+           display: 'flex',
+           flexDirection: 'column',
+           px: { xs: 0, sm: 3 },
+diff --git a/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot b/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot
+index bf1cf819a..6b2c89de0 100644
+--- a/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot
++++ b/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.EditorDialogWithResource.stories.storyshot
+@@ -79,7 +79,7 @@
+           </div>
+         </h2>
+         <div
+-          class="MuiDialogContent-root css-7r89gu-MuiDialogContent-root"
++          class="MuiDialogContent-root css-d6bo4z-MuiDialogContent-root"
+         >
+           <div
+             class="MuiBox-root css-1jpm9pd"
+diff --git a/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot b/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot
+index 09374d588..a2fc946f0 100644
+--- a/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot
++++ b/source/frontend/src/components/common/Resource/__snapshots__/EditorDialog.ExtraActions.stories.storyshot
+@@ -79,7 +79,7 @@
+           </div>
+         </h2>
+         <div
+-          class="MuiDialogContent-root css-7r89gu-MuiDialogContent-root"
++          class="MuiDialogContent-root css-d6bo4z-MuiDialogContent-root"
+         >
+           <div
+             class="MuiBox-root css-1jpm9pd"

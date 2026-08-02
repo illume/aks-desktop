@@ -1,0 +1,157 @@
+diff --git a/source/app/electron-builder.config.js b/source/app/electron-builder.config.js
+index 4a1093830..f3faf1a4d 100644
+--- a/source/app/electron-builder.config.js
++++ b/source/app/electron-builder.config.js
+@@ -2,22 +2,32 @@
+ 
+ const packageJson = require('./package.json');
+ const path = require('node:path');
+-const { DEFAULT_MANIFEST_FILE, resolveBuildManifestPath } = require('./scripts/build-manifest');
++const {
++  applyProductMetadata,
++  DEFAULT_MANIFEST_FILE,
++  loadBuildManifest,
++  resolveBuildManifestPath,
++} = require('./scripts/build-manifest');
+ 
+ const manifestFile = resolveBuildManifestPath();
+ const defaultManifest = path.resolve(DEFAULT_MANIFEST_FILE);
+ 
+-module.exports = {
+-  ...packageJson.build,
+-  extraResources: packageJson.build.extraResources.map(resource => {
+-    if (path.resolve(__dirname, resource.from) !== defaultManifest) {
+-      return resource;
+-    }
++const manifest = loadBuildManifest(manifestFile);
+ 
+-    return {
+-      ...resource,
+-      from: manifestFile,
+-      to: 'app-build-manifest.json',
+-    };
+-  }),
+-};
++module.exports = applyProductMetadata(
++  {
++    ...packageJson.build,
++    extraResources: packageJson.build.extraResources.map(resource => {
++      if (path.resolve(__dirname, resource.from) !== defaultManifest) {
++        return resource;
++      }
++
++      return {
++        ...resource,
++        from: manifestFile,
++        to: 'app-build-manifest.json',
++      };
++    }),
++  },
++  manifest
++);
+diff --git a/source/app/electron/build-manifest.test.ts b/source/app/electron/build-manifest.test.ts
+index d4b280ecc..9a173fa72 100644
+--- a/source/app/electron/build-manifest.test.ts
++++ b/source/app/electron/build-manifest.test.ts
+@@ -24,6 +24,7 @@ import { afterEach, describe, expect, it } from 'vitest';
+ 
+ const require = createRequire(import.meta.url);
+ const {
++  applyProductMetadata,
+   DEFAULT_MANIFEST_FILE,
+   loadBuildManifest,
+   resolveBuildManifestPath,
+@@ -81,6 +82,40 @@ describe('build manifest selection', () => {
+   });
+ });
+ 
++describe('product metadata', () => {
++  it('applies product identity without changing Headlamp defaults', () => {
++    const defaults = { appId: 'io.headlamp', productName: 'Headlamp' };
++    expect(applyProductMetadata(defaults, { plugins: [] })).toBe(defaults);
++    expect(
++      applyProductMetadata(defaults, {
++        product: {
++          name: 'example-desktop',
++          productName: 'Example Desktop',
++          version: '1.2.3',
++          appId: 'io.example.desktop',
++          artifactName: '${name}-${version}.${ext}',
++          protocols: { name: 'example', schemes: ['example'] },
++        },
++      })
++    ).toMatchObject({
++      appId: 'io.example.desktop',
++      productName: 'Example Desktop',
++      buildVersion: '1.2.3',
++      extraMetadata: {
++        name: 'example-desktop',
++        productName: 'Example Desktop',
++        version: '1.2.3',
++      },
++    });
++  });
++
++  it('rejects malformed product metadata', () => {
++    expect(() => applyProductMetadata({}, { product: { version: 1 } })).toThrow(
++      'product.version must be a string'
++    );
++  });
++});
++
+ describe('plugin archive integrity', () => {
+   it('requires digests for remote archives in external manifests', () => {
+     expect(() =>
+diff --git a/source/app/scripts/build-manifest.js b/source/app/scripts/build-manifest.js
+index 45d390f8b..b2bbb41c7 100644
+--- a/source/app/scripts/build-manifest.js
++++ b/source/app/scripts/build-manifest.js
+@@ -14,7 +14,48 @@ function loadBuildManifest(manifestFile = resolveBuildManifestPath()) {
+   return JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+ }
+ 
++function applyProductMetadata(config, manifest) {
++  const product = manifest.product;
++  if (product === undefined) {
++    return config;
++  }
++  if (!product || typeof product !== 'object' || Array.isArray(product)) {
++    throw new Error('Build manifest product must be an object');
++  }
++
++  const scalarFields = ['name', 'productName', 'version', 'appId', 'artifactName'];
++  for (const field of scalarFields) {
++    if (product[field] !== undefined && typeof product[field] !== 'string') {
++      throw new Error(`Build manifest product.${field} must be a string`);
++    }
++  }
++  if (
++    product.protocols !== undefined &&
++    (!product.protocols ||
++      typeof product.protocols !== 'object' ||
++      Array.isArray(product.protocols))
++  ) {
++    throw new Error('Build manifest product.protocols must be an object');
++  }
++
++  return {
++    ...config,
++    ...(product.productName && { productName: product.productName }),
++    ...(product.appId && { appId: product.appId }),
++    ...(product.artifactName && { artifactName: product.artifactName }),
++    ...(product.protocols && { protocols: product.protocols }),
++    ...(product.version && { buildVersion: product.version }),
++    extraMetadata: {
++      ...config.extraMetadata,
++      ...(product.name && { name: product.name }),
++      ...(product.productName && { productName: product.productName }),
++      ...(product.version && { version: product.version }),
++    },
++  };
++}
++
+ module.exports = {
++  applyProductMetadata,
+   DEFAULT_MANIFEST_FILE,
+   loadBuildManifest,
+   resolveBuildManifestPath,

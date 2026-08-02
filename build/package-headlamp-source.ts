@@ -270,7 +270,7 @@ export function updateHeadlampSource(options: UpdateOptions) {
   }
   const [oldSelector, oldPatchPath] = patchEntries[0];
   const newSelector = `${PACKAGE_NAME}@${version}`;
-  const newPatchPath = `build/patches/headlamp-source@${version}.patch`;
+  const newPatchPath = `patches/headlamp-source@${version}.patch`;
   const absoluteOldPatch = path.join(rootDir, oldPatchPath);
   const absoluteNewPatch = path.join(rootDir, newPatchPath);
   if (oldPatchPath !== newPatchPath) {

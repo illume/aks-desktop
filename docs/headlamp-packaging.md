@@ -70,16 +70,19 @@ records:
 
 - base release tag `v0.44.0` and upstream `main` commit
   `99a230be9c9c679a70d59c219cc246c00ae2be45`;
-- package integrity and the root-owned npm patch in
+- package integrity and the root-owned npm patch series in
   [`package-lock.json`](../package-lock.json); and
 - AKS-owned product policy and plugin workspaces in the root
   [`package.json`](../package.json) under `headlamp`.
 
-The source package has no install lifecycle script. npm 12 applies
-[`build/patches/headlamp-source@0.44.0-main.99a230be.patch`](../build/patches/headlamp-source@0.44.0-main.99a230be.patch)
-during installation because the root `package.json` declares it in
-`patchedDependencies`. npm stores the patch hash in lockfile version 4 and
-fails installation if the package, patch, or selector differs.
+The source package has no install lifecycle script. The root
+[`patches/series`](../patches/series) lists 69 ordered, independently reviewable
+patches. npm 12 accepts only one patch file for a package version, so
+`npm run headlamp:patches` deterministically concatenates the series into
+[`patches/headlamp-source@0.44.0-main.99a230be.patch`](../patches/headlamp-source@0.44.0-main.99a230be.patch).
+`patchedDependencies` points npm at that generated aggregate. npm stores its
+hash in lockfile version 4 and fails installation if the package, patch, or
+selector differs.
 
 ```bash
 nvm use                         # Node.js 22.22.2
@@ -248,7 +251,7 @@ The wrapper delegates to Headlamp's npm scripts rather than Make:
 }
 ```
 
-The consumer owns the patch:
+The consumer owns the patches:
 
 ```json
 {
@@ -257,16 +260,16 @@ The consumer owns the patch:
   },
   "patchedDependencies": {
     "@headlamp-k8s/headlamp-source@0.44.0-main.99a230be":
-      "build/patches/headlamp-source@0.44.0-main.99a230be.patch"
+      "patches/headlamp-source@0.44.0-main.99a230be.patch"
   }
 }
 ```
 
 Native patches are root-only consumer state and are stripped when an npm package
 is published. This is intentional: a reusable source package stays pristine,
-while AKS Desktop or another product can own a different patch at its top level.
+while AKS Desktop or another product can own a different root-level series.
 Once upstream changes land, update the exact source package and shrink or remove
-the consumer patch.
+the consumer patches.
 
 Installation is also explicit. `npm ci` verifies and patches the source archive
 but runs no source-package lifecycle hook. `npm run headlamp:install` invokes the

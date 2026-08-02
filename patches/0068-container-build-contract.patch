@@ -1,0 +1,26 @@
+diff --git a/source/Dockerfile b/source/Dockerfile
+index 307f20422997df155216fef7e827a55b5d856afe..96c2a22b104beb6e3fd29db453df0f8d7871287f 100644
+--- a/source/Dockerfile
++++ b/source/Dockerfile
+@@ -28,9 +28,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
+ 
+ FROM --platform=${BUILDPLATFORM} node:22@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS frontend-build
+ 
+-# We need .git and app/ in order to get the version and git version for the frontend/.env file
+-# that's generated when building the frontend.
+-COPY .git/ ./headlamp/.git/
++ARG HEADLAMP_SOURCE_COMMIT
++ARG HEADLAMP_BUILD_MANIFEST
++ENV HEADLAMP_SOURCE_COMMIT=${HEADLAMP_SOURCE_COMMIT} \
++    HEADLAMP_BUILD_MANIFEST=${HEADLAMP_BUILD_MANIFEST}
+ 
+ COPY app/package.json /headlamp/app/package.json
+ 
+@@ -41,6 +42,7 @@ RUN cd ./frontend && npm ci --only=prod
+ 
+ FROM frontend-build AS frontend
+ COPY ./frontend /headlamp/frontend
++COPY ./app /headlamp/app
+ 
+ WORKDIR /headlamp
+ 

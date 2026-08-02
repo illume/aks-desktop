@@ -1,0 +1,106 @@
+diff --git a/source/frontend/src/components/App/Home/ClusterContextMenu.tsx b/source/frontend/src/components/App/Home/ClusterContextMenu.tsx
+index 86454a433..560a6068f 100644
+--- a/source/frontend/src/components/App/Home/ClusterContextMenu.tsx
++++ b/source/frontend/src/components/App/Home/ClusterContextMenu.tsx
+@@ -39,12 +39,16 @@ import ErrorBoundary from '../../common/ErrorBoundary/ErrorBoundary';
+ interface ClusterContextMenuProps {
+   /** The cluster for the context menu to act on. */
+   cluster: Cluster;
++  onClusterRemoved?: () => void;
+ }
+ 
+ /**
+  * ClusterContextMenu component displays a context menu for a given cluster.
+  */
+-export default function ClusterContextMenu({ cluster }: ClusterContextMenuProps) {
++export default function ClusterContextMenu({
++  cluster,
++  onClusterRemoved = () => window.location.reload(),
++}: ClusterContextMenuProps) {
+   const { t } = useTranslation(['translation']);
+   const history = useHistory();
+   const dispatch = useDispatch();
+@@ -68,6 +72,7 @@ export default function ClusterContextMenu({ cluster }: ClusterContextMenuProps)
+     deleteCluster(clusterName, deleteFromKubeconfig, clusterID, kubeconfigOrigin, originalName)
+       .then(config => {
+         dispatch(setConfig(config));
++        onClusterRemoved();
+       })
+       .catch((err: Error) => {
+         enqueueSnackbar(
+@@ -77,9 +82,6 @@ export default function ClusterContextMenu({ cluster }: ClusterContextMenuProps)
+             preventDuplicate: true,
+           }
+         );
+-      })
+-      .finally(() => {
+-        history.push('/');
+       });
+   }
+ 
+diff --git a/source/frontend/src/components/App/Home/ClusterTable.test.tsx b/source/frontend/src/components/App/Home/ClusterTable.test.tsx
+index fd0eb77c6..13aea93c1 100644
+--- a/source/frontend/src/components/App/Home/ClusterTable.test.tsx
++++ b/source/frontend/src/components/App/Home/ClusterTable.test.tsx
+@@ -15,11 +15,12 @@
+  */
+ 
+ import { ThemeProvider } from '@mui/material/styles';
+-import { fireEvent, render, screen } from '@testing-library/react';
++import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+ import { SnackbarProvider } from 'notistack';
+ import { ReactNode } from 'react';
+ import { MemoryRouter } from 'react-router-dom';
+ import { afterEach, describe, expect, it, vi } from 'vitest';
++import { deleteCluster } from '../../../lib/k8s/api/v1/clusterApi';
+ import { Cluster } from '../../../lib/k8s/cluster';
+ import { createMuiTheme } from '../../../lib/themes';
+ import ClusterContextMenu from './ClusterContextMenu';
+@@ -45,6 +46,10 @@ vi.mock('react-redux', () => ({
+   useDispatch: () => vi.fn(),
+ }));
+ 
++vi.mock('../../../lib/k8s/api/v1/clusterApi', () => ({
++  deleteCluster: vi.fn(),
++}));
++
+ vi.mock('../../../helpers', () => ({
+   default: {
+     isElectron: () => true,
+@@ -359,6 +364,36 @@ describe('ClusterTable', () => {
+ });
+ 
+ describe('ClusterContextMenu', () => {
++  it('reloads after deleting a cluster', async () => {
++    vi.mocked(deleteCluster).mockResolvedValue({} as Awaited<ReturnType<typeof deleteCluster>>);
++    const onClusterRemoved = vi.fn();
++
++    render(
++      <SnackbarProvider>
++        <MemoryRouter>
++          <ClusterContextMenu
++            onClusterRemoved={onClusterRemoved}
++            cluster={
++              {
++                name: 'spoke-a',
++                auth_type: '',
++                meta_data: {
++                  source: 'kubeconfig',
++                },
++              } as Cluster
++            }
++          />
++        </MemoryRouter>
++      </SnackbarProvider>
++    );
++
++    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
++    fireEvent.click(screen.getByText('Delete'));
++    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
++
++    await waitFor(() => expect(onClusterRemoved).toHaveBeenCalled());
++  });
++
+   it('does not show delete actions for Cluster Inventory clusters', () => {
+     render(
+       <SnackbarProvider>

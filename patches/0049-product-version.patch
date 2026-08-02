@@ -1,0 +1,139 @@
+diff --git a/source/frontend/src/components/App/TopBar.tsx b/source/frontend/src/components/App/TopBar.tsx
+index 1b05713b8..e1b71d03b 100644
+--- a/source/frontend/src/components/App/TopBar.tsx
++++ b/source/frontend/src/components/App/TopBar.tsx
+@@ -33,7 +33,7 @@ import React, { memo, useCallback } from 'react';
+ import { useTranslation } from 'react-i18next';
+ import { useDispatch } from 'react-redux';
+ import { useHistory } from 'react-router-dom';
+-import { getProductName, getVersion } from '../../helpers/getProductInfo';
++import { getProductName, getProductVersion, getVersion } from '../../helpers/getProductInfo';
+ import { logout } from '../../lib/auth';
+ import { useCluster, useClustersConf, useSelectedClusters } from '../../lib/k8s';
+ import { ClusterUserInfo, getClusterUserInfo } from '../../lib/k8s/api/v1/clusterApi';
+@@ -411,7 +411,7 @@ export const PureTopBar = memo(
+             <Icon icon="mdi:information-outline" />
+           </ListItemIcon>
+           <ListItemText>
+-            {getProductName()} {getVersion()['VERSION']}
++            {getProductName()} {getProductVersion() ?? getVersion()['VERSION']}
+           </ListItemText>
+         </MenuItem>
+       </Menu>
+diff --git a/source/frontend/src/components/App/VersionDialog.tsx b/source/frontend/src/components/App/VersionDialog.tsx
+index 9f9a3113d..45792ed1a 100644
+--- a/source/frontend/src/components/App/VersionDialog.tsx
++++ b/source/frontend/src/components/App/VersionDialog.tsx
+@@ -17,7 +17,7 @@
+ import DialogContent from '@mui/material/DialogContent';
+ import { useTranslation } from 'react-i18next';
+ import { useDispatch } from 'react-redux';
+-import { getProductName, getVersion } from '../../helpers/getProductInfo';
++import { getProductName, getProductVersion, getVersion } from '../../helpers/getProductInfo';
+ import { useTypedSelector } from '../../redux/hooks';
+ import { uiSlice } from '../../redux/uiSlice';
+ import { Dialog } from '../common/Dialog';
+@@ -28,11 +28,32 @@ export default function VersionDialog(props: {
+     VERSION: any;
+     GIT_VERSION: any;
+   };
++  getProductVersion?: () => string | undefined;
+ }) {
+   const open = useTypedSelector(state => state.ui.isVersionDialogOpen);
+   const dispatch = useDispatch();
+   const { t } = useTranslation(['glossary', 'translation']);
+   const { VERSION, GIT_VERSION } = props.getVersion ? props.getVersion() : getVersion();
++  const productVersion = props.getProductVersion ? props.getProductVersion() : getProductVersion();
++  const showProductVersion = productVersion && productVersion !== VERSION;
++  const rows = [
++    ...(showProductVersion
++      ? [
++          {
++            name: `${getProductName() || 'Product'} ${t('translation|Version')}`,
++            value: productVersion,
++          },
++        ]
++      : []),
++    {
++      name: showProductVersion ? `Headlamp ${t('translation|Version')}` : t('translation|Version'),
++      value: VERSION,
++    },
++    {
++      name: t('Git Commit'),
++      value: GIT_VERSION,
++    },
++  ];
+ 
+   return (
+     <Dialog
+@@ -45,18 +66,7 @@ export default function VersionDialog(props: {
+       style={{ zIndex: 1900 }}
+     >
+       <DialogContent>
+-        <NameValueTable
+-          rows={[
+-            {
+-              name: t('translation|Version'),
+-              value: VERSION,
+-            },
+-            {
+-              name: t('Git Commit'),
+-              value: GIT_VERSION,
+-            },
+-          ]}
+-        />
++        <NameValueTable rows={rows} />
+       </DialogContent>
+     </Dialog>
+   );
+diff --git a/source/frontend/src/helpers/getProductInfo.test.ts b/source/frontend/src/helpers/getProductInfo.test.ts
+new file mode 100644
+index 000000000..6f9731711
+--- /dev/null
++++ b/source/frontend/src/helpers/getProductInfo.test.ts
+@@ -0,0 +1,30 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { getProductVersion } from './getProductInfo';
++
++describe('getProductVersion', () => {
++  afterEach(() => {
++    vi.unstubAllEnvs();
++  });
++
++  it('returns the configured product version', () => {
++    vi.stubEnv('REACT_APP_HEADLAMP_PRODUCT_VERSION', '1.2.3');
++
++    expect(getProductVersion()).toBe('1.2.3');
++  });
++});
+diff --git a/source/frontend/src/helpers/getProductInfo.ts b/source/frontend/src/helpers/getProductInfo.ts
+index 773e32584..6c9b3731b 100644
+--- a/source/frontend/src/helpers/getProductInfo.ts
++++ b/source/frontend/src/helpers/getProductInfo.ts
+@@ -29,3 +29,10 @@ export function getVersion() {
+ export function getProductName(): string | undefined {
+   return import.meta.env.REACT_APP_HEADLAMP_PRODUCT_NAME;
+ }
++
++/**
++ * @returns the version of the product distribution, or undefined if it is not set.
++ */
++export function getProductVersion(): string | undefined {
++  return import.meta.env.REACT_APP_HEADLAMP_PRODUCT_VERSION;
++}

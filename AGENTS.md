@@ -8,7 +8,7 @@ Navigation guide for AI coding agents. For Headlamp plugin API examples see [`pl
 | --- | --- | --- | --- |
 | **Plugin** | `plugins/aks-desktop/` | AKS-specific UI, Azure integration, Kubernetes operations | Most changes go here |
 | **Build** | `build/` | Plugin setup, external tool bundling (Azure CLI, Python), post-build verification | Packaging, bundled tool versions, installer behavior |
-| **Headlamp distribution** | `package.json`, `package-lock.json`, `build/patches/` | Installs pinned source and applies npm-native patches | Source/package updates and generic Headlamp changes |
+| **Headlamp distribution** | `package.json`, `package-lock.json`, `patches/` | Installs pinned source and applies npm-native patches | Source/package updates and generic Headlamp changes |
 
 Headlamp patch commits must use a prefix:
 
@@ -30,7 +30,7 @@ See [`MAINTENANCE.md`](./MAINTENANCE.md) for the full fork rebase workflow.
 | Component-local types | Co-located in the component directory (e.g., `plugins/aks-desktop/src/components/DeployWizard/components/types.ts`) |
 | Plugin registration | `plugins/aks-desktop/src/index.tsx` |
 | Build / packaging | `build/` |
-| Headlamp core | Update the root npm patch under `build/patches/`; keep submission patches under `docs/headlamp-upstream-patches/` |
+| Headlamp core | Update the numbered npm patch series and upstream submission patches under `patches/` |
 
 ## Module Boundary Rules
 

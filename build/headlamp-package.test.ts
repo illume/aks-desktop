@@ -10,6 +10,7 @@ import {
   HEADLAMP_SOURCE_DIR,
   ROOT_DIR,
 } from './headlamp-path';
+import { composeHeadlampPatchSeries } from './headlamp-patch-series';
 import { headlampSourceVersion } from './package-headlamp-source';
 const packageManifest = JSON.parse(
   fs.readFileSync(path.join(HEADLAMP_PACKAGE_DIR, 'package.json'), 'utf8')
@@ -56,13 +57,19 @@ test('the installed package is a complete pinned source distribution', () => {
 
 test('npm owns and verifies the Headlamp patch', () => {
   const selector = `@headlamp-k8s/headlamp-source@${VERSION}`;
-  const patchPath = `build/patches/headlamp-source@${VERSION}.patch`;
+  const patchPath = `patches/headlamp-source@${VERSION}.patch`;
   assert.equal(rootManifest.patchedDependencies[selector], patchPath);
   const lockEntry =
     packageLock.packages['node_modules/@headlamp-k8s/headlamp-source'];
   assert.equal(lockEntry.version, VERSION);
   assert.equal(lockEntry.patched.path, patchPath);
   assert.match(lockEntry.patched.integrity, /^sha512-/);
+  assert.equal(
+    fs
+      .readFileSync(path.join(ROOT_DIR, patchPath))
+      .equals(composeHeadlampPatchSeries()),
+    true
+  );
   assert.equal(
     fs.statSync(
       path.join(HEADLAMP_SOURCE_DIR, 'app', 'scripts', 'build-manifest.js')

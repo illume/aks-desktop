@@ -1,0 +1,45 @@
+diff --git a/source/frontend/src/lib/themes.test.ts b/source/frontend/src/lib/themes.test.ts
+index 1eb5d4e3a..69af3ef1e 100644
+--- a/source/frontend/src/lib/themes.test.ts
++++ b/source/frontend/src/lib/themes.test.ts
+@@ -35,6 +35,18 @@ describe('themes.ts', () => {
+       expect(theme.palette.background.default).toBe('#1f1f1f');
+     });
+ 
++    it('should keep warning alerts readable in the dark theme', () => {
++      const theme = createMuiTheme({ base: 'dark', name: 'Dark Theme' });
++
++      expect(theme.components?.MuiAlert?.styleOverrides?.standardWarning).toEqual({
++        backgroundColor: 'rgba(255, 152, 0, 0.12)',
++        color: '#fff3e0',
++        '& .MuiAlert-icon': {
++          color: '#ffb74d',
++        },
++      });
++    });
++
+     it('should set searchHint defaults for light and dark themes', () => {
+       const lightTheme = createMuiTheme({ base: 'light', name: 'Light Theme' });
+       const darkTheme = createMuiTheme({ base: 'dark', name: 'Dark Theme' });
+diff --git a/source/frontend/src/lib/themes.ts b/source/frontend/src/lib/themes.ts
+index 173313bcc..8ab7752bc 100644
+--- a/source/frontend/src/lib/themes.ts
++++ b/source/frontend/src/lib/themes.ts
+@@ -534,6 +534,17 @@ export function createMuiTheme(currentTheme: AppTheme) {
+             underline: 'hover' as 'always' | 'hover' | 'none',
+           },
+         },
++        MuiAlert: {
++          styleOverrides: {
++            standardWarning: {
++              backgroundColor: 'rgba(255, 152, 0, 0.12)',
++              color: orange[50],
++              '& .MuiAlert-icon': {
++                color: orange[300],
++              },
++            },
++          },
++        },
+         MuiSwitch: {
+           styleOverrides: {
+             root: {

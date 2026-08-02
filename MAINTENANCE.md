@@ -7,9 +7,12 @@ This document outlines the maintenance procedures for this project.
 AKS Desktop depends on `@headlamp-k8s/headlamp-source`, an npm package containing
 the complete pinned Headlamp source tree and npm scripts for applications and
 containers. The package records upstream base tag `v0.44.0` and commit
-`99a230be9c9c679a70d59c219cc246c00ae2be45`. npm verifies the package integrity
-from `package-lock.json` and applies the root-owned patch declared by
-`patchedDependencies`; there is no submodule or custom patch applicator.
+`99a230be9c9c679a70d59c219cc246c00ae2be45`. The numbered files in
+`patches/series` are the root-owned, reviewable patch series. npm supports one
+patch file per package version, so `npm run headlamp:patches` deterministically
+concatenates that series into the file declared by `patchedDependencies`. npm
+verifies and applies the aggregate; there is no submodule or custom patch
+applicator.
 The same tag, branch, repository, and full commit are the single source of truth
 in `package.json#headlampSource`.
 
@@ -17,7 +20,7 @@ To validate or update the distribution:
 
 ```bash
 nvm use                         # Node.js version required by npm 12
-npm ci                          # verify the source package and apply its patch
+npm ci                          # verify the source package and apply the patch series
 npm run headlamp:install        # explicitly install the source build toolchain
 npm run test:headlamp-patches   # inspect npm's patch and package contract
 npm run headlamp:assemble       # stage plugins, tools, and product configuration
@@ -27,7 +30,7 @@ npm run headlamp:doctor         # verify the generated product manifest
 The repository requires npm 12 or newer because native dependency patches are
 part of installation and are not lifecycle scripts. The source package itself
 has no install lifecycle script; `headlamp:install` is an explicit command and
-permits only the build dependencies reviewed in the consumer patch. Build with
+permits only the build dependencies reviewed in the consumer patches. Build with
 `npm run build:linux`, `npm run build:mac`, `npm run build:win`, or
 `npm run build:container`. After an application build,
 `npm run test:distribution` verifies packaged tools and starts the application
@@ -53,25 +56,26 @@ npm run test:build
 `headlamp:source` verifies the clean worktree's `HEAD`, packages only Git-tracked
 files, derives the package version from the base tag and SHA, and updates the
 package artifact, exact dependency, patch selector, and both lockfile integrity
-records. It does not apply the patch; the second `npm ci` is the authoritative
+records. It does not apply the patches; the second `npm ci` is the authoritative
 npm-native patch check. Update `baseTag` in `package.json#headlampSource` when
-the upstream release baseline changes. Delete the superseded package and patch
-only after the replacement passes.
+the upstream release baseline changes. Delete the superseded package and
+aggregate only after the replacement passes.
 
 The
 [`Headlamp main compatibility`](.github/workflows/headlamp-main-compatibility.yml)
 workflow resolves `main` to a full SHA every day, prepares that source package,
-lets npm apply the AKS patch, builds an unpacked AKS Desktop application, runs
+lets npm apply the AKS patch series, builds an unpacked AKS Desktop application, runs
 TypeScript and lint checks, and starts the packaged application in headless
 mode. It never changes the committed pin.
 
-### Update a patch after a conflict
+### Update patches after a conflict
 
-If `npm ci` reports that the patch does not apply, keep the newly generated
-package and use the previous patch as a reviewed starting point. The package is
-local until `@headlamp-k8s/headlamp-source` is published, so npm cannot fetch its
-clean baseline for `npm patch update`; this maintenance-only rebase uses Git,
-while normal installs continue to use npm as the only patch applicator:
+If `npm ci` reports that a patch does not apply, keep the newly generated
+package and rebase the numbered patches in `patches/series`, in order. The
+package is local until `@headlamp-k8s/headlamp-source` is published, so npm
+cannot fetch its clean baseline for `npm patch update`. This maintenance-only
+rebase uses Git; normal installs continue to use npm as the only patch
+applicator:
 
 ```bash
 work=$(mktemp -d)
@@ -83,18 +87,27 @@ git -C "$work/edit" add -A
 git -C "$work/edit" \
   -c user.name=patch -c user.email=patch@example.invalid \
   commit -m baseline
-git -C "$work/edit" apply --reject \
-  "$PWD/build/patches/headlamp-source@<previous-version>.patch" || true
+patch=0001-external-plugin-manifest.patch
+git -C "$work/edit" apply --reject "$PWD/patches/$patch"
 ```
 
-Resolve every `*.rej` against the new source and remove the reject files. Then
-generate the reviewed npm patch and refresh its lockfile integrity:
+For each entry in `patches/series`, resolve any `*.rej`, remove the reject
+files, regenerate that numbered patch against the preceding committed state,
+and commit it in the temporary repository before continuing:
 
 ```bash
 git -C "$work/edit" add -N .
-git -C "$work/edit" diff --binary --full-index HEAD -- \
-  > "build/patches/headlamp-source@<new-version>.patch"
-npm run headlamp:source -- --source /path/to/headlamp
+git -C "$work/edit" diff --binary --full-index HEAD -- > "$PWD/patches/$patch"
+git -C "$work/edit" add -A
+git -C "$work/edit" \
+  -c user.name=patch -c user.email=patch@example.invalid \
+  commit -m "$patch"
+```
+
+After all entries apply, compose the npm-required aggregate and validate it:
+
+```bash
+npm run headlamp:patches
 npm ci
 npm run test:headlamp-patches
 ```

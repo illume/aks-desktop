@@ -1,0 +1,85 @@
+diff --git a/source/frontend/src/components/project/ProjectDetails.tsx b/source/frontend/src/components/project/ProjectDetails.tsx
+index 6eda2935f..0ab1f7bca 100644
+--- a/source/frontend/src/components/project/ProjectDetails.tsx
++++ b/source/frontend/src/components/project/ProjectDetails.tsx
+@@ -522,7 +522,12 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+   return (
+     <ProjectDetailsContext.Provider value={contextValue}>
+       <Box
+-        sx={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'flex-start' }}
++        sx={{
++          display: 'flex',
++          flexDirection: 'column',
++          minHeight: '100%',
++          alignItems: 'flex-start',
++        }}
+       >
+         <SectionBox
+           outterBoxProps={{
+diff --git a/source/frontend/src/components/project/ProjectResourcesTab.tsx b/source/frontend/src/components/project/ProjectResourcesTab.tsx
+index be8199594..8a4d06c5d 100644
+--- a/source/frontend/src/components/project/ProjectResourcesTab.tsx
++++ b/source/frontend/src/components/project/ProjectResourcesTab.tsx
+@@ -395,7 +395,7 @@ export function ProjectResourcesTab({
+           borderColor: theme.palette.divider,
+           borderTop: 0,
+           flexGrow: 1,
+-          minHeight: 0,
++          minHeight: '300px',
+           flexBasis: 0,
+           [theme.breakpoints.down('md')]: {
+             flexDirection: 'column',
+diff --git a/source/frontend/src/components/project/ResourceCategoriesList.tsx b/source/frontend/src/components/project/ResourceCategoriesList.tsx
+index 6ff64ba76..1e82fecbf 100644
+--- a/source/frontend/src/components/project/ResourceCategoriesList.tsx
++++ b/source/frontend/src/components/project/ResourceCategoriesList.tsx
+@@ -44,9 +44,13 @@ export function ResourceCategoriesList({
+ }) {
+   return (
+     <Box
+-      sx={{
++      sx={theme => ({
+         flexShrink: 0,
+-      }}
++        [theme.breakpoints.down('md')]: {
++          maxHeight: '200px',
++          overflowY: 'auto',
++        },
++      })}
+     >
+       <List dense>
+         {categoryList.map(({ category, items, health }) => {
+diff --git a/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot b/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
+index 4f5082e84..f1229c057 100644
+--- a/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
++++ b/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
+@@ -4,10 +4,10 @@
+       style="height: 500px;"
+     >
+       <div
+-        class="MuiBox-root css-gul9zg"
++        class="MuiBox-root css-vwjlh1"
+       >
+         <div
+-          class="MuiBox-root css-6su6fj"
++          class="MuiBox-root css-dlbtr1"
+         >
+           <ul
+             class="MuiList-root MuiList-padding MuiList-dense css-h4y409-MuiList-root"
+diff --git a/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot b/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
+index 965d0c23a..e43eb56bd 100644
+--- a/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
++++ b/source/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
+@@ -4,10 +4,10 @@
+       style="height: 500px;"
+     >
+       <div
+-        class="MuiBox-root css-gul9zg"
++        class="MuiBox-root css-vwjlh1"
+       >
+         <div
+-          class="MuiBox-root css-6su6fj"
++          class="MuiBox-root css-dlbtr1"
+         >
+           <ul
+             class="MuiList-root MuiList-padding MuiList-dense css-h4y409-MuiList-root"

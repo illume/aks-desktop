@@ -21,7 +21,7 @@
     "build:container": "npm run headlamp:assemble && cross-env HEADLAMP_BUILD_MANIFEST=.aks-desktop/product-manifest.json npm --prefix node_modules/@headlamp-k8s/headlamp-source run build:container",
     "test:build": "tsx --test build/*.test.ts",
     "test:headlamp-package": "tsx --test build/headlamp-package.test.ts",
-    "test:headlamp-patches": "npm patch ls && npm run test:headlamp-package",
+    "test:headlamp-patches": "npm run headlamp:patches -- --check && npm patch ls && npm run test:headlamp-package",
     "test:post-build": "tsx ./build/verify-bundled-tools.ts",
     "test:distribution": "npm run test:post-build && npm run headlamp:smoke --",
     "plugin:setup": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run bundle:plugins",
@@ -40,6 +40,7 @@
     "ai-assistant:lint": "cd plugins/ai-assistant && npm run lint",
     "ai-assistant:format": "cd plugins/ai-assistant && npm run format",
     "headlamp:manifest": "tsx ./build/generate-headlamp-manifest.ts",
+    "headlamp:patches": "tsx ./build/headlamp-patch-series.ts",
     "headlamp:assemble": "npm run headlamp:tools && npm run plugin:setup && npm run headlamp:manifest",
     "headlamp:doctor": "npm run test:headlamp-package && tsx ./build/generate-headlamp-manifest.ts --check",
     "headlamp:source": "tsx ./build/package-headlamp-source.ts",
@@ -281,7 +282,7 @@
     "typescript": "^6.0.3"
   },
   "patchedDependencies": {
-    "@headlamp-k8s/headlamp-source@0.44.0-main.99a230be": "build/patches/headlamp-source@0.44.0-main.99a230be.patch"
+    "@headlamp-k8s/headlamp-source@0.44.0-main.99a230be": "patches/headlamp-source@0.44.0-main.99a230be.patch"
   },
   "lint-staged": {
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx}": [

@@ -1,0 +1,46 @@
+diff --git a/source/frontend/.storybook/baseMocks.ts b/source/frontend/.storybook/baseMocks.ts
+index bf03564f8..367fb6f36 100644
+--- a/source/frontend/.storybook/baseMocks.ts
++++ b/source/frontend/.storybook/baseMocks.ts
+@@ -110,6 +110,18 @@ export const baseMocks = [
+       items: [],
+     })
+   ),
++  http.get('http://localhost:4466/apis/apiextensions.k8s.io/v1/customresourcedefinitions', () =>
++    HttpResponse.json({
++      kind: 'CustomResourceDefinitionList',
++      apiVersion: 'apiextensions.k8s.io/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
++  http.get(
++    'http://localhost:4466/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions',
++    () => HttpResponse.error()
++  ),
+   http.get('http://localhost:4466/apis/metrics.k8s.io/v1beta1/nodes', () =>
+     HttpResponse.json({
+       apiVersion: 'metrics.k8s.io/v1beta1',
+diff --git a/source/plugins/headlamp-plugin/config/.storybook/baseMocks.ts b/source/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
+index f8f14ae5d..5d0ae098b 100644
+--- a/source/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
++++ b/source/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
+@@ -183,6 +183,18 @@ export const baseMocks = [
+       items: [],
+     })
+   ),
++  http.get('http://localhost:4466/apis/apiextensions.k8s.io/v1/customresourcedefinitions', () =>
++    HttpResponse.json({
++      kind: 'CustomResourceDefinitionList',
++      apiVersion: 'apiextensions.k8s.io/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
++  http.get(
++    'http://localhost:4466/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions',
++    () => HttpResponse.error()
++  ),
+   http.get('http://localhost:4466/apis/metrics.k8s.io/v1beta1/nodes', () =>
+     HttpResponse.json({
+       apiVersion: 'metrics.k8s.io/v1beta1',

@@ -1,0 +1,93 @@
+diff --git a/source/frontend/src/components/App/RouteSwitcher.tsx b/source/frontend/src/components/App/RouteSwitcher.tsx
+index 0e69b0a50..3f7cc9cbc 100644
+--- a/source/frontend/src/components/App/RouteSwitcher.tsx
++++ b/source/frontend/src/components/App/RouteSwitcher.tsx
+@@ -19,6 +19,7 @@ import React, { Suspense } from 'react';
+ import { useTranslation } from 'react-i18next';
+ import { useDispatch } from 'react-redux';
+ import { Redirect, Route, RouteProps, Switch, useHistory } from 'react-router-dom';
++import { getDocumentTitle } from '../../helpers/getDocumentTitle';
+ import { getCluster, getSelectedClusters } from '../../lib/cluster';
+ import { useCluster, useClustersConf } from '../../lib/k8s';
+ import { testAuth } from '../../lib/k8s/api/v1/clusterApi';
+@@ -135,12 +136,7 @@ function PageTitle({
+   const cluster = useCluster();
+ 
+   React.useEffect(() => {
+-    if (cluster && title) {
+-      document.title = `${cluster} - ${title}`;
+-      return;
+-    }
+-
+-    document.title = cluster || title || '';
++    document.title = getDocumentTitle(cluster, title);
+   }, [cluster, title]);
+ 
+   return <>{children}</>;
+diff --git a/source/frontend/src/helpers/getDocumentTitle.test.ts b/source/frontend/src/helpers/getDocumentTitle.test.ts
+new file mode 100644
+index 000000000..895dab19c
+--- /dev/null
++++ b/source/frontend/src/helpers/getDocumentTitle.test.ts
+@@ -0,0 +1,30 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import { getDocumentTitle } from './getDocumentTitle';
++
++describe('getDocumentTitle', () => {
++  it('includes cluster, route, and product names', () => {
++    expect(getDocumentTitle('cluster-a', 'Workloads', 'AKS Desktop')).toBe(
++      'cluster-a - Workloads - AKS Desktop'
++    );
++  });
++
++  it('uses the product name when route context is unavailable', () => {
++    expect(getDocumentTitle(undefined, undefined, 'AKS Desktop')).toBe('AKS Desktop');
++  });
++});
+diff --git a/source/frontend/src/helpers/getDocumentTitle.ts b/source/frontend/src/helpers/getDocumentTitle.ts
+new file mode 100644
+index 000000000..0c96203bd
+--- /dev/null
++++ b/source/frontend/src/helpers/getDocumentTitle.ts
+@@ -0,0 +1,25 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { getProductName } from './getProductInfo';
++
++export function getDocumentTitle(
++  cluster: string | null | undefined,
++  title: string | null | undefined,
++  productName = getProductName() || 'Headlamp'
++) {
++  return [cluster, title, productName].filter(Boolean).join(' - ');
++}

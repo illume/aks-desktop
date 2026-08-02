@@ -59,10 +59,10 @@ function createSourceCheckout() {
 function createProject(commit: string) {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-project-'));
   tempDirs.push(rootDir);
-  fs.mkdirSync(path.join(rootDir, 'build', 'patches'), { recursive: true });
+  fs.mkdirSync(path.join(rootDir, 'patches'), { recursive: true });
   fs.mkdirSync(path.join(rootDir, 'packages'));
   const version = `0.44.0-main.${commit.slice(0, 8)}`;
-  const patchPath = `build/patches/headlamp-source@${version}.patch`;
+  const patchPath = `patches/headlamp-source@${version}.patch`;
   fs.writeFileSync(path.join(rootDir, patchPath), 'patch\n');
   fs.writeFileSync(
     path.join(rootDir, 'package.json'),
@@ -139,7 +139,7 @@ test('packages a clean exact Headlamp commit and updates the npm contract', () =
   );
   assert.equal(
     project.patchedDependencies[selector],
-    `build/patches/headlamp-source@${version}.patch`
+    `patches/headlamp-source@${version}.patch`
   );
   assert.equal(fs.existsSync(result.artifactPath), true);
   assert.match(

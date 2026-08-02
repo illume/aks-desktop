@@ -1,0 +1,71 @@
+diff --git a/source/app/electron/preload.ts b/source/app/electron/preload.ts
+index 1edbdf963..8c631e519 100644
+--- a/source/app/electron/preload.ts
++++ b/source/app/electron/preload.ts
+@@ -117,4 +117,5 @@ contextBridge.exposeInMainWorld('desktopApi', {
+   notifyClusterChange: (cluster: string | null) => {
+     ipcRenderer.send('cluster-changed', cluster);
+   },
++  platform: process.platform,
+ });
+diff --git a/source/frontend/src/i18n/electronI18n.tsx b/source/frontend/src/i18n/electronI18n.tsx
+index 39255cb4a..edf0c854e 100644
+--- a/source/frontend/src/i18n/electronI18n.tsx
++++ b/source/frontend/src/i18n/electronI18n.tsx
+@@ -18,12 +18,6 @@ import React from 'react';
+ import { useTranslation } from 'react-i18next';
+ import { isElectron } from '../helpers/isElectron';
+ 
+-declare global {
+-  interface Window {
+-    desktopApi: any;
+-  }
+-}
+-
+ // If we're running under electron, we need to communicate any language changes.
+ const ipcRenderer = isElectron() ? window.desktopApi : null;
+ 
+diff --git a/source/frontend/src/components/App/pluginManager.test.ts b/source/frontend/src/components/App/pluginManager.test.ts
+--- a/source/frontend/src/components/App/pluginManager.test.ts
++++ b/source/frontend/src/components/App/pluginManager.test.ts
+@@ -27,6 +27,7 @@ describe('PluginManager', () => {
+     unsubscribe.mockReset();
+     removeListener.mockReset();
+     window.desktopApi = {
++      platform: 'linux',
+       send: vi.fn(),
+       receive: vi.fn((_channel, listener) => {
+         handleResponse = listener;
+diff --git a/source/frontend/src/components/App/runCommand.test.ts b/source/frontend/src/components/App/runCommand.test.ts
+--- a/source/frontend/src/components/App/runCommand.test.ts
++++ b/source/frontend/src/components/App/runCommand.test.ts
+@@ -20,3 +20,3 @@ describe('runCommand', () => {
+   beforeEach(() => {
+-    window.desktopApi = {};
++    window.desktopApi = { platform: 'linux' };
+   });
+diff --git a/source/frontend/src/plugin/lib.ts b/source/frontend/src/plugin/lib.ts
+index da490e775..830bc7066 100644
+--- a/source/frontend/src/plugin/lib.ts
++++ b/source/frontend/src/plugin/lib.ts
+@@ -67,6 +67,11 @@ export abstract class Plugin {
+   abstract initialize(register: Registry): boolean | void;
+ }
+ 
++export interface DesktopApi {
++  platform: NodeJS.Platform;
++  [key: string]: any;
++}
++
+ declare global {
+   interface Window {
+     pluginLib: {
+@@ -76,7 +81,7 @@ declare global {
+       [pluginId: string]: Plugin;
+     };
+     registerPlugin: (pluginId: string, pluginObj: Plugin) => void;
+-    desktopApi: any;
++    desktopApi: DesktopApi;
+   }
+ }
+ 
