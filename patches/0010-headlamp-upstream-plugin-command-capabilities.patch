@@ -1,0 +1,741 @@
+From 321cfcd6f218274173a1ea77194afcb289570ebb Mon Sep 17 00:00:00 2001
+From: René Dudfield <renedudfield@microsoft.com>
+Date: Fri, 31 Jul 2026 19:40:43 +0000
+Subject: [PATCH] app: authorize manifest-declared plugin commands
+
+---
+ app/electron/preload.ts                       |   9 +
+ app/electron/runCmd.test.ts                   | 139 +++++++++++++-
+ app/electron/runCmd.ts                        | 179 +++++++++++++++++-
+ frontend/src/components/App/runCommand.ts     |  15 +-
+ .../src/plugin/commandCapabilities.test.ts    |  64 +++++++
+ frontend/src/plugin/commandCapabilities.ts    |  76 ++++++++
+ frontend/src/plugin/index.ts                  |  41 ++++
+ 7 files changed, 512 insertions(+), 11 deletions(-)
+ create mode 100644 frontend/src/plugin/commandCapabilities.test.ts
+ create mode 100644 frontend/src/plugin/commandCapabilities.ts
+
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index 1edbdf963..c5d26bbd7 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -113,6 +113,15 @@ contextBridge.exposeInMainWorld('desktopApi', {
+       ipcRenderer.invoke('mcp-cluster-change', { cluster }),
+   },
+ 
++  commandCapabilities: {
++    register: (
++      registrations: Array<{
++        pluginName: string;
++        scopes: Array<{ command: string; args: string[] }>;
++      }>
++    ) => ipcRenderer.invoke('register-plugin-command-capabilities', registrations),
++  },
++
+   // Notify cluster change (for MCP server restart)
+   notifyClusterChange: (cluster: string | null) => {
+     ipcRenderer.send('cluster-changed', cluster);
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index f9bcb1f9d..9c6423e57 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -18,11 +18,17 @@ import { EventEmitter } from 'events';
+ import path from 'path';
+ import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+ 
+-const { getShellEnvironmentMock, spawnMock } = vi.hoisted(() => ({
++const { dialogMock, getShellEnvironmentMock, spawnMock } = vi.hoisted(() => ({
++  dialogMock: vi.fn(),
+   getShellEnvironmentMock: vi.fn(),
+   spawnMock: vi.fn(),
+ }));
+ 
++vi.mock('electron', () => ({
++  BrowserWindow: vi.fn(),
++  dialog: { showMessageBoxSync: dialogMock },
++}));
++
+ vi.mock('child_process', () => ({
+   spawn: spawnMock,
+ }));
+@@ -51,12 +57,88 @@ vi.mock('./main', () => ({
+ }));
+ 
+ import {
++  checkCommandCapability,
++  checkCommandConsent,
+   checkPermissionSecret,
++  createCommandCapabilities,
+   environmentOverrides,
+   handleRunCommand,
+   validateCommandData,
+ } from './runCmd';
+ 
++describe('checkCommandConsent', () => {
++  it('does not run a newly denied command', () => {
++    dialogMock.mockReturnValue(1);
++
++    expect(checkCommandConsent('kubectl', ['get'], {} as any)).toBe(false);
++  });
++
++  it('does not reuse consent across plugin identities', () => {
++    dialogMock.mockReturnValue(1);
++
++    expect(checkCommandConsent('az', ['account'], {} as any, '@example/plugin')).toBe(false);
++    expect(dialogMock).toHaveBeenCalledWith(
++      expect.anything(),
++      expect.objectContaining({ detail: '@example/plugin: az account' })
++    );
++  });
++});
++
++describe('plugin command capabilities', () => {
++  it('binds a capability to its plugin command scope', () => {
++    const { capabilities, scopeByCapability } = createCommandCapabilities([
++      {
++        pluginName: '@example/plugin',
++        scopes: [{ command: 'kubectl', args: ['get'] }],
++      },
++    ]);
++    const capability = capabilities['@example/plugin'][0].capability;
++
++    expect(
++      checkCommandCapability(
++        {
++          id: '1',
++          command: 'kubectl',
++          args: ['get', 'pods'],
++          options: {},
++          permissionSecrets: {},
++          capability,
++        },
++        scopeByCapability
++      )
++    ).toEqual([true, '']);
++    expect(
++      checkCommandCapability(
++        {
++          id: '2',
++          command: 'kubectl',
++          args: ['delete', 'pods'],
++          options: {},
++          permissionSecrets: {},
++          capability,
++        },
++        scopeByCapability
++      )
++    ).toEqual([false, 'Command is outside its declared plugin scope']);
++  });
++
++  it('ignores malformed and duplicate scopes', () => {
++    const { capabilities } = createCommandCapabilities([
++      {
++        pluginName: 'example',
++        scopes: [
++          { command: 'kubectl', args: ['get'] },
++          { command: 'kubectl', args: ['get'] },
++          { command: '../shell', args: [] },
++          { command: 'scriptjs', args: ['plugin/script.js'] },
++        ],
++      },
++    ]);
++
++    expect(capabilities.example).toHaveLength(1);
++  });
++});
++
+ it('does not cache process environment changes as shell overrides', () => {
+   expect(
+     environmentOverrides(
+@@ -268,6 +350,30 @@ describe('validateCommandData', () => {
+       })[0]
+     ).toBe(true);
+   });
++
++  it('accepts a structurally valid declared command capability', () => {
++    expect(
++      validateCommandData({
++        command: 'kubectl',
++        args: ['get'],
++        options: {},
++        permissionSecrets: {},
++        capability: 'a'.repeat(64),
++      })[0]
++    ).toBe(true);
++  });
++
++  it('rejects a malformed command capability', () => {
++    expect(
++      validateCommandData({
++        command: 'kubectl',
++        args: ['get'],
++        options: {},
++        permissionSecrets: {},
++        capability: 'not-a-capability',
++      })[0]
++    ).toBe(false);
++  });
+ });
+ 
+ describe('handleRunCommand', () => {
+@@ -322,6 +428,37 @@ describe('handleRunCommand', () => {
+     expect(sentMessages).toContainEqual(['command-exit', 'test-id', -1]);
+   });
+ 
++  it('runs a command only within its manifest-declared capability', async () => {
++    const { capabilities, scopeByCapability } = createCommandCapabilities([
++      {
++        pluginName: '@example/plugin',
++        scopes: [{ command: 'kubectl', args: ['get'] }],
++      },
++    ]);
++    dialogMock.mockReturnValue(0);
++
++    await handleRunCommand(
++      fakeEvent,
++      {
++        id: 'declared-command',
++        command: 'kubectl',
++        args: ['get', 'pods'],
++        options: {},
++        permissionSecrets: {},
++        capability: capabilities['@example/plugin'][0].capability,
++      },
++      { id: 1 } as any,
++      {},
++      scopeByCapability
++    );
++
++    expect(spawnMock).toHaveBeenCalledWith(
++      'kubectl',
++      ['get', 'pods'],
++      expect.objectContaining({ shell: false })
++    );
++  });
++
+   it('reports synchronous spawn errors without rejecting', async () => {
+     spawnMock.mockImplementation(() => {
+       throw new Error('spawn failed');
+diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
+index 3502afe7c..cf349d1d8 100644
+--- a/app/electron/runCmd.ts
++++ b/app/electron/runCmd.ts
+@@ -41,6 +41,127 @@ interface CommandData {
+   options: {};
+   /** The permission secrets for the command. */
+   permissionSecrets: Record<string, number>;
++  /** Opaque capability for a manifest-declared command scope. */
++  capability?: string;
++}
++
++interface PluginCommandScope {
++  command: string;
++  args: string[];
++}
++
++interface PluginCommandCapability extends PluginCommandScope {
++  capability: string;
++}
++
++interface CommandCapabilityRegistration {
++  pluginName: string;
++  scopes: PluginCommandScope[];
++}
++
++interface RegisteredCommandScope extends PluginCommandScope {
++  pluginName: string;
++}
++
++const VALID_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
++const VALID_COMMAND = /^[a-z0-9][a-z0-9._-]*$/i;
++const MAX_PLUGIN_NAME_LENGTH = 214;
++const MAX_COMMAND_LENGTH = 128;
++const MAX_ARGUMENTS = 16;
++const MAX_ARGUMENT_LENGTH = 256;
++const MAX_PLUGINS = 256;
++const MAX_SCOPES = 64;
++
++function validCommandScope(scope: unknown): scope is PluginCommandScope {
++  if (typeof scope !== 'object' || scope === null) {
++    return false;
++  }
++  const { command, args } = scope as Partial<PluginCommandScope>;
++  return (
++    typeof command === 'string' &&
++    command.length <= MAX_COMMAND_LENGTH &&
++    VALID_COMMAND.test(command) &&
++    command !== 'scriptjs' &&
++    Array.isArray(args) &&
++    args.length <= MAX_ARGUMENTS &&
++    args.every(
++      argument =>
++        typeof argument === 'string' &&
++        argument.length <= MAX_ARGUMENT_LENGTH &&
++        !argument.includes('\0')
++    )
++  );
++}
++
++export function createCommandCapabilities(registrations: unknown): {
++  capabilities: Record<string, PluginCommandCapability[]>;
++  scopeByCapability: Map<string, RegisteredCommandScope>;
++} {
++  const capabilities: Record<string, PluginCommandCapability[]> = Object.create(null);
++  const scopeByCapability = new Map<string, RegisteredCommandScope>();
++  if (!Array.isArray(registrations) || registrations.length > MAX_PLUGINS) {
++    return { capabilities, scopeByCapability };
++  }
++
++  for (const registration of registrations) {
++    if (typeof registration !== 'object' || registration === null) {
++      continue;
++    }
++    const { pluginName, scopes } = registration as Partial<CommandCapabilityRegistration>;
++    if (
++      typeof pluginName !== 'string' ||
++      pluginName.length > MAX_PLUGIN_NAME_LENGTH ||
++      !VALID_PLUGIN_NAME.test(pluginName) ||
++      !Array.isArray(scopes) ||
++      scopes.length > MAX_SCOPES
++    ) {
++      continue;
++    }
++
++    const seenScopes = new Set<string>();
++    capabilities[pluginName] = [];
++    for (const scope of scopes) {
++      if (!validCommandScope(scope)) {
++        continue;
++      }
++      const scopeKey = JSON.stringify([scope.command, scope.args]);
++      if (seenScopes.has(scopeKey)) {
++        continue;
++      }
++      seenScopes.add(scopeKey);
++      const capability = crypto.randomBytes(32).toString('hex');
++      capabilities[pluginName].push({ ...scope, capability });
++      scopeByCapability.set(capability, { ...scope, pluginName });
++    }
++  }
++
++  return { capabilities, scopeByCapability };
++}
++
++export function checkCommandCapability(
++  commandData: CommandData,
++  scopeByCapability: Map<string, RegisteredCommandScope>
++): [boolean, string] {
++  const scope = getCommandCapabilityScope(commandData, scopeByCapability);
++  return scope ? [true, ''] : [false, 'Command is outside its declared plugin scope'];
++}
++
++function getCommandCapabilityScope(
++  commandData: CommandData,
++  scopeByCapability: Map<string, RegisteredCommandScope>
++): RegisteredCommandScope | undefined {
++  const scope =
++    typeof commandData.capability === 'string'
++      ? scopeByCapability.get(commandData.capability)
++      : undefined;
++  if (
++    !scope ||
++    scope.command !== commandData.command ||
++    !scope.args.every((argument, index) => argument === commandData.args[index])
++  ) {
++    return undefined;
++  }
++  return scope;
+ }
+ 
+ /** Returns only values changed by shell initialization. */
+@@ -85,12 +206,17 @@ function confirmCommandDialog(command: string, mainWindow: BrowserWindow): boole
+  * @param args - The arguments to the command.
+  * @returns true if the user has consented to running the command, false otherwise.
+  */
+-function checkCommandConsent(command: string, args: string[], mainWindow: BrowserWindow): boolean {
++export function checkCommandConsent(
++  command: string,
++  args: string[],
++  mainWindow: BrowserWindow,
++  pluginName?: string
++): boolean {
+   const settings = loadSettings(SETTINGS_PATH);
+   const confirmedCommands = settings?.confirmedCommands;
+ 
+   // Build the consent key: command + (first arg if present)
+-  let consentKey = command;
++  let consentKey = pluginName ? `${pluginName}: ${command}` : command;
+   if (args && args.length > 0) {
+     consentKey += ' ' + args[0];
+   }
+@@ -109,6 +235,7 @@ function checkCommandConsent(command: string, args: string[], mainWindow: Browse
+     }
+     settings.confirmedCommands[consentKey] = commandChoice;
+     saveSettings(SETTINGS_PATH, settings);
++    return commandChoice;
+   }
+   return true;
+ }
+@@ -264,7 +391,8 @@ export async function handleRunCommand(
+   event: IpcMainEvent,
+   eventData: CommandDataPartial,
+   mainWindow: BrowserWindow | null,
+-  permissionSecrets: Record<string, number>
++  permissionSecrets: Record<string, number>,
++  scopeByCapability: Map<string, RegisteredCommandScope> = new Map()
+ ): Promise<void> {
+   if (mainWindow === null) {
+     console.error('Main window is null, cannot run command');
+@@ -277,13 +405,29 @@ export async function handleRunCommand(
+   }
+   const commandData = eventData as CommandData;
+ 
+-  const [permissionsValid, permissionError] = checkPermissionSecret(commandData, permissionSecrets);
++  const commandScope =
++    commandData.capability === undefined
++      ? undefined
++      : getCommandCapabilityScope(commandData, scopeByCapability);
++  const [permissionsValid, permissionError]: [boolean, string] =
++    commandData.capability === undefined
++      ? checkPermissionSecret(commandData, permissionSecrets)
++      : commandScope
++      ? [true, '']
++      : [false, 'Command is outside its declared plugin scope'];
+   if (!permissionsValid) {
+     console.error(permissionError);
+     return;
+   }
+ 
+-  if (!checkCommandConsent(commandData.command, commandData.args, mainWindow)) {
++  if (
++    !checkCommandConsent(
++      commandData.command,
++      commandData.args,
++      mainWindow,
++      commandScope?.pluginName
++    )
++  ) {
+     return;
+   }
+ 
+@@ -393,6 +537,8 @@ export function setupRunCmdHandlers(mainWindow: BrowserWindow | null, ipcMain: E
+   // This means that if the secrets are requested before the plugins are loaded, then
+   // they will not be sent until the next time the app is reloaded.
+   let pluginPermissionSecretsSent = false;
++  let capabilityRegistrationAllowed = true;
++  let scopeByCapability = new Map<string, RegisteredCommandScope>();
+   const permissionSecrets = {
+     'runCmd-minikube': cryptoRandom(),
+     'runCmd-scriptjs-minikube/manage-minikube.js': cryptoRandom(),
+@@ -409,15 +555,27 @@ export function setupRunCmdHandlers(mainWindow: BrowserWindow | null, ipcMain: E
+     }
+   });
+ 
++  ipcMain.handle('register-plugin-command-capabilities', (event, registrations: unknown) => {
++    if (event.sender !== mainWindow?.webContents || !capabilityRegistrationAllowed) {
++      return {};
++    }
++    capabilityRegistrationAllowed = false;
++    const registration = createCommandCapabilities(registrations);
++    scopeByCapability = registration.scopeByCapability;
++    return registration.capabilities;
++  });
++
+   // Only allow sending secrets again when the Electron main window reloads (not just URL changes).
+   mainWindow?.webContents.on('did-frame-finish-load', (event, isMainFrame) => {
+     if (isMainFrame) {
+       pluginPermissionSecretsSent = false;
++      capabilityRegistrationAllowed = true;
++      scopeByCapability.clear();
+     }
+   });
+ 
+   ipcMain.on('run-command', (event, eventData) =>
+-    handleRunCommand(event, eventData, mainWindow, permissionSecrets)
++    handleRunCommand(event, eventData, mainWindow, permissionSecrets, scopeByCapability)
+   );
+ }
+ 
+@@ -454,9 +612,16 @@ export function validateCommandData(eventData: CommandDataPartial): [boolean, st
+     }
+   }
+ 
++  if (
++    eventData.capability !== undefined &&
++    (typeof eventData.capability !== 'string' || !/^[a-f0-9]{64}$/.test(eventData.capability))
++  ) {
++    return [false, 'Invalid command capability'];
++  }
++
+   const validCommands = ['minikube', 'az', 'scriptjs', 'gh'];
+ 
+-  if (!validCommands.includes(eventData.command)) {
++  if (eventData.capability === undefined && !validCommands.includes(eventData.command)) {
+     return [
+       false,
+       `Invalid command: ${eventData.command}, only valid commands are: ${JSON.stringify(
+diff --git a/frontend/src/components/App/runCommand.ts b/frontend/src/components/App/runCommand.ts
+index da5df944d..c68e12dfa 100644
+--- a/frontend/src/components/App/runCommand.ts
++++ b/frontend/src/components/App/runCommand.ts
+@@ -48,7 +48,7 @@
+  * ```
+  */
+ export function runCommand(
+-  command: 'minikube' | 'az' | 'scriptjs' | 'gh',
++  command: string,
+   args: string[],
+   options: {},
+   permissionSecrets?: Record<string, number>,
+@@ -60,12 +60,14 @@ export function runCommand(
+       args: string[];
+       options: {};
+       permissionSecrets: Record<string, number>;
++      capability?: string;
+     }
+   ) => void,
+   desktopApiReceive?: (
+     channel: string,
+     listener: (cmdId: string, data: string | number) => void
+-  ) => void
++  ) => void,
++  capability?: string
+ ): {
+   stdout: { on: (event: string, listener: (chunk: any) => void) => void };
+   stderr: { on: (event: string, listener: (chunk: any) => void) => void };
+@@ -113,7 +115,14 @@ export function runCommand(
+   // We use desktopApiReceive and desktopApiSend to communicate with the main process.
+   // Because other plugins may change the global window.desktopApi functions
+   // to snoop on the secrets that plugins are sending.
+-  desktopApiSend('run-command', { id, command, args, options, permissionSecrets });
++  desktopApiSend('run-command', {
++    id,
++    command,
++    args,
++    options,
++    permissionSecrets,
++    capability,
++  });
+ 
+   return {
+     stdout: {
+diff --git a/frontend/src/plugin/commandCapabilities.test.ts b/frontend/src/plugin/commandCapabilities.test.ts
+new file mode 100644
+index 000000000..a720ee718
+--- /dev/null
++++ b/frontend/src/plugin/commandCapabilities.test.ts
+@@ -0,0 +1,64 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import { findCommandCapability, getDeclaredCommandScopes } from './commandCapabilities';
++
++describe('getDeclaredCommandScopes', () => {
++  it('reads exact command and argument-prefix scopes', () => {
++    expect(
++      getDeclaredCommandScopes({
++        headlamp: {
++          runCommands: [{ command: 'kubectl', args: ['get'] }, { command: 'az' }],
++        },
++      })
++    ).toEqual([
++      { command: 'kubectl', args: ['get'] },
++      { command: 'az', args: [] },
++    ]);
++  });
++
++  it('ignores malformed scopes', () => {
++    expect(
++      getDeclaredCommandScopes({
++        headlamp: {
++          runCommands: [
++            { command: '../shell', args: [] },
++            { command: 'kubectl', args: 'get' },
++            { command: 'az', args: ['account'] },
++          ],
++        },
++      })
++    ).toEqual([{ command: 'az', args: ['account'] }]);
++  });
++});
++
++describe('findCommandCapability', () => {
++  const capabilities = [
++    { command: 'kubectl', args: ['get'], capability: 'get-capability' },
++    { command: 'kubectl', args: ['delete'], capability: 'delete-capability' },
++  ];
++
++  it('matches a declared argument prefix', () => {
++    expect(findCommandCapability(capabilities, 'kubectl', ['get', 'pods'])).toBe('get-capability');
++  });
++
++  it('rejects a command outside the declared scope', () => {
++    expect(findCommandCapability(capabilities, 'kubectl', ['apply', '-f', 'pod.yaml'])).toBe(
++      undefined
++    );
++  });
++});
+diff --git a/frontend/src/plugin/commandCapabilities.ts b/frontend/src/plugin/commandCapabilities.ts
+new file mode 100644
+index 000000000..1344c727e
+--- /dev/null
++++ b/frontend/src/plugin/commandCapabilities.ts
+@@ -0,0 +1,76 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++const VALID_COMMAND = /^[a-z0-9][a-z0-9._-]*$/i;
++const MAX_COMMAND_LENGTH = 128;
++const MAX_ARGUMENTS = 16;
++const MAX_ARGUMENT_LENGTH = 256;
++const MAX_SCOPES = 64;
++
++export interface PluginCommandScope {
++  command: string;
++  args: string[];
++}
++
++export interface PluginCommandCapability extends PluginCommandScope {
++  capability: string;
++}
++
++function isValidScope(scope: unknown): scope is PluginCommandScope {
++  if (typeof scope !== 'object' || scope === null) {
++    return false;
++  }
++  const { command, args = [] } = scope as { command?: unknown; args?: unknown };
++  return (
++    typeof command === 'string' &&
++    command.length <= MAX_COMMAND_LENGTH &&
++    VALID_COMMAND.test(command) &&
++    Array.isArray(args) &&
++    args.length <= MAX_ARGUMENTS &&
++    args.every(
++      arg => typeof arg === 'string' && arg.length <= MAX_ARGUMENT_LENGTH && !arg.includes('\0')
++    )
++  );
++}
++
++export function getDeclaredCommandScopes(packageInfo: unknown): PluginCommandScope[] {
++  if (typeof packageInfo !== 'object' || packageInfo === null) {
++    return [];
++  }
++  const headlamp = (packageInfo as { headlamp?: unknown }).headlamp;
++  if (typeof headlamp !== 'object' || headlamp === null) {
++    return [];
++  }
++  const runCommands = (headlamp as { runCommands?: unknown }).runCommands;
++  if (!Array.isArray(runCommands) || runCommands.length > MAX_SCOPES) {
++    return [];
++  }
++  return runCommands.filter(isValidScope).map(scope => ({
++    command: scope.command,
++    args: scope.args ?? [],
++  }));
++}
++
++export function findCommandCapability(
++  capabilities: PluginCommandCapability[],
++  command: string,
++  args: string[]
++): string | undefined {
++  return capabilities.find(
++    scope =>
++      scope.command === command && scope.args.every((argument, index) => argument === args[index])
++  )?.capability;
++}
+diff --git a/frontend/src/plugin/index.ts b/frontend/src/plugin/index.ts
+index 0b9e7de81..df50fcebd 100644
+--- a/frontend/src/plugin/index.ts
++++ b/frontend/src/plugin/index.ts
+@@ -52,6 +52,11 @@ import * as Utils from '../lib/util';
+ import { eventAction, HeadlampEventType } from '../redux/headlampEventSlice';
+ import store from '../redux/stores/store';
+ import * as stateless from '../stateless/index';
++import {
++  findCommandCapability,
++  getDeclaredCommandScopes,
++  PluginCommandCapability,
++} from './commandCapabilities';
+ import { Headlamp, Plugin } from './lib';
+ import { changePluginLanguage, initializePluginI18n } from './pluginI18n';
+ import { useTranslation } from './pluginI18n';
+@@ -569,6 +574,15 @@ export async function fetchAndExecutePlugins(
+   const sourcesToExecute = indicesToExecute.map(index => sources[index]);
+   const pluginPathsToExecute = indicesToExecute.map(index => pluginPaths[index]);
+   const packageInfosToExecute = indicesToExecute.map(index => packageInfos[index]);
++  const commandCapabilitiesBridge = window?.desktopApi?.commandCapabilities;
++  const commandCapabilities: Record<string, PluginCommandCapability[]> = commandCapabilitiesBridge
++    ? await commandCapabilitiesBridge.register(
++        packageInfosToExecute.map(plugin => ({
++          pluginName: plugin.name,
++          scopes: getDeclaredCommandScopes(plugin),
++        }))
++      )
++    : {};
+ 
+   // Save references to the pluginRunCommand and desktopApiSend/Receive.
+   // Plugins can use without worrying about modified global window.desktopApi.
+@@ -622,6 +636,33 @@ export async function fetchAndExecutePlugins(
+           return secretsToReturn;
+         },
+         getArgValues: (pluginName, pluginPath, allowedPermissions) => {
++          const declaredCapabilities = commandCapabilities[pluginName] ?? [];
++          if (declaredCapabilities.length > 0) {
++            function pluginRunCommand(
++              command: string,
++              args: string[],
++              options: {}
++            ): ReturnType<typeof internalRunCommand> {
++              const capability = findCommandCapability(declaredCapabilities, command, args);
++              if (!capability) {
++                throw new Error(`Command is outside the plugin's declared scope: ${command}`);
++              }
++              return internalRunCommand(
++                command,
++                args,
++                options,
++                {},
++                pluginDesktopApiSend,
++                pluginDesktopApiReceive,
++                capability
++              );
++            }
++            return [
++              ['pluginRunCommand', 'pluginPath'],
++              [pluginRunCommand, pluginPath],
++            ];
++          }
++
+           // allowedPermissions is the return value of getAllowedPermissions
+           const isPackage = identifyPackages(pluginPath, pluginName, isDevelopmentMode);
+           if (isPackage['@headlamp-k8s/minikube']) {
+-- 
+2.54.0

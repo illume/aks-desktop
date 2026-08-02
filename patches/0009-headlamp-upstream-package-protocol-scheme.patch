@@ -1,0 +1,172 @@
+From 554919d17198e6ae3b0ea94af9ef3515c0985aa8 Mon Sep 17 00:00:00 2001
+From: gambtho <Thomas.Gamble@microsoft.com>
+Date: Fri, 31 Jul 2026 18:58:03 +0000
+Subject: [PATCH] app: read the custom protocol from product metadata
+
+---
+ app/electron/main.ts          | 14 ++++++++++
+ app/electron/protocol.test.ts | 52 +++++++++++++++++++++++++++++++++++
+ app/electron/protocol.ts      | 47 +++++++++++++++++++++++++++++++
+ 3 files changed, 113 insertions(+)
+ create mode 100644 app/electron/protocol.test.ts
+ create mode 100644 app/electron/protocol.ts
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index a2ac8e598..d92526681 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -53,6 +53,7 @@ import {
+   getPluginBinDirectories,
+   PluginManager,
+ } from './plugin-management';
++import { isProtocolUrl, readProtocolScheme } from './protocol';
+ import {
+   addRunCmdConsent,
+   environmentOverrides,
+@@ -192,6 +193,11 @@ const MAX_PORT_ATTEMPTS = Math.abs(Number(process.env.HEADLAMP_MAX_PORT_ATTEMPTS
+ 
+ const useExternalServer = process.env.EXTERNAL_SERVER || false;
+ const shouldCheckForUpdates = process.env.HEADLAMP_CHECK_FOR_UPDATES !== 'false';
++const productManifestPath = path.join(
++  isDev ? path.resolve('./') : process.resourcesPath,
++  'app-build-manifest.json'
++);
++const protocolScheme = readProtocolScheme(productManifestPath);
+ 
+ // make it global so that it doesn't get garbage collected
+ let mainWindow: BrowserWindow | null;
+@@ -1717,6 +1723,13 @@ function startElectron() {
+         );
+         return;
+       }
++      if (!isProtocolUrl(url, protocolScheme)) {
++        dialog.showErrorBox(
++          i18n.t('Invalid URL'),
++          i18n.t('Application opened with an invalid URL: {{ url }}', { url })
++        );
++        return;
++      }
+ 
+       const urlParam = urlObj.hostname;
+       let baseUrl = startUrl;
+@@ -1737,6 +1750,7 @@ function startElectron() {
+       mainWindow?.webContents.send('appConfig', {
+         checkForUpdates: shouldCheckForUpdates,
+         appVersion,
++        protocolScheme,
+       });
+     });
+ 
+diff --git a/app/electron/protocol.test.ts b/app/electron/protocol.test.ts
+new file mode 100644
+index 000000000..e699b9e95
+--- /dev/null
++++ b/app/electron/protocol.test.ts
+@@ -0,0 +1,52 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import { getProtocolScheme, isProtocolUrl, readProtocolScheme } from './protocol';
++
++describe('getProtocolScheme', () => {
++  it('returns the protocol persisted in product metadata', () => {
++    expect(getProtocolScheme({ protocolScheme: 'My-Desktop' })).toBe('my-desktop');
++  });
++
++  it.each([{}, null, { protocolScheme: 1 }])(
++    'falls back for product metadata without a protocol',
++    buildManifest => {
++      expect(getProtocolScheme(buildManifest)).toBe('headlamp');
++    }
++  );
++
++  it('falls back for an invalid protocol', () => {
++    expect(getProtocolScheme({ protocolScheme: 'not a scheme' })).toBe('headlamp');
++  });
++});
++
++describe('readProtocolScheme', () => {
++  it('falls back when product metadata cannot be read', () => {
++    expect(readProtocolScheme('/path/that/does/not/exist')).toBe('headlamp');
++  });
++});
++
++describe('isProtocolUrl', () => {
++  it('accepts URLs for the configured protocol', () => {
++    expect(isProtocolUrl('my-desktop://cluster?name=local', 'my-desktop')).toBe(true);
++  });
++
++  it('rejects malformed URLs and other protocols', () => {
++    expect(isProtocolUrl('not a URL', 'my-desktop')).toBe(false);
++    expect(isProtocolUrl('headlamp://cluster', 'my-desktop')).toBe(false);
++  });
++});
+diff --git a/app/electron/protocol.ts b/app/electron/protocol.ts
+new file mode 100644
+index 000000000..f9b178ece
+--- /dev/null
++++ b/app/electron/protocol.ts
+@@ -0,0 +1,47 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import fs from 'node:fs';
++
++const DEFAULT_PROTOCOL_SCHEME = 'headlamp';
++const VALID_PROTOCOL_SCHEME = /^[a-z][a-z0-9+.-]*$/i;
++
++export function getProtocolScheme(buildManifest: unknown): string {
++  if (typeof buildManifest !== 'object' || buildManifest === null) {
++    return DEFAULT_PROTOCOL_SCHEME;
++  }
++
++  const scheme = (buildManifest as { protocolScheme?: unknown }).protocolScheme;
++  return typeof scheme === 'string' && VALID_PROTOCOL_SCHEME.test(scheme)
++    ? scheme.toLowerCase()
++    : DEFAULT_PROTOCOL_SCHEME;
++}
++
++export function readProtocolScheme(manifestPath: string): string {
++  try {
++    return getProtocolScheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
++  } catch {
++    return DEFAULT_PROTOCOL_SCHEME;
++  }
++}
++
++export function isProtocolUrl(value: string, protocolScheme: string): boolean {
++  try {
++    return new URL(value).protocol === `${protocolScheme}:`;
++  } catch {
++    return false;
++  }
++}
+-- 
+2.54.0

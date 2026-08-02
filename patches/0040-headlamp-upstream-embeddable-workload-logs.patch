@@ -1,0 +1,111 @@
+From 5347c2066377af8a333db2ebba96449babd95149 Mon Sep 17 00:00:00 2001
+From: Oleksandr Dubenko <oldubenko@microsoft.com>
+Date: Sat, 1 Aug 2026 05:31:36 +0000
+Subject: [PATCH] frontend: export embeddable workload logs
+
+---
+ .../common/Resource/LogsButton.test.tsx          | 16 +++++++++++++++-
+ .../components/common/Resource/LogsButton.tsx    | 12 +++++++-----
+ .../src/plugin/__snapshots__/pluginLib.snapshot  |  2 ++
+ 3 files changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/frontend/src/components/common/Resource/LogsButton.test.tsx b/frontend/src/components/common/Resource/LogsButton.test.tsx
+index b805bb6bb..03b4a654a 100644
+--- a/frontend/src/components/common/Resource/LogsButton.test.tsx
++++ b/frontend/src/components/common/Resource/LogsButton.test.tsx
+@@ -22,7 +22,7 @@ import Job from '../../../lib/k8s/job';
+ import Pod from '../../../lib/k8s/pod';
+ import StatefulSet from '../../../lib/k8s/statefulSet';
+ import { TestContext } from '../../../test';
+-import { launchWorkloadLogs, LogsButton } from './LogsButton';
++import { launchWorkloadLogs, LogsButton, WorkloadLogs } from './LogsButton';
+ 
+ const {
+   MockKubeObject,
+@@ -518,6 +518,20 @@ describe('LogsButton', () => {
+     });
+   });
+ 
++  it('renders workload logs inline without launching an Activity', async () => {
++    mockClusterFetch.mockResolvedValue({ json: async () => ({ items: [mockPodData] }) });
++
++    render(
++      <TestContext>
++        <WorkloadLogs item={new Deployment(deploymentData as any)} />
++      </TestContext>
++    );
++
++    await waitFor(() => expect(mockClusterFetch).toHaveBeenCalled());
++    expect(screen.getByTestId('mock-log-viewer')).toBeInTheDocument();
++    expect(mockActivityLaunch).not.toHaveBeenCalled();
++  });
++
+   it('launchWorkloadLogs ignores non-loggable workloads safely (cross-bundle check)', () => {
+     class UnknownWorkload extends MockKubeObject {
+       static kind = 'Unknown';
+diff --git a/frontend/src/components/common/Resource/LogsButton.tsx b/frontend/src/components/common/Resource/LogsButton.tsx
+index 5e86c93bf..30e0a43ae 100644
+--- a/frontend/src/components/common/Resource/LogsButton.tsx
++++ b/frontend/src/components/common/Resource/LogsButton.tsx
+@@ -55,8 +55,7 @@ import { LogViewer } from '../LogViewer';
+ import { LightTooltip } from '../Tooltip';
+ import { ALL_SEVERITIES, filterLogsBySeverity, LogSeverity } from './logSeverityFilter';
+ 
+-// Component props interface
+-interface LogsButtonProps {
++export interface WorkloadLogsProps {
+   item: KubeObject | null;
+ }
+ 
+@@ -92,7 +91,10 @@ const PaddedFormControlLabel = styled(FormControlLabel)(({ theme }) => ({
+   paddingRight: theme.spacing(2),
+ }));
+ 
+-function LogsButtonContent({ item }: LogsButtonProps) {
++/**
++ * Workload log controls and output for embedding outside the Activity view.
++ */
++export function WorkloadLogs({ item }: WorkloadLogsProps) {
+   const [pods, setPods] = useState<Pod[]>([]);
+   const [selectedPodIndex, setSelectedPodIndex] = useState<number | 'all'>('all');
+   const [selectedContainer, setSelectedContainer] = useState('');
+@@ -691,7 +693,7 @@ export function launchWorkloadLogs(
+     icon: <Icon icon="mdi:file-document-box-outline" width="100%" height="100%" />,
+     cluster: item.cluster,
+     location: 'full',
+-    content: <LogsButtonContent item={item} />,
++    content: <WorkloadLogs item={item} />,
+   });
+   dispatchHeadlampEvent?.({
+     type: HeadlampEventType.LOGS,
+@@ -701,7 +703,7 @@ export function launchWorkloadLogs(
+   });
+ }
+ 
+-export function LogsButton({ item }: LogsButtonProps) {
++export function LogsButton({ item }: WorkloadLogsProps) {
+   const { t } = useTranslation();
+   const dispatchHeadlampEvent = useEventCallback();
+ 
+diff --git a/frontend/src/plugin/__snapshots__/pluginLib.snapshot b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+index 206883e2f..38e4499f8 100644
+--- a/frontend/src/plugin/__snapshots__/pluginLib.snapshot
++++ b/frontend/src/plugin/__snapshots__/pluginLib.snapshot
+@@ -245,6 +245,7 @@
+       "ViewDialog": [Function],
+       "VolumeMounts": [Function],
+       "VolumeSection": [Function],
++      "WorkloadLogs": [Function],
+       "addResourceTableColumnsProcessor": [Function],
+       "buildLabelRows": [Function],
+       "formatCommand": [Function],
+@@ -321,6 +322,7 @@
+     "ViewDialog": [Function],
+     "VolumeMounts": [Function],
+     "VolumeSection": [Function],
++    "WorkloadLogs": [Function],
+     "addResourceTableColumnsProcessor": [Function],
+     "buildLabelRows": [Function],
+     "formatCommand": [Function],
+-- 
+2.54.0

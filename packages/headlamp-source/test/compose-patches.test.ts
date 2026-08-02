@@ -8,10 +8,12 @@ const { composePatchSeries, parsePatchSeries } = require('../scripts/compose-pat
 
 test('accepts a contiguous, ordered patch series', () => {
   assert.deepEqual(
-    parsePatchSeries('0001 source first-change.patch\n0002 package second-change.patch\n'),
+    parsePatchSeries(
+      '0001 source 0001-first-change.patch\n0002 package 0002-second-change.patch\n'
+    ),
     [
-      { file: 'first-change.patch', scope: 'source' },
-      { file: 'second-change.patch', scope: 'package' },
+      { file: '0001-first-change.patch', scope: 'source' },
+      { file: '0002-second-change.patch', scope: 'package' },
     ]
   );
 });
@@ -19,10 +21,10 @@ test('accepts a contiguous, ordered patch series', () => {
 test('rejects unsafe or unordered patch series entries', () => {
   for (const series of [
     '',
-    '0001 source ../change.patch\n',
-    '0002 source change.patch\n',
-    '0001 source change.patch\n0003 package other-change.patch\n',
-    '0001 source change.patch\n0002 package change.patch\n',
+    '0001 source ../0001-change.patch\n',
+    '0002 source 0002-change.patch\n',
+    '0001 source 0002-change.patch\n',
+    '0001 source 0001-change.patch\n0003 package 0003-other-change.patch\n',
   ]) {
     assert.throws(() => parsePatchSeries(series));
   }
@@ -35,7 +37,7 @@ test('uses Git to compose source patches for the source-bearing npm package', ()
   fs.mkdirSync(path.join(packageDir, 'source', 'app'), { recursive: true });
   fs.mkdirSync(patchDir);
   fs.writeFileSync(path.join(packageDir, 'source', 'app', 'file.js'), 'old\n');
-  fs.writeFileSync(path.join(patchDir, 'series'), '0001 source example-change.patch\n');
+  fs.writeFileSync(path.join(patchDir, 'series'), '0001 source 0001-example-change.patch\n');
   const mailPatch = [
     'From: patch@example.invalid',
     'Subject: [PATCH] example',
@@ -50,7 +52,7 @@ test('uses Git to compose source patches for the source-bearing npm package', ()
     '2.50.1',
     '',
   ].join('\n');
-  fs.writeFileSync(path.join(patchDir, 'example-change.patch'), mailPatch);
+  fs.writeFileSync(path.join(patchDir, '0001-example-change.patch'), mailPatch);
 
   try {
     const aggregate = composePatchSeries(root, packageDir).toString();

@@ -1,0 +1,89 @@
+From 15847a77b8043779d1631cc9f3ca7398681d3c24 Mon Sep 17 00:00:00 2001
+From: Oleksandr Dubenko <oldubenko@microsoft.com>
+Date: Fri, 31 Jul 2026 14:15:26 +0000
+Subject: [PATCH] frontend: keep project tabs usable at high zoom
+
+---
+ frontend/src/components/project/ProjectDetails.tsx        | 8 +++++++-
+ frontend/src/components/project/ProjectResourcesTab.tsx   | 5 ++++-
+ .../ProjectResourcesTab.Empty.stories.storyshot           | 2 +-
+ .../ProjectResourcesTab.WithWorkloads.stories.storyshot   | 2 +-
+ 4 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/frontend/src/components/project/ProjectDetails.tsx b/frontend/src/components/project/ProjectDetails.tsx
+index f177cf4a9..6eda2935f 100644
+--- a/frontend/src/components/project/ProjectDetails.tsx
++++ b/frontend/src/components/project/ProjectDetails.tsx
+@@ -547,7 +547,12 @@ function ProjectDetailsContent({ project }: { project: ProjectDefinition }) {
+           }
+         >
+           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+-            <Tabs value={selectedTab} onChange={handleTabChange}>
++            <Tabs
++              value={selectedTab}
++              onChange={handleTabChange}
++              variant="scrollable"
++              scrollButtons="auto"
++            >
+               {Object.values(allTabs)
+                 .filter(tab => tab.component)
+                 .map(tab => (
+@@ -607,6 +612,7 @@ function ProjectGraph({ project: { namespaces, clusters } }: { project: ProjectD
+         flexGrow: 1,
+         display: 'flex',
+         flexDirection: 'column',
++        minHeight: '600px',
+       }}
+     >
+       <SelectedClustersContext.Provider value={clusters}>
+diff --git a/frontend/src/components/project/ProjectResourcesTab.tsx b/frontend/src/components/project/ProjectResourcesTab.tsx
+index 91800cb76..be8199594 100644
+--- a/frontend/src/components/project/ProjectResourcesTab.tsx
++++ b/frontend/src/components/project/ProjectResourcesTab.tsx
+@@ -397,6 +397,9 @@ export function ProjectResourcesTab({
+           flexGrow: 1,
+           minHeight: 0,
+           flexBasis: 0,
++          [theme.breakpoints.down('md')]: {
++            flexDirection: 'column',
++          },
+         })}
+       >
+         <ResourceCategoriesList
+@@ -414,7 +417,7 @@ export function ProjectResourcesTab({
+           })}
+         >
+           {selectedCategory && (
+-            <Box>
++            <Box sx={{ minHeight: '400px' }}>
+               {selectedResources.length === 0 ? (
+                 <Typography variant="body2" color="text.secondary">
+                   {t('No {{category}} resources found for this project.', {
+diff --git a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
+index 174e17849..4f5082e84 100644
+--- a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
++++ b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.Empty.stories.storyshot
+@@ -4,7 +4,7 @@
+       style="height: 500px;"
+     >
+       <div
+-        class="MuiBox-root css-1xxsrwd"
++        class="MuiBox-root css-gul9zg"
+       >
+         <div
+           class="MuiBox-root css-6su6fj"
+diff --git a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
+index 0b58a5e67..965d0c23a 100644
+--- a/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
++++ b/frontend/src/components/project/__snapshots__/ProjectResourcesTab.WithWorkloads.stories.storyshot
+@@ -4,7 +4,7 @@
+       style="height: 500px;"
+     >
+       <div
+-        class="MuiBox-root css-1xxsrwd"
++        class="MuiBox-root css-gul9zg"
+       >
+         <div
+           class="MuiBox-root css-6su6fj"
+-- 
+2.54.0

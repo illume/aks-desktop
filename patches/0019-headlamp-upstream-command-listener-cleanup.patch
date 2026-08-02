@@ -1,0 +1,146 @@
+From 48e4e03806152cf2aa527147e9a4105150b6b082 Mon Sep 17 00:00:00 2001
+From: tejhan-diallo <tejhan.diallo@gmail.com>
+Date: Thu, 12 Mar 2026 06:09:43 -0400
+Subject: [PATCH] frontend: clean up command listeners on exit
+
+---
+ .../src/components/App/runCommand.test.ts     | 68 +++++++++++++++++++
+ frontend/src/components/App/runCommand.ts     | 34 ++++++----
+ 2 files changed, 90 insertions(+), 12 deletions(-)
+ create mode 100644 frontend/src/components/App/runCommand.test.ts
+
+diff --git a/frontend/src/components/App/runCommand.test.ts b/frontend/src/components/App/runCommand.test.ts
+new file mode 100644
+index 000000000..923fa792c
+--- /dev/null
++++ b/frontend/src/components/App/runCommand.test.ts
+@@ -0,0 +1,68 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { runCommand } from './runCommand';
++
++describe('runCommand', () => {
++  beforeEach(() => {
++    window.desktopApi = {};
++  });
++
++  it('removes command listeners after the matching command exits', () => {
++    const listeners = new Map<string, (id: string, data: string | number) => void>();
++    const removers = new Map<string, ReturnType<typeof vi.fn>>();
++    const send = vi.fn();
++    const receive = vi.fn(
++      (channel: string, listener: (id: string, data: string | number) => void) => {
++        const remove = vi.fn();
++        listeners.set(channel, listener);
++        removers.set(channel, remove);
++        return remove;
++      }
++    );
++
++    runCommand('gh', ['auth', 'status'], {}, {}, send, receive);
++    const commandId = send.mock.calls[0][1].id;
++
++    listeners.get('command-exit')?.(commandId, 0);
++
++    expect([...removers.values()]).toHaveLength(3);
++    for (const remove of removers.values()) {
++      expect(remove).toHaveBeenCalledOnce();
++    }
++  });
++
++  it('keeps listeners for another command exit', () => {
++    const listeners = new Map<string, (id: string, data: string | number) => void>();
++    const removers: Array<ReturnType<typeof vi.fn>> = [];
++    const receive = vi.fn(
++      (channel: string, listener: (id: string, data: string | number) => void) => {
++        const remove = vi.fn();
++        listeners.set(channel, listener);
++        removers.push(remove);
++        return remove;
++      }
++    );
++
++    runCommand('gh', ['auth', 'status'], {}, {}, vi.fn(), receive);
++    listeners.get('command-exit')?.('another-command', 0);
++
++    for (const remove of removers) {
++      expect(remove).not.toHaveBeenCalled();
++    }
++  });
++});
+diff --git a/frontend/src/components/App/runCommand.ts b/frontend/src/components/App/runCommand.ts
+index da5df944d..31234ca19 100644
+--- a/frontend/src/components/App/runCommand.ts
++++ b/frontend/src/components/App/runCommand.ts
+@@ -65,7 +65,7 @@ export function runCommand(
+   desktopApiReceive?: (
+     channel: string,
+     listener: (cmdId: string, data: string | number) => void
+-  ) => void
++  ) => (() => void) | void
+ ): {
+   stdout: { on: (event: string, listener: (chunk: any) => void) => void };
+   stderr: { on: (event: string, listener: (chunk: any) => void) => void };
+@@ -87,24 +87,34 @@ export function runCommand(
+   const id = `${new Date().getTime()}-${Math.random().toString(36)}`;
+ 
+   const stdout = new EventTarget();
+-  desktopApiReceive('command-stdout', (cmdId: string, data: string | number) => {
+-    if (cmdId === id) {
+-      const event = new CustomEvent('data', { detail: data });
+-      stdout.dispatchEvent(event);
++  const removeStdout = desktopApiReceive(
++    'command-stdout',
++    (cmdId: string, data: string | number) => {
++      if (cmdId === id) {
++        const event = new CustomEvent('data', { detail: data });
++        stdout.dispatchEvent(event);
++      }
+     }
+-  });
++  );
+ 
+   const stderr = new EventTarget();
+-  desktopApiReceive('command-stderr', (cmdId: string, data: string | number) => {
+-    if (cmdId === id) {
+-      const event = new CustomEvent('data', { detail: data });
+-      stderr.dispatchEvent(event);
++  const removeStderr = desktopApiReceive(
++    'command-stderr',
++    (cmdId: string, data: string | number) => {
++      if (cmdId === id) {
++        const event = new CustomEvent('data', { detail: data });
++        stderr.dispatchEvent(event);
++      }
+     }
+-  });
++  );
+ 
+   const exit = new EventTarget();
+-  desktopApiReceive('command-exit', (cmdId: string, code: string | number) => {
++  const removeExit = desktopApiReceive('command-exit', (cmdId: string, code: string | number) => {
+     if (cmdId === id) {
++      removeStdout?.();
++      removeStderr?.();
++      removeExit?.();
++
+       const event = new CustomEvent('exit', { detail: code });
+       exit.dispatchEvent(event);
+     }
+-- 
+2.54.0

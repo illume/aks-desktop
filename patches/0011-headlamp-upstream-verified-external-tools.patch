@@ -1,0 +1,627 @@
+From a7e35513b46ed153102837330c63a0a762ae6f93 Mon Sep 17 00:00:00 2001
+From: Joaquim Rocha <joaquim.rocha@microsoft.com>
+Date: Fri, 31 Jul 2026 21:43:12 +0000
+Subject: [PATCH] app: resolve verified external tools
+
+---
+ app/electron/external-tools.test.ts           |  99 +++++++++++++
+ app/electron/external-tools.ts                | 138 ++++++++++++++++++
+ app/electron/main.ts                          |   9 +-
+ app/electron/preload.ts                       |   2 +-
+ app/electron/runCmd.test.ts                   |  55 +++++++
+ app/electron/runCmd.ts                        |  57 ++++++--
+ .../src/plugin/commandCapabilities.test.ts    |  14 +-
+ frontend/src/plugin/commandCapabilities.ts    |  29 ++--
+ 8 files changed, 374 insertions(+), 29 deletions(-)
+ create mode 100644 app/electron/external-tools.test.ts
+ create mode 100644 app/electron/external-tools.ts
+
+diff --git a/app/electron/external-tools.test.ts b/app/electron/external-tools.test.ts
+new file mode 100644
+index 0000000..a14d5c9
+--- /dev/null
++++ b/app/electron/external-tools.test.ts
+@@ -0,0 +1,99 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import crypto from 'node:crypto';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import { resolveExternalTools } from './external-tools';
++
++describe('resolveExternalTools', () => {
++  let directory: string;
++  let resourcesPath: string;
++  let executablePath: string;
++  let digest: string;
++
++  beforeEach(() => {
++    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-external-tools-'));
++    resourcesPath = path.join(directory, 'resources');
++    executablePath = path.join(resourcesPath, 'bin', 'example');
++    fs.mkdirSync(path.dirname(executablePath), { recursive: true });
++    fs.writeFileSync(executablePath, 'verified executable');
++    digest = crypto.createHash('sha256').update(fs.readFileSync(executablePath)).digest('hex');
++  });
++
++  afterEach(() => {
++    fs.rmSync(directory, { recursive: true, force: true });
++  });
++
++  function manifest(toolPath = 'bin/example', sha256 = digest) {
++    return {
++      'external-tools': [
++        {
++          id: 'example-cli',
++          platforms: {
++            linux: { path: toolPath, sha256 },
++          },
++        },
++      ],
++    };
++  }
++
++  it('resolves a digest-verified executable for the current product', () => {
++    expect(resolveExternalTools(manifest(), resourcesPath, 'linux')).toEqual(
++      new Map([['example-cli', executablePath]])
++    );
++  });
++
++  it('rejects a tool whose digest does not match', () => {
++    expect(
++      resolveExternalTools(manifest('bin/example', '0'.repeat(64)), resourcesPath, 'linux')
++    ).toEqual(new Map());
++  });
++
++  it('rejects paths outside the product resources directory', () => {
++    const outsidePath = path.join(directory, 'outside');
++    fs.writeFileSync(outsidePath, 'verified executable');
++    const outsideDigest = crypto
++      .createHash('sha256')
++      .update(fs.readFileSync(outsidePath))
++      .digest('hex');
++
++    expect(
++      resolveExternalTools(manifest('../outside', outsideDigest), resourcesPath, 'linux')
++    ).toEqual(new Map());
++  });
++
++  it('rejects symlinks that escape the product resources directory', () => {
++    const outsidePath = path.join(directory, 'outside');
++    const symlinkPath = path.join(resourcesPath, 'bin', 'linked');
++    fs.writeFileSync(outsidePath, 'verified executable');
++    fs.symlinkSync(outsidePath, symlinkPath);
++    const outsideDigest = crypto
++      .createHash('sha256')
++      .update(fs.readFileSync(outsidePath))
++      .digest('hex');
++
++    expect(
++      resolveExternalTools(manifest('bin/linked', outsideDigest), resourcesPath, 'linux')
++    ).toEqual(new Map());
++  });
++
++  it('uses only the selected platform declaration', () => {
++    expect(resolveExternalTools(manifest(), resourcesPath, 'win32')).toEqual(new Map());
++  });
++});
+diff --git a/app/electron/external-tools.ts b/app/electron/external-tools.ts
+new file mode 100644
+index 0000000..c250928
+--- /dev/null
++++ b/app/electron/external-tools.ts
+@@ -0,0 +1,138 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import crypto from 'node:crypto';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const VALID_TOOL_ID = /^[a-z0-9][a-z0-9._-]*$/i;
++const VALID_SHA256 = /^[a-f0-9]{64}$/;
++const MAX_TOOL_ID_LENGTH = 128;
++const MAX_TOOLS = 64;
++
++interface ExternalToolPlatform {
++  path: string;
++  sha256: string;
++}
++
++interface ExternalToolDeclaration {
++  id: string;
++  platforms: Partial<Record<NodeJS.Platform, ExternalToolPlatform>>;
++}
++
++function isWithin(basePath: string, candidatePath: string): boolean {
++  const relativePath = path.relative(basePath, candidatePath);
++  return (
++    relativePath !== '' &&
++    !relativePath.startsWith(`..${path.sep}`) &&
++    !path.isAbsolute(relativePath)
++  );
++}
++
++function isExternalToolPlatform(value: unknown): value is ExternalToolPlatform {
++  if (typeof value !== 'object' || value === null) {
++    return false;
++  }
++  const platform = value as Partial<ExternalToolPlatform>;
++  return (
++    typeof platform.path === 'string' &&
++    platform.path.length > 0 &&
++    !platform.path.includes('\0') &&
++    !path.isAbsolute(platform.path) &&
++    typeof platform.sha256 === 'string' &&
++    VALID_SHA256.test(platform.sha256)
++  );
++}
++
++function isExternalToolDeclaration(value: unknown): value is ExternalToolDeclaration {
++  if (typeof value !== 'object' || value === null) {
++    return false;
++  }
++  const declaration = value as Partial<ExternalToolDeclaration>;
++  return (
++    typeof declaration.id === 'string' &&
++    declaration.id.length <= MAX_TOOL_ID_LENGTH &&
++    VALID_TOOL_ID.test(declaration.id) &&
++    typeof declaration.platforms === 'object' &&
++    declaration.platforms !== null
++  );
++}
++
++export function resolveExternalTools(
++  manifest: unknown,
++  resourcesPath: string,
++  platform: NodeJS.Platform = process.platform
++): Map<string, string> {
++  const tools = new Map<string, string>();
++  if (typeof manifest !== 'object' || manifest === null) {
++    return tools;
++  }
++  const declarations = (manifest as { 'external-tools'?: unknown })['external-tools'];
++  if (!Array.isArray(declarations) || declarations.length > MAX_TOOLS) {
++    return tools;
++  }
++
++  let realResourcesPath: string;
++  try {
++    realResourcesPath = fs.realpathSync(resourcesPath);
++  } catch {
++    return tools;
++  }
++
++  for (const declaration of declarations) {
++    if (!isExternalToolDeclaration(declaration) || tools.has(declaration.id)) {
++      continue;
++    }
++    const platformEntry = declaration.platforms[platform];
++    if (!isExternalToolPlatform(platformEntry)) {
++      continue;
++    }
++
++    try {
++      const candidatePath = path.resolve(realResourcesPath, platformEntry.path);
++      if (!isWithin(realResourcesPath, candidatePath)) {
++        continue;
++      }
++      const executablePath = fs.realpathSync(candidatePath);
++      if (!isWithin(realResourcesPath, executablePath) || !fs.statSync(executablePath).isFile()) {
++        continue;
++      }
++      const digest = crypto.createHash('sha256').update(fs.readFileSync(executablePath)).digest();
++      const expectedDigest = Buffer.from(platformEntry.sha256, 'hex');
++      if (!crypto.timingSafeEqual(digest, expectedDigest)) {
++        continue;
++      }
++      tools.set(declaration.id, executablePath);
++    } catch {
++      // Invalid or missing product resources are not exposed to plugins.
++    }
++  }
++
++  return tools;
++}
++
++export function loadExternalTools(
++  manifestPath: string,
++  resourcesPath: string,
++  platform: NodeJS.Platform = process.platform
++): Map<string, string> {
++  try {
++    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
++    return resolveExternalTools(manifest, resourcesPath, platform);
++  } catch {
++    return new Map();
++  }
++}
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index a2ac8e5..ad04540 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -41,6 +41,7 @@ import url from 'url';
+ import yargs from 'yargs';
+ import { hideBin } from 'yargs/helpers';
+ import { setupCustomCAs, setupSystemCAs } from './certificates';
++import { loadExternalTools } from './external-tools';
+ import i18n from './i18next.config';
+ import MCPClient from './mcp/MCPClient';
+ import { filterUserOwnedPids } from './ownedProcesses';
+@@ -1794,7 +1795,13 @@ function startElectron() {
+       applyTrayIconSetting(enabled);
+     });
+ 
+-    setupRunCmdHandlers(mainWindow, ipcMain);
++    const manifestDirectory = isDev ? path.resolve('./') : process.resourcesPath;
++    const resourcesDirectory = isDev ? path.resolve('./resources') : process.resourcesPath;
++    setupRunCmdHandlers(
++      mainWindow,
++      ipcMain,
++      loadExternalTools(path.join(manifestDirectory, 'app-build-manifest.json'), resourcesDirectory)
++    );
+ 
+     new PluginManagerEventListeners().setupEventHandlers();
+ 
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index c5d26bb..355653b 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -117,7 +117,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
+     register: (
+       registrations: Array<{
+         pluginName: string;
+-        scopes: Array<{ command: string; args: string[] }>;
++        scopes: Array<{ command?: string; tool?: string; args: string[] }>;
+       }>
+     ) => ipcRenderer.invoke('register-plugin-command-capabilities', registrations),
+   },
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index 9c6423e..7500b55 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -137,6 +137,27 @@ describe('plugin command capabilities', () => {
+ 
+     expect(capabilities.example).toHaveLength(1);
+   });
++
++  it('registers only product-verified external tools', () => {
++    const registrations = [
++      {
++        pluginName: 'example',
++        scopes: [{ tool: 'example-cli', args: ['account'] }],
++      },
++    ];
++
++    expect(createCommandCapabilities(registrations).capabilities.example).toEqual([]);
++    expect(
++      createCommandCapabilities(registrations, new Map([['example-cli', '/resources/bin/example']]))
++        .capabilities.example
++    ).toEqual([
++      expect.objectContaining({
++        tool: 'example-cli',
++        args: ['account'],
++        capability: expect.stringMatching(/^[a-f0-9]{64}$/),
++      }),
++    ]);
++  });
+ });
+ 
+ it('does not cache process environment changes as shell overrides', () => {
+@@ -459,6 +480,40 @@ describe('handleRunCommand', () => {
+     );
+   });
+ 
++  it('resolves a declared tool capability to its verified product path', async () => {
++    const { capabilities, scopeByCapability } = createCommandCapabilities(
++      [
++        {
++          pluginName: '@example/plugin',
++          scopes: [{ tool: 'example-cli', args: ['account'] }],
++        },
++      ],
++      new Map([['example-cli', '/resources/bin/example']])
++    );
++    dialogMock.mockReturnValue(0);
++
++    await handleRunCommand(
++      fakeEvent,
++      {
++        id: 'declared-tool',
++        command: 'example-cli',
++        args: ['account', 'show'],
++        options: {},
++        permissionSecrets: {},
++        capability: capabilities['@example/plugin'][0].capability,
++      },
++      { id: 1 } as any,
++      {},
++      scopeByCapability
++    );
++
++    expect(spawnMock).toHaveBeenCalledWith(
++      '/resources/bin/example',
++      ['account', 'show'],
++      expect.objectContaining({ shell: false })
++    );
++  });
++
+   it('reports synchronous spawn errors without rejecting', async () => {
+     spawnMock.mockImplementation(() => {
+       throw new Error('spawn failed');
+diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
+index cf349d1..79c0c64 100644
+--- a/app/electron/runCmd.ts
++++ b/app/electron/runCmd.ts
+@@ -46,7 +46,8 @@ interface CommandData {
+ }
+ 
+ interface PluginCommandScope {
+-  command: string;
++  command?: string;
++  tool?: string;
+   args: string[];
+ }
+ 
+@@ -61,6 +62,7 @@ interface CommandCapabilityRegistration {
+ 
+ interface RegisteredCommandScope extends PluginCommandScope {
+   pluginName: string;
++  executable?: string;
+ }
+ 
+ const VALID_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
+@@ -72,16 +74,26 @@ const MAX_ARGUMENT_LENGTH = 256;
+ const MAX_PLUGINS = 256;
+ const MAX_SCOPES = 64;
+ 
+-function validCommandScope(scope: unknown): scope is PluginCommandScope {
++function validCommandScope(
++  scope: unknown,
++  externalTools: ReadonlyMap<string, string>
++): scope is PluginCommandScope {
+   if (typeof scope !== 'object' || scope === null) {
+     return false;
+   }
+-  const { command, args } = scope as Partial<PluginCommandScope>;
++  const { command, tool, args } = scope as Partial<PluginCommandScope>;
++  const hasCommand = typeof command === 'string';
++  const hasTool = typeof tool === 'string';
+   return (
+-    typeof command === 'string' &&
+-    command.length <= MAX_COMMAND_LENGTH &&
+-    VALID_COMMAND.test(command) &&
+-    command !== 'scriptjs' &&
++    hasCommand !== hasTool &&
++    ((hasCommand &&
++      command.length <= MAX_COMMAND_LENGTH &&
++      VALID_COMMAND.test(command) &&
++      command !== 'scriptjs') ||
++      (hasTool &&
++        tool.length <= MAX_COMMAND_LENGTH &&
++        VALID_COMMAND.test(tool) &&
++        externalTools.has(tool))) &&
+     Array.isArray(args) &&
+     args.length <= MAX_ARGUMENTS &&
+     args.every(
+@@ -93,7 +105,10 @@ function validCommandScope(scope: unknown): scope is PluginCommandScope {
+   );
+ }
+ 
+-export function createCommandCapabilities(registrations: unknown): {
++export function createCommandCapabilities(
++  registrations: unknown,
++  externalTools: ReadonlyMap<string, string> = new Map()
++): {
+   capabilities: Record<string, PluginCommandCapability[]>;
+   scopeByCapability: Map<string, RegisteredCommandScope>;
+ } {
+@@ -121,17 +136,21 @@ export function createCommandCapabilities(registrations: unknown): {
+     const seenScopes = new Set<string>();
+     capabilities[pluginName] = [];
+     for (const scope of scopes) {
+-      if (!validCommandScope(scope)) {
++      if (!validCommandScope(scope, externalTools)) {
+         continue;
+       }
+-      const scopeKey = JSON.stringify([scope.command, scope.args]);
++      const scopeKey = JSON.stringify([scope.command, scope.tool, scope.args]);
+       if (seenScopes.has(scopeKey)) {
+         continue;
+       }
+       seenScopes.add(scopeKey);
+       const capability = crypto.randomBytes(32).toString('hex');
+       capabilities[pluginName].push({ ...scope, capability });
+-      scopeByCapability.set(capability, { ...scope, pluginName });
++      scopeByCapability.set(capability, {
++        ...scope,
++        pluginName,
++        ...(scope.tool ? { executable: externalTools.get(scope.tool) } : {}),
++      });
+     }
+   }
+ 
+@@ -156,7 +175,7 @@ function getCommandCapabilityScope(
+       : undefined;
+   if (
+     !scope ||
+-    scope.command !== commandData.command ||
++    (scope.command ?? scope.tool) !== commandData.command ||
+     !scope.args.every((argument, index) => argument === commandData.args[index])
+   ) {
+     return undefined;
+@@ -422,7 +441,7 @@ export async function handleRunCommand(
+ 
+   if (
+     !checkCommandConsent(
+-      commandData.command,
++      commandScope?.tool ? `tool:${commandScope.tool}` : commandData.command,
+       commandData.args,
+       mainWindow,
+       commandScope?.pluginName
+@@ -433,7 +452,9 @@ export async function handleRunCommand(
+ 
+   // Get the command and args to run. With the correct paths for "scriptjs" commands.
+   // scriptjs commands are scripts run with the compiled app, or with "Electron" in dev mode.
+-  const command = commandData.command === 'scriptjs' ? process.execPath : commandData.command;
++  const command =
++    commandScope?.executable ??
++    (commandData.command === 'scriptjs' ? process.execPath : commandData.command);
+   const args =
+     commandData.command === 'scriptjs'
+       ? [getPluginsScriptPath(commandData.args[0]), ...commandData.args.slice(1)]
+@@ -527,7 +548,11 @@ function cryptoRandom() {
+  * @param mainWindow - The main browser window.
+  * @param ipcMain - The IPC main instance.
+  */
+-export function setupRunCmdHandlers(mainWindow: BrowserWindow | null, ipcMain: Electron.IpcMain) {
++export function setupRunCmdHandlers(
++  mainWindow: BrowserWindow | null,
++  ipcMain: Electron.IpcMain,
++  externalTools: ReadonlyMap<string, string> = new Map()
++) {
+   if (mainWindow === null) {
+     console.error('Main window is null, cannot set up run command handlers');
+     return;
+@@ -560,7 +585,7 @@ export function setupRunCmdHandlers(mainWindow: BrowserWindow | null, ipcMain: E
+       return {};
+     }
+     capabilityRegistrationAllowed = false;
+-    const registration = createCommandCapabilities(registrations);
++    const registration = createCommandCapabilities(registrations, externalTools);
+     scopeByCapability = registration.scopeByCapability;
+     return registration.capabilities;
+   });
+diff --git a/frontend/src/plugin/commandCapabilities.test.ts b/frontend/src/plugin/commandCapabilities.test.ts
+index a720ee7..012f952 100644
+--- a/frontend/src/plugin/commandCapabilities.test.ts
++++ b/frontend/src/plugin/commandCapabilities.test.ts
+@@ -38,11 +38,16 @@ describe('getDeclaredCommandScopes', () => {
+           runCommands: [
+             { command: '../shell', args: [] },
+             { command: 'kubectl', args: 'get' },
++            { command: 'az', tool: 'azure-cli', args: [] },
+             { command: 'az', args: ['account'] },
++            { tool: 'azure-cli', args: ['account'] },
+           ],
+         },
+       })
+-    ).toEqual([{ command: 'az', args: ['account'] }]);
++    ).toEqual([
++      { command: 'az', args: ['account'] },
++      { tool: 'azure-cli', args: ['account'] },
++    ]);
+   });
+ });
+ 
+@@ -50,6 +55,7 @@ describe('findCommandCapability', () => {
+   const capabilities = [
+     { command: 'kubectl', args: ['get'], capability: 'get-capability' },
+     { command: 'kubectl', args: ['delete'], capability: 'delete-capability' },
++    { tool: 'azure-cli', args: ['account'], capability: 'tool-capability' },
+   ];
+ 
+   it('matches a declared argument prefix', () => {
+@@ -61,4 +67,10 @@ describe('findCommandCapability', () => {
+       undefined
+     );
+   });
++
++  it('matches a declared external tool by product ID', () => {
++    expect(findCommandCapability(capabilities, 'azure-cli', ['account', 'show'])).toBe(
++      'tool-capability'
++    );
++  });
+ });
+diff --git a/frontend/src/plugin/commandCapabilities.ts b/frontend/src/plugin/commandCapabilities.ts
+index 1344c72..7e21372 100644
+--- a/frontend/src/plugin/commandCapabilities.ts
++++ b/frontend/src/plugin/commandCapabilities.ts
+@@ -21,7 +21,8 @@ const MAX_ARGUMENT_LENGTH = 256;
+ const MAX_SCOPES = 64;
+ 
+ export interface PluginCommandScope {
+-  command: string;
++  command?: string;
++  tool?: string;
+   args: string[];
+ }
+ 
+@@ -33,11 +34,21 @@ function isValidScope(scope: unknown): scope is PluginCommandScope {
+   if (typeof scope !== 'object' || scope === null) {
+     return false;
+   }
+-  const { command, args = [] } = scope as { command?: unknown; args?: unknown };
++  const {
++    command,
++    tool,
++    args = [],
++  } = scope as {
++    command?: unknown;
++    tool?: unknown;
++    args?: unknown;
++  };
++  const hasCommand = typeof command === 'string';
++  const hasTool = typeof tool === 'string';
+   return (
+-    typeof command === 'string' &&
+-    command.length <= MAX_COMMAND_LENGTH &&
+-    VALID_COMMAND.test(command) &&
++    hasCommand !== hasTool &&
++    ((hasCommand && command.length <= MAX_COMMAND_LENGTH && VALID_COMMAND.test(command)) ||
++      (hasTool && tool.length <= MAX_COMMAND_LENGTH && VALID_COMMAND.test(tool))) &&
+     Array.isArray(args) &&
+     args.length <= MAX_ARGUMENTS &&
+     args.every(
+@@ -58,10 +69,7 @@ export function getDeclaredCommandScopes(packageInfo: unknown): PluginCommandSco
+   if (!Array.isArray(runCommands) || runCommands.length > MAX_SCOPES) {
+     return [];
+   }
+-  return runCommands.filter(isValidScope).map(scope => ({
+-    command: scope.command,
+-    args: scope.args ?? [],
+-  }));
++  return runCommands.filter(isValidScope).map(scope => ({ ...scope, args: scope.args ?? [] }));
+ }
+ 
+ export function findCommandCapability(
+@@ -71,6 +79,7 @@ export function findCommandCapability(
+ ): string | undefined {
+   return capabilities.find(
+     scope =>
+-      scope.command === command && scope.args.every((argument, index) => argument === args[index])
++      (scope.command ?? scope.tool) === command &&
++      scope.args.every((argument, index) => argument === args[index])
+   )?.capability;
+ }
+-- 
+2.54.0

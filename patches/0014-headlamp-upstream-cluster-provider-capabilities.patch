@@ -1,0 +1,613 @@
+From bc7d2152cab7cc720ef11f6356f94b1f4eaf957b Mon Sep 17 00:00:00 2001
+From: Joaquim Rocha <joaquim.rocha@microsoft.com>
+Date: Fri, 31 Jul 2026 22:04:08 +0000
+Subject: [PATCH] app: authorize package cluster providers
+
+---
+ app/electron/cluster-provider.test.ts         | 152 +++++++++++++++++
+ app/electron/cluster-provider.ts              | 156 ++++++++++++++++++
+ app/electron/main.ts                          |   2 +
+ app/electron/preload.ts                       |   7 +
+ .../clusterProviderCapabilities.test.ts       |  53 ++++++
+ .../src/plugin/clusterProviderCapabilities.ts |  55 ++++++
+ frontend/src/plugin/index.ts                  |  87 +++++++---
+ 7 files changed, 490 insertions(+), 22 deletions(-)
+ create mode 100644 app/electron/cluster-provider.test.ts
+ create mode 100644 app/electron/cluster-provider.ts
+ create mode 100644 frontend/src/plugin/clusterProviderCapabilities.test.ts
+ create mode 100644 frontend/src/plugin/clusterProviderCapabilities.ts
+
+diff --git a/app/electron/cluster-provider.test.ts b/app/electron/cluster-provider.test.ts
+new file mode 100644
+index 0000000..ac61aff
+--- /dev/null
++++ b/app/electron/cluster-provider.test.ts
+@@ -0,0 +1,152 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import {
++  createClusterProviderCapabilities,
++  registerClusterProvider,
++  setupClusterProviderHandlers,
++} from './cluster-provider';
++
++const cleanups: Array<() => void> = [];
++
++afterEach(() => {
++  cleanups.splice(0).forEach(cleanup => cleanup());
++});
++
++function register(provider: string, handler = vi.fn()) {
++  cleanups.push(registerClusterProvider(provider, handler));
++  return handler;
++}
++
++describe('cluster provider registration', () => {
++  it('creates an opaque capability only for a registered provider', () => {
++    register('example.cluster');
++
++    const { capabilities, providerByCapability } = createClusterProviderCapabilities([
++      { pluginName: '@example/plugin', providers: ['example.cluster', 'missing.cluster'] },
++    ]);
++
++    expect(capabilities['@example/plugin']).toEqual([
++      { provider: 'example.cluster', capability: expect.stringMatching(/^[a-f0-9]{64}$/) },
++    ]);
++    expect(providerByCapability.get(capabilities['@example/plugin'][0].capability)).toBe(
++      'example.cluster'
++    );
++  });
++
++  it('rejects duplicate provider ownership', () => {
++    register('example.cluster');
++    expect(() => registerClusterProvider('example.cluster', vi.fn())).toThrow(
++      'Cluster provider is already registered'
++    );
++  });
++
++  it('ignores malformed registrations', () => {
++    register('example.cluster');
++    expect(
++      createClusterProviderCapabilities([
++        { pluginName: '../plugin', providers: ['example.cluster'] },
++        { pluginName: 'example', providers: ['../provider'] },
++      ]).capabilities
++    ).toEqual({ example: [] });
++  });
++});
++
++describe('cluster provider IPC', () => {
++  function setup() {
++    const handlers = new Map<string, (...args: any[]) => any>();
++    const webContents = { on: vi.fn() };
++    const removeHandler = vi.fn(channel => handlers.delete(channel));
++    setupClusterProviderHandlers(
++      { webContents } as any,
++      {
++        handle: vi.fn((channel, handler) => handlers.set(channel, handler)),
++        removeHandler,
++      } as any
++    );
++    return {
++      handlers,
++      event: { sender: webContents },
++      otherEvent: { sender: {} },
++      removeHandler,
++    };
++  }
++
++  it('invokes the provider associated with the capability', async () => {
++    const handler = register('example.cluster', vi.fn().mockResolvedValue({ success: true }));
++    const { handlers, event } = setup();
++    const capabilities = await handlers.get('register-plugin-cluster-provider-capabilities')!(
++      event,
++      [{ pluginName: 'example', providers: ['example.cluster'] }]
++    );
++
++    await expect(
++      handlers.get('invoke-cluster-provider')!(event, capabilities.example[0].capability, {
++        cluster: 'demo',
++      })
++    ).resolves.toEqual({ success: true });
++    expect(handler).toHaveBeenCalledWith({ cluster: 'demo' });
++  });
++
++  it('rejects another renderer and an unknown capability', async () => {
++    register('example.cluster');
++    const { handlers, event, otherEvent } = setup();
++    const invoke = handlers.get('invoke-cluster-provider')!;
++
++    await expect(invoke(otherEvent, 'a'.repeat(64), {})).resolves.toEqual({
++      success: false,
++      message: 'Invalid cluster provider capability or request',
++    });
++    await expect(invoke(event, 'a'.repeat(64), {})).resolves.toEqual({
++      success: false,
++      message: 'Invalid cluster provider capability or request',
++    });
++  });
++
++  it('returns a generic error when the provider fails', async () => {
++    register('example.cluster', vi.fn().mockRejectedValue(new Error('sensitive detail')));
++    const { handlers, event } = setup();
++    const capabilities = await handlers.get('register-plugin-cluster-provider-capabilities')!(
++      event,
++      [{ pluginName: 'example', providers: ['example.cluster'] }]
++    );
++
++    await expect(
++      handlers.get('invoke-cluster-provider')!(event, capabilities.example[0].capability, {
++        cluster: 'demo',
++      })
++    ).resolves.toEqual({ success: false, message: 'Cluster provider failed' });
++  });
++
++  it('allows capability registration only once per page load', async () => {
++    register('example.cluster');
++    const { handlers, event } = setup();
++    const registerCapabilities = handlers.get('register-plugin-cluster-provider-capabilities')!;
++
++    expect(
++      await registerCapabilities(event, [{ pluginName: 'example', providers: ['example.cluster'] }])
++    ).toHaveProperty('example');
++    expect(await registerCapabilities(event, [])).toEqual({});
++  });
++
++  it('replaces its own handlers when a window is recreated', () => {
++    const { removeHandler } = setup();
++
++    expect(removeHandler).toHaveBeenCalledWith('register-plugin-cluster-provider-capabilities');
++    expect(removeHandler).toHaveBeenCalledWith('invoke-cluster-provider');
++  });
++});
+diff --git a/app/electron/cluster-provider.ts b/app/electron/cluster-provider.ts
+new file mode 100644
+index 0000000..4352a6f
+--- /dev/null
++++ b/app/electron/cluster-provider.ts
+@@ -0,0 +1,156 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import crypto from 'crypto';
++import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
++
++const VALID_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
++const MAX_NAME_LENGTH = 214;
++const MAX_PLUGINS = 256;
++const MAX_PROVIDERS_PER_PLUGIN = 16;
++const MAX_REQUEST_LENGTH = 1024 * 1024;
++
++export type ClusterProviderHandler = (
++  request: Record<string, unknown>
++) => unknown | Promise<unknown>;
++
++interface ClusterProviderRegistration {
++  pluginName: string;
++  providers: string[];
++}
++
++export interface ClusterProviderCapability {
++  provider: string;
++  capability: string;
++}
++
++const providers = new Map<string, ClusterProviderHandler>();
++
++function validName(value: unknown): value is string {
++  return typeof value === 'string' && value.length <= MAX_NAME_LENGTH && VALID_NAME.test(value);
++}
++
++export function registerClusterProvider(
++  provider: string,
++  handler: ClusterProviderHandler
++): () => void {
++  if (!validName(provider) || typeof handler !== 'function') {
++    throw new Error('Invalid cluster provider registration');
++  }
++  if (providers.has(provider)) {
++    throw new Error(`Cluster provider is already registered: ${provider}`);
++  }
++  providers.set(provider, handler);
++
++  return () => {
++    if (providers.get(provider) === handler) {
++      providers.delete(provider);
++    }
++  };
++}
++
++export function createClusterProviderCapabilities(registrations: unknown): {
++  capabilities: Record<string, ClusterProviderCapability[]>;
++  providerByCapability: Map<string, string>;
++} {
++  const capabilities: Record<string, ClusterProviderCapability[]> = Object.create(null);
++  const providerByCapability = new Map<string, string>();
++  if (!Array.isArray(registrations) || registrations.length > MAX_PLUGINS) {
++    return { capabilities, providerByCapability };
++  }
++
++  const seenPlugins = new Set<string>();
++  for (const item of registrations) {
++    if (typeof item !== 'object' || item === null) {
++      continue;
++    }
++    const { pluginName, providers: requestedProviders } =
++      item as Partial<ClusterProviderRegistration>;
++    if (
++      !validName(pluginName) ||
++      seenPlugins.has(pluginName) ||
++      !Array.isArray(requestedProviders) ||
++      requestedProviders.length > MAX_PROVIDERS_PER_PLUGIN
++    ) {
++      continue;
++    }
++    seenPlugins.add(pluginName);
++    capabilities[pluginName] = [];
++
++    for (const provider of new Set(requestedProviders)) {
++      if (!validName(provider) || !providers.has(provider)) {
++        continue;
++      }
++      const capability = crypto.randomBytes(32).toString('hex');
++      capabilities[pluginName].push({ provider, capability });
++      providerByCapability.set(capability, provider);
++    }
++  }
++  return { capabilities, providerByCapability };
++}
++
++function validRequest(request: unknown): request is Record<string, unknown> {
++  if (typeof request !== 'object' || request === null || Array.isArray(request)) {
++    return false;
++  }
++  try {
++    return JSON.stringify(request).length <= MAX_REQUEST_LENGTH;
++  } catch {
++    return false;
++  }
++}
++
++export function setupClusterProviderHandlers(mainWindow: BrowserWindow, ipcMain: IpcMain): void {
++  let registrationAllowed = true;
++  let providerByCapability = new Map<string, string>();
++  const fromMainWindow = (event: IpcMainInvokeEvent) => event.sender === mainWindow.webContents;
++
++  ipcMain.removeHandler('register-plugin-cluster-provider-capabilities');
++  ipcMain.removeHandler('invoke-cluster-provider');
++  ipcMain.handle('register-plugin-cluster-provider-capabilities', (event, registrations) => {
++    if (!fromMainWindow(event) || !registrationAllowed) {
++      return {};
++    }
++    registrationAllowed = false;
++    const registration = createClusterProviderCapabilities(registrations);
++    providerByCapability = registration.providerByCapability;
++    return registration.capabilities;
++  });
++
++  ipcMain.handle('invoke-cluster-provider', async (event, capability, request) => {
++    const provider =
++      fromMainWindow(event) && typeof capability === 'string'
++        ? providerByCapability.get(capability)
++        : undefined;
++    const handler = provider ? providers.get(provider) : undefined;
++    if (!provider || !handler || !validRequest(request)) {
++      return { success: false, message: 'Invalid cluster provider capability or request' };
++    }
++    try {
++      return await handler(request);
++    } catch (error) {
++      console.error(`Cluster provider failed: ${provider}`, error);
++      return { success: false, message: 'Cluster provider failed' };
++    }
++  });
++
++  mainWindow.webContents.on('did-frame-finish-load', (_event, isMainFrame) => {
++    if (isMainFrame) {
++      registrationAllowed = true;
++      providerByCapability.clear();
++    }
++  });
++}
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index ad04540..5490be7 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -41,6 +41,7 @@ import url from 'url';
+ import yargs from 'yargs';
+ import { hideBin } from 'yargs/helpers';
+ import { setupCustomCAs, setupSystemCAs } from './certificates';
++import { setupClusterProviderHandlers } from './cluster-provider';
+ import { loadExternalTools } from './external-tools';
+ import i18n from './i18next.config';
+ import MCPClient from './mcp/MCPClient';
+@@ -1797,6 +1798,7 @@ function startElectron() {
+ 
+     const manifestDirectory = isDev ? path.resolve('./') : process.resourcesPath;
+     const resourcesDirectory = isDev ? path.resolve('./resources') : process.resourcesPath;
++    setupClusterProviderHandlers(mainWindow, ipcMain);
+     setupRunCmdHandlers(
+       mainWindow,
+       ipcMain,
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index 355653b..6d2a8e4 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -122,6 +122,13 @@ contextBridge.exposeInMainWorld('desktopApi', {
+     ) => ipcRenderer.invoke('register-plugin-command-capabilities', registrations),
+   },
+ 
++  clusterProviderCapabilities: {
++    register: (registrations: Array<{ pluginName: string; providers: string[] }>) =>
++      ipcRenderer.invoke('register-plugin-cluster-provider-capabilities', registrations),
++    invoke: (capability: string, request: Record<string, unknown>) =>
++      ipcRenderer.invoke('invoke-cluster-provider', capability, request),
++  },
++
+   // Notify cluster change (for MCP server restart)
+   notifyClusterChange: (cluster: string | null) => {
+     ipcRenderer.send('cluster-changed', cluster);
+diff --git a/frontend/src/plugin/clusterProviderCapabilities.test.ts b/frontend/src/plugin/clusterProviderCapabilities.test.ts
+new file mode 100644
+index 0000000..3bea432
+--- /dev/null
++++ b/frontend/src/plugin/clusterProviderCapabilities.test.ts
+@@ -0,0 +1,53 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it } from 'vitest';
++import {
++  findClusterProviderCapability,
++  getDeclaredClusterProviders,
++} from './clusterProviderCapabilities';
++
++describe('getDeclaredClusterProviders', () => {
++  it('reads unique provider IDs from plugin metadata', () => {
++    expect(
++      getDeclaredClusterProviders({
++        headlamp: { clusterProviders: ['example.cluster', 'example.cluster'] },
++      })
++    ).toEqual(['example.cluster']);
++  });
++
++  it('ignores invalid provider IDs', () => {
++    expect(
++      getDeclaredClusterProviders({
++        headlamp: { clusterProviders: ['example.cluster', '../provider', 1] },
++      })
++    ).toEqual(['example.cluster']);
++  });
++});
++
++describe('findClusterProviderCapability', () => {
++  it('returns only the requested provider capability', () => {
++    const capabilities = [
++      { provider: 'example.cluster', capability: 'example-capability' },
++      { provider: 'other.cluster', capability: 'other-capability' },
++    ];
++
++    expect(findClusterProviderCapability(capabilities, 'example.cluster')).toBe(
++      'example-capability'
++    );
++    expect(findClusterProviderCapability(capabilities, 'missing.cluster')).toBeUndefined();
++  });
++});
+diff --git a/frontend/src/plugin/clusterProviderCapabilities.ts b/frontend/src/plugin/clusterProviderCapabilities.ts
+new file mode 100644
+index 0000000..3d61375
+--- /dev/null
++++ b/frontend/src/plugin/clusterProviderCapabilities.ts
+@@ -0,0 +1,55 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++const VALID_PROVIDER = /^[a-z0-9][a-z0-9._-]*$/i;
++const MAX_PROVIDER_LENGTH = 214;
++const MAX_PROVIDERS = 16;
++
++export interface ClusterProviderCapability {
++  provider: string;
++  capability: string;
++}
++
++export function getDeclaredClusterProviders(packageInfo: unknown): string[] {
++  if (typeof packageInfo !== 'object' || packageInfo === null) {
++    return [];
++  }
++  const headlamp = (packageInfo as { headlamp?: unknown }).headlamp;
++  if (typeof headlamp !== 'object' || headlamp === null) {
++    return [];
++  }
++  const providers = (headlamp as { clusterProviders?: unknown }).clusterProviders;
++  if (!Array.isArray(providers) || providers.length > MAX_PROVIDERS) {
++    return [];
++  }
++  return [
++    ...new Set(
++      providers.filter(
++        provider =>
++          typeof provider === 'string' &&
++          provider.length <= MAX_PROVIDER_LENGTH &&
++          VALID_PROVIDER.test(provider)
++      )
++    ),
++  ];
++}
++
++export function findClusterProviderCapability(
++  capabilities: ClusterProviderCapability[],
++  provider: string
++): string | undefined {
++  return capabilities.find(item => item.provider === provider)?.capability;
++}
+diff --git a/frontend/src/plugin/index.ts b/frontend/src/plugin/index.ts
+index df50fce..bf4cc09 100644
+--- a/frontend/src/plugin/index.ts
++++ b/frontend/src/plugin/index.ts
+@@ -52,6 +52,11 @@ import * as Utils from '../lib/util';
+ import { eventAction, HeadlampEventType } from '../redux/headlampEventSlice';
+ import store from '../redux/stores/store';
+ import * as stateless from '../stateless/index';
++import {
++  ClusterProviderCapability,
++  findClusterProviderCapability,
++  getDeclaredClusterProviders,
++} from './clusterProviderCapabilities';
+ import {
+   findCommandCapability,
+   getDeclaredCommandScopes,
+@@ -583,6 +588,17 @@ export async function fetchAndExecutePlugins(
+         }))
+       )
+     : {};
++  const clusterProviderBridge = window?.desktopApi?.clusterProviderCapabilities;
++  const invokeClusterProvider = clusterProviderBridge?.invoke;
++  const clusterProviderCapabilities: Record<string, ClusterProviderCapability[]> =
++    clusterProviderBridge
++      ? await clusterProviderBridge.register(
++          packageInfosToExecute.map(plugin => ({
++            pluginName: plugin.name,
++            providers: getDeclaredClusterProviders(plugin),
++          }))
++        )
++      : {};
+ 
+   // Save references to the pluginRunCommand and desktopApiSend/Receive.
+   // Plugins can use without worrying about modified global window.desktopApi.
+@@ -637,30 +653,57 @@ export async function fetchAndExecutePlugins(
+         },
+         getArgValues: (pluginName, pluginPath, allowedPermissions) => {
+           const declaredCapabilities = commandCapabilities[pluginName] ?? [];
+-          if (declaredCapabilities.length > 0) {
+-            function pluginRunCommand(
+-              command: string,
+-              args: string[],
+-              options: {}
+-            ): ReturnType<typeof internalRunCommand> {
+-              const capability = findCommandCapability(declaredCapabilities, command, args);
+-              if (!capability) {
+-                throw new Error(`Command is outside the plugin's declared scope: ${command}`);
++          const declaredClusterProviders = clusterProviderCapabilities[pluginName] ?? [];
++          if (declaredCapabilities.length > 0 || declaredClusterProviders.length > 0) {
++            const args: string[] = [];
++            const values: unknown[] = [];
++            if (declaredCapabilities.length > 0) {
++              function pluginRunCommand(
++                command: string,
++                args: string[],
++                options: {}
++              ): ReturnType<typeof internalRunCommand> {
++                const capability = findCommandCapability(declaredCapabilities, command, args);
++                if (!capability) {
++                  throw new Error(`Command is outside the plugin's declared scope: ${command}`);
++                }
++                return internalRunCommand(
++                  command,
++                  args,
++                  options,
++                  {},
++                  pluginDesktopApiSend,
++                  pluginDesktopApiReceive,
++                  capability
++                );
+               }
+-              return internalRunCommand(
+-                command,
+-                args,
+-                options,
+-                {},
+-                pluginDesktopApiSend,
+-                pluginDesktopApiReceive,
+-                capability
+-              );
++              args.push('pluginRunCommand');
++              values.push(pluginRunCommand);
+             }
+-            return [
+-              ['pluginRunCommand', 'pluginPath'],
+-              [pluginRunCommand, pluginPath],
+-            ];
++            if (declaredClusterProviders.length > 0 && invokeClusterProvider) {
++              function clusterProviderInvoke(
++                provider: string,
++                request: Record<string, unknown>
++              ): Promise<unknown> {
++                const capability = findClusterProviderCapability(
++                  declaredClusterProviders,
++                  provider
++                );
++                if (!capability) {
++                  return Promise.reject(
++                    new Error(
++                      `Cluster provider is outside the plugin's declared scope: ${provider}`
++                    )
++                  );
++                }
++                return invokeClusterProvider(capability, request);
++              }
++              args.push('clusterProviderInvoke');
++              values.push(clusterProviderInvoke);
++            }
++            args.push('pluginPath');
++            values.push(pluginPath);
++            return [args, values];
+           }
+ 
+           // allowedPermissions is the return value of getAllowedPermissions
+-- 
+2.54.0

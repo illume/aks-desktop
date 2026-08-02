@@ -1,0 +1,55 @@
+From 161b17215de3f53ff30c76b1aae2e8f93d44c8e0 Mon Sep 17 00:00:00 2001
+From: tejhan-diallo <tejhan.diallo@gmail.com>
+Date: Thu, 12 Mar 2026 06:09:43 -0400
+Subject: [PATCH] app: report invalid command exits
+
+---
+ app/electron/runCmd.test.ts | 18 ++++++++++++++++++
+ app/electron/runCmd.ts      |  3 +++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index f9bcb1f9d..dc5655fc7 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -295,6 +295,24 @@ describe('handleRunCommand', () => {
+     vi.unstubAllEnvs();
+   });
+ 
++  it('reports an exit when command data is invalid', async () => {
++    await handleRunCommand(
++      fakeEvent,
++      {
++        id: 'invalid-command',
++        command: 'not-allowed',
++        args: [],
++        options: {},
++        permissionSecrets: {},
++      },
++      { id: 1 } as any,
++      {}
++    );
++
++    expect(sentMessages).toContainEqual(['command-exit', 'invalid-command', -1]);
++    expect(spawnMock).not.toHaveBeenCalled();
++  });
++
+   it('runs gh with the login-shell environment and reports child errors', async () => {
+     const fakeMainWindow = { id: 1 } as any;
+     const permissionSecrets = { 'runCmd-gh': 99 };
+diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
+index 3502afe7c..36633ccb9 100644
+--- a/app/electron/runCmd.ts
++++ b/app/electron/runCmd.ts
+@@ -273,6 +273,9 @@ export async function handleRunCommand(
+   const [isValid, errorMessage] = validateCommandData(eventData);
+   if (!isValid) {
+     console.error(errorMessage);
++    if (eventData.id) {
++      event.sender.send('command-exit', eventData.id, -1);
++    }
+     return;
+   }
+   const commandData = eventData as CommandData;
+-- 
+2.54.0

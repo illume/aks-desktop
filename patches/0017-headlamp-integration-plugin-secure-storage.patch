@@ -1,0 +1,746 @@
+From 2f8924b6dde1855ed39fd62dd1410b49abcdba72 Mon Sep 17 00:00:00 2001
+From: gambtho <Thomas.Gamble@microsoft.com>
+Date: Sat, 1 Aug 2026 12:32:31 +0000
+Subject: [PATCH] upstreamable: combine secure storage with plugin capabilities
+
+---
+ app/electron/main.ts                      |   2 +
+ app/electron/preload.ts                   |  11 +
+ app/electron/secure-storage.test.ts       | 147 ++++++++++++
+ app/electron/secure-storage.ts            | 275 ++++++++++++++++++++++
+ frontend/src/plugin/index.ts              | 112 ++++-----
+ frontend/src/plugin/secureStorage.test.ts |  38 +++
+ frontend/src/plugin/secureStorage.ts      |  38 +++
+ 7 files changed, 570 insertions(+), 53 deletions(-)
+ create mode 100644 app/electron/secure-storage.test.ts
+ create mode 100644 app/electron/secure-storage.ts
+ create mode 100644 frontend/src/plugin/secureStorage.test.ts
+ create mode 100644 frontend/src/plugin/secureStorage.ts
+
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index e9abb6c..34d7b05 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -65,6 +65,7 @@ import {
+   runScript,
+   setupRunCmdHandlers,
+ } from './runCmd';
++import { setupSecureStorageHandlers } from './secure-storage';
+ import { loadSettings, SETTINGS_PATH } from './settings';
+ import {
+   cleanupHeadlampTray,
+@@ -1832,6 +1833,7 @@ function startElectron() {
+       loadExternalTools(manifestPath, resourcesDirectory),
+       () => loadCapabilityPolicy().commandScopes
+     );
++    setupSecureStorageHandlers(mainWindow);
+ 
+     new PluginManagerEventListeners().setupEventHandlers();
+ 
+diff --git a/app/electron/preload.ts b/app/electron/preload.ts
+index eb95d37..ba6afce 100644
+--- a/app/electron/preload.ts
++++ b/app/electron/preload.ts
+@@ -134,6 +134,17 @@ contextBridge.exposeInMainWorld('desktopApi', {
+       ipcRenderer.invoke('invoke-cluster-provider', capability, request),
+   },
+ 
++  secureStorage: {
++    register: (namespaces: string[]): Promise<Record<string, string>> =>
++      ipcRenderer.invoke('secure-storage-register', namespaces),
++    save: (capability: string, key: string, value: string) =>
++      ipcRenderer.invoke('secure-storage-save', capability, key, value),
++    load: (capability: string, key: string) =>
++      ipcRenderer.invoke('secure-storage-load', capability, key),
++    delete: (capability: string, key: string) =>
++      ipcRenderer.invoke('secure-storage-delete', capability, key),
++  },
++
+   // Notify cluster change (for MCP server restart)
+   notifyClusterChange: (cluster: string | null) => {
+     ipcRenderer.send('cluster-changed', cluster);
+diff --git a/app/electron/secure-storage.test.ts b/app/electron/secure-storage.test.ts
+new file mode 100644
+index 0000000..e4145c9
+--- /dev/null
++++ b/app/electron/secure-storage.test.ts
+@@ -0,0 +1,147 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++const { backend, encryptionAvailable } = vi.hoisted(() => ({
++  backend: { value: 'secret_service' },
++  encryptionAvailable: { value: true },
++}));
++
++vi.mock('electron', () => ({
++  app: { getPath: vi.fn() },
++  ipcMain: { handle: vi.fn() },
++  safeStorage: {
++    isEncryptionAvailable: () => encryptionAvailable.value,
++    getSelectedStorageBackend: () => backend.value,
++    encryptString: (value: string) => Buffer.from(`encrypted:${value}`),
++    decryptString: (value: Buffer) => value.toString().replace(/^encrypted:/, ''),
++  },
++}));
++
++import {
++  createSecureStorageCapabilities,
++  isValidKey,
++  isValidNamespace,
++  PluginSecureStorage,
++  readSecureStorageFile,
++} from './secure-storage';
++
++describe('secure storage validation', () => {
++  it('accepts package namespaces and safe keys', () => {
++    expect(isValidNamespace('example-plugin')).toBe(true);
++    expect(isValidNamespace('@example/plugin')).toBe(true);
++    expect(isValidKey('oauth:token')).toBe(true);
++  });
++
++  it.each(['', '../plugin', 'plugin/name', '__proto__'])(
++    'rejects an invalid namespace or key: %s',
++    value => {
++      expect(isValidNamespace(value) && isValidKey(value)).toBe(false);
++    }
++  );
++
++  it('creates distinct opaque capabilities for valid namespaces', () => {
++    const { capabilities, namespaceByCapability } = createSecureStorageCapabilities([
++      '@example/one',
++      '@example/two',
++      '../invalid',
++    ]);
++
++    expect(Object.keys(capabilities)).toEqual(['@example/one', '@example/two']);
++    expect(capabilities['@example/one']).not.toBe(capabilities['@example/two']);
++    expect(namespaceByCapability.get(capabilities['@example/one'])).toBe('@example/one');
++  });
++});
++
++describe('PluginSecureStorage', () => {
++  let directory: string;
++  let storagePath: string;
++  let storage: PluginSecureStorage;
++
++  beforeEach(() => {
++    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-secure-storage-'));
++    storagePath = path.join(directory, 'secure-storage.json');
++    storage = new PluginSecureStorage(storagePath);
++    backend.value = 'secret_service';
++    encryptionAvailable.value = true;
++  });
++
++  afterEach(() => {
++    fs.rmSync(directory, { recursive: true, force: true });
++  });
++
++  it('keeps values isolated by plugin namespace', () => {
++    expect(storage.save('@example/one', 'token', 'first')).toEqual({ success: true });
++    expect(storage.save('@example/two', 'token', 'second')).toEqual({ success: true });
++
++    expect(storage.load('@example/one', 'token')).toEqual({
++      success: true,
++      value: 'first',
++    });
++    expect(storage.load('@example/two', 'token')).toEqual({
++      success: true,
++      value: 'second',
++    });
++  });
++
++  it('deletes only the calling plugin value', () => {
++    storage.save('@example/one', 'token', 'first');
++    storage.save('@example/two', 'token', 'second');
++
++    expect(storage.delete('@example/one', 'token')).toEqual({ success: true });
++    expect(storage.load('@example/one', 'token')).toEqual({ success: true, value: null });
++    expect(storage.load('@example/two', 'token')).toEqual({
++      success: true,
++      value: 'second',
++    });
++  });
++
++  it('rejects plaintext fallback storage on Linux', () => {
++    backend.value = 'basic_text';
++
++    expect(storage.save('@example/one', 'token', 'value')).toEqual({
++      success: false,
++      error: 'Encryption unavailable',
++    });
++  });
++
++  it('uses restricted file permissions on non-Windows platforms', () => {
++    storage.save('@example/one', 'token', 'value');
++
++    if (process.platform !== 'win32') {
++      expect(fs.statSync(storagePath).mode & 0o777).toBe(0o600);
++    }
++  });
++
++  it('ignores malformed persisted entries', () => {
++    fs.writeFileSync(
++      storagePath,
++      JSON.stringify({
++        '@example/one:token': 'encrypted:value',
++        '../invalid:token': 'encrypted:other',
++        constructor: 'encrypted:other',
++      })
++    );
++
++    expect(readSecureStorageFile(storagePath)).toEqual({
++      '@example/one:token': 'encrypted:value',
++    });
++  });
++});
+diff --git a/app/electron/secure-storage.ts b/app/electron/secure-storage.ts
+new file mode 100644
+index 0000000..e16f424
+--- /dev/null
++++ b/app/electron/secure-storage.ts
+@@ -0,0 +1,275 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
++import { app, ipcMain, safeStorage } from 'electron';
++import crypto from 'node:crypto';
++import fs from 'node:fs';
++import path from 'node:path';
++
++export const SECURE_STORAGE_REGISTER = 'secure-storage-register';
++export const SECURE_STORAGE_SAVE = 'secure-storage-save';
++export const SECURE_STORAGE_LOAD = 'secure-storage-load';
++export const SECURE_STORAGE_DELETE = 'secure-storage-delete';
++
++const VALID_NAMESPACE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
++const VALID_KEY = /^[a-z0-9_-][a-z0-9:_-]*$/i;
++const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
++const MAX_NAMESPACE_LENGTH = 214;
++const MAX_KEY_LENGTH = 128;
++const MAX_VALUE_LENGTH = 64 * 1024;
++const MAX_ENTRIES_PER_NAMESPACE = 256;
++const MAX_NAMESPACES = 256;
++
++export interface SecureStorageResult {
++  success: boolean;
++  value?: string | null;
++  error?: string;
++}
++
++export function isValidNamespace(namespace: unknown): namespace is string {
++  return (
++    typeof namespace === 'string' &&
++    namespace.length <= MAX_NAMESPACE_LENGTH &&
++    VALID_NAMESPACE.test(namespace)
++  );
++}
++
++export function isValidKey(key: unknown): key is string {
++  return (
++    typeof key === 'string' &&
++    key.length <= MAX_KEY_LENGTH &&
++    VALID_KEY.test(key) &&
++    !DANGEROUS_KEYS.has(key)
++  );
++}
++
++function storedKey(namespace: string, key: string): string {
++  return `${namespace}:${key}`;
++}
++
++function isValidStoredKey(key: string): boolean {
++  const separator = key.indexOf(':');
++  return (
++    separator > 0 &&
++    isValidNamespace(key.slice(0, separator)) &&
++    isValidKey(key.slice(separator + 1))
++  );
++}
++
++export function readSecureStorageFile(storagePath: string): Record<string, string> {
++  try {
++    const parsed = JSON.parse(fs.readFileSync(storagePath, 'utf8'));
++    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
++      return Object.create(null);
++    }
++
++    const result: Record<string, string> = Object.create(null);
++    for (const [key, value] of Object.entries(parsed)) {
++      if (typeof value === 'string' && isValidStoredKey(key)) {
++        result[key] = value;
++      }
++    }
++    return result;
++  } catch {
++    return Object.create(null);
++  }
++}
++
++export function writeSecureStorageFile(storagePath: string, data: Record<string, string>): void {
++  const temporaryPath = `${storagePath}.tmp-${process.pid}-${Date.now()}`;
++  const descriptor = fs.openSync(temporaryPath, 'w', 0o600);
++  try {
++    fs.writeFileSync(descriptor, JSON.stringify(data), 'utf8');
++    fs.fsyncSync(descriptor);
++  } finally {
++    fs.closeSync(descriptor);
++  }
++
++  try {
++    fs.renameSync(temporaryPath, storagePath);
++  } catch (error) {
++    try {
++      fs.unlinkSync(temporaryPath);
++    } catch {
++      // Best-effort cleanup.
++    }
++    throw error;
++  }
++}
++
++function encryptionIsAvailable(): boolean {
++  if (!safeStorage.isEncryptionAvailable()) {
++    return false;
++  }
++  return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text';
++}
++
++export class PluginSecureStorage {
++  constructor(private readonly storagePath: string) {}
++
++  save(namespace: string, key: unknown, value: unknown): SecureStorageResult {
++    if (!isValidNamespace(namespace) || !isValidKey(key)) {
++      return { success: false, error: 'Invalid storage namespace or key' };
++    }
++    if (typeof value !== 'string' || value.length > MAX_VALUE_LENGTH) {
++      return { success: false, error: 'Invalid storage value' };
++    }
++    if (!encryptionIsAvailable()) {
++      return { success: false, error: 'Encryption unavailable' };
++    }
++
++    try {
++      const data = readSecureStorageFile(this.storagePath);
++      const entry = storedKey(namespace, key);
++      const namespacePrefix = `${namespace}:`;
++      const entryCount = Object.keys(data).filter(item => item.startsWith(namespacePrefix)).length;
++      if (!(entry in data) && entryCount >= MAX_ENTRIES_PER_NAMESPACE) {
++        return { success: false, error: 'Storage entry limit reached' };
++      }
++
++      data[entry] = safeStorage.encryptString(value).toString('base64');
++      writeSecureStorageFile(this.storagePath, data);
++      return { success: true };
++    } catch {
++      return { success: false, error: 'Unable to save secure storage value' };
++    }
++  }
++
++  load(namespace: string, key: unknown): SecureStorageResult {
++    if (!isValidNamespace(namespace) || !isValidKey(key)) {
++      return { success: false, error: 'Invalid storage namespace or key' };
++    }
++    if (!encryptionIsAvailable()) {
++      return { success: false, error: 'Encryption unavailable' };
++    }
++
++    const data = readSecureStorageFile(this.storagePath);
++    const entry = storedKey(namespace, key);
++    const encrypted = data[entry];
++    if (!encrypted) {
++      return { success: true, value: null };
++    }
++
++    try {
++      return {
++        success: true,
++        value: safeStorage.decryptString(Buffer.from(encrypted, 'base64')),
++      };
++    } catch {
++      delete data[entry];
++      try {
++        writeSecureStorageFile(this.storagePath, data);
++      } catch {
++        return { success: false, error: 'Unable to repair secure storage' };
++      }
++      return { success: true, value: null };
++    }
++  }
++
++  delete(namespace: string, key: unknown): SecureStorageResult {
++    if (!isValidNamespace(namespace) || !isValidKey(key)) {
++      return { success: false, error: 'Invalid storage namespace or key' };
++    }
++    if (!encryptionIsAvailable()) {
++      return { success: false, error: 'Encryption unavailable' };
++    }
++
++    try {
++      const data = readSecureStorageFile(this.storagePath);
++      const entry = storedKey(namespace, key);
++      if (!(entry in data)) {
++        return { success: true };
++      }
++      delete data[entry];
++      writeSecureStorageFile(this.storagePath, data);
++      return { success: true };
++    } catch {
++      return { success: false, error: 'Unable to delete secure storage value' };
++    }
++  }
++}
++
++export function createSecureStorageCapabilities(namespaces: unknown): {
++  capabilities: Record<string, string>;
++  namespaceByCapability: Map<string, string>;
++} {
++  const capabilities: Record<string, string> = Object.create(null);
++  const namespaceByCapability = new Map<string, string>();
++  if (!Array.isArray(namespaces) || namespaces.length > MAX_NAMESPACES) {
++    return { capabilities, namespaceByCapability };
++  }
++
++  for (const namespace of new Set(namespaces)) {
++    if (!isValidNamespace(namespace)) {
++      continue;
++    }
++    const capability = crypto.randomBytes(32).toString('hex');
++    capabilities[namespace] = capability;
++    namespaceByCapability.set(capability, namespace);
++  }
++  return { capabilities, namespaceByCapability };
++}
++
++export function setupSecureStorageHandlers(mainWindow: BrowserWindow): void {
++  const storage = new PluginSecureStorage(
++    path.join(app.getPath('userData'), 'secure-storage.json')
++  );
++  let registrationAllowed = true;
++  let namespaceByCapability = new Map<string, string>();
++
++  const fromMainWindow = (event: IpcMainInvokeEvent) => event.sender === mainWindow.webContents;
++  const namespaceFor = (event: IpcMainInvokeEvent, capability: unknown) =>
++    fromMainWindow(event) && typeof capability === 'string'
++      ? namespaceByCapability.get(capability)
++      : undefined;
++
++  ipcMain.handle(SECURE_STORAGE_REGISTER, (event, namespaces: unknown) => {
++    if (!fromMainWindow(event) || !registrationAllowed) {
++      return {};
++    }
++    registrationAllowed = false;
++    const registration = createSecureStorageCapabilities(namespaces);
++    namespaceByCapability = registration.namespaceByCapability;
++    return registration.capabilities;
++  });
++
++  ipcMain.handle(SECURE_STORAGE_SAVE, (event, capability, key, value) => {
++    const namespace = namespaceFor(event, capability);
++    return namespace
++      ? storage.save(namespace, key, value)
++      : { success: false, error: 'Invalid secure storage capability' };
++  });
++  ipcMain.handle(SECURE_STORAGE_LOAD, (event, capability, key) => {
++    const namespace = namespaceFor(event, capability);
++    return namespace
++      ? storage.load(namespace, key)
++      : { success: false, error: 'Invalid secure storage capability' };
++  });
++  ipcMain.handle(SECURE_STORAGE_DELETE, (event, capability, key) => {
++    const namespace = namespaceFor(event, capability);
++    return namespace
++      ? storage.delete(namespace, key)
++      : { success: false, error: 'Invalid secure storage capability' };
++  });
++
++  mainWindow.webContents.on('did-frame-finish-load', (_event, isMainFrame) => {
++    if (isMainFrame) {
++      registrationAllowed = true;
++      namespaceByCapability.clear();
++    }
++  });
++}
+diff --git a/frontend/src/plugin/index.ts b/frontend/src/plugin/index.ts
+index 93e73a6..f096c7e 100644
+--- a/frontend/src/plugin/index.ts
++++ b/frontend/src/plugin/index.ts
+@@ -68,6 +68,7 @@ import { useTranslation } from './pluginI18n';
+ import { PluginInfo } from './pluginsSlice';
+ import Registry, * as registryToExport from './registry';
+ import { getInfoForRunningPlugins, identifyPackages, runPlugin, runPluginProps } from './runPlugin';
++import { createPluginSecureStorage } from './secureStorage';
+ 
+ window.pluginLib = {
+   ApiProxy,
+@@ -578,6 +579,10 @@ export async function fetchAndExecutePlugins(
+   const sourcesToExecute = indicesToExecute.map(index => sources[index]);
+   const pluginPathsToExecute = indicesToExecute.map(index => pluginPaths[index]);
+   const packageInfosToExecute = indicesToExecute.map(index => packageInfos[index]);
++  const secureStorageBridge = window?.desktopApi?.secureStorage;
++  const secureStorageCapabilities: Record<string, string> = secureStorageBridge
++    ? await secureStorageBridge.register(packageInfosToExecute.map(plugin => plugin.name))
++    : {};
+   const commandCapabilitiesBridge = window?.desktopApi?.commandCapabilities;
+   const commandCapabilities: Record<string, PluginCommandCapability[]> = commandCapabilitiesBridge
+     ? await commandCapabilitiesBridge.register(
+@@ -651,11 +656,11 @@ export async function fetchAndExecutePlugins(
+           return secretsToReturn;
+         },
+         getArgValues: (pluginName, pluginPath, allowedPermissions) => {
++          const argumentNames: string[] = [];
++          const argumentValues: unknown[] = [];
+           const declaredCapabilities = commandCapabilities[pluginName] ?? [];
+           const declaredClusterProviders = clusterProviderCapabilities[pluginName] ?? [];
+           if (declaredCapabilities.length > 0 || declaredClusterProviders.length > 0) {
+-            const args: string[] = [];
+-            const values: unknown[] = [];
+             if (declaredCapabilities.length > 0) {
+               function pluginRunCommand(
+                 command: string,
+@@ -676,8 +681,8 @@ export async function fetchAndExecutePlugins(
+                   capability
+                 );
+               }
+-              args.push('pluginRunCommand');
+-              values.push(pluginRunCommand);
++              argumentNames.push('pluginRunCommand');
++              argumentValues.push(pluginRunCommand);
+             }
+             if (declaredClusterProviders.length > 0 && invokeClusterProvider) {
+               function clusterProviderInvoke(
+@@ -697,62 +702,63 @@ export async function fetchAndExecutePlugins(
+                 }
+                 return invokeClusterProvider(capability, request);
+               }
+-              args.push('clusterProviderInvoke');
+-              values.push(clusterProviderInvoke);
++              argumentNames.push('clusterProviderInvoke');
++              argumentValues.push(clusterProviderInvoke);
++            }
++            argumentNames.push('pluginPath');
++            argumentValues.push(pluginPath);
++          } else {
++            // allowedPermissions is the return value of getAllowedPermissions
++            const isPackage = identifyPackages(pluginPath, pluginName, isDevelopmentMode);
++            if (isPackage['@headlamp-k8s/minikube']) {
++              // We construct a pluginRunCommand that has private
++              //  - permission secrets
++              //  - stored desktopApiSend and desktopApiReceive functions that can't be modified
++              function pluginRunCommand(
++                command: 'minikube' | 'az' | 'scriptjs',
++                args: string[],
++                options: {}
++              ): ReturnType<typeof internalRunCommand> {
++                return internalRunCommand(
++                  command,
++                  args,
++                  options,
++                  allowedPermissions,
++                  pluginDesktopApiSend,
++                  pluginDesktopApiReceive
++                );
++              }
++              argumentNames.push('pluginRunCommand', 'pluginPath');
++              argumentValues.push(pluginRunCommand, pluginPath);
+             }
+-            args.push('pluginPath');
+-            values.push(pluginPath);
+-            return [args, values];
+-          }
+ 
+-          // allowedPermissions is the return value of getAllowedPermissions
+-          const isPackage = identifyPackages(pluginPath, pluginName, isDevelopmentMode);
+-          if (isPackage['@headlamp-k8s/minikube']) {
+-            // We construct a pluginRunCommand that has private
+-            //  - permission secrets
+-            //  - stored desktopApiSend and desktopApiReceive functions that can't be modified
+-            function pluginRunCommand(
+-              command: 'minikube' | 'az' | 'scriptjs',
+-              args: string[],
+-              options: {}
+-            ): ReturnType<typeof internalRunCommand> {
+-              return internalRunCommand(
+-                command,
+-                args,
+-                options,
+-                allowedPermissions,
+-                pluginDesktopApiSend,
+-                pluginDesktopApiReceive
+-              );
++            if (isPackage['@headlamp-k8s/ai-assistant']) {
++              function pluginRunCommand(
++                command: 'gh' | 'az',
++                args: string[],
++                options: {}
++              ): ReturnType<typeof internalRunCommand> {
++                return internalRunCommand(
++                  command,
++                  args,
++                  options,
++                  allowedPermissions,
++                  pluginDesktopApiSend,
++                  pluginDesktopApiReceive
++                );
++              }
++              argumentNames.push('pluginRunCommand', 'pluginPath');
++              argumentValues.push(pluginRunCommand, pluginPath);
+             }
+-            return [
+-              ['pluginRunCommand', 'pluginPath'],
+-              [pluginRunCommand, pluginPath],
+-            ];
+           }
+ 
+-          if (isPackage['@headlamp-k8s/ai-assistant']) {
+-            function pluginRunCommand(
+-              command: 'gh' | 'az',
+-              args: string[],
+-              options: {}
+-            ): ReturnType<typeof internalRunCommand> {
+-              return internalRunCommand(
+-                command,
+-                args,
+-                options,
+-                allowedPermissions,
+-                pluginDesktopApiSend,
+-                pluginDesktopApiReceive
+-              );
+-            }
+-            return [
+-              ['pluginRunCommand', 'pluginPath'],
+-              [pluginRunCommand, pluginPath],
+-            ];
++          const storageCapability = secureStorageCapabilities[pluginName];
++          if (storageCapability && secureStorageBridge) {
++            argumentNames.push('pluginSecureStorage');
++            argumentValues.push(createPluginSecureStorage(storageCapability, secureStorageBridge));
+           }
+ 
+-          return [[], []];
++          return [argumentNames, argumentValues];
+         },
+         PrivateFunction,
+         internalRunPlugin,
+diff --git a/frontend/src/plugin/secureStorage.test.ts b/frontend/src/plugin/secureStorage.test.ts
+new file mode 100644
+index 0000000..ade5b29
+--- /dev/null
++++ b/frontend/src/plugin/secureStorage.test.ts
+@@ -0,0 +1,38 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import { describe, expect, it, vi } from 'vitest';
++import { createPluginSecureStorage } from './secureStorage';
++
++describe('createPluginSecureStorage', () => {
++  it('binds every operation to the plugin capability', async () => {
++    const bridge = {
++      save: vi.fn().mockResolvedValue({ success: true }),
++      load: vi.fn().mockResolvedValue({ success: true, value: 'value' }),
++      delete: vi.fn().mockResolvedValue({ success: true }),
++    };
++    const storage = createPluginSecureStorage('capability', bridge);
++
++    await storage.save('key', 'value');
++    await storage.load('key');
++    await storage.delete('key');
++
++    expect(bridge.save).toHaveBeenCalledWith('capability', 'key', 'value');
++    expect(bridge.load).toHaveBeenCalledWith('capability', 'key');
++    expect(bridge.delete).toHaveBeenCalledWith('capability', 'key');
++    expect(Object.isFrozen(storage)).toBe(true);
++  });
++});
+diff --git a/frontend/src/plugin/secureStorage.ts b/frontend/src/plugin/secureStorage.ts
+new file mode 100644
+index 0000000..6f15d21
+--- /dev/null
++++ b/frontend/src/plugin/secureStorage.ts
+@@ -0,0 +1,38 @@
++/*
++ * Copyright 2025 The Kubernetes Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++export interface PluginSecureStorage {
++  save(key: string, value: string): Promise<{ success: boolean; error?: string }>;
++  load(key: string): Promise<{ success: boolean; value?: string | null; error?: string }>;
++  delete(key: string): Promise<{ success: boolean; error?: string }>;
++}
++
++export interface SecureStorageBridge {
++  save(capability: string, key: string, value: string): ReturnType<PluginSecureStorage['save']>;
++  load(capability: string, key: string): ReturnType<PluginSecureStorage['load']>;
++  delete(capability: string, key: string): ReturnType<PluginSecureStorage['delete']>;
++}
++
++export function createPluginSecureStorage(
++  capability: string,
++  bridge: SecureStorageBridge
++): PluginSecureStorage {
++  return Object.freeze({
++    save: (key: string, value: string) => bridge.save(capability, key, value),
++    load: (key: string) => bridge.load(capability, key),
++    delete: (key: string) => bridge.delete(capability, key),
++  });
++}
+-- 
+2.54.0

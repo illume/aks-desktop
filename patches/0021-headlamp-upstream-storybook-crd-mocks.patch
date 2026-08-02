@@ -1,0 +1,58 @@
+From f746c41f650347f9089fc5cedcd7aada30ce9121 Mon Sep 17 00:00:00 2001
+From: Evangelos Skopelitis <eskopelitis@microsoft.com>
+Date: Fri, 31 Jul 2026 16:40:11 +0000
+Subject: [PATCH] frontend/storybook: Mock custom resource definitions
+
+---
+ frontend/.storybook/baseMocks.ts                     | 12 ++++++++++++
+ .../headlamp-plugin/config/.storybook/baseMocks.ts   | 12 ++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/frontend/.storybook/baseMocks.ts b/frontend/.storybook/baseMocks.ts
+index bf03564f8..367fb6f36 100644
+--- a/frontend/.storybook/baseMocks.ts
++++ b/frontend/.storybook/baseMocks.ts
+@@ -110,6 +110,18 @@ export const baseMocks = [
+       items: [],
+     })
+   ),
++  http.get('http://localhost:4466/apis/apiextensions.k8s.io/v1/customresourcedefinitions', () =>
++    HttpResponse.json({
++      kind: 'CustomResourceDefinitionList',
++      apiVersion: 'apiextensions.k8s.io/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
++  http.get(
++    'http://localhost:4466/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions',
++    () => HttpResponse.error()
++  ),
+   http.get('http://localhost:4466/apis/metrics.k8s.io/v1beta1/nodes', () =>
+     HttpResponse.json({
+       apiVersion: 'metrics.k8s.io/v1beta1',
+diff --git a/plugins/headlamp-plugin/config/.storybook/baseMocks.ts b/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
+index f8f14ae5d..5d0ae098b 100644
+--- a/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
++++ b/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
+@@ -183,6 +183,18 @@ export const baseMocks = [
+       items: [],
+     })
+   ),
++  http.get('http://localhost:4466/apis/apiextensions.k8s.io/v1/customresourcedefinitions', () =>
++    HttpResponse.json({
++      kind: 'CustomResourceDefinitionList',
++      apiVersion: 'apiextensions.k8s.io/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
++  http.get(
++    'http://localhost:4466/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions',
++    () => HttpResponse.error()
++  ),
+   http.get('http://localhost:4466/apis/metrics.k8s.io/v1beta1/nodes', () =>
+     HttpResponse.json({
+       apiVersion: 'metrics.k8s.io/v1beta1',
+-- 
+2.54.0

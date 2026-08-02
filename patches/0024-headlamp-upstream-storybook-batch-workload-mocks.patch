@@ -1,0 +1,66 @@
+From 077f862239570c843f73a6d3ae9cebbea5b92093 Mon Sep 17 00:00:00 2001
+From: Evangelos Skopelitis <eskopelitis@microsoft.com>
+Date: Fri, 31 Jul 2026 16:42:21 +0000
+Subject: [PATCH] frontend/storybook: Mock batch workload lists
+
+---
+ frontend/.storybook/baseMocks.ts                 | 16 ++++++++++++++++
+ .../config/.storybook/baseMocks.ts               | 16 ++++++++++++++++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/frontend/.storybook/baseMocks.ts b/frontend/.storybook/baseMocks.ts
+index ecde6f2f0..b8d59e18c 100644
+--- a/frontend/.storybook/baseMocks.ts
++++ b/frontend/.storybook/baseMocks.ts
+@@ -150,6 +150,22 @@ export const baseMocks = [
+       items: [],
+     })
+   ),
++  http.get('http://localhost:4466/apis/batch/v1/jobs', () =>
++    HttpResponse.json({
++      kind: 'JobList',
++      apiVersion: 'batch/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
++  http.get('http://localhost:4466/apis/batch/v1/cronjobs', () =>
++    HttpResponse.json({
++      kind: 'CronJobList',
++      apiVersion: 'batch/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
+   http.get('http://localhost:4466/apis/apiextensions.k8s.io/v1/customresourcedefinitions', () =>
+     HttpResponse.json({
+       kind: 'CustomResourceDefinitionList',
+diff --git a/plugins/headlamp-plugin/config/.storybook/baseMocks.ts b/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
+index 939aca897..7f6c17d25 100644
+--- a/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
++++ b/plugins/headlamp-plugin/config/.storybook/baseMocks.ts
+@@ -223,6 +223,22 @@ export const baseMocks = [
+       items: [],
+     })
+   ),
++  http.get('http://localhost:4466/apis/batch/v1/jobs', () =>
++    HttpResponse.json({
++      kind: 'JobList',
++      apiVersion: 'batch/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
++  http.get('http://localhost:4466/apis/batch/v1/cronjobs', () =>
++    HttpResponse.json({
++      kind: 'CronJobList',
++      apiVersion: 'batch/v1',
++      metadata: {},
++      items: [],
++    })
++  ),
+   http.get('http://localhost:4466/apis/apiextensions.k8s.io/v1/customresourcedefinitions', () =>
+     HttpResponse.json({
+       kind: 'CustomResourceDefinitionList',
+-- 
+2.54.0

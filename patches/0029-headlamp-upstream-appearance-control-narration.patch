@@ -1,0 +1,171 @@
+From aa1519f07682db08cc2220a64648562e65b3e5e5 Mon Sep 17 00:00:00 2001
+From: Vincent T <vtaylor@microsoft.com>
+Date: Fri, 31 Jul 2026 14:16:33 +0000
+Subject: [PATCH] frontend: improve appearance control narration
+
+---
+ frontend/src/components/App/Settings/SettingsCluster.tsx      | 4 ++--
+ .../__snapshots__/SettingsCluster.Default.stories.storyshot   | 4 ++--
+ .../SettingsCluster.DynamicCluster.stories.storyshot          | 4 ++--
+ ...ettingsCluster.MultipleAllowedNamespaces.stories.storyshot | 4 ++--
+ .../SettingsCluster.NamespaceValidation.stories.storyshot     | 4 ++--
+ .../SettingsCluster.WithAppearance.stories.storyshot          | 4 ++--
+ .../SettingsCluster.WithSavedSettings.stories.storyshot       | 4 ++--
+ 7 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/frontend/src/components/App/Settings/SettingsCluster.tsx b/frontend/src/components/App/Settings/SettingsCluster.tsx
+index 2d0a92b34..f95554341 100644
+--- a/frontend/src/components/App/Settings/SettingsCluster.tsx
++++ b/frontend/src/components/App/Settings/SettingsCluster.tsx
+@@ -256,7 +256,7 @@ export default function SettingsCluster() {
+                         size="small"
+                         onClick={() => setColorPickerOpen(true)}
+                         startIcon={<Icon icon="mdi:palette" />}
+-                        aria-labelledby={`${appearanceLabelID} ${colorButtonID}`}
++                        aria-labelledby={`${appearanceLabelID} ${accentColorLabelID} ${colorButtonID}`}
+                       >
+                         {appearanceAccentColor
+                           ? t('translation|Change Color')
+@@ -292,7 +292,7 @@ export default function SettingsCluster() {
+                         size="small"
+                         onClick={() => setIconPickerOpen(true)}
+                         startIcon={<Icon icon="mdi:emoticon-outline" />}
+-                        aria-labelledby={`${appearanceLabelID} ${iconButtonID}`}
++                        aria-labelledby={`${appearanceLabelID} ${clusterIconLabelID} ${iconButtonID}`}
+                       >
+                         {appearanceIcon
+                           ? t('translation|Change Icon')
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot
+index ed615d8be..cbb7aecbf 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.Default.stories.storyshot
+@@ -154,7 +154,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label color-picker-button"
++                    aria-labelledby="cluster-appearance-label accent-color-label color-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="color-picker-button"
+                     tabindex="0"
+@@ -183,7 +183,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label icon-picker-button"
++                    aria-labelledby="cluster-appearance-label cluster-icon-label icon-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="icon-picker-button"
+                     tabindex="0"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot
+index 17e54aa78..4a5e4864e 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.DynamicCluster.stories.storyshot
+@@ -154,7 +154,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label color-picker-button"
++                    aria-labelledby="cluster-appearance-label accent-color-label color-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="color-picker-button"
+                     tabindex="0"
+@@ -183,7 +183,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label icon-picker-button"
++                    aria-labelledby="cluster-appearance-label cluster-icon-label icon-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="icon-picker-button"
+                     tabindex="0"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot
+index 0309f7608..07bc8f652 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.MultipleAllowedNamespaces.stories.storyshot
+@@ -154,7 +154,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label color-picker-button"
++                    aria-labelledby="cluster-appearance-label accent-color-label color-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="color-picker-button"
+                     tabindex="0"
+@@ -183,7 +183,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label icon-picker-button"
++                    aria-labelledby="cluster-appearance-label cluster-icon-label icon-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="icon-picker-button"
+                     tabindex="0"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot
+index e28a48fb3..15a4582ba 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.NamespaceValidation.stories.storyshot
+@@ -154,7 +154,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label color-picker-button"
++                    aria-labelledby="cluster-appearance-label accent-color-label color-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="color-picker-button"
+                     tabindex="0"
+@@ -183,7 +183,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label icon-picker-button"
++                    aria-labelledby="cluster-appearance-label cluster-icon-label icon-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="icon-picker-button"
+                     tabindex="0"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot
+index cfc4ed204..93b47d796 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithAppearance.stories.storyshot
+@@ -157,7 +157,7 @@
+                     class="MuiBox-root css-1nkprdw"
+                   />
+                   <button
+-                    aria-labelledby="cluster-appearance-label color-picker-button"
++                    aria-labelledby="cluster-appearance-label accent-color-label color-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="color-picker-button"
+                     tabindex="0"
+@@ -196,7 +196,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label icon-picker-button"
++                    aria-labelledby="cluster-appearance-label cluster-icon-label icon-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="icon-picker-button"
+                     tabindex="0"
+diff --git a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot
+index 237b3efc6..28a822dd3 100644
+--- a/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot
++++ b/frontend/src/components/App/Settings/__snapshots__/SettingsCluster.WithSavedSettings.stories.storyshot
+@@ -157,7 +157,7 @@
+                     class="MuiBox-root css-7mxbmx"
+                   />
+                   <button
+-                    aria-labelledby="cluster-appearance-label color-picker-button"
++                    aria-labelledby="cluster-appearance-label accent-color-label color-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="color-picker-button"
+                     tabindex="0"
+@@ -196,7 +196,7 @@
+                   class="MuiBox-root css-axw7ok"
+                 >
+                   <button
+-                    aria-labelledby="cluster-appearance-label icon-picker-button"
++                    aria-labelledby="cluster-appearance-label cluster-icon-label icon-picker-button"
+                     class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeSmall MuiButton-outlinedSizeSmall MuiButton-colorPrimary MuiButton-disableElevation css-irzb5y-MuiButtonBase-root-MuiButton-root"
+                     id="icon-picker-button"
+                     tabindex="0"
+-- 
+2.54.0

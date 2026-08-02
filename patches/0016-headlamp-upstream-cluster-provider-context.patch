@@ -1,0 +1,341 @@
+From 878d6d92b63d744bf2207ee98f3ebf637781a028 Mon Sep 17 00:00:00 2001
+From: tejhan-diallo <tejhan.diallo@gmail.com>
+Date: Sat, 1 Aug 2026 09:49:03 +0000
+Subject: [PATCH] upstreamable: pass host kubeconfig provider context
+
+---
+ app/electron/cluster-provider.test.ts | 43 ++++++++++++++++++++++++++-
+ app/electron/cluster-provider.ts      | 39 ++++++++++++++++++++++--
+ app/electron/main.ts                  | 26 +++++++++-------
+ app/electron/runCmd.test.ts           | 18 +++++++++++
+ app/electron/runCmd.ts                | 36 ++++++++++++++++++++++
+ 5 files changed, 147 insertions(+), 15 deletions(-)
+
+diff --git a/app/electron/cluster-provider.test.ts b/app/electron/cluster-provider.test.ts
+index 78b55b0fc..954f3ca96 100644
+--- a/app/electron/cluster-provider.test.ts
++++ b/app/electron/cluster-provider.test.ts
+@@ -14,10 +14,12 @@
+  * limitations under the License.
+  */
+ 
++import path from 'node:path';
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import {
+   createClusterProviderCapabilities,
+   registerClusterProvider,
++  resolveKubeconfigPaths,
+   setupClusterProviderHandlers,
+ } from './cluster-provider';
+ 
+@@ -25,6 +27,7 @@ const cleanups: Array<() => void> = [];
+ 
+ afterEach(() => {
+   cleanups.splice(0).forEach(cleanup => cleanup());
++  vi.unstubAllEnvs();
+ });
+ 
+ function register(provider: string, handler = vi.fn()) {
+@@ -48,6 +51,40 @@ describe('cluster provider registration', () => {
+     );
+   });
+ 
++  describe('cluster provider context', () => {
++    it('resolves and de-duplicates host-configured kubeconfig paths', () => {
++      expect(
++        resolveKubeconfigPaths(undefined, {
++          KUBECONFIG: ['first', '', 'second', 'first'].join(path.delimiter),
++        })
++      ).toEqual([path.resolve('first'), path.resolve('second')]);
++    });
++
++    it('prefers the host command-line kubeconfig path', () => {
++      expect(
++        resolveKubeconfigPaths('command-line', {
++          HEADLAMP_CONFIG_KUBECONFIG: 'headlamp-config',
++          KUBECONFIG: ['first', '', 'second', 'first'].join(path.delimiter),
++        })
++      ).toEqual([path.resolve('command-line')]);
++    });
++
++    it('prefers Headlamp configuration over the standard environment', () => {
++      expect(
++        resolveKubeconfigPaths(undefined, {
++          HEADLAMP_CONFIG_KUBECONFIG: 'headlamp-config',
++          KUBECONFIG: 'standard-config',
++        })
++      ).toEqual([path.resolve('headlamp-config')]);
++    });
++
++    it('uses the standard host kubeconfig path by default', () => {
++      expect(resolveKubeconfigPaths(undefined, {}, path.resolve('home'))).toEqual([
++        path.resolve('home', '.kube', 'config'),
++      ]);
++    });
++  });
++
+   it('rejects duplicate provider ownership', () => {
+     register('example.cluster');
+     expect(() => registerClusterProvider('example.cluster', vi.fn())).toThrow(
+@@ -104,6 +141,7 @@ describe('cluster provider IPC', () => {
+   }
+ 
+   it('invokes the provider associated with the capability', async () => {
++    vi.stubEnv('KUBECONFIG', path.resolve('configured-kubeconfig'));
+     const handler = register('example.cluster', vi.fn().mockResolvedValue({ success: true }));
+     const { handlers, event } = setup();
+     const capabilities = await handlers.get('register-plugin-cluster-provider-capabilities')!(
+@@ -116,7 +154,10 @@ describe('cluster provider IPC', () => {
+         cluster: 'demo',
+       })
+     ).resolves.toEqual({ success: true });
+-    expect(handler).toHaveBeenCalledWith({ cluster: 'demo' });
++    expect(handler).toHaveBeenCalledWith(
++      { cluster: 'demo' },
++      { kubeconfigPaths: [path.resolve('configured-kubeconfig')] }
++    );
+   });
+ 
+   it('rejects another renderer and an unknown capability', async () => {
+diff --git a/app/electron/cluster-provider.ts b/app/electron/cluster-provider.ts
+index acf29afd3..de25ecce9 100644
+--- a/app/electron/cluster-provider.ts
++++ b/app/electron/cluster-provider.ts
+@@ -16,6 +16,8 @@
+ 
+ import crypto from 'crypto';
+ import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
++import os from 'node:os';
++import path from 'node:path';
+ 
+ const VALID_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
+ const MAX_NAME_LENGTH = 214;
+@@ -23,8 +25,13 @@ const MAX_PLUGINS = 256;
+ const MAX_PROVIDERS_PER_PLUGIN = 16;
+ const MAX_REQUEST_LENGTH = 1024 * 1024;
+ 
++export interface ClusterProviderContext {
++  kubeconfigPaths: readonly string[];
++}
++
+ export type ClusterProviderHandler = (
+-  request: Record<string, unknown>
++  request: Record<string, unknown>,
++  context: ClusterProviderContext
+ ) => unknown | Promise<unknown>;
+ 
+ interface ClusterProviderRegistration {
+@@ -113,6 +120,7 @@ function validRequest(request: unknown): request is Record<string, unknown> {
+   if (typeof request !== 'object' || request === null || Array.isArray(request)) {
+     return false;
+   }
++
+   try {
+     return JSON.stringify(request).length <= MAX_REQUEST_LENGTH;
+   } catch {
+@@ -120,10 +128,35 @@ function validRequest(request: unknown): request is Record<string, unknown> {
+   }
+ }
+ 
++export function resolveKubeconfigPaths(
++  kubeconfigArgument?: string,
++  environment: NodeJS.ProcessEnv = process.env,
++  homeDirectory: string = os.homedir()
++): string[] {
++  let configuredPaths: string[] | undefined;
++  if (typeof kubeconfigArgument === 'string' && kubeconfigArgument.length > 0) {
++    configuredPaths = [kubeconfigArgument];
++  } else if (environment.HEADLAMP_CONFIG_KUBECONFIG) {
++    configuredPaths = [environment.HEADLAMP_CONFIG_KUBECONFIG];
++  } else {
++    configuredPaths = environment.KUBECONFIG?.split(path.delimiter)
++      .map(candidate => candidate.trim())
++      .filter(Boolean);
++  }
++  const paths =
++    configuredPaths && configuredPaths.length > 0
++      ? configuredPaths.map(candidate => path.resolve(candidate))
++      : [path.join(homeDirectory, '.kube', 'config')];
++  return [...new Set(paths)];
++}
++
+ export function setupClusterProviderHandlers(
+   mainWindow: BrowserWindow,
+   ipcMain: IpcMain,
+-  getAuthorizedProviders?: () => ReadonlyMap<string, ReadonlySet<string>>
++  getAuthorizedProviders?: () => ReadonlyMap<string, ReadonlySet<string>>,
++  getContext: () => ClusterProviderContext | Promise<ClusterProviderContext> = () => ({
++    kubeconfigPaths: resolveKubeconfigPaths(),
++  })
+ ): void {
+   let registrationAllowed = true;
+   let providerByCapability = new Map<string, string>();
+@@ -154,7 +187,7 @@ export function setupClusterProviderHandlers(
+       return { success: false, message: 'Invalid cluster provider capability or request' };
+     }
+     try {
+-      return await handler(request);
++      return await handler(request, await getContext());
+     } catch (error) {
+       console.error(`Cluster provider failed: ${provider}`, error);
+       return { success: false, message: 'Cluster provider failed' };
+diff --git a/app/electron/main.ts b/app/electron/main.ts
+index ee93bad4c..69732a287 100644
+--- a/app/electron/main.ts
++++ b/app/electron/main.ts
+@@ -41,7 +41,7 @@ import url from 'url';
+ import yargs from 'yargs';
+ import { hideBin } from 'yargs/helpers';
+ import { setupCustomCAs, setupSystemCAs } from './certificates';
+-import { setupClusterProviderHandlers } from './cluster-provider';
++import { resolveKubeconfigPaths, setupClusterProviderHandlers } from './cluster-provider';
+ import { loadExternalTools } from './external-tools';
+ import i18n from './i18next.config';
+ import MCPClient from './mcp/MCPClient';
+@@ -59,6 +59,7 @@ import {
+ import {
+   addRunCmdConsent,
+   environmentOverrides,
++  mergeShellEnvironment,
+   removeRunCmdConsent,
+   runScript,
+   setupRunCmdHandlers,
+@@ -730,18 +731,24 @@ async function getShellEnv(): Promise<NodeJS.ProcessEnv> {
+ }
+ 
+ let shellEnvironmentPromise: Promise<NodeJS.ProcessEnv> | null = null;
++let shellEnvironmentBaseline: NodeJS.ProcessEnv | null = null;
+ 
+ /** Returns the cached login-shell changes merged with the current process environment. */
+ export async function getShellEnvironment(): Promise<NodeJS.ProcessEnv> {
+   if (!shellEnvironmentPromise) {
++    shellEnvironmentBaseline = { ...process.env };
+     shellEnvironmentPromise = getShellEnv()
+-      .then(environment => environmentOverrides(environment))
++      .then(environment => environmentOverrides(environment, shellEnvironmentBaseline!))
+       .catch(error => {
+         console.warn('Failed to get shell environment, using process.env:', error);
+         return {};
+       });
+   }
+-  return { ...process.env, ...(await shellEnvironmentPromise) };
++  return mergeShellEnvironment(
++    process.env,
++    await shellEnvironmentPromise,
++    shellEnvironmentBaseline!
++  );
+ }
+ 
+ /**
+@@ -863,13 +870,7 @@ async function startServer(flags: string[] = []): Promise<ChildProcessWithoutNul
+   serverArgs = serverArgs.concat(flags);
+   console.log('arguments passed to backend server', serverArgs);
+ 
+-  let extendedEnv;
+-  try {
+-    extendedEnv = await getShellEnv();
+-  } catch (error) {
+-    console.error('Failed to get shell environment, using default:', error);
+-    extendedEnv = process.env;
+-  }
++  const extendedEnv = await getShellEnvironment();
+ 
+   const options = {
+     detached: true,
+@@ -1806,7 +1807,10 @@ function startElectron() {
+     setupClusterProviderHandlers(
+       mainWindow,
+       ipcMain,
+-      () => loadCapabilityPolicy().clusterProviders
++      () => loadCapabilityPolicy().clusterProviders,
++      async () => ({
++        kubeconfigPaths: resolveKubeconfigPaths(args.kubeconfig, await getShellEnvironment()),
++      })
+     );
+     setupRunCmdHandlers(
+       mainWindow,
+diff --git a/app/electron/runCmd.test.ts b/app/electron/runCmd.test.ts
+index 2cdbf9ceb..01ebe01b5 100644
+--- a/app/electron/runCmd.test.ts
++++ b/app/electron/runCmd.test.ts
+@@ -64,6 +64,7 @@ import {
+   createCommandCapabilities,
+   environmentOverrides,
+   handleRunCommand,
++  mergeShellEnvironment,
+   validateCommandData,
+ } from './runCmd';
+ 
+@@ -255,6 +256,23 @@ it('does not cache process environment changes as shell overrides', () => {
+   ).toEqual({ PATH: '/opt/homebrew/bin:/usr/bin' });
+ });
+ 
++it('preserves live environment and PATH additions after shell initialization', () => {
++  const baselinePath = ['system-bin', 'shared-bin'].join(path.delimiter);
++  const currentPath = ['plugin-bin', 'system-bin', 'shared-bin'].join(path.delimiter);
++  const shellPath = ['shell-bin', 'system-bin', 'shared-bin'].join(path.delimiter);
++
++  expect(
++    mergeShellEnvironment(
++      { PATH: currentPath, HEADLAMP_BACKEND_TOKEN: 'current' },
++      { PATH: shellPath },
++      { PATH: baselinePath }
++    )
++  ).toEqual({
++    PATH: ['plugin-bin', 'shell-bin', 'system-bin', 'shared-bin'].join(path.delimiter),
++    HEADLAMP_BACKEND_TOKEN: 'current',
++  });
++});
++
+ describe('checkPermissionSecret', () => {
+   const baseCommandData = {
+     id: '1',
+diff --git a/app/electron/runCmd.ts b/app/electron/runCmd.ts
+index d49275526..b74d09965 100644
+--- a/app/electron/runCmd.ts
++++ b/app/electron/runCmd.ts
+@@ -179,6 +179,42 @@ export function environmentOverrides(
+   );
+ }
+ 
++/** Merges cached shell changes without discarding later process environment updates. */
++export function mergeShellEnvironment(
++  currentEnvironment: NodeJS.ProcessEnv,
++  shellOverrides: NodeJS.ProcessEnv,
++  baselineEnvironment: NodeJS.ProcessEnv
++): NodeJS.ProcessEnv {
++  const mergedEnvironment = { ...currentEnvironment, ...shellOverrides };
++  for (const key of new Set([
++    ...Object.keys(baselineEnvironment),
++    ...Object.keys(currentEnvironment),
++  ])) {
++    if (currentEnvironment[key] !== baselineEnvironment[key]) {
++      if (currentEnvironment[key] === undefined) {
++        delete mergedEnvironment[key];
++      } else {
++        mergedEnvironment[key] = currentEnvironment[key];
++      }
++    }
++  }
++
++  if (
++    currentEnvironment.PATH !== baselineEnvironment.PATH &&
++    currentEnvironment.PATH &&
++    shellOverrides.PATH
++  ) {
++    const baselineEntries = new Set((baselineEnvironment.PATH ?? '').split(path.delimiter));
++    const currentEntries = currentEnvironment.PATH.split(path.delimiter);
++    const liveEntries = currentEntries.filter(entry => !baselineEntries.has(entry));
++    mergedEnvironment.PATH = [
++      ...new Set([...liveEntries, ...shellOverrides.PATH.split(path.delimiter), ...currentEntries]),
++    ].join(path.delimiter);
++  }
++
++  return mergedEnvironment;
++}
++
+ /**
+  * Ask the user with an electron dialog if they want to allow the command
+  * to be executed.
+-- 
+2.54.0

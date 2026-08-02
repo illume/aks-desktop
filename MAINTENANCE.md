@@ -14,7 +14,10 @@ application/container builds, and runtime smoke tests. It records upstream base
 tag `v0.44.0` and commit
 `99a230be9c9c679a70d59c219cc246c00ae2be45`. The numbered files in
 `patches/series` are the root-owned, independently reviewable source of truth;
-the generated `headlamp-source@*.patch` is not. npm supports
+each filename starts with its four-digit series lane, and related standalone
+upstream candidates share that prefix. Mailbox patches preserve the author of
+the audited commit they replace. The generated `headlamp-source@*.patch` is not
+the source of truth. npm supports
 one patch file per package version, so `npm run headlamp:patches` uses Git to
 apply the series in order and emit the aggregate declared by `patchedDependencies`. npm
 verifies and applies the aggregate; there is no submodule or custom patch

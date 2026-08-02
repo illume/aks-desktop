@@ -62,9 +62,9 @@ function createProject(commit) {
   const version = `0.44.0-main.${commit.slice(0, 8)}`;
   const patchPath = `patches/headlamp-source@${version}.patch`;
   fs.writeFileSync(path.join(rootDir, patchPath), 'patch\n');
-  fs.writeFileSync(path.join(rootDir, 'patches', 'series'), '0001 source readme.patch\n');
+  fs.writeFileSync(path.join(rootDir, 'patches', 'series'), '0001 source 0001-readme.patch\n');
   fs.writeFileSync(
-    path.join(rootDir, 'patches', 'readme.patch'),
+    path.join(rootDir, 'patches', '0001-readme.patch'),
     `diff --git a/README.md b/README.md
 --- a/README.md
 +++ b/README.md
