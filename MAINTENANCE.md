@@ -4,11 +4,14 @@ This document outlines the maintenance procedures for this project.
 
 ## Headlamp distribution
 
-AKS Desktop depends on the unpacked npm package in
-`packages/headlamp-source/`. It contains the complete pinned Headlamp source
-tree and reusable npm scripts for source updates, patch composition, product
-manifests, plugin bundling, application/container builds, and runtime smoke
-tests. The package records upstream base tag `v0.44.0` and commit
+AKS Desktop generates a local npm package from the skeleton in
+`packages/headlamp-source/`. The repository does not track the upstream source
+tree. `build/setup-npm.sh` fetches the exact configured Headlamp commit and
+copies its Git-tracked files into the ignored `source/` directory before npm
+installs and patches the package. The skeleton owns reusable scripts for source
+updates, patch composition, product manifests, plugin bundling,
+application/container builds, and runtime smoke tests. It records upstream base
+tag `v0.44.0` and commit
 `99a230be9c9c679a70d59c219cc246c00ae2be45`. The numbered files in
 `patches/series` reference the root-owned, reviewable patch series. npm supports
 one patch file per package version, so `npm run headlamp:patches` normalizes and
@@ -22,7 +25,8 @@ To validate or update the distribution:
 
 ```bash
 nvm use                         # Node.js version required by npm 12
-npm ci                          # verify the source package and apply the patch series
+source build/setup-npm.sh       # materialize the source and select npm 12
+npm ci                          # install the package and apply the patch series
 npm run headlamp:install        # explicitly install the source build toolchain
 npm run test:headlamp-patches   # inspect npm's patch and package contract
 npm run headlamp:assemble       # stage plugins, tools, and product configuration
@@ -46,10 +50,10 @@ new commit without editing the configuration first, pass its full SHA:
 
 ```bash
 git -C /path/to/headlamp checkout <full-commit-sha>
-npm ci
-npm run headlamp:source -- \
+node packages/headlamp-source/scripts/update-source.js \
   --source /path/to/headlamp \
   --commit <full-commit-sha>
+source build/setup-npm.sh
 npm ci
 npm run test:headlamp-patches
 npm run test:build
@@ -59,11 +63,11 @@ npm run test:build
 `packages/headlamp-source/source/` with only Git-tracked files, derives the
 package version from the base tag and SHA, and updates the package metadata,
 exact dependency, local lockfile resolution, patch selector, and patch
-integrity. It does not apply the patches; the second `npm ci` is the
-authoritative npm-native patch check. Update `baseTag` in
-`package.json#headlampSource` when the upstream release baseline changes. Stage
-the complete source update with `git add -f packages/headlamp-source` only after
-the replacement passes.
+integrity. It does not apply the patches; `npm ci` is the authoritative
+npm-native patch check. The generated source directory and commit marker remain
+ignored; stage only the package metadata, dependency, lockfile, and renamed
+aggregate patch. Update `baseTag` in `package.json#headlampSource` when the
+upstream release baseline changes.
 
 The
 [`Headlamp main compatibility`](.github/workflows/headlamp-main-compatibility.yml)

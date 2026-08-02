@@ -44,16 +44,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Install pinned dependencies
+      - name: Prepare source package from Headlamp main
+        run: node packages/headlamp-source/scripts/update-source.js --source .headlamp-main --commit "${{ steps.headlamp.outputs.commit }}"
+
+      - name: Install dependencies and apply the AKS Desktop patch
         run: |
           source build/setup-npm.sh
           npm ci
-
-      - name: Prepare source package from Headlamp main
-        run: npm run headlamp:source -- --source .headlamp-main --commit "${{ steps.headlamp.outputs.commit }}"
-
-      - name: Apply the AKS Desktop patch
-        run: rm -rf node_modules && npm ci
 
       - name: Verify package and build contracts
         run: npm run test:headlamp-patches && npm run test:build

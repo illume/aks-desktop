@@ -1,3 +1,2 @@
 *.sh text eol=lf
 patches/headlamp-source@*.patch -diff
-packages/headlamp-source/source/** -diff

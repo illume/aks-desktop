@@ -1,11 +1,22 @@
 const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const PACKAGE_NAME = '@headlamp-k8s/headlamp-source';
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const BASE_TAG_PATTERN = /^v(\d+\.\d+\.\d+)$/;
+const SOURCE_MARKER = '.source-commit';
+const REQUIRED_SOURCE_PATHS = [
+  'package.json',
+  'LICENSE',
+  'README.md',
+  'Dockerfile',
+  'app',
+  'backend',
+  'frontend',
+];
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -19,6 +30,7 @@ function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     maxBuffer: 20 * 1024 * 1024,
   });
   if (result.error) {
@@ -65,15 +77,7 @@ function verifySourceCheckout(sourceDir, commit) {
   if (changes) {
     throw new Error('Headlamp source checkout has tracked changes');
   }
-  for (const required of [
-    'package.json',
-    'LICENSE',
-    'README.md',
-    'Dockerfile',
-    'app',
-    'backend',
-    'frontend',
-  ]) {
+  for (const required of REQUIRED_SOURCE_PATHS) {
     if (!fs.existsSync(path.join(sourceDir, required))) {
       throw new Error(`Headlamp source checkout is missing ${required}`);
     }
@@ -113,6 +117,88 @@ function copyTrackedSource(sourceDir, destination) {
   }
 }
 
+function materializeHeadlampSource(packageDir, sourceDir, commit) {
+  const resolvedSourceDir = fs.realpathSync(sourceDir);
+  verifySourceCheckout(resolvedSourceDir, commit);
+  const temporarySource = fs.mkdtempSync(path.join(packageDir, '.source-'));
+  try {
+    copyTrackedSource(resolvedSourceDir, temporarySource);
+    fs.rmSync(path.join(packageDir, 'source'), { recursive: true, force: true });
+    fs.renameSync(temporarySource, path.join(packageDir, 'source'));
+    fs.writeFileSync(path.join(packageDir, SOURCE_MARKER), `${commit}\n`);
+  } catch (error) {
+    fs.rmSync(temporarySource, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function sourceIsMaterialized(packageDir, commit) {
+  const marker = path.join(packageDir, SOURCE_MARKER);
+  if (
+    !fs.existsSync(marker) ||
+    fs.readFileSync(marker, 'utf8').trim() !== commit
+  ) {
+    return false;
+  }
+  return REQUIRED_SOURCE_PATHS.every(required =>
+    fs.existsSync(path.join(packageDir, 'source', required))
+  );
+}
+
+function fetchSourceCheckout(repository, commit) {
+  const checkout = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-checkout-'));
+  try {
+    run('git', ['init', '--quiet'], checkout);
+    run(
+      'git',
+      ['fetch', '--quiet', '--no-tags', '--filter=blob:none', repository, commit],
+      checkout
+    );
+    run('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], checkout);
+    return checkout;
+  } catch (error) {
+    fs.rmSync(checkout, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function prepareHeadlampSource(options = {}) {
+  const rootDir = path.resolve(options.rootDir || process.env.INIT_CWD || process.cwd());
+  const packageDir = path.resolve(options.packageDir || path.join(__dirname, '..'));
+  const config = readJson(path.join(rootDir, 'package.json')).headlampSource;
+  if (!config) {
+    throw new Error('package.json must declare headlampSource');
+  }
+  const packageManifest = readJson(path.join(packageDir, 'package.json'));
+  const version = sourceVersion(config);
+  if (
+    packageManifest.version !== version ||
+    packageManifest.repository?.url !== config.repository ||
+    packageManifest.repository?.commit !== config.commit
+  ) {
+    throw new Error(
+      'Headlamp source package metadata does not match package.json#headlampSource'
+    );
+  }
+  if (sourceIsMaterialized(packageDir, config.commit)) {
+    console.log(`Headlamp source ${config.commit} is already materialized`);
+    return { packageDir, prepared: false };
+  }
+
+  const checkout = options.sourceDir
+    ? fs.realpathSync(options.sourceDir)
+    : fetchSourceCheckout(config.repository, config.commit);
+  try {
+    materializeHeadlampSource(packageDir, checkout, config.commit);
+  } finally {
+    if (!options.sourceDir) {
+      fs.rmSync(checkout, { recursive: true, force: true });
+    }
+  }
+  console.log(`Materialized Headlamp source ${config.commit}`);
+  return { packageDir, prepared: true };
+}
+
 function updatePackageManifest(packageDir, config, version) {
   const manifestPath = path.join(packageDir, 'package.json');
   const manifest = readJson(manifestPath);
@@ -133,15 +219,12 @@ function updatePackageManifest(packageDir, config, version) {
     `docker buildx build --pull --platform=local ` +
     `-t ghcr.io/headlamp-k8s/plugins:${version} -f source/Dockerfile.plugins source`;
   writeJson(manifestPath, manifest);
-  fs.copyFileSync(path.join(packageDir, 'source', 'LICENSE'), path.join(packageDir, 'LICENSE'));
-  fs.copyFileSync(path.join(packageDir, 'source', 'README.md'), path.join(packageDir, 'README.md'));
   return manifest;
 }
 
 function updateHeadlampSource(options) {
   const rootDir = path.resolve(options.rootDir || process.env.INIT_CWD || process.cwd());
   const packageDir = path.resolve(options.packageDir || path.join(__dirname, '..'));
-  const sourceDir = fs.realpathSync(options.sourceDir);
   const projectPath = path.join(rootDir, 'package.json');
   const lockPath = path.join(rootDir, 'package-lock.json');
   const project = readJson(projectPath);
@@ -156,6 +239,7 @@ function updateHeadlampSource(options) {
     ...(options.commit ? { commit: options.commit.toLowerCase() } : {}),
   };
   const version = sourceVersion(config);
+  const sourceDir = fs.realpathSync(options.sourceDir);
   verifySourceCheckout(sourceDir, config.commit);
 
   const patchEntries = Object.entries(project.patchedDependencies || {}).filter(([selector]) =>
@@ -179,15 +263,7 @@ function updateHeadlampSource(options) {
     fs.copyFileSync(absoluteOldPatch, absoluteNewPatch);
   }
 
-  const temporarySource = fs.mkdtempSync(path.join(packageDir, '.source-'));
-  try {
-    copyTrackedSource(sourceDir, temporarySource);
-    fs.rmSync(path.join(packageDir, 'source'), { recursive: true, force: true });
-    fs.renameSync(temporarySource, path.join(packageDir, 'source'));
-  } catch (error) {
-    fs.rmSync(temporarySource, { recursive: true, force: true });
-    throw error;
-  }
+  materializeHeadlampSource(packageDir, sourceDir, config.commit);
 
   const packageManifest = updatePackageManifest(packageDir, config, version);
   project.headlampSource = config;
@@ -226,20 +302,30 @@ function argument(name) {
 }
 
 if (require.main === module) {
-  const sourceDir = argument('--source');
-  if (!sourceDir) {
-    throw new Error(
-      'Usage: npm run source:update -- --source <checkout> [--commit <sha>]'
-    );
+  const rootDir = argument('--root');
+  if (process.argv.includes('--prepare')) {
+    prepareHeadlampSource({
+      rootDir,
+      sourceDir: argument('--source'),
+    });
+  } else {
+    const sourceDir = argument('--source');
+    if (!sourceDir) {
+      throw new Error(
+        'Usage: npm run source:update -- --source <checkout> [--commit <sha>]'
+      );
+    }
+    updateHeadlampSource({
+      rootDir,
+      sourceDir,
+      commit: argument('--commit'),
+      baseTag: argument('--base-tag'),
+    });
   }
-  updateHeadlampSource({
-    sourceDir,
-    commit: argument('--commit'),
-    baseTag: argument('--base-tag'),
-  });
 }
 
 module.exports = {
+  prepareHeadlampSource,
   sourceVersion,
   updateHeadlampSource,
   validateTrackedSourcePath,

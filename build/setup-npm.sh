@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+node "$REPOSITORY_ROOT/packages/headlamp-source/scripts/update-source.js" \
+  --prepare --root "$REPOSITORY_ROOT"
+
 NPM_TOOL_DIR="${RUNNER_TEMP:-${AGENT_TEMPDIRECTORY:-${TMPDIR:-/tmp}}}/npm-12"
 npm install --prefix "$NPM_TOOL_DIR" --no-save --ignore-scripts --no-audit --no-fund npm@12.0.2
 

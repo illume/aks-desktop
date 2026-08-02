@@ -63,6 +63,16 @@ test('the installed package is a complete pinned source distribution', () => {
   }
 });
 
+test('upstream Headlamp source is materialized instead of tracked', () => {
+  const result = spawnSync(
+    'git',
+    ['ls-files', 'packages/headlamp-source/source'],
+    { cwd: ROOT_DIR, encoding: 'utf8' }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), '');
+});
+
 test('npm owns and verifies the Headlamp patch', () => {
   const selector = `@headlamp-k8s/headlamp-source@${VERSION}`;
   const patchPath = `patches/headlamp-source@${VERSION}.patch`;

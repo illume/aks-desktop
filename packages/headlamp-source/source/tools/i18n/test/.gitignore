@@ -1,7 +1,0 @@
-# Test artifacts
-temp/
-coverage/
-*.log
-
-# Jest cache
-.jest/

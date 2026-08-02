@@ -1,7 +1,7 @@
 {
   "name": "@headlamp-k8s/headlamp-source",
   "version": "0.44.0-main.99a230be",
-  "description": "Complete Headlamp source and npm build entry points",
+  "description": "Headlamp source assembly and npm build entry points",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -35,6 +35,7 @@
     "bundle:plugins": "node scripts/bundle-plugins.js",
     "patches:compose": "node scripts/compose-patches.js",
     "smoke:app": "node scripts/smoke-app.js",
+    "source:prepare": "node scripts/update-source.js --prepare",
     "source:update": "node scripts/update-source.js",
     "test:helpers": "node --test test/*.test.js",
     "test": "npm --prefix source test",

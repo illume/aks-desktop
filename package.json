@@ -41,6 +41,7 @@
     "ai-assistant:format": "cd plugins/ai-assistant && npm run format",
     "headlamp:manifest": "tsx ./build/generate-headlamp-manifest.ts",
     "headlamp:patches": "npm --prefix packages/headlamp-source run patches:compose --",
+    "headlamp:prepare": "node packages/headlamp-source/scripts/update-source.js --prepare",
     "headlamp:assemble": "npm run headlamp:tools && npm run plugin:setup && npm run headlamp:manifest",
     "headlamp:doctor": "npm run test:headlamp-package && tsx ./build/generate-headlamp-manifest.ts --check",
     "headlamp:source": "npm --prefix packages/headlamp-source run source:update --",

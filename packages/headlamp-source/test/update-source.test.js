@@ -6,6 +6,7 @@ const path = require('node:path');
 const { afterEach, test } = require('node:test');
 
 const {
+  prepareHeadlampSource,
   sourceVersion,
   updateHeadlampSource,
   validateTrackedSourcePath,
@@ -154,6 +155,10 @@ test('updates an unpacked source package from a clean exact commit', () => {
   assert.equal(packageManifest.headlampSource.commit, nextCommit);
   assert.equal(project.devDependencies['@headlamp-k8s/headlamp-source'], version);
   assert.equal(fs.existsSync(path.join(packageDir, 'source', 'Dockerfile')), true);
+  assert.equal(
+    fs.readFileSync(path.join(packageDir, '.source-commit'), 'utf8').trim(),
+    nextCommit
+  );
   assert.equal(fs.existsSync(path.join(packageDir, 'source', 'untracked.txt')), false);
   assert.equal(
     lock.packages['node_modules/@headlamp-k8s/headlamp-source'].resolved,
@@ -167,6 +172,34 @@ test('updates an unpacked source package from a clean exact commit', () => {
     lock.packages['node_modules/@headlamp-k8s/headlamp-source'].patched.integrity,
     /^sha512-/
   );
+});
+
+test('materializes the configured commit without tracking upstream source', () => {
+  const { commit, sourceDir } = createSourceCheckout();
+  const { packageDir, rootDir } = createProject(commit);
+  const projectPath = path.join(rootDir, 'package.json');
+  const packagePath = path.join(packageDir, 'package.json');
+  const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+  const packageManifest = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  project.headlampSource.repository = sourceDir;
+  packageManifest.repository.url = sourceDir;
+  fs.writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`);
+  fs.writeFileSync(packagePath, `${JSON.stringify(packageManifest, null, 2)}\n`);
+  fs.rmSync(path.join(packageDir, 'source'), { recursive: true });
+
+  assert.deepEqual(prepareHeadlampSource({ rootDir, packageDir }), {
+    packageDir,
+    prepared: true,
+  });
+  assert.equal(fs.existsSync(path.join(packageDir, 'source', 'Dockerfile')), true);
+  assert.equal(
+    fs.readFileSync(path.join(packageDir, '.source-commit'), 'utf8').trim(),
+    commit
+  );
+  assert.deepEqual(prepareHeadlampSource({ rootDir, packageDir }), {
+    packageDir,
+    prepared: false,
+  });
 });
 
 test('rejects a checkout that does not match the configured commit', () => {

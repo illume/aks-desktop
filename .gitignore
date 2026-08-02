@@ -457,5 +457,7 @@ FodyWeavers.xsd
 # Old translation files
 **/locales/**/*_old.json
 
-# Keep the complete, Git-tracked Headlamp source distribution.
+# The package skeleton is tracked; setup materializes pinned upstream source.
 !packages/headlamp-source/**
+packages/headlamp-source/.source-*
+packages/headlamp-source/source/
