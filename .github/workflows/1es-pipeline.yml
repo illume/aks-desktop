@@ -124,7 +124,8 @@ extends:
 
                   node --experimental-strip-types build/setup-npm.ts ci
                   echo "Building AKS desktop Windows application..."
-                  if ! npm run build:win-ci || ! npm run test:distribution; then
+                  if ! node --experimental-strip-types build/setup-npm.ts run build:win-ci || \
+                    ! node --experimental-strip-types build/setup-npm.ts run test:distribution; then
                     exit 1
                   fi
                   echo "✅ Build complete"

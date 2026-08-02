@@ -31,21 +31,23 @@ To validate or update the distribution:
 nvm use                         # Node.js version required by npm 12
 node --experimental-strip-types build/setup-npm.ts ci
                                 # materialize source, select npm 12, and install
-npm run headlamp:install        # explicitly install the source build toolchain
-npm run test:headlamp-patches   # inspect npm's patch and package contract
-npm run headlamp:assemble       # stage plugins, tools, and product configuration
-npm run headlamp:doctor         # verify the generated product manifest
+node --experimental-strip-types build/setup-npm.ts run headlamp:install
+node --experimental-strip-types build/setup-npm.ts run test:headlamp-patches
+node --experimental-strip-types build/setup-npm.ts run headlamp:assemble
+node --experimental-strip-types build/setup-npm.ts run headlamp:doctor
 ```
 
 The repository requires npm 12 or newer because native dependency patches are
 part of installation and are not lifecycle scripts. The source package itself
 has no install lifecycle script; `headlamp:install` is an explicit command and
 permits only the build dependencies reviewed in the consumer patches. Build with
-`npm run build:linux`, `npm run build:mac`, `npm run build:win`, or
-`npm run build:container`. After an application build,
-`npm run test:distribution` verifies packaged tools and starts the application
-in headless mode. Linux CI appends `-- --no-sandbox`; normal launches never
-disable the sandbox.
+`node --experimental-strip-types build/setup-npm.ts run build:linux` (or
+`build:mac`, `build:win`, or `build:container`). Route same-shell npm commands
+through the setup script so they use npm 12; CI exports its path for later
+steps. After an application build, use the same wrapper with
+`run test:distribution` to verify packaged tools and start the application in
+headless mode. Linux CI appends `-- --no-sandbox`; normal launches never disable
+the sandbox.
 
 ### Test or adopt another Headlamp commit
 
@@ -58,8 +60,8 @@ node --experimental-strip-types packages/headlamp-source/scripts/update-source.t
   --source /path/to/headlamp \
   --commit <full-commit-sha>
 node --experimental-strip-types build/setup-npm.ts ci
-npm run test:headlamp-patches
-npm run test:build
+node --experimental-strip-types build/setup-npm.ts run test:headlamp-patches
+node --experimental-strip-types build/setup-npm.ts run test:build
 ```
 
 `headlamp:source` verifies the clean worktree's `HEAD`, replaces

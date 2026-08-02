@@ -90,13 +90,13 @@ selector differs.
 nvm use                         # Node.js 22.22.2
 node --experimental-strip-types build/setup-npm.ts ci
                                 # materialize source, select npm 12, and install
-npm run headlamp:install        # explicitly install the source build toolchain
-npm run test:headlamp-patches  # inspect npm's patch and source-package contract
-npm run headlamp:assemble      # build plugins/tools and generate the manifest
-npm run headlamp:doctor        # verify package, policy, and tool digests
-npm run build:linux            # or build:mac / build:win
-npm run build:container        # build the manifest-configured server image
-npm run test:distribution      # inspect and start the packaged application
+node --experimental-strip-types build/setup-npm.ts run headlamp:install
+node --experimental-strip-types build/setup-npm.ts run test:headlamp-patches
+node --experimental-strip-types build/setup-npm.ts run headlamp:assemble
+node --experimental-strip-types build/setup-npm.ts run headlamp:doctor
+node --experimental-strip-types build/setup-npm.ts run build:linux
+node --experimental-strip-types build/setup-npm.ts run build:container
+node --experimental-strip-types build/setup-npm.ts run test:distribution
 ```
 
 This PR carries only the reviewable package scripts and metadata under

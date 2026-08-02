@@ -12,8 +12,10 @@ lifecycle script.
 ## Consumer setup
 
 Run `node --experimental-strip-types build/setup-npm.ts ci` from the consumer,
-then run `npm run install:all` explicitly before local source or application
-builds.
+then run `node --experimental-strip-types build/setup-npm.ts run install:all`
+explicitly before local source or application builds. Route additional
+same-shell npm commands through the setup script; CI exports npm 12's path for
+later steps.
 `build:container` passes the recorded source commit and accepts a
 `HEADLAMP_BUILD_MANIFEST` environment value as a Docker build argument, so the
 container build does not require Git metadata.
