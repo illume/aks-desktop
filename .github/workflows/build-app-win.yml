@@ -40,8 +40,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          source build/setup-npm.sh
-          npm ci
+          node --experimental-strip-types build/setup-npm.ts ci
 
       - name: Setup AKS desktop and Build Headlamp (Windows)
         run: npm run build:win-ci

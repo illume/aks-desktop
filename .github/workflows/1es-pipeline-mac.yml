@@ -170,8 +170,7 @@ extends:
                   set -e
                   echo "Updating package.json to build for $(ARCH)..."
 
-                  source build/setup-npm.sh
-                  npm ci
+                  node --experimental-strip-types build/setup-npm.ts ci
                   cd node_modules/@headlamp-k8s/headlamp-source/source/app
 
                   # Use Node.js to safely modify the JSON
@@ -664,8 +663,7 @@ extends:
                   set -e
                   echo "Updating package.json to build for $(ARCH)..."
 
-                  source build/setup-npm.sh
-                  npm ci
+                  node --experimental-strip-types build/setup-npm.ts ci
                   cd node_modules/@headlamp-k8s/headlamp-source/source/app
 
                   # Use Node.js to safely modify the JSON

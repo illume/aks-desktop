@@ -6,7 +6,7 @@ This document outlines the maintenance procedures for this project.
 
 AKS Desktop generates a local npm package from the skeleton in
 `packages/headlamp-source/`. The repository does not track the upstream source
-tree. `build/setup-npm.sh` fetches the exact configured Headlamp commit and
+tree. `build/setup-npm.ts` fetches the exact configured Headlamp commit and
 copies its Git-tracked files into the ignored `source/` directory before npm
 installs and patches the package. The skeleton owns reusable scripts for source
 updates, patch composition, product manifests, plugin bundling,
@@ -26,8 +26,8 @@ To validate or update the distribution:
 
 ```bash
 nvm use                         # Node.js version required by npm 12
-source build/setup-npm.sh       # materialize the source and select npm 12
-npm ci                          # install the package and apply the patch series
+node --experimental-strip-types build/setup-npm.ts ci
+                                # materialize source, select npm 12, and install
 npm run headlamp:install        # explicitly install the source build toolchain
 npm run test:headlamp-patches   # inspect npm's patch and package contract
 npm run headlamp:assemble       # stage plugins, tools, and product configuration
@@ -54,8 +54,7 @@ git -C /path/to/headlamp checkout <full-commit-sha>
 node --experimental-strip-types packages/headlamp-source/scripts/update-source.ts \
   --source /path/to/headlamp \
   --commit <full-commit-sha>
-source build/setup-npm.sh
-npm ci
+node --experimental-strip-types build/setup-npm.ts ci
 npm run test:headlamp-patches
 npm run test:build
 ```

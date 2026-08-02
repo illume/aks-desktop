@@ -48,9 +48,7 @@ jobs:
         run: node --experimental-strip-types packages/headlamp-source/scripts/update-source.ts --source .headlamp-main --commit "${{ steps.headlamp.outputs.commit }}"
 
       - name: Install dependencies and apply the AKS Desktop patch
-        run: |
-          source build/setup-npm.sh
-          npm ci
+        run: node --experimental-strip-types build/setup-npm.ts ci
 
       - name: Verify package and build contracts
         run: npm run test:headlamp-patches && npm run test:build

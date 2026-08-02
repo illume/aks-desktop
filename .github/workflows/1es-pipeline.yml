@@ -122,8 +122,7 @@ extends:
                   go env | grep -E "GOPROXY|GOSUMDB|PROXY"
                   echo "=== END GO ENVIRONMENT ==="
 
-                  source build/setup-npm.sh
-                  npm ci
+                  node --experimental-strip-types build/setup-npm.ts ci
                   echo "Building AKS desktop Windows application..."
                   if ! npm run build:win-ci || ! npm run test:distribution; then
                     exit 1

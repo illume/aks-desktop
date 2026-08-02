@@ -28,8 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          source build/setup-npm.sh
-          npm ci
+          node --experimental-strip-types build/setup-npm.ts ci
 
       - name: Run plugin packaging tests
         run: npm run test:build
@@ -49,8 +48,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          source build/setup-npm.sh
-          npm ci
+          node --experimental-strip-types build/setup-npm.ts ci
 
       - name: Test the package CLI
         run: npm run test:headlamp-package
