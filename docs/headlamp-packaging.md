@@ -78,7 +78,7 @@ records:
 The source package has no install lifecycle script. The root
 [`patches/series`](../patches/series) lists 69 ordered, independently reviewable
 patches. npm 12 accepts only one patch file for a package version, so
-`npm run headlamp:patches` deterministically concatenates the series into
+`npm run headlamp:patches` normalizes and concatenates the series into
 [`patches/headlamp-source@0.44.0-main.99a230be.patch`](../patches/headlamp-source@0.44.0-main.99a230be.patch).
 `patchedDependencies` points npm at that generated aggregate. npm stores its
 hash in lockfile version 4 and fails installation if the package, patch, or

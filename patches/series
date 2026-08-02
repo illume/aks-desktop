@@ -1,69 +1,69 @@
-0001-external-plugin-manifest.patch
-0002-default-disabled-plugins.patch
-0003-packaged-plugin-identity.patch
-0004-build-manifest-product-metadata.patch
-0005-build-manifest-platform-metadata.patch
-0006-build-manifest-targets.patch
-0007-build-manifest-resources.patch
-0008-build-manifest-resource-verification.patch
-0009-package-protocol-scheme.patch
-0010-plugin-command-capabilities.patch
-0011-verified-external-tools.patch
-0012-explicit-command-scope-prefixes.patch
-0013-capability-command-options.patch
-0014-cluster-provider-capabilities.patch
-0015-product-plugin-capability-policy.patch
-0016-cluster-provider-context.patch
-0017-plugin-secure-storage.patch
-0018-oauth-provider-registry.patch
-0019-listener-cleanup.patch
-0020-command-rejection-exits.patch
-0021-storybook-crd-mocks.patch
-0022-storybook-pod-mocks.patch
-0023-storybook-apps-workload-mocks.patch
-0024-storybook-batch-workload-mocks.patch
-0025-project-tabs-zoom.patch
-0026-project-grid-zoom.patch
-0027-accessible-column-selector.patch
-0028-allowed-namespace-list.patch
-0029-appearance-control-narration.patch
-0030-artifact-package-name.patch
-0031-backend-app-name.patch
-0032-cluster-deletion-reload.patch
-0033-conditional-project-overview-sections.patch
-0034-dark-alert-contrast.patch
-0035-debug-image-narration.patch
-0036-desktop-platform.patch
-0037-dmg-license.patch
-0038-editor-dialog-zoom.patch
-0039-electron-zoom-menu-actions.patch
-0040-embeddable-workload-logs.patch
-0041-generic-locale-packs.patch
-0042-graphview-crd-watch.patch
-0043-linux-executable-name.patch
-0044-list-plugins-without-shell.patch
-0045-package-verification-names.patch
-0046-plugin-source-map-offset.patch
-0047-product-document-title.patch
-0048-product-error-content.patch
-0049-product-version.patch
-0050-project-grouping.patch
-0051-project-header-action-navigation.patch
-0052-query-retry-policy.patch
-0053-resource-map-label-reflow.patch
-0054-secondary-theme-contrast.patch
-0055-simpletable-overflow.patch
-0056-static-plugin-no-cache.patch
-0057-table-props.patch
-0058-tooltip-landmark-check.patch
-0059-unscheduled-pod-grouping.patch
-0060-view-button-split-right.patch
-0061-windows-shell-lookup.patch
-0062-cluster-empty-state.patch
-0063-configurable-update-checks.patch
-0064-hide-empty-project-sections.patch
-0065-legal-documents.patch
-0066-replaceable-project-creation.patch
-0067-source-package-helpers.patch
-0068-container-build-contract.patch
-0069-source-install-contract.patch
+0001 source headlamp-upstream-external-plugin-manifest.patch
+0002 source headlamp-integration-default-disabled-plugins.patch
+0003 source headlamp-upstream-packaged-plugin-identity.patch
+0004 source headlamp-upstream-build-manifest-product-metadata.patch
+0005 source headlamp-upstream-build-manifest-platform-metadata.patch
+0006 source headlamp-upstream-build-manifest-targets.patch
+0007 source headlamp-upstream-build-manifest-resources.patch
+0008 source headlamp-upstream-build-manifest-resource-verification.patch
+0009 source headlamp-upstream-package-protocol-scheme.patch
+0010 source headlamp-upstream-plugin-command-capabilities.patch
+0011 source headlamp-upstream-verified-external-tools.patch
+0012 source headlamp-upstream-explicit-command-scope-prefixes.patch
+0013 source headlamp-upstream-capability-command-options.patch
+0014 source headlamp-upstream-cluster-provider-capabilities.patch
+0015 source headlamp-upstream-product-plugin-capability-policy.patch
+0016 source headlamp-upstream-cluster-provider-context.patch
+0017 source headlamp-integration-plugin-secure-storage.patch
+0018 source headlamp-integration-oauth-provider-registry.patch
+0019 source headlamp-integration-listener-cleanup.patch
+0020 source headlamp-integration-command-rejection-exits.patch
+0021 source headlamp-upstream-storybook-crd-mocks.patch
+0022 source headlamp-upstream-storybook-pod-mocks.patch
+0023 source headlamp-upstream-storybook-apps-workload-mocks.patch
+0024 source headlamp-upstream-storybook-batch-workload-mocks.patch
+0025 source headlamp-upstream-project-tabs-zoom.patch
+0026 source headlamp-upstream-project-grid-zoom.patch
+0027 source headlamp-upstream-accessible-column-selector.patch
+0028 source headlamp-upstream-allowed-namespace-list.patch
+0029 source headlamp-upstream-appearance-control-narration.patch
+0030 source headlamp-upstream-artifact-package-name.patch
+0031 source headlamp-upstream-backend-app-name.patch
+0032 source headlamp-upstream-cluster-deletion-reload.patch
+0033 source headlamp-upstream-conditional-project-overview-sections.patch
+0034 source headlamp-upstream-dark-alert-contrast.patch
+0035 source headlamp-upstream-debug-image-narration.patch
+0036 source headlamp-upstream-desktop-platform.patch
+0037 source headlamp-upstream-dmg-license.patch
+0038 source headlamp-upstream-editor-dialog-zoom.patch
+0039 source headlamp-upstream-electron-zoom-menu-actions.patch
+0040 source headlamp-upstream-embeddable-workload-logs.patch
+0041 source headlamp-upstream-generic-locale-packs.patch
+0042 source headlamp-upstream-graphview-crd-watch.patch
+0043 source headlamp-upstream-linux-executable-name.patch
+0044 source headlamp-upstream-list-plugins-without-shell.patch
+0045 source headlamp-upstream-package-verification-names.patch
+0046 source headlamp-upstream-plugin-source-map-offset.patch
+0047 source headlamp-upstream-product-document-title.patch
+0048 source headlamp-upstream-product-error-content.patch
+0049 source headlamp-upstream-product-version.patch
+0050 source headlamp-upstream-project-grouping.patch
+0051 source headlamp-upstream-project-header-action-navigation.patch
+0052 source headlamp-upstream-query-retry-policy.patch
+0053 source headlamp-upstream-resource-map-label-reflow.patch
+0054 source headlamp-upstream-secondary-theme-contrast.patch
+0055 source headlamp-upstream-simpletable-overflow.patch
+0056 source headlamp-upstream-static-plugin-no-cache.patch
+0057 source headlamp-upstream-table-props.patch
+0058 source headlamp-upstream-tooltip-landmark-check.patch
+0059 source headlamp-upstream-unscheduled-pod-grouping.patch
+0060 source headlamp-upstream-view-button-split-right.patch
+0061 source headlamp-upstream-windows-shell-lookup.patch
+0062 source headlamp-integration-cluster-empty-state.patch
+0063 source headlamp-integration-configurable-update-checks.patch
+0064 source headlamp-integration-hide-empty-project-sections.patch
+0065 source headlamp-integration-legal-documents.patch
+0066 source headlamp-integration-replaceable-project-creation.patch
+0067 package headlamp-package-helpers.patch
+0068 package headlamp-package-container-build.patch
+0069 package headlamp-package-install-policy.patch

@@ -5,7 +5,13 @@ import * as path from 'node:path';
 import { ROOT_DIR } from './headlamp-path';
 
 const PACKAGE_NAME = '@headlamp-k8s/headlamp-source';
-const SERIES_ENTRY_PATTERN = /^\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.patch$/;
+const SERIES_ENTRY_PATTERN =
+  /^(\d{4}) (source|package) ([a-z0-9]+(?:-[a-z0-9]+)*\.patch)$/;
+
+export interface PatchSeriesEntry {
+  file: string;
+  scope: 'source' | 'package';
+}
 
 function readJson(file: string) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -19,21 +25,68 @@ function sha512(value: Buffer): string {
   return `sha512-${createHash('sha512').update(value).digest('base64')}`;
 }
 
-export function parsePatchSeries(value: string): string[] {
-  const entries = value.split(/\r?\n/).filter(Boolean);
-  if (entries.length === 0) {
+export function parsePatchSeries(value: string): PatchSeriesEntry[] {
+  const lines = value.split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) {
     throw new Error('Headlamp patch series is empty');
   }
-  entries.forEach((entry, index) => {
-    const expectedPrefix = `${String(index + 1).padStart(4, '0')}-`;
-    if (
-      !SERIES_ENTRY_PATTERN.test(entry) ||
-      !entry.startsWith(expectedPrefix)
-    ) {
-      throw new Error(`Invalid Headlamp patch series entry: ${entry}`);
+  const files = new Set<string>();
+  return lines.map((line, index) => {
+    const match = SERIES_ENTRY_PATTERN.exec(line);
+    if (match?.[1] !== String(index + 1).padStart(4, '0')) {
+      throw new Error(`Invalid Headlamp patch series entry: ${line}`);
     }
+    const [, , scope, file] = match;
+    if (files.has(file)) {
+      throw new Error(`Duplicate Headlamp patch series entry: ${file}`);
+    }
+    files.add(file);
+    return { file, scope } as PatchSeriesEntry;
   });
-  return entries;
+}
+
+export function normalizePatch(
+  value: string,
+  scope: PatchSeriesEntry['scope']
+): Buffer {
+  const start = value.indexOf('diff --git ');
+  if (start === -1) {
+    throw new Error('Headlamp patch contains no unified diff');
+  }
+  let patch = value.slice(start);
+  const footer = patch.lastIndexOf('\n-- \n');
+  if (footer !== -1) {
+    patch = patch.slice(0, footer + 1);
+  }
+  if (scope === 'source') {
+    patch = patch
+      .split('\n')
+      .map(line => {
+        if (line.startsWith('diff --git a/')) {
+          return line
+            .replace('diff --git a/', 'diff --git a/source/')
+            .replace(' b/', ' b/source/');
+        }
+        for (const prefix of ['--- a/', '+++ b/']) {
+          if (line.startsWith(prefix)) {
+            return `${prefix}source/${line.slice(prefix.length)}`;
+          }
+        }
+        for (const prefix of [
+          'rename from ',
+          'rename to ',
+          'copy from ',
+          'copy to ',
+        ]) {
+          if (line.startsWith(prefix)) {
+            return `${prefix}source/${line.slice(prefix.length)}`;
+          }
+        }
+        return line;
+      })
+      .join('\n');
+  }
+  return Buffer.from(patch.endsWith('\n') ? patch : `${patch}\n`);
 }
 
 export function composeHeadlampPatchSeries(rootDir = ROOT_DIR): Buffer {
@@ -42,15 +95,12 @@ export function composeHeadlampPatchSeries(rootDir = ROOT_DIR): Buffer {
     fs.readFileSync(path.join(patchDir, 'series'), 'utf8')
   );
   return Buffer.concat(
-    entries.map(entry => {
-      const contents = fs.readFileSync(path.join(patchDir, entry));
-      if (!contents.toString('utf8', 0, 11).startsWith('diff --git ')) {
-        throw new Error(`Invalid Headlamp patch: ${entry}`);
-      }
-      return contents.at(-1) === 10
-        ? contents
-        : Buffer.concat([contents, Buffer.from('\n')]);
-    })
+    entries.map(entry =>
+      normalizePatch(
+        fs.readFileSync(path.join(patchDir, entry.file), 'utf8'),
+        entry.scope
+      )
+    )
   );
 }
 

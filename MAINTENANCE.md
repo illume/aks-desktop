@@ -8,8 +8,8 @@ AKS Desktop depends on `@headlamp-k8s/headlamp-source`, an npm package containin
 the complete pinned Headlamp source tree and npm scripts for applications and
 containers. The package records upstream base tag `v0.44.0` and commit
 `99a230be9c9c679a70d59c219cc246c00ae2be45`. The numbered files in
-`patches/series` are the root-owned, reviewable patch series. npm supports one
-patch file per package version, so `npm run headlamp:patches` deterministically
+`patches/series` reference the root-owned, reviewable patch series. npm supports
+one patch file per package version, so `npm run headlamp:patches` normalizes and
 concatenates that series into the file declared by `patchedDependencies`. npm
 verifies and applies the aggregate; there is no submodule or custom patch
 applicator.
@@ -82,24 +82,29 @@ work=$(mktemp -d)
 mkdir "$work/edit"
 tar -xzf packages/headlamp-k8s-headlamp-source-<new-version>.tgz \
   -C "$work/edit" --strip-components=1
-git -C "$work/edit" init
-git -C "$work/edit" add -A
-git -C "$work/edit" \
+read -r _ scope patch < "$PWD/patches/series"
+target="$work/edit/source"
+git -C "$target" init
+git -C "$target" add -A
+git -C "$target" \
   -c user.name=patch -c user.email=patch@example.invalid \
   commit -m baseline
-patch=0001-external-plugin-manifest.patch
-git -C "$work/edit" apply --reject "$PWD/patches/$patch"
+git -C "$target" apply --reject "$PWD/patches/$patch"
 ```
 
-For each entry in `patches/series`, resolve any `*.rej`, remove the reject
-files, regenerate that numbered patch against the preceding committed state,
-and commit it in the temporary repository before continuing:
+Each `source` entry in `patches/series` is maintained against a clean Headlamp
+worktree; each `package` entry is maintained against the source-bearing npm
+package. Resolve any `*.rej`, remove the reject files, regenerate that patch
+against the preceding committed state, and commit it in the temporary
+repository before continuing. After the `source` entries, remove the temporary
+`source/.git`, initialize the package root, and repeat for the three `package`
+entries:
 
 ```bash
-git -C "$work/edit" add -N .
-git -C "$work/edit" diff --binary --full-index HEAD -- > "$PWD/patches/$patch"
-git -C "$work/edit" add -A
-git -C "$work/edit" \
+git -C "$target" add -N .
+git -C "$target" diff --binary --full-index HEAD -- > "$PWD/patches/$patch"
+git -C "$target" add -A
+git -C "$target" \
   -c user.name=patch -c user.email=patch@example.invalid \
   commit -m "$patch"
 ```
