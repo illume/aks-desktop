@@ -35,7 +35,9 @@ jobs:
           submodules: false
 
       - name: Install dependencies
-        run: npm install --global npm@12.0.2 && npm ci
+        run: |
+          source build/setup-npm.sh
+          npm ci
 
       - name: Setup AKS desktop and Build Headlamp (macOS)
         run: npm run build:mac

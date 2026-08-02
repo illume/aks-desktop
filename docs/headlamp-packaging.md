@@ -1,9 +1,9 @@
 # Removing the Headlamp submodule
 
 > Research snapshot: 2026-07-30; implementation updated 2026-08-01.
-> `@headlamp-k8s/headlamp-source` is a local publication prototype; the package
-> name is not yet an upstream release. The npm-native consumer patch and product
-> manifest are implemented in this repository.
+> `@headlamp-k8s/headlamp-source` is an unpacked local publication prototype;
+> the package name is not yet an upstream release. The npm-native consumer patch
+> and product manifest are implemented in this repository.
 
 ## Terminology
 
@@ -70,7 +70,7 @@ records:
 
 - base release tag `v0.44.0` and upstream `main` commit
   `99a230be9c9c679a70d59c219cc246c00ae2be45`;
-- package integrity and the root-owned npm patch series in
+- the local package path and root-owned npm patch integrity in
   [`package-lock.json`](../package-lock.json); and
 - AKS-owned product policy and plugin workspaces in the root
   [`package.json`](../package.json) under `headlamp`.
@@ -86,7 +86,7 @@ selector differs.
 
 ```bash
 nvm use                         # Node.js 22.22.2
-npm ci                          # verify package integrity and apply the npm patch
+npm ci                          # install the local package and apply the npm patch
 npm run headlamp:install        # explicitly install the source build toolchain
 npm run test:headlamp-patches  # inspect npm's patch and source-package contract
 npm run headlamp:assemble      # build plugins/tools and generate the manifest
@@ -96,9 +96,11 @@ npm run build:container        # build the manifest-configured server image
 npm run test:distribution      # inspect and start the packaged application
 ```
 
-This PR carries the exact package tarball only until the source package is
-published. The dependency remains a registry-style exact version, so publishing
-changes the lockfile's `resolved` location rather than the consumer or patch
+This PR carries the exact package as reviewable files under
+[`packages/headlamp-source`](../packages/headlamp-source). The lockfile resolves
+the registry-style exact version to that local directory, and npm packs it
+during installation before applying the consumer patch. Publishing changes only
+the lockfile's `resolved` location, not the dependency selector or patch
 contract. `npm run test:distribution` resolves the current platform's executable
 from the product manifest, verifies packaged resources, starts Headlamp in
 headless mode, and requires its HTTP endpoint to return the application page.
@@ -225,6 +227,7 @@ metadata does not rewrite Headlamp's root `package.json`:
 @headlamp-k8s/headlamp-source/
 ├── package.json                 # package identity and build entry points
 ├── LICENSE
+├── scripts/                     # reusable update, assembly, and validation tools
 └── source/                      # complete pristine Headlamp source
     ├── app/
     ├── backend/
@@ -271,13 +274,14 @@ while AKS Desktop or another product can own a different root-level series.
 Once upstream changes land, update the exact source package and shrink or remove
 the consumer patches.
 
-Installation is also explicit. `npm ci` verifies and patches the source archive
-but runs no source-package lifecycle hook. `npm run headlamp:install` invokes the
-package's build-toolchain script. npm 12 blocks dependency install scripts unless
-the patched Headlamp project manifests approve them. The frontend approvals are
-version-pinned; Headlamp's app lock omits registry URLs, so npm permits only
-name-scoped approvals there, with the committed app lockfile fixing the selected
-versions. Test-only Husky and Mock Service Worker scripts remain blocked.
+Installation is also explicit. `npm ci` packs the local source directory and
+applies the patch but runs no source-package lifecycle hook.
+`npm run headlamp:install` invokes the package's build-toolchain script. npm 12
+blocks dependency install scripts unless the patched Headlamp project manifests
+approve them. The frontend approvals are version-pinned; Headlamp's app lock
+omits registry URLs, so npm permits only name-scoped approvals there, with the
+committed app lockfile fixing the selected versions. Test-only Husky and Mock
+Service Worker scripts remain blocked.
 
 ## Security benefits of a packaged dependency
 
@@ -312,7 +316,7 @@ These source choices serve different purposes:
 | --- | --- | --- |
 | Normal release | Canonical repository and a release tag | Pin and verify the commit and tree, as above. |
 | Temporary fork | Fork repository and branch, tag, or pull-request ref | Pin and verify the reviewed commit and tree; never build a floating ref. |
-| Current transition | Source-bearing npm package | Exact-pin its version, package integrity, base tag, commit, and npm-native consumer patch. |
+| Current transition | Source-bearing npm package | Exact-pin its version, local path, base tag, commit, and npm-native consumer patch. |
 | Published source asset | Manually attached release archive | Require an immutable URL, SHA-256, and preferably a signature/provenance. Use this instead of a generated archive for releases once upstream publishes it. |
 | Local development | Developer-only path override | Permit dirty files for iteration, print the commit and dirty state, and reject this mode in CI and release builds. |
 

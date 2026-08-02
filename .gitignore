@@ -249,7 +249,7 @@ PublishScripts/
 # The packages folder can be ignored because of Package Restore
 **/[Pp]ackages/*
 !packages/
-!packages/headlamp-k8s-headlamp-source-*.tgz
+!packages/headlamp-source/
 .headlamp-main/
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
@@ -456,3 +456,6 @@ FodyWeavers.xsd
 
 # Old translation files
 **/locales/**/*_old.json
+
+# Keep the complete, Git-tracked Headlamp source distribution.
+!packages/headlamp-source/**

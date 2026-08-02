@@ -4,9 +4,14 @@ import * as path from 'node:path';
 
 import {
   HEADLAMP_APP_DIR,
+  HEADLAMP_PACKAGE_DIR,
   HEADLAMP_MANIFEST_PATH,
   ROOT_DIR,
 } from './headlamp-path';
+
+const { createProductTemplate: createTemplate } = require(
+  path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'product-manifest.js')
+);
 
 function sha256(file: string): string {
   const hash = createHash('sha256');
@@ -58,12 +63,7 @@ export function createProductTemplate() {
   const project = JSON.parse(
     fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8')
   );
-  const { plugins, ...template } = project.headlamp;
-  template.product.version = project.version;
-  template.plugins = plugins.map(
-    ({ source: _source, ...plugin }: { source: string }) => plugin
-  );
-  return template;
+  return createTemplate(project);
 }
 
 export function createManifest() {

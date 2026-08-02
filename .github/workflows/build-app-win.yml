@@ -38,7 +38,10 @@ jobs:
           submodules: false
 
       - name: Install dependencies
-        run: npm install --global npm@12.0.2 && npm ci
+        shell: bash
+        run: |
+          source build/setup-npm.sh
+          npm ci
 
       - name: Setup AKS desktop and Build Headlamp (Windows)
         run: npm run build:win-ci

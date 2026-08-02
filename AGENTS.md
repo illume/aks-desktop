@@ -8,7 +8,7 @@ Navigation guide for AI coding agents. For Headlamp plugin API examples see [`pl
 | --- | --- | --- | --- |
 | **Plugin** | `plugins/aks-desktop/` | AKS-specific UI, Azure integration, Kubernetes operations | Most changes go here |
 | **Build** | `build/` | Plugin setup, external tool bundling (Azure CLI, Python), post-build verification | Packaging, bundled tool versions, installer behavior |
-| **Headlamp distribution** | `package.json`, `package-lock.json`, `patches/` | Installs pinned source and applies npm-native patches | Source/package updates and generic Headlamp changes |
+| **Headlamp distribution** | `packages/headlamp-source/`, `package.json`, `package-lock.json`, `patches/` | Installs pinned source and applies npm-native patches | Source/package updates and generic Headlamp changes |
 
 Headlamp patch commits must use a prefix:
 

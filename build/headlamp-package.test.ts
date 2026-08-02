@@ -10,8 +10,16 @@ import {
   HEADLAMP_SOURCE_DIR,
   ROOT_DIR,
 } from './headlamp-path';
-import { composeHeadlampPatchSeries } from './headlamp-patch-series';
-import { headlampSourceVersion } from './package-headlamp-source';
+
+const { composePatchSeries } = require(
+  path.join(
+    ROOT_DIR,
+    'packages',
+    'headlamp-source',
+    'scripts',
+    'compose-patches.js'
+  )
+);
 const packageManifest = JSON.parse(
   fs.readFileSync(path.join(HEADLAMP_PACKAGE_DIR, 'package.json'), 'utf8')
 );
@@ -21,7 +29,7 @@ const rootManifest = JSON.parse(
 const packageLock = JSON.parse(
   fs.readFileSync(path.join(ROOT_DIR, 'package-lock.json'), 'utf8')
 );
-const VERSION = headlampSourceVersion(rootManifest.headlampSource);
+const VERSION = `${rootManifest.headlampSource.baseTag.slice(1)}-main.${rootManifest.headlampSource.commit.slice(0, 8)}`;
 const { packagedExecutableCandidates } = require(
   path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'smoke-app.js')
 );
@@ -67,7 +75,7 @@ test('npm owns and verifies the Headlamp patch', () => {
   assert.equal(
     fs
       .readFileSync(path.join(ROOT_DIR, patchPath))
-      .equals(composeHeadlampPatchSeries()),
+      .equals(composePatchSeries(ROOT_DIR)),
     true
   );
   assert.equal(

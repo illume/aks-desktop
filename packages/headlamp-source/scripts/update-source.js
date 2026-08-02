@@ -1,0 +1,246 @@
+const { createHash } = require('node:crypto');
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const PACKAGE_NAME = '@headlamp-k8s/headlamp-source';
+const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
+const BASE_TAG_PATTERN = /^v(\d+\.\d+\.\d+)$/;
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function writeJson(file, value) {
+  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function run(command, args, cwd) {
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `${command} ${args.join(' ')} failed${cwd ? ` in ${cwd}` : ''}:\n${
+        result.stderr || result.stdout
+      }`
+    );
+  }
+  return result.stdout;
+}
+
+function sha512(file) {
+  return `sha512-${createHash('sha512')
+    .update(fs.readFileSync(file))
+    .digest('base64')}`;
+}
+
+function sourceVersion(config) {
+  const tag = BASE_TAG_PATTERN.exec(config.baseTag);
+  const commit = config.commit.toLowerCase();
+  if (!tag) {
+    throw new Error(`Headlamp base tag must look like v0.44.0: ${config.baseTag}`);
+  }
+  if (!COMMIT_PATTERN.test(commit)) {
+    throw new Error(`Headlamp commit must be a full Git SHA: ${config.commit}`);
+  }
+  return `${tag[1]}-main.${commit.slice(0, 8)}`;
+}
+
+function verifySourceCheckout(sourceDir, commit) {
+  const actualCommit = run('git', ['rev-parse', 'HEAD'], sourceDir).trim();
+  if (actualCommit !== commit) {
+    throw new Error(`Headlamp source checkout is at ${actualCommit}, which does not match ${commit}`);
+  }
+  const changes = run(
+    'git',
+    ['status', '--porcelain', '--untracked-files=no'],
+    sourceDir
+  ).trim();
+  if (changes) {
+    throw new Error('Headlamp source checkout has tracked changes');
+  }
+  for (const required of [
+    'package.json',
+    'LICENSE',
+    'README.md',
+    'Dockerfile',
+    'app',
+    'backend',
+    'frontend',
+  ]) {
+    if (!fs.existsSync(path.join(sourceDir, required))) {
+      throw new Error(`Headlamp source checkout is missing ${required}`);
+    }
+  }
+}
+
+function validateTrackedSourcePath(relativeFile) {
+  const normalizedPath = relativeFile.replaceAll('\\', '/');
+  if (
+    path.posix.isAbsolute(normalizedPath) ||
+    path.win32.isAbsolute(relativeFile) ||
+    normalizedPath === '..' ||
+    normalizedPath.startsWith('../')
+  ) {
+    throw new Error(`Unsafe Headlamp source path: ${relativeFile}`);
+  }
+}
+
+function copyTrackedSource(sourceDir, destination) {
+  const files = run('git', ['ls-files', '-z'], sourceDir)
+    .split('\0')
+    .filter(Boolean);
+  for (const relativeFile of files) {
+    validateTrackedSourcePath(relativeFile);
+    const source = path.join(sourceDir, relativeFile);
+    const target = path.join(destination, relativeFile);
+    const stat = fs.lstatSync(source);
+    if (stat.isDirectory()) {
+      throw new Error(`Headlamp source contains an uninitialized submodule: ${relativeFile}`);
+    }
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Headlamp source contains a tracked symbolic link: ${relativeFile}`);
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(source, target);
+    fs.chmodSync(target, stat.mode);
+  }
+}
+
+function updatePackageManifest(packageDir, config, version) {
+  const manifestPath = path.join(packageDir, 'package.json');
+  const manifest = readJson(manifestPath);
+  manifest.version = version;
+  manifest.repository.url = config.repository;
+  manifest.repository.commit = config.commit;
+  manifest.headlampSource = {
+    ref: config.ref,
+    baseTag: config.baseTag,
+    commit: config.commit,
+  };
+  manifest.scripts['build:container'] =
+    `docker buildx build --pull --platform=local ` +
+    `--build-arg HEADLAMP_SOURCE_COMMIT=${config.commit} ` +
+    `--build-arg HEADLAMP_BUILD_MANIFEST ` +
+    `-t ghcr.io/headlamp-k8s/headlamp:${version} -f source/Dockerfile source`;
+  manifest.scripts['build:plugins-container'] =
+    `docker buildx build --pull --platform=local ` +
+    `-t ghcr.io/headlamp-k8s/plugins:${version} -f source/Dockerfile.plugins source`;
+  writeJson(manifestPath, manifest);
+  fs.copyFileSync(path.join(packageDir, 'source', 'LICENSE'), path.join(packageDir, 'LICENSE'));
+  fs.copyFileSync(path.join(packageDir, 'source', 'README.md'), path.join(packageDir, 'README.md'));
+  return manifest;
+}
+
+function updateHeadlampSource(options) {
+  const rootDir = path.resolve(options.rootDir || process.env.INIT_CWD || process.cwd());
+  const packageDir = path.resolve(options.packageDir || path.join(__dirname, '..'));
+  const sourceDir = fs.realpathSync(options.sourceDir);
+  const projectPath = path.join(rootDir, 'package.json');
+  const lockPath = path.join(rootDir, 'package-lock.json');
+  const project = readJson(projectPath);
+  const lock = readJson(lockPath);
+  const currentConfig = project.headlampSource;
+  if (!currentConfig) {
+    throw new Error('package.json must declare headlampSource');
+  }
+  const config = {
+    ...currentConfig,
+    ...(options.baseTag ? { baseTag: options.baseTag } : {}),
+    ...(options.commit ? { commit: options.commit.toLowerCase() } : {}),
+  };
+  const version = sourceVersion(config);
+  verifySourceCheckout(sourceDir, config.commit);
+
+  const patchEntries = Object.entries(project.patchedDependencies || {}).filter(([selector]) =>
+    selector.startsWith(`${PACKAGE_NAME}@`)
+  );
+  if (patchEntries.length !== 1) {
+    throw new Error(`Expected one ${PACKAGE_NAME} patch, found ${patchEntries.length}`);
+  }
+  const [oldSelector, oldPatchPath] = patchEntries[0];
+  const newSelector = `${PACKAGE_NAME}@${version}`;
+  const newPatchPath = `patches/headlamp-source@${version}.patch`;
+  const absoluteOldPatch = path.join(rootDir, oldPatchPath);
+  const absoluteNewPatch = path.join(rootDir, newPatchPath);
+  if (oldPatchPath !== newPatchPath) {
+    if (
+      fs.existsSync(absoluteNewPatch) &&
+      !fs.readFileSync(absoluteNewPatch).equals(fs.readFileSync(absoluteOldPatch))
+    ) {
+      throw new Error(`Refusing to overwrite a different patch: ${newPatchPath}`);
+    }
+    fs.copyFileSync(absoluteOldPatch, absoluteNewPatch);
+  }
+
+  const temporarySource = fs.mkdtempSync(path.join(packageDir, '.source-'));
+  try {
+    copyTrackedSource(sourceDir, temporarySource);
+    fs.rmSync(path.join(packageDir, 'source'), { recursive: true, force: true });
+    fs.renameSync(temporarySource, path.join(packageDir, 'source'));
+  } catch (error) {
+    fs.rmSync(temporarySource, { recursive: true, force: true });
+    throw error;
+  }
+
+  const packageManifest = updatePackageManifest(packageDir, config, version);
+  project.headlampSource = config;
+  project.devDependencies[PACKAGE_NAME] = version;
+  delete project.patchedDependencies[oldSelector];
+  project.patchedDependencies[newSelector] = newPatchPath;
+
+  lock.packages[''].devDependencies[PACKAGE_NAME] = version;
+  lock.packages[`node_modules/${PACKAGE_NAME}`] = {
+    version,
+    resolved: `file:${path.relative(rootDir, packageDir).split(path.sep).join('/')}`,
+    dev: true,
+    license: packageManifest.license,
+    engines: packageManifest.engines,
+    patched: {
+      integrity: sha512(absoluteNewPatch),
+      path: newPatchPath,
+    },
+  };
+
+  writeJson(projectPath, project);
+  writeJson(lockPath, lock);
+  console.log(`Prepared ${PACKAGE_NAME}@${version} from ${config.commit}`);
+  console.log(`Run npm ci to apply and validate ${newPatchPath}`);
+
+  return {
+    packageDir,
+    patchPath: absoluteNewPatch,
+    version,
+  };
+}
+
+function argument(name) {
+  const index = process.argv.indexOf(name);
+  return index === -1 ? undefined : process.argv[index + 1];
+}
+
+if (require.main === module) {
+  const sourceDir = argument('--source');
+  if (!sourceDir) {
+    throw new Error(
+      'Usage: npm run source:update -- --source <checkout> [--commit <sha>]'
+    );
+  }
+  updateHeadlampSource({
+    sourceDir,
+    commit: argument('--commit'),
+    baseTag: argument('--base-tag'),
+  });
+}
+
+module.exports = {
+  sourceVersion,
+  updateHeadlampSource,
+  validateTrackedSourcePath,
+};

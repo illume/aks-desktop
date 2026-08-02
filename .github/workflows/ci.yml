@@ -27,7 +27,9 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm install --global npm@12.0.2 && npm ci
+        run: |
+          source build/setup-npm.sh
+          npm ci
 
       - name: Run plugin packaging tests
         run: npm run test:build
@@ -46,7 +48,9 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm install --global npm@12.0.2 && npm ci
+        run: |
+          source build/setup-npm.sh
+          npm ci
 
       - name: Test the package CLI
         run: npm run test:headlamp-package

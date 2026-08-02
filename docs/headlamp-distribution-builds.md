@@ -319,7 +319,9 @@ products.
 
 | Current code | Upstream reusable tool | What remains in AKS |
 | --- | --- | --- |
-| Source-package `scripts/bundle-plugins.js` and its consumer tests | Safe plugin workspace bundler with package-identity validation, collision rejection, and clean output | Plugin list and permissions in root `package.json` |
+| Source-package `scripts/bundle-plugins.js` and package-owned tests | Safe plugin workspace bundler with package-identity validation, collision rejection, and clean output | Plugin list and permissions in root `package.json` |
+| Source-package `scripts/update-source.js` and `scripts/compose-patches.js` | Commit-pinned source updates and deterministic npm patch composition | Exact source pin and root-owned patch series |
+| Source-package `scripts/product-manifest.js` | Product-template generation from consumer package metadata | Azure tools, legal resources, and digest enrichment |
 | Source-package `app/scripts/setup-plugins.js` and `container/fetch-plugins.sh` | One checksum-verifying manifest implementation for desktop and container builds | Product-selected archives/defaults |
 | `build/setup-external-tools.ts` | Platform-aware external-resource staging API | Azure CLI/kubelogin declarations |
 | Generic parts of `build/download-az-cli.ts` | Required-digest downloader, redirect policy, safe archive extraction, cache, and platform selector | Azure CLI/Python installation and extensions |
@@ -329,8 +331,8 @@ products.
 | Downstream `app/scripts/verify-build-*` changes | Cross-platform `verify-distribution` driven by artifact metadata | AKS release policy |
 | `scripts/headlamp-submodule.sh` | Nothing | Removed; npm installs the exact source package |
 
-The existing AKS plugin copy tests already cover scoped names, stale output, and
-path traversal; they are a useful seed for the upstream bundler. Before
+The source-package plugin tests cover scoped names, stale output, and path
+traversal; they are a useful seed for the upstream bundler. Before
 upstreaming downloader code, make missing checksums fatal and replace shell
 command interpolation with argument-array process APIs and safe extraction.
 

@@ -64,6 +64,6 @@
 0064 source headlamp-integration-hide-empty-project-sections.patch
 0065 source headlamp-integration-legal-documents.patch
 0066 source headlamp-integration-replaceable-project-creation.patch
-0067 package headlamp-package-helpers.patch
+0067 source headlamp-upstream-i18next-shared-config-types.patch
 0068 package headlamp-package-container-build.patch
 0069 package headlamp-package-install-policy.patch

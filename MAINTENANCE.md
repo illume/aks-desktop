@@ -4,9 +4,11 @@ This document outlines the maintenance procedures for this project.
 
 ## Headlamp distribution
 
-AKS Desktop depends on `@headlamp-k8s/headlamp-source`, an npm package containing
-the complete pinned Headlamp source tree and npm scripts for applications and
-containers. The package records upstream base tag `v0.44.0` and commit
+AKS Desktop depends on the unpacked npm package in
+`packages/headlamp-source/`. It contains the complete pinned Headlamp source
+tree and reusable npm scripts for source updates, patch composition, product
+manifests, plugin bundling, application/container builds, and runtime smoke
+tests. The package records upstream base tag `v0.44.0` and commit
 `99a230be9c9c679a70d59c219cc246c00ae2be45`. The numbered files in
 `patches/series` reference the root-owned, reviewable patch series. npm supports
 one patch file per package version, so `npm run headlamp:patches` normalizes and
@@ -53,13 +55,15 @@ npm run test:headlamp-patches
 npm run test:build
 ```
 
-`headlamp:source` verifies the clean worktree's `HEAD`, packages only Git-tracked
-files, derives the package version from the base tag and SHA, and updates the
-package artifact, exact dependency, patch selector, and both lockfile integrity
-records. It does not apply the patches; the second `npm ci` is the authoritative
-npm-native patch check. Update `baseTag` in `package.json#headlampSource` when
-the upstream release baseline changes. Delete the superseded package and
-aggregate only after the replacement passes.
+`headlamp:source` verifies the clean worktree's `HEAD`, replaces
+`packages/headlamp-source/source/` with only Git-tracked files, derives the
+package version from the base tag and SHA, and updates the package metadata,
+exact dependency, local lockfile resolution, patch selector, and patch
+integrity. It does not apply the patches; the second `npm ci` is the
+authoritative npm-native patch check. Update `baseTag` in
+`package.json#headlampSource` when the upstream release baseline changes. Stage
+the complete source update with `git add -f packages/headlamp-source` only after
+the replacement passes.
 
 The
 [`Headlamp main compatibility`](.github/workflows/headlamp-main-compatibility.yml)
@@ -71,17 +75,15 @@ mode. It never changes the committed pin.
 ### Update patches after a conflict
 
 If `npm ci` reports that a patch does not apply, keep the newly generated
-package and rebase the numbered patches in `patches/series`, in order. The
-package is local until `@headlamp-k8s/headlamp-source` is published, so npm
+source directory and rebase the numbered patches in `patches/series`, in order.
+The package is local until `@headlamp-k8s/headlamp-source` is published, so npm
 cannot fetch its clean baseline for `npm patch update`. This maintenance-only
 rebase uses Git; normal installs continue to use npm as the only patch
 applicator:
 
 ```bash
 work=$(mktemp -d)
-mkdir "$work/edit"
-tar -xzf packages/headlamp-k8s-headlamp-source-<new-version>.tgz \
-  -C "$work/edit" --strip-components=1
+cp -a packages/headlamp-source "$work/edit"
 read -r _ scope patch < "$PWD/patches/series"
 target="$work/edit/source"
 git -C "$target" init
@@ -97,7 +99,7 @@ worktree; each `package` entry is maintained against the source-bearing npm
 package. Resolve any `*.rej`, remove the reject files, regenerate that patch
 against the preceding committed state, and commit it in the temporary
 repository before continuing. After the `source` entries, remove the temporary
-`source/.git`, initialize the package root, and repeat for the three `package`
+`source/.git`, initialize the package root, and repeat for the `package`
 entries:
 
 ```bash
