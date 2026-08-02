@@ -5,7 +5,7 @@ const path = require('node:path');
 const VALID_PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
 const VALID_SHA256 = /^[a-f0-9]{64}$/i;
 
-function projectRoot() {
+function projectRoot(): string {
   return path.resolve(process.env.INIT_CWD || process.cwd());
 }
 

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { createProductTemplate } = require('../scripts/product-manifest.js');
+const { createProductTemplate } = require('../scripts/product-manifest.ts');
 
 test('creates product configuration without consumer-only plugin sources', () => {
   const template = createProductTemplate({

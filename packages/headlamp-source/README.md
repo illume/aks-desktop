@@ -4,6 +4,8 @@ This package skeleton materializes the complete Headlamp source tree at the
 commit recorded in `headlampSource`. `source:prepare` copies the verified
 upstream commit into the ignored `source/` directory; its other npm scripts
 build the web/backend distribution, desktop applications, and containers.
+The package also generates product manifests, stages shipped plugins, and
+smoke-tests packaged applications from consumer configuration.
 Consumers own any npm native dependency patches; this package has no install
 lifecycle script.
 

@@ -9,7 +9,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { HEADLAMP_APP_DIR } from './headlamp-path';
 import * as os from 'os';
 import * as https from 'https';
 import * as http from 'http';
@@ -19,6 +18,9 @@ import { createWriteStream, createReadStream } from 'fs';
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.dirname(SCRIPT_DIR);
+const { appDir: HEADLAMP_APP_DIR } = require(
+  '../packages/headlamp-source/scripts/paths.ts'
+).resolveInstalledHeadlampPaths(ROOT_DIR);
 const EXTERNAL_TOOLS_DIR = path.join(HEADLAMP_APP_DIR, 'resources', 'external-tools');
 const AZ_CLI_DIR = path.join(EXTERNAL_TOOLS_DIR, 'az-cli');
 const PACKAGE_JSON_PATH = path.join(ROOT_DIR, 'package.json');

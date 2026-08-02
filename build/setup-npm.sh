@@ -3,7 +3,7 @@
 REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 (
   cd "$REPOSITORY_ROOT"
-  node packages/headlamp-source/scripts/update-source.js --prepare --root .
+  node --experimental-strip-types packages/headlamp-source/scripts/update-source.ts --prepare --root .
 )
 
 NPM_TOOL_DIR="${RUNNER_TEMP:-${AGENT_TEMPDIRECTORY:-${TMPDIR:-/tmp}}}/npm-12"

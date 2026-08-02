@@ -6,13 +6,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";
 
-import { createProductTemplate } from "./generate-headlamp-manifest";
-
 const rootDir = path.resolve(__dirname, "..");
 const project = JSON.parse(
   fs.readFileSync(path.join(rootDir, "package.json"), "utf8"),
 );
-const manifest = createProductTemplate();
+const { createProductTemplate } = require(
+  "../packages/headlamp-source/scripts/product-manifest.ts"
+);
+const manifest = createProductTemplate(project);
 
 test("declares AKS product identity and policy outside Headlamp", () => {
   assert.deepEqual(
@@ -72,6 +73,7 @@ test("declares plugin defaults and external tool integrity generation", () => {
     manifest.plugins.some((plugin: { source?: string }) => "source" in plugin),
     false,
   );
+  assert.equal("build" in manifest, false);
   const aksPlugin = manifest.plugins.find(
     (plugin: { packageName: string }) =>
       plugin.packageName === "aks-desktop",

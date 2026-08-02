@@ -45,7 +45,7 @@ jobs:
           cache: npm
 
       - name: Prepare source package from Headlamp main
-        run: node packages/headlamp-source/scripts/update-source.js --source .headlamp-main --commit "${{ steps.headlamp.outputs.commit }}"
+        run: node --experimental-strip-types packages/headlamp-source/scripts/update-source.ts --source .headlamp-main --commit "${{ steps.headlamp.outputs.commit }}"
 
       - name: Install dependencies and apply the AKS Desktop patch
         run: |

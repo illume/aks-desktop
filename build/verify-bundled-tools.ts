@@ -11,10 +11,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { HEADLAMP_DIST_DIR } from './headlamp-path';
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.dirname(SCRIPT_DIR);
+const { distDir: HEADLAMP_DIST_DIR } = require(
+  '../packages/headlamp-source/scripts/paths.ts'
+).resolveInstalledHeadlampPaths(ROOT_DIR);
 const CURRENT_PLATFORM = process.platform;
 
 // Read the assembled application name from the product manifest.

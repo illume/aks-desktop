@@ -14,8 +14,8 @@ application/container builds, and runtime smoke tests. It records upstream base
 tag `v0.44.0` and commit
 `99a230be9c9c679a70d59c219cc246c00ae2be45`. The numbered files in
 `patches/series` reference the root-owned, reviewable patch series. npm supports
-one patch file per package version, so `npm run headlamp:patches` normalizes and
-concatenates that series into the file declared by `patchedDependencies`. npm
+one patch file per package version, so `npm run headlamp:patches` uses Git to
+apply the series in order and emit the aggregate declared by `patchedDependencies`. npm
 verifies and applies the aggregate; there is no submodule or custom patch
 applicator.
 The same tag, branch, repository, and full commit are the single source of truth
@@ -50,7 +50,7 @@ new commit without editing the configuration first, pass its full SHA:
 
 ```bash
 git -C /path/to/headlamp checkout <full-commit-sha>
-node packages/headlamp-source/scripts/update-source.js \
+node --experimental-strip-types packages/headlamp-source/scripts/update-source.ts \
   --source /path/to/headlamp \
   --commit <full-commit-sha>
 source build/setup-npm.sh

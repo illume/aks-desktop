@@ -2,7 +2,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-function option(args, name) {
+function option(args: string[], name: string) {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 }

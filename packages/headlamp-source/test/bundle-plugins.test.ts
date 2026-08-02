@@ -1,20 +1,17 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import assert from 'node:assert/strict';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { afterEach, test } from 'node:test';
-
-import { HEADLAMP_PACKAGE_DIR } from './headlamp-path';
-
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { afterEach, test } = require('node:test');
 const {
   bundleConfiguredPlugins,
   bundlePlugin,
   copyPlugin,
   validatePluginConfiguration,
-} = require(path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'bundle-plugins.js'));
+} = require('../scripts/bundle-plugins.ts');
 
 const tempDirs: string[] = [];
 

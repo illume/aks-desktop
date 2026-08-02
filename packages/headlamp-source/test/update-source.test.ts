@@ -10,7 +10,7 @@ const {
   sourceVersion,
   updateHeadlampSource,
   validateTrackedSourcePath,
-} = require('../scripts/update-source.js');
+} = require('../scripts/update-source.ts');
 
 const tempDirs = [];
 
@@ -62,6 +62,17 @@ function createProject(commit) {
   const version = `0.44.0-main.${commit.slice(0, 8)}`;
   const patchPath = `patches/headlamp-source@${version}.patch`;
   fs.writeFileSync(path.join(rootDir, patchPath), 'patch\n');
+  fs.writeFileSync(path.join(rootDir, 'patches', 'series'), '0001 source readme.patch\n');
+  fs.writeFileSync(
+    path.join(rootDir, 'patches', 'readme.patch'),
+    `diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1 +1 @@
+-readme
++patched readme
+`
+  );
   fs.writeFileSync(
     path.join(packageDir, 'package.json'),
     `${JSON.stringify(
@@ -75,6 +86,7 @@ function createProject(commit) {
           commit,
         },
         engines: { node: '>=22.22.2', npm: '>=12.0.0' },
+        dependencies: { tsx: '4.23.1' },
         scripts: {
           'build:container': 'old',
           'build:plugins-container': 'old',
@@ -159,6 +171,10 @@ test('updates an unpacked source package from a clean exact commit', () => {
     fs.readFileSync(path.join(packageDir, '.source-commit'), 'utf8').trim(),
     nextCommit
   );
+  assert.match(
+    fs.readFileSync(result.patchPath, 'utf8'),
+    /diff --git a\/source\/README\.md b\/source\/README\.md/
+  );
   assert.equal(fs.existsSync(path.join(packageDir, 'source', 'untracked.txt')), false);
   assert.equal(
     lock.packages['node_modules/@headlamp-k8s/headlamp-source'].resolved,
@@ -167,6 +183,10 @@ test('updates an unpacked source package from a clean exact commit', () => {
   assert.equal(
     'integrity' in lock.packages['node_modules/@headlamp-k8s/headlamp-source'],
     false
+  );
+  assert.deepEqual(
+    lock.packages['node_modules/@headlamp-k8s/headlamp-source'].dependencies,
+    { tsx: '4.23.1' }
   );
   assert.match(
     lock.packages['node_modules/@headlamp-k8s/headlamp-source'].patched.integrity,

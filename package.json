@@ -39,11 +39,11 @@
     "ai-assistant:test": "cd plugins/ai-assistant && npm test",
     "ai-assistant:lint": "cd plugins/ai-assistant && npm run lint",
     "ai-assistant:format": "cd plugins/ai-assistant && npm run format",
-    "headlamp:manifest": "tsx ./build/generate-headlamp-manifest.ts",
+    "headlamp:manifest": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run manifest:generate",
     "headlamp:patches": "npm --prefix packages/headlamp-source run patches:compose --",
-    "headlamp:prepare": "node packages/headlamp-source/scripts/update-source.js --prepare",
+    "headlamp:prepare": "node --experimental-strip-types packages/headlamp-source/scripts/update-source.ts --prepare",
     "headlamp:assemble": "npm run headlamp:tools && npm run plugin:setup && npm run headlamp:manifest",
-    "headlamp:doctor": "npm run test:headlamp-package && tsx ./build/generate-headlamp-manifest.ts --check",
+    "headlamp:doctor": "npm run test:headlamp-package && npm --prefix node_modules/@headlamp-k8s/headlamp-source run manifest:check",
     "headlamp:source": "npm --prefix packages/headlamp-source run source:update --",
     "headlamp:smoke": "npm --prefix node_modules/@headlamp-k8s/headlamp-source run smoke:app --",
     "headlamp:tools": "tsx ./build/setup-external-tools.ts",
@@ -126,6 +126,64 @@
       "win": {
         "executableName": "aks-desktop"
       }
+    },
+    "build": {
+      "manifest": ".aks-desktop/product-manifest.json",
+      "resources": [
+        {
+          "base": "headlampApp",
+          "from": "resources/external-tools",
+          "to": "external-tools"
+        },
+        {
+          "base": "project",
+          "from": "LICENSE.txt",
+          "to": "AKS_DESKTOP_LICENSE.txt"
+        },
+        {
+          "base": "project",
+          "from": "NOTICE.md",
+          "to": "AKS_DESKTOP_NOTICE.md"
+        }
+      ],
+      "externalTools": [
+        {
+          "id": "az",
+          "platforms": {
+            "linux": {
+              "file": "resources/external-tools/az-cli/linux/bin/az",
+              "path": "external-tools/az-cli/linux/bin/az",
+              "verificationPath": "external-tools/az-cli/linux/bin/az-wrapper"
+            },
+            "darwin": {
+              "file": "resources/external-tools/az-cli/darwin/bin/az",
+              "path": "external-tools/az-cli/darwin/bin/az",
+              "verificationPath": "external-tools/az-cli/darwin/bin/az-wrapper"
+            },
+            "win32": {
+              "file": "resources/external-tools/az-cli/win32/bin/az.cmd",
+              "path": "external-tools/az-cli/win32/bin/az.cmd"
+            }
+          }
+        },
+        {
+          "id": "az-kubelogin",
+          "platforms": {
+            "linux": {
+              "file": "resources/external-tools/bin/az-kubelogin.py",
+              "path": "external-tools/bin/az-kubelogin.py"
+            },
+            "darwin": {
+              "file": "resources/external-tools/bin/az-kubelogin.py",
+              "path": "external-tools/bin/az-kubelogin.py"
+            },
+            "win32": {
+              "file": "resources/external-tools/bin/az-kubelogin.py",
+              "path": "external-tools/bin/az-kubelogin.py"
+            }
+          }
+        }
+      ]
     },
     "plugins": [
       {

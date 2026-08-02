@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const PACKAGE_NAME = '@headlamp-k8s/headlamp-source';
+const { composePatchSeries } = require('./compose-patches.ts');
+
+const PACKAGE_NAME: string = '@headlamp-k8s/headlamp-source';
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const BASE_TAG_PATTERN = /^v(\d+\.\d+\.\d+)$/;
 const SOURCE_MARKER = '.source-commit';
@@ -176,7 +178,7 @@ function fetchSourceCheckout(repository, commit) {
   }
 }
 
-function prepareHeadlampSource(options = {}) {
+function prepareHeadlampSource(options: any = {}) {
   const rootDir = path.resolve(options.rootDir || process.env.INIT_CWD || process.cwd());
   const packageDir = path.resolve(options.packageDir || path.join(__dirname, '..'));
   const config = readJson(path.join(rootDir, 'package.json')).headlampSource;
@@ -280,6 +282,7 @@ function updateHeadlampSource(options) {
   materializeHeadlampSource(packageDir, sourceDir, config.commit);
 
   const packageManifest = updatePackageManifest(packageDir, config, version);
+  fs.writeFileSync(absoluteNewPatch, composePatchSeries(rootDir, packageDir));
   project.headlampSource = config;
   project.devDependencies[PACKAGE_NAME] = version;
   delete project.patchedDependencies[oldSelector];
@@ -291,6 +294,7 @@ function updateHeadlampSource(options) {
     resolved: `file:${path.relative(rootDir, packageDir).split(path.sep).join('/')}`,
     dev: true,
     license: packageManifest.license,
+    dependencies: packageManifest.dependencies,
     engines: packageManifest.engines,
     patched: {
       integrity: sha512(absoluteNewPatch),

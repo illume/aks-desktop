@@ -5,11 +5,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 
-import {
-  HEADLAMP_PACKAGE_DIR,
-  HEADLAMP_SOURCE_DIR,
-  ROOT_DIR,
-} from './headlamp-path';
+const ROOT_DIR = path.resolve(__dirname, '..');
+const {
+  packageDir: HEADLAMP_PACKAGE_DIR,
+  sourceDir: HEADLAMP_SOURCE_DIR,
+} = require('../packages/headlamp-source/scripts/paths.ts').resolveInstalledHeadlampPaths(
+  ROOT_DIR
+);
 
 const { composePatchSeries } = require(
   path.join(
@@ -17,7 +19,7 @@ const { composePatchSeries } = require(
     'packages',
     'headlamp-source',
     'scripts',
-    'compose-patches.js'
+    'compose-patches.ts'
   )
 );
 const packageManifest = JSON.parse(
@@ -31,7 +33,7 @@ const packageLock = JSON.parse(
 );
 const VERSION = `${rootManifest.headlampSource.baseTag.slice(1)}-main.${rootManifest.headlampSource.commit.slice(0, 8)}`;
 const { packagedExecutableCandidates } = require(
-  path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'smoke-app.js')
+  path.join(HEADLAMP_PACKAGE_DIR, 'scripts', 'smoke-app.ts')
 );
 
 test('the installed package is a complete pinned source distribution', () => {
@@ -97,6 +99,7 @@ test('npm owns and verifies the Headlamp patch', () => {
 });
 
 test('the source package exports app and container build scripts', () => {
+  assert.equal(packageManifest.dependencies.tsx, '4.23.1');
   for (const script of [
     'build',
     'build:app',
@@ -106,6 +109,8 @@ test('the source package exports app and container build scripts', () => {
     'build:container',
     'build:plugins-container',
     'bundle:plugins',
+    'manifest:generate',
+    'manifest:check',
     'smoke:app',
   ]) {
     assert.equal(typeof packageManifest.scripts[script], 'string');

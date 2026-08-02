@@ -1,8 +1,10 @@
 const { createHash } = require('node:crypto');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
-const PACKAGE_NAME = '@headlamp-k8s/headlamp-source';
+const PACKAGE_NAME: string = '@headlamp-k8s/headlamp-source';
 const SERIES_ENTRY_PATTERN =
   /^(\d{4}) (source|package) ([a-z0-9]+(?:-[a-z0-9]+)*\.patch)$/;
 
@@ -38,50 +40,78 @@ function parsePatchSeries(value) {
   });
 }
 
-function normalizePatch(value, scope) {
-  const start = value.indexOf('diff --git ');
-  if (start === -1) {
-    throw new Error('Headlamp patch contains no unified diff');
+function runGit(args, options: any = {}) {
+  const result = spawnSync('git', args, {
+    cwd: options.cwd,
+    encoding: options.encoding,
+    env: { ...process.env, ...options.env },
+    maxBuffer: 100 * 1024 * 1024,
+  });
+  if (result.error) {
+    throw result.error;
   }
-  let patch = value.slice(start);
-  const footer = patch.lastIndexOf('\n-- \n');
-  if (footer !== -1) {
-    patch = patch.slice(0, footer + 1);
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(' ')} failed:\n${result.stderr || result.stdout}`);
   }
-  if (scope === 'source') {
-    patch = patch
-      .split('\n')
-      .map(line => {
-        if (line.startsWith('diff --git a/')) {
-          return line
-            .replace('diff --git a/', 'diff --git a/source/')
-            .replace(' b/', ' b/source/');
-        }
-        for (const prefix of ['--- a/', '+++ b/']) {
-          if (line.startsWith(prefix)) {
-            return `${prefix}source/${line.slice(prefix.length)}`;
-          }
-        }
-        for (const prefix of ['rename from ', 'rename to ', 'copy from ', 'copy to ']) {
-          if (line.startsWith(prefix)) {
-            return `${prefix}source/${line.slice(prefix.length)}`;
-          }
-        }
-        return line;
-      })
-      .join('\n');
-  }
-  return Buffer.from(patch.endsWith('\n') ? patch : `${patch}\n`);
+  return result.stdout;
 }
 
-function composePatchSeries(rootDir = process.env.INIT_CWD || process.cwd()) {
+function composePatchSeries(
+  rootDir = process.env.INIT_CWD || process.cwd(),
+  packageDir = path.join(rootDir, 'packages', 'headlamp-source')
+) {
   const patchDir = path.join(rootDir, 'patches');
   const entries = parsePatchSeries(fs.readFileSync(path.join(patchDir, 'series'), 'utf8'));
-  return Buffer.concat(
-    entries.map(entry =>
-      normalizePatch(fs.readFileSync(path.join(patchDir, entry.file), 'utf8'), entry.scope)
-    )
-  );
+  if (!fs.existsSync(path.join(packageDir, 'source'))) {
+    throw new Error('Headlamp source is not materialized; run source:prepare first');
+  }
+
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'headlamp-patches-'));
+  const gitConfig = path.join(temporaryDirectory, 'gitconfig');
+  const gitDir = path.join(temporaryDirectory, 'repository.git');
+  try {
+    fs.writeFileSync(gitConfig, '');
+    runGit(['init', '--bare', '--quiet', gitDir]);
+    const repository = {
+      cwd: packageDir,
+      env: {
+        GIT_CONFIG_GLOBAL: gitConfig,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_DIR: gitDir,
+        GIT_WORK_TREE: packageDir,
+      },
+    };
+    runGit(['add', '--all', '--', '.'], repository);
+    const baseTree = runGit(['write-tree'], { ...repository, encoding: 'utf8' }).trim();
+    for (const entry of entries) {
+      const args = ['apply', '--cached', '--whitespace=nowarn'];
+      if (entry.scope === 'source') {
+        args.push('--directory=source');
+      }
+      args.push(path.join(patchDir, entry.file));
+      runGit(args, repository);
+    }
+    return runGit(
+      [
+        '-c',
+        'diff.algorithm=myers',
+        'diff',
+        '--cached',
+        '--binary',
+        '--full-index',
+        '--no-color',
+        '--no-ext-diff',
+        '--no-renames',
+        '--src-prefix=a/',
+        '--dst-prefix=b/',
+        baseTree,
+        '--',
+      ],
+      repository
+    );
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
 }
 
 function configuredPatch(rootDir) {
@@ -141,7 +171,6 @@ if (require.main === module) {
 
 module.exports = {
   composePatchSeries,
-  normalizePatch,
   parsePatchSeries,
   updateHeadlampPatch,
 };

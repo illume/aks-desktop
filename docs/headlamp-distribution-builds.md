@@ -319,13 +319,13 @@ products.
 
 | Current code | Upstream reusable tool | What remains in AKS |
 | --- | --- | --- |
-| Source-package `scripts/bundle-plugins.js` and package-owned tests | Safe plugin workspace bundler with package-identity validation, collision rejection, and clean output | Plugin list and permissions in root `package.json` |
-| Source-package `scripts/update-source.js` and `scripts/compose-patches.js` | Commit-pinned source updates and deterministic npm patch composition | Exact source pin and root-owned patch series |
-| Source-package `scripts/product-manifest.js` | Product-template generation from consumer package metadata | Azure tools, legal resources, and digest enrichment |
+| Source-package `scripts/bundle-plugins.ts` and package-owned tests | Safe plugin workspace bundler with package-identity validation, collision rejection, and clean output | Plugin list and permissions in root `package.json` |
+| Source-package `scripts/update-source.ts` and `scripts/compose-patches.ts` | Commit-pinned source updates and deterministic npm patch composition | Exact source pin and root-owned patch series |
+| Source-package `scripts/product-manifest.ts` and `scripts/generate-product-manifest.ts` | Product-manifest generation, resource mapping, and digest enrichment from consumer package metadata | Product values and resource/tool declarations in root `package.json` |
 | Source-package `app/scripts/setup-plugins.js` and `container/fetch-plugins.sh` | One checksum-verifying manifest implementation for desktop and container builds | Product-selected archives/defaults |
 | `build/setup-external-tools.ts` | Platform-aware external-resource staging API | Azure CLI/kubelogin declarations |
 | Generic parts of `build/download-az-cli.ts` | Required-digest downloader, redirect policy, safe archive extraction, cache, and platform selector | Azure CLI/Python installation and extensions |
-| Source-package `scripts/smoke-app.js` and `build/verify-bundled-tools.ts` | Electron output-layout resolver and manifest-driven resource/executable verifier | Azure-specific invocation probes |
+| Source-package `scripts/smoke-app.ts` and `build/verify-bundled-tools.ts` | Electron output-layout resolver and manifest-driven resource/executable verifier | Azure-specific invocation probes |
 | `Localize/translation-manager.mjs` | Multi-source locale overlay/merge command in the plugin toolchain | OneLoc conventions and AKS locked terms |
 | Root `build:*` scripts and downstream builder config | `assemble-desktop --product --target --output` over an exported base builder config | Thin npm aliases, signing inputs, product manifest |
 | Downstream `app/scripts/verify-build-*` changes | Cross-platform `verify-distribution` driven by artifact metadata | AKS release policy |

@@ -1,11 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-function createProductTemplate(project) {
+function createProductTemplate(project: any) {
   if (!project?.headlamp?.product || !Array.isArray(project.headlamp.plugins)) {
     throw new Error('package.json must declare headlamp.product and headlamp.plugins');
   }
-  const { plugins, ...template } = structuredClone(project.headlamp);
+  const { plugins, build: _build, ...template } = structuredClone(project.headlamp);
   template.product.version = project.version;
   template.plugins = plugins.map(({ source: _source, ...plugin }) => plugin);
   return template;
