@@ -4,7 +4,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { composePatchSeries } = require('./compose-patches.ts');
+const {
+  composePatchSeries,
+  materializeHeadlampPatch,
+} = require('./compose-patches.ts');
 
 const PACKAGE_NAME: string = '@headlamp-k8s/headlamp-source';
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
@@ -197,6 +200,7 @@ function prepareHeadlampSource(options: any = {}) {
     );
   }
   if (sourceIsMaterialized(packageDir, config.commit)) {
+    materializeHeadlampPatch(rootDir);
     console.log(`Headlamp source ${config.commit} is already materialized`);
     return { packageDir, prepared: false };
   }
@@ -211,6 +215,7 @@ function prepareHeadlampSource(options: any = {}) {
       fs.rmSync(checkout, { recursive: true, force: true });
     }
   }
+  materializeHeadlampPatch(rootDir);
   console.log(`Materialized Headlamp source ${config.commit}`);
   return { packageDir, prepared: true };
 }
@@ -269,15 +274,6 @@ function updateHeadlampSource(options) {
   const newPatchPath = `patches/headlamp-source@${version}.patch`;
   const absoluteOldPatch = path.join(rootDir, oldPatchPath);
   const absoluteNewPatch = path.join(rootDir, newPatchPath);
-  if (oldPatchPath !== newPatchPath) {
-    if (
-      fs.existsSync(absoluteNewPatch) &&
-      !fs.readFileSync(absoluteNewPatch).equals(fs.readFileSync(absoluteOldPatch))
-    ) {
-      throw new Error(`Refusing to overwrite a different patch: ${newPatchPath}`);
-    }
-    fs.copyFileSync(absoluteOldPatch, absoluteNewPatch);
-  }
 
   materializeHeadlampSource(packageDir, sourceDir, config.commit);
 
@@ -301,6 +297,9 @@ function updateHeadlampSource(options) {
       path: newPatchPath,
     },
   };
+  if (oldPatchPath !== newPatchPath) {
+    fs.rmSync(absoluteOldPatch, { force: true });
+  }
 
   writeJson(projectPath, project);
   writeJson(lockPath, lock);

@@ -16,12 +16,11 @@ tag `v0.44.0` and commit
 `patches/series` are the root-owned, independently reviewable source of truth;
 each filename starts with its four-digit series lane, and related standalone
 upstream candidates share that prefix. Mailbox patches preserve the author of
-the audited commit they replace. The generated `headlamp-source@*.patch` is not
-the source of truth. npm supports
-one patch file per package version, so `npm run headlamp:patches` uses Git to
-apply the series in order and emit the aggregate declared by `patchedDependencies`. npm
-verifies and applies the aggregate; there is no submodule or custom patch
-applicator.
+the audited commit they replace. npm supports one patch file per package
+version, so setup uses Git to apply the series in order and materialize the
+ignored aggregate declared by `patchedDependencies`. npm verifies and applies
+that generated input; there is no committed aggregate, submodule, or custom
+patch applicator.
 The same tag, branch, repository, and full commit are the single source of truth
 in `package.json#headlampSource`.
 
@@ -70,9 +69,9 @@ package version from the base tag and SHA, and updates the package metadata,
 exact dependency, local lockfile resolution, patch selector, and patch
 integrity. It does not apply the patches; `npm ci` is the authoritative
 npm-native patch check. The generated source directory and commit marker remain
-ignored; stage only the package metadata, dependency, lockfile, and renamed
-aggregate patch. Update `baseTag` in `package.json#headlampSource` when the
-upstream release baseline changes.
+ignored, as does the generated npm aggregate; stage only the package metadata,
+dependency, lockfile, and numbered patch changes. Update `baseTag` in
+`package.json#headlampSource` when the upstream release baseline changes.
 
 The
 [`Headlamp main compatibility`](.github/workflows/headlamp-main-compatibility.yml)

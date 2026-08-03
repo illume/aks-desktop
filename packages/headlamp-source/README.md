@@ -2,7 +2,8 @@
 
 This package skeleton materializes the complete Headlamp source tree at the
 commit recorded in `headlampSource`. `source:prepare` copies the verified
-upstream commit into the ignored `source/` directory; its other npm scripts
+upstream commit into the ignored `source/` directory and materializes npm's
+ignored aggregate from the consumer's numbered patches; its other npm scripts
 build the web/backend distribution, desktop applications, and containers.
 The package also generates product manifests, stages shipped plugins, and
 smoke-tests packaged applications from consumer configuration.
@@ -27,7 +28,7 @@ Commands read the consumer repository from npm's `INIT_CWD` and its
 
 | npm command | Implementation | Purpose |
 | --- | --- | --- |
-| `source:prepare [-- --source <checkout>]` | `scripts/update-source.ts` | Materialize the configured, pinned Headlamp commit in the ignored `source/` directory. An existing checkout is optional. |
+| `source:prepare [-- --source <checkout>]` | `scripts/update-source.ts` | Materialize the configured, pinned Headlamp commit and npm's ignored aggregate. An existing checkout is optional. |
 | `source:update -- --source <checkout> [--commit <sha>] [--base-tag <tag>]` | `scripts/update-source.ts` | Update the source pin, package metadata, generated npm patch, and lockfile from a verified checkout. |
 | `patches:compose [-- --check]` | `scripts/compose-patches.ts` | Compose the ordered root `patches/series` into npm's generated package patch and update, or verify, its lockfile integrity. |
 | `bundle:plugins` | `scripts/bundle-plugins.ts` | Validate, build, and stage plugins declared by the consumer under `headlamp.plugins`. |

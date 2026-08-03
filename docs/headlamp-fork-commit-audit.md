@@ -38,7 +38,7 @@ Every audited commit has a primary disposition:
 | AKS-owned work | 7 rows: 3 configuration changes and 4 plugin changes |
 | No independent submission | 47 rows: 36 folds and 11 removals |
 | Patch artifacts | 69 numbered ordered entries; 13 superseded upstream candidates retain their lane number for independent submission |
-| Executable migration | The 66 validated Headlamp changes and 3 source-package integration changes form the root-owned [ordered series](../patches/series); npm applies its [generated aggregate](../patches/headlamp-source@0.44.0-main.99a230be.patch) and locks package and patch integrity |
+| Executable migration | The 66 validated Headlamp changes and 3 source-package integration changes form the root-owned [ordered series](../patches/series); setup materializes npm's ignored aggregate, and npm locks package and patch integrity |
 | Unresolved classifications | None |
 | Open product decisions | Row 43: confirm the supported AKS Desktop architectures before declaring package targets |
 

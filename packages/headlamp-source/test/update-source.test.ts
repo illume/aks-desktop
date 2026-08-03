@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -11,6 +12,7 @@ const {
   updateHeadlampSource,
   validateTrackedSourcePath,
 } = require('../scripts/update-source.ts');
+const { composePatchSeries } = require('../scripts/compose-patches.ts');
 
 const tempDirs = [];
 
@@ -58,10 +60,21 @@ function createProject(commit) {
   tempDirs.push(rootDir);
   const packageDir = path.join(rootDir, 'packages', 'headlamp-source');
   fs.mkdirSync(path.join(packageDir, 'source'), { recursive: true });
+  for (const directory of ['app', 'backend', 'frontend']) {
+    fs.mkdirSync(path.join(packageDir, 'source', directory));
+    fs.writeFileSync(path.join(packageDir, 'source', directory, '.keep'), '');
+  }
+  for (const [file, contents] of [
+    ['package.json', '{"name":"headlamp-root","private":true}\n'],
+    ['LICENSE', 'license\n'],
+    ['README.md', 'readme\n'],
+    ['Dockerfile', 'FROM scratch\n'],
+  ]) {
+    fs.writeFileSync(path.join(packageDir, 'source', file), contents);
+  }
   fs.mkdirSync(path.join(rootDir, 'patches'));
   const version = `0.44.0-main.${commit.slice(0, 8)}`;
   const patchPath = `patches/headlamp-source@${version}.patch`;
-  fs.writeFileSync(path.join(rootDir, patchPath), 'patch\n');
   fs.writeFileSync(path.join(rootDir, 'patches', 'series'), '0001 source 0001-readme.patch\n');
   fs.writeFileSync(
     path.join(rootDir, 'patches', '0001-readme.patch'),
@@ -133,14 +146,21 @@ function createProject(commit) {
             version: '1.0.0',
             devDependencies: { '@headlamp-k8s/headlamp-source': version },
           },
-          'node_modules/@headlamp-k8s/headlamp-source': {},
+          'node_modules/@headlamp-k8s/headlamp-source': {
+            patched: {
+              path: patchPath,
+              integrity: `sha512-${createHash('sha512')
+                .update(composePatchSeries(rootDir, packageDir))
+                .digest('base64')}`,
+            },
+          },
         },
       },
       null,
       2
     )}\n`
   );
-  return { packageDir, rootDir };
+  return { packageDir, patchPath, rootDir };
 }
 
 test('updates an unpacked source package from a clean exact commit', () => {
@@ -196,7 +216,7 @@ test('updates an unpacked source package from a clean exact commit', () => {
 
 test('materializes the configured commit without tracking upstream source', () => {
   const { commit, sourceDir } = createSourceCheckout();
-  const { packageDir, rootDir } = createProject(commit);
+  const { packageDir, patchPath, rootDir } = createProject(commit);
   const projectPath = path.join(rootDir, 'package.json');
   const packagePath = path.join(packageDir, 'package.json');
   const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
@@ -216,10 +236,37 @@ test('materializes the configured commit without tracking upstream source', () =
     fs.readFileSync(path.join(packageDir, '.source-commit'), 'utf8').trim(),
     commit
   );
+  assert.equal(fs.existsSync(path.join(rootDir, patchPath)), true);
   assert.deepEqual(prepareHeadlampSource({ rootDir, packageDir }), {
     packageDir,
     prepared: false,
   });
+});
+
+test('rejects a generated aggregate that differs from the lockfile', () => {
+  const { commit, sourceDir } = createSourceCheckout();
+  const { packageDir, patchPath, rootDir } = createProject(commit);
+  const projectPath = path.join(rootDir, 'package.json');
+  const packagePath = path.join(packageDir, 'package.json');
+  const lockPath = path.join(rootDir, 'package-lock.json');
+  const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+  const packageManifest = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  project.headlampSource.repository = sourceDir;
+  packageManifest.repository.url = sourceDir;
+  lock.packages[
+    'node_modules/@headlamp-k8s/headlamp-source'
+  ].patched.integrity = 'sha512-invalid';
+  fs.writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`);
+  fs.writeFileSync(packagePath, `${JSON.stringify(packageManifest, null, 2)}\n`);
+  fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+  fs.rmSync(path.join(packageDir, 'source'), { recursive: true });
+
+  assert.throws(
+    () => prepareHeadlampSource({ rootDir, packageDir }),
+    /patch lock integrity/
+  );
+  assert.equal(fs.existsSync(path.join(rootDir, patchPath)), false);
 });
 
 test('replaces an invalid generated source marker', () => {

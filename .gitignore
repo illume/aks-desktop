@@ -461,3 +461,6 @@ FodyWeavers.xsd
 !packages/headlamp-source/**
 packages/headlamp-source/.source-*
 packages/headlamp-source/source/
+
+# npm accepts one patch per package, so setup generates this from patches/series.
+patches/headlamp-source@*.patch

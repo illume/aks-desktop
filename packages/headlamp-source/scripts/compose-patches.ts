@@ -134,7 +134,7 @@ function configuredPatch(rootDir) {
   return { patchPath, selector };
 }
 
-function updateHeadlampPatch(rootDir = process.env.INIT_CWD || process.cwd(), check = false) {
+function patchState(rootDir) {
   const { patchPath } = configuredPatch(rootDir);
   const aggregate = composePatchSeries(rootDir);
   const absolutePatch = path.join(rootDir, patchPath);
@@ -146,7 +146,21 @@ function updateHeadlampPatch(rootDir = process.env.INIT_CWD || process.cwd(), ch
   if (!lockEntry?.patched) {
     throw new Error(`${PACKAGE_NAME} is not patched in package-lock.json`);
   }
+  return { absolutePatch, aggregate, integrity, lock, lockEntry, lockPath, patchPath };
+}
 
+function materializeHeadlampPatch(rootDir = process.env.INIT_CWD || process.cwd()) {
+  const { absolutePatch, aggregate, integrity, lockEntry, patchPath } = patchState(rootDir);
+  if (lockEntry.patched.path !== patchPath || lockEntry.patched.integrity !== integrity) {
+    throw new Error('Run npm run headlamp:patches to update the patch lock integrity');
+  }
+  fs.writeFileSync(absolutePatch, aggregate);
+  console.log(`Generated ${patchPath}`);
+}
+
+function updateHeadlampPatch(rootDir = process.env.INIT_CWD || process.cwd(), check = false) {
+  const { absolutePatch, aggregate, integrity, lock, lockEntry, lockPath, patchPath } =
+    patchState(rootDir);
   if (check) {
     if (!fs.existsSync(absolutePatch) || !fs.readFileSync(absolutePatch).equals(aggregate)) {
       throw new Error(`Run npm run headlamp:patches to update ${patchPath}`);
@@ -172,6 +186,7 @@ if (require.main === module) {
 
 module.exports = {
   composePatchSeries,
+  materializeHeadlampPatch,
   parsePatchSeries,
   updateHeadlampPatch,
 };
