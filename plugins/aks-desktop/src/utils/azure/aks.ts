@@ -20,6 +20,8 @@ export interface AKSCluster {
   isAzureRBACEnabled: boolean;
 }
 
+let registrationQueue = Promise.resolve();
+
 /**
  * Get list of Azure subscriptions
  */
@@ -101,6 +103,16 @@ export async function registerAKSCluster(
   success: boolean;
   message: string;
 }> {
+  // Tenant context is selected by subscription ID; the desktop API's sixth argument is cluster type.
+  void tenantId;
+
+  const previousRegistration = registrationQueue;
+  let releaseRegistration!: () => void;
+  registrationQueue = new Promise(resolve => {
+    releaseRegistration = resolve;
+  });
+  await previousRegistration;
+
   try {
     console.debug(
       '[AKS] Registering cluster:',
@@ -125,7 +137,7 @@ export async function registerAKSCluster(
       clusterName,
       false, // isAzureRBACEnabled
       managedNamespace,
-      tenantId
+      'aks'
     );
 
     console.debug('[AKS] Registration result:', result);
@@ -136,5 +148,7 @@ export async function registerAKSCluster(
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error',
     };
+  } finally {
+    releaseRegistration();
   }
 }
