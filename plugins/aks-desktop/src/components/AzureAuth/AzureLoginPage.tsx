@@ -121,11 +121,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         return;
       }
 
-      setStatusMessage(
-        t(
-          'Please complete the authentication in your browser. This window will automatically redirect once login is complete.'
-        )
-      );
+      setStatusMessage(`${t('Verifying Azure login')}...`);
 
       // Check immediately, then poll for login completion
       let pollCount = 0;

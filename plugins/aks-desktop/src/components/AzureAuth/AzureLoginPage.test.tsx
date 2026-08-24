@@ -98,6 +98,7 @@ describe('AzureLoginPage telemetry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
 
     expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'started');
+    expect(screen.getByText('Initiating Azure login...')).toBeTruthy();
     expect(mocks.trackAksFeature.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.initiateLogin.mock.invocationCallOrder[0]
     );
@@ -202,18 +203,28 @@ describe('AzureLoginPage telemetry', () => {
   });
 
   test('checks for login completion and redirects without waiting for the polling interval', async () => {
+    const statusDeferred = createDeferred<{
+      isLoggedIn: boolean;
+      username: string;
+      tenantId: string;
+      subscriptionId: string;
+    }>();
     mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
     await renderLoggedOutPage();
-    mocks.getLoginStatus.mockResolvedValueOnce({
-      isLoggedIn: true,
-      username: 'sensitive-user@contoso.com',
-      tenantId: 'sensitive-tenant',
-      subscriptionId: 'sensitive-subscription',
-    });
+    mocks.getLoginStatus.mockReturnValueOnce(statusDeferred.promise);
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
-    await act(async () => {});
+    expect(await screen.findByText('Verifying Azure login...')).toBeTruthy();
+    await act(async () => {
+      statusDeferred.resolve({
+        isLoggedIn: true,
+        username: 'sensitive-user@contoso.com',
+        tenantId: 'sensitive-tenant',
+        subscriptionId: 'sensitive-subscription',
+      });
+      await statusDeferred.promise;
+    });
 
     expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'succeeded');
     expect(mocks.getLoginStatus).toHaveBeenCalledTimes(2);
@@ -243,6 +254,9 @@ describe('AzureLoginPage telemetry', () => {
     expect(mocks.push).not.toHaveBeenCalled();
     expect(setIntervalSpy).toHaveBeenCalledTimes(1);
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), LOGIN_POLL_INTERVAL_MS);
+    expect(
+      screen.getByText('Waiting for login completion... (5.0 minutes remaining)')
+    ).toBeTruthy();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
