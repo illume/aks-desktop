@@ -97,15 +97,11 @@ export async function registerAKSCluster(
   subscriptionId: string,
   resourceGroup: string,
   clusterName: string,
-  managedNamespace?: string,
-  tenantId?: string
+  managedNamespace?: string
 ): Promise<{
   success: boolean;
   message: string;
 }> {
-  // Tenant context is selected by subscription ID; the desktop API's sixth argument is cluster type.
-  void tenantId;
-
   const previousRegistration = registrationQueue;
   let releaseRegistration!: () => void;
   registrationQueue = new Promise(resolve => {

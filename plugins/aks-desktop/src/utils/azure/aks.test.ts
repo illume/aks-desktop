@@ -21,10 +21,10 @@ describe('registerAKSCluster', () => {
     vi.restoreAllMocks();
   });
 
-  test('passes the AKS cluster type instead of the tenant ID', async () => {
+  test('passes the AKS cluster type to the desktop API', async () => {
     desktopRegisterAKSCluster.mockResolvedValue(successResult);
 
-    await registerAKSCluster('sub-1', 'rg-1', 'cluster-1', undefined, 'tenant-1');
+    await registerAKSCluster('sub-1', 'rg-1', 'cluster-1');
 
     expect(desktopRegisterAKSCluster).toHaveBeenCalledWith(
       'sub-1',
