@@ -36,26 +36,36 @@ describe('registerAKSCluster', () => {
     );
   });
 
-  test('serializes concurrent registrations', async () => {
-    let resolveFirst!: (result: typeof successResult) => void;
-    desktopRegisterAKSCluster
-      .mockImplementationOnce(
-        () =>
-          new Promise(resolve => {
-            resolveFirst = resolve;
-          })
-      )
-      .mockResolvedValueOnce(successResult);
+  test('prevents concurrent registrations from losing a kubeconfig update', async () => {
+    let registeredClusters: string[] = [];
+    let markFirstStarted!: () => void;
+    let releaseFirst!: () => void;
+    const firstStarted = new Promise<void>(resolve => {
+      markFirstStarted = resolve;
+    });
+    const firstMayFinish = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    desktopRegisterAKSCluster.mockImplementation(
+      async (_subscriptionId: string, _resourceGroup: string, clusterName: string) => {
+        const existingClusters = [...registeredClusters];
+        if (clusterName === 'cluster-1') {
+          markFirstStarted();
+          await firstMayFinish;
+        }
+        registeredClusters = [...existingClusters, clusterName];
+        return successResult;
+      }
+    );
 
     const first = registerAKSCluster('sub-1', 'rg-1', 'cluster-1');
+    await firstStarted;
     const second = registerAKSCluster('sub-2', 'rg-2', 'cluster-2');
 
-    await vi.waitFor(() => expect(desktopRegisterAKSCluster).toHaveBeenCalledTimes(1));
-    resolveFirst(successResult);
+    releaseFirst();
 
-    await expect(first).resolves.toEqual(successResult);
-    await expect(second).resolves.toEqual(successResult);
-    expect(desktopRegisterAKSCluster).toHaveBeenCalledTimes(2);
+    await Promise.all([first, second]);
+    expect(registeredClusters).toEqual(['cluster-1', 'cluster-2']);
   });
 
   test('continues the queue after a desktop registration rejects', async () => {
