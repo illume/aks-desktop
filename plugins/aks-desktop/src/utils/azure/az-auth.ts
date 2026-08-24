@@ -5,11 +5,23 @@ import {
   debugLog,
   getErrorMessage,
   isAzCliLoggedIn,
+  isAzError,
   isCliNotFoundError,
   needsRelogin,
   runCommandAsync,
 } from './az-cli-core';
 import { getAzCommand, getInstallationInstructions } from './az-cli-path';
+
+function isLoginCommandFailure(stderr: string): boolean {
+  const error = stderr.trim();
+  return (
+    isAzError(error) ||
+    /^Command exited with code [1-9]\d*$/.test(error) ||
+    error.startsWith('Command execution error:') ||
+    error.startsWith('Failed to execute command:') ||
+    error === 'pluginRunCommand is not available.'
+  );
+}
 
 export async function getLoginStatus(): Promise<{
   isLoggedIn: boolean;
@@ -100,6 +112,13 @@ export async function initiateLogin(): Promise<{ success: boolean; message: stri
       return {
         success: false,
         message: `Azure CLI not found. Please install Azure CLI first.\n\n${instructions}`,
+      };
+    }
+
+    if (!stdout && stderr && isLoginCommandFailure(stderr)) {
+      return {
+        success: false,
+        message: `Failed to initiate login: ${stderr}`,
       };
     }
 

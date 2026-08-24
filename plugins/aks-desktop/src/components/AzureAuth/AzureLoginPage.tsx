@@ -47,7 +47,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showRetry, setShowRetry] = useState(false);
-  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginAttemptOutcomeRef = useRef<LoginAttemptOutcome>('idle');
@@ -59,6 +59,13 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
 
   const isActiveAttempt = (attemptGeneration: number) =>
     isCurrentAttempt(attemptGeneration) && loginAttemptOutcomeRef.current === 'active';
+
+  const clearPollingTimeout = () => {
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+  };
 
   const clearLoginTimeout = () => {
     if (loginTimeoutRef.current) {
@@ -78,10 +85,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     if (!isActiveAttempt(attemptGeneration)) {
       return;
     }
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
+    clearPollingTimeout();
     clearLoginRetryTimeout();
     clearLoginTimeout();
     loginAttemptOutcomeRef.current = 'failed';
@@ -122,10 +126,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     return () => {
       mountedRef.current = false;
       loginAttemptGenerationRef.current++;
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
+      clearPollingTimeout();
       clearLoginRetryTimeout();
       clearLoginTimeout();
     };
@@ -206,10 +207,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
           }
 
           if (status.isLoggedIn) {
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-            }
-            pollingIntervalRef.current = null;
+            clearPollingTimeout();
             clearLoginRetryTimeout();
             clearLoginTimeout();
             loginAttemptOutcomeRef.current = 'succeeded';
@@ -239,9 +237,19 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         }
       };
 
+      const scheduleNextPoll = () => {
+        pollingTimeoutRef.current = setTimeout(async () => {
+          pollingTimeoutRef.current = null;
+          await pollLoginStatus();
+          if (isActiveAttempt(attemptGeneration)) {
+            scheduleNextPoll();
+          }
+        }, LOGIN_POLL_INTERVAL_MS);
+      };
+
       await pollLoginStatus(false);
       if (isActiveAttempt(attemptGeneration)) {
-        pollingIntervalRef.current = setInterval(pollLoginStatus, LOGIN_POLL_INTERVAL_MS);
+        scheduleNextPoll();
       }
     } catch (error) {
       if (!isActiveAttempt(attemptGeneration)) {
@@ -268,10 +276,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     loginAttemptGenerationRef.current++;
     loginAttemptOutcomeRef.current = 'cancelled';
     trackAksFeature('aksd.auth-login', 'cancelled');
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
+    clearPollingTimeout();
     clearLoginRetryTimeout();
     clearLoginTimeout();
     setLoading(false);

@@ -252,7 +252,6 @@ describe('AzureLoginPage telemetry', () => {
     mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
     await renderLoggedOutPage();
     mocks.getLoginStatus.mockReturnValueOnce(statusDeferred.promise);
-    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     expect(await screen.findByText('Checking authentication status')).toBeTruthy();
@@ -268,7 +267,7 @@ describe('AzureLoginPage telemetry', () => {
 
     expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'succeeded');
     expect(mocks.getLoginStatus).toHaveBeenCalledTimes(2);
-    expect(setIntervalSpy).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
     expect(mocks.push).toHaveBeenCalledWith('/azure/profile');
     const successCall = mocks.trackAksFeature.mock.calls.findIndex(
       call => call[0] === 'aksd.auth-login' && call[1] === 'succeeded'
@@ -285,15 +284,14 @@ describe('AzureLoginPage telemetry', () => {
     mocks.getLoginStatus
       .mockResolvedValueOnce({ isLoggedIn: false })
       .mockResolvedValueOnce({ isLoggedIn: true });
-    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     await act(async () => {});
 
     expect(mocks.getLoginStatus).toHaveBeenCalledTimes(2);
     expect(mocks.push).not.toHaveBeenCalled();
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
-    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), LOGIN_POLL_INTERVAL_MS);
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), LOGIN_POLL_INTERVAL_MS);
     expect(
       screen.getByText('Waiting for login completion... (5.0 minutes remaining)')
     ).toBeTruthy();
@@ -302,6 +300,37 @@ describe('AzureLoginPage telemetry', () => {
       await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
     });
     expect(mocks.getLoginStatus).toHaveBeenCalledTimes(3);
+    expect(mocks.push).toHaveBeenCalledWith('/azure/profile');
+  });
+
+  test('waits for a slow status check before scheduling the next poll', async () => {
+    const statusDeferred = createDeferred<{ isLoggedIn: boolean }>();
+    mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
+    await renderLoggedOutPage();
+    mocks.getLoginStatus
+      .mockResolvedValueOnce({ isLoggedIn: false })
+      .mockReturnValueOnce(statusDeferred.promise)
+      .mockResolvedValueOnce({ isLoggedIn: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
+    await act(async () => {});
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
+    });
+    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS * 3);
+    });
+    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      statusDeferred.resolve({ isLoggedIn: false });
+      await statusDeferred.promise;
+      await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
+    });
+
+    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(4);
     expect(mocks.push).toHaveBeenCalledWith('/azure/profile');
   });
 
@@ -450,7 +479,6 @@ describe('AzureLoginPage telemetry', () => {
     mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
     await renderLoggedOutPage();
     mocks.getLoginStatus.mockReturnValueOnce(statusDeferred.promise);
-    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     expect(await screen.findByText('Checking authentication status')).toBeTruthy();
@@ -460,7 +488,6 @@ describe('AzureLoginPage telemetry', () => {
 
     expect(await screen.findByText('Login timeout. Please try again.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign in with Azure' })).toBeTruthy();
-    expect(setIntervalSpy).not.toHaveBeenCalled();
 
     await act(async () => {
       statusDeferred.resolve({ isLoggedIn: true });
@@ -506,7 +533,9 @@ describe('AzureLoginPage telemetry', () => {
   test('does not emit terminal telemetry for a transient polling error', async () => {
     mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
     await renderLoggedOutPage();
-    mocks.getLoginStatus.mockRejectedValueOnce(new Error('transient sensitive error'));
+    mocks.getLoginStatus
+      .mockRejectedValueOnce(new Error('transient sensitive error'))
+      .mockResolvedValueOnce({ isLoggedIn: true });
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     await act(async () => {});
@@ -514,10 +543,13 @@ describe('AzureLoginPage telemetry', () => {
       await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
     });
 
-    expect(mocks.trackAksFeature).toHaveBeenCalledTimes(1);
-    expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'started');
+    expect(mocks.trackAksFeature.mock.calls).toEqual([
+      ['aksd.auth-login', 'started'],
+      ['aksd.auth-login', 'succeeded'],
+    ]);
     expect(mocks.trackError).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(3);
+    expect(mocks.push).toHaveBeenCalledWith('/azure/profile');
   });
 
   test('emits cancelled only when cancelling an active login attempt', async () => {
