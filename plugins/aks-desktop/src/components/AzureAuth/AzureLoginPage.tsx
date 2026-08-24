@@ -136,27 +136,29 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         )
       );
 
-      // Start polling for login completion
+      // Check immediately, then poll for login completion
       let pollCount = 0;
       const maxPolls = Math.ceil(LOGIN_TIMEOUT_MS / LOGIN_POLL_INTERVAL_MS);
 
-      const interval = setInterval(async () => {
+      const pollLoginStatus = async (countTowardTimeout = true) => {
         if (!isActiveAttempt(attemptGeneration)) {
-          clearInterval(interval);
           return;
         }
-        pollCount++;
+        if (countTowardTimeout) {
+          pollCount++;
+        }
 
         try {
           const status = await getLoginStatus();
 
           if (!isActiveAttempt(attemptGeneration)) {
-            clearInterval(interval);
             return;
           }
 
           if (status.isLoggedIn) {
-            clearInterval(interval);
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+            }
             pollingIntervalRef.current = null;
             loginAttemptOutcomeRef.current = 'succeeded';
             trackAksFeature('aksd.auth-login', 'succeeded');
@@ -176,7 +178,9 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
               }
             }, LOGIN_REDIRECT_DELAY_MS);
           } else if (pollCount >= maxPolls) {
-            clearInterval(interval);
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+            }
             pollingIntervalRef.current = null;
             loginAttemptOutcomeRef.current = 'failed';
             trackLoginFailure('TimeoutError');
@@ -192,14 +196,16 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
           }
         } catch (error) {
           if (!isActiveAttempt(attemptGeneration)) {
-            clearInterval(interval);
             return;
           }
           console.error('Error polling login status:', error);
         }
-      }, LOGIN_POLL_INTERVAL_MS);
+      };
 
-      pollingIntervalRef.current = interval;
+      await pollLoginStatus(false);
+      if (isActiveAttempt(attemptGeneration)) {
+        pollingIntervalRef.current = setInterval(pollLoginStatus, LOGIN_POLL_INTERVAL_MS);
+      }
     } catch (error) {
       if (!isActiveAttempt(attemptGeneration)) {
         return;

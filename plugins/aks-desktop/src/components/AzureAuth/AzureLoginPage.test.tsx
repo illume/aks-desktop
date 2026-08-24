@@ -205,7 +205,7 @@ describe('AzureLoginPage telemetry', () => {
     expect(mocks.trackError).not.toHaveBeenCalled();
   });
 
-  test('emits succeeded before navigating after polling confirms login', async () => {
+  test('checks for login completion immediately before starting the polling interval', async () => {
     mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
     await renderLoggedOutPage();
     mocks.getLoginStatus.mockResolvedValueOnce({
@@ -217,11 +217,9 @@ describe('AzureLoginPage telemetry', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     await act(async () => {});
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
-    });
 
     expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'succeeded');
+    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(2);
     expect(mocks.push).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -245,9 +243,6 @@ describe('AzureLoginPage telemetry', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     await act(async () => {});
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
-    });
 
     expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'succeeded');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -297,9 +292,6 @@ describe('AzureLoginPage telemetry', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     await act(async () => {});
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
-    });
     expect(mocks.trackAksFeature.mock.calls).toEqual([
       ['aksd.auth-login', 'started'],
       ['aksd.auth-login', 'succeeded'],
