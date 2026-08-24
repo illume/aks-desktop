@@ -69,6 +69,30 @@ describe('useRegisterCluster', () => {
     });
   });
 
+  test('handleRegister ignores a second call while registration is in flight', async () => {
+    let resolveRegister!: (value: { success: boolean; message: string }) => void;
+    mockRegisterAKSCluster.mockReturnValue(
+      new Promise(resolve => {
+        resolveRegister = resolve;
+      })
+    );
+    const { result } = renderHook(() => useRegisterCluster('aks-prod', 'rg-prod', 'sub-123'));
+
+    let firstCall!: Promise<void>;
+    let secondCall!: Promise<void>;
+    act(() => {
+      firstCall = result.current.handleRegister();
+      secondCall = result.current.handleRegister();
+    });
+
+    expect(mockRegisterAKSCluster).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRegister({ success: true, message: 'ok' });
+      await Promise.all([firstCall, secondCall]);
+    });
+  });
+
   test('handleRegister sets success message on result.success=true', async () => {
     mockRegisterAKSCluster.mockResolvedValue({ success: true, message: 'ok' });
     const { result } = renderHook(() => useRegisterCluster('aks-prod', 'rg-prod', 'sub-123'));

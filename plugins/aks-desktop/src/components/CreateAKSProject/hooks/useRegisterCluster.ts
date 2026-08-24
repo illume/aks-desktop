@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { registerAKSCluster } from '../../../utils/azure/aks';
 
 /** Set to `true` locally to enable verbose debug logging. Never enable in production. */
@@ -55,11 +55,13 @@ export function useRegisterCluster(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [success, setSuccess] = useState<string | undefined>(undefined);
+  const registrationInFlightRef = useRef(false);
 
   const handleRegister = async () => {
-    if (!cluster || !resourceGroup || !subscription) {
+    if (registrationInFlightRef.current || !cluster || !resourceGroup || !subscription) {
       return;
     }
+    registrationInFlightRef.current = true;
 
     setLoading(true);
     setError(undefined);
@@ -85,6 +87,7 @@ export function useRegisterCluster(
         })
       );
     } finally {
+      registrationInFlightRef.current = false;
       setLoading(false);
     }
   };
