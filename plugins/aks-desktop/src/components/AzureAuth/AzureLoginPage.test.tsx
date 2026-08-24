@@ -381,6 +381,7 @@ describe('AzureLoginPage telemetry', () => {
     const deferred = createDeferred<{ success: boolean; message: string }>();
     mocks.initiateLogin.mockReturnValue(deferred.promise);
     await renderLoggedOutPage();
+    mocks.getLoginStatus.mockClear();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
     await act(async () => {
@@ -400,7 +401,7 @@ describe('AzureLoginPage telemetry', () => {
       deferred.resolve({ success: true, message: 'late success' });
       await deferred.promise;
     });
-    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(1);
+    expect(mocks.getLoginStatus).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
