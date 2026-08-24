@@ -43,6 +43,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loginTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginAttemptOutcomeRef = useRef<LoginAttemptOutcome>('idle');
   const loginAttemptGenerationRef = useRef(0);
   const mountedRef = useRef(true);
@@ -52,6 +53,36 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
 
   const isActiveAttempt = (attemptGeneration: number) =>
     isCurrentAttempt(attemptGeneration) && loginAttemptOutcomeRef.current === 'active';
+
+  const clearLoginTimeout = () => {
+    if (loginTimeoutRef.current) {
+      clearTimeout(loginTimeoutRef.current);
+      loginTimeoutRef.current = null;
+    }
+  };
+
+  const handleLoginTimeout = (attemptGeneration: number) => {
+    if (!isActiveAttempt(attemptGeneration)) {
+      return;
+    }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    clearLoginTimeout();
+    loginAttemptOutcomeRef.current = 'failed';
+    trackLoginFailure('TimeoutError');
+    setErrorMessage(t('Login timeout. Please try again.'));
+    setLoading(false);
+  };
+
+  const startLoginTimeout = (attemptGeneration: number) => {
+    clearLoginTimeout();
+    loginTimeoutRef.current = setTimeout(
+      () => handleLoginTimeout(attemptGeneration),
+      LOGIN_TIMEOUT_MS
+    );
+  };
 
   // Get redirect target from URL query parameter or prop, fallback to profile page
   const getRedirectTarget = () => {
@@ -71,6 +102,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
+      clearLoginTimeout();
     };
   }, []);
 
@@ -105,6 +137,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     setLoading(true);
     setErrorMessage('');
     setStatusMessage(`${t('Initiating Azure login')}...`);
+    startLoginTimeout(attemptGeneration);
 
     try {
       const result = await initiateLogin();
@@ -114,6 +147,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       }
 
       if (!result.success) {
+        clearLoginTimeout();
         loginAttemptOutcomeRef.current = 'failed';
         trackLoginFailure('UnknownError');
         setErrorMessage(result.message);
@@ -121,6 +155,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         return;
       }
 
+      startLoginTimeout(attemptGeneration);
       setStatusMessage(t('Checking authentication status'));
 
       // Check immediately, then poll for login completion
@@ -147,6 +182,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
               clearInterval(pollingIntervalRef.current);
             }
             pollingIntervalRef.current = null;
+            clearLoginTimeout();
             loginAttemptOutcomeRef.current = 'succeeded';
             trackAksFeature('aksd.auth-login', 'succeeded');
             setStatusMessage(`${t('Login successful! Redirecting')}...`);
@@ -157,14 +193,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
             const target = getRedirectTarget();
             history.push(target);
           } else if (pollCount >= maxPolls) {
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-            }
-            pollingIntervalRef.current = null;
-            loginAttemptOutcomeRef.current = 'failed';
-            trackLoginFailure('TimeoutError');
-            setErrorMessage(t('Login timeout. Please try again.'));
-            setLoading(false);
+            handleLoginTimeout(attemptGeneration);
           } else {
             const remaining = ((maxPolls - pollCount) * LOGIN_POLL_INTERVAL_MS) / 60_000;
             setStatusMessage(
@@ -190,6 +219,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         return;
       }
       console.error('Error initiating login:', error);
+      clearLoginTimeout();
       loginAttemptOutcomeRef.current = 'failed';
       trackLoginFailure('UnknownError');
       setErrorMessage(
@@ -212,6 +242,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
+    clearLoginTimeout();
     setLoading(false);
     setStatusMessage('');
     setErrorMessage('');

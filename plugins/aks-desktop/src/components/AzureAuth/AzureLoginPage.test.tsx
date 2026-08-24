@@ -377,6 +377,58 @@ describe('AzureLoginPage telemetry', () => {
     ).not.toContain('sensitive thrown exception');
   });
 
+  test('times out when login initiation hangs', async () => {
+    const deferred = createDeferred<{ success: boolean; message: string }>();
+    mocks.initiateLogin.mockReturnValue(deferred.promise);
+    await renderLoggedOutPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_TIMEOUT_MS);
+    });
+
+    expect(await screen.findByText('Login timeout. Please try again.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign in with Azure' })).toBeTruthy();
+    expect(mocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-login', 'failed');
+    expect(mocks.trackError).toHaveBeenCalledWith({
+      area: 'auth-login',
+      errorClass: 'TimeoutError',
+      phase: 'failed',
+    });
+
+    await act(async () => {
+      deferred.resolve({ success: true, message: 'late success' });
+      await deferred.promise;
+    });
+    expect(mocks.getLoginStatus).toHaveBeenCalledTimes(1);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  test('times out when the immediate status check hangs', async () => {
+    const statusDeferred = createDeferred<{ isLoggedIn: boolean }>();
+    mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
+    await renderLoggedOutPage();
+    mocks.getLoginStatus.mockReturnValueOnce(statusDeferred.promise);
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
+    expect(await screen.findByText('Checking authentication status')).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_TIMEOUT_MS);
+    });
+
+    expect(await screen.findByText('Login timeout. Please try again.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign in with Azure' })).toBeTruthy();
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      statusDeferred.resolve({ isLoggedIn: true });
+      await statusDeferred.promise;
+    });
+    expect(mocks.trackAksFeature).not.toHaveBeenCalledWith('aksd.auth-login', 'succeeded');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
   test('emits failed and TimeoutError when polling times out', async () => {
     mocks.initiateLogin.mockResolvedValue({ success: true, message: 'browser opened' });
     await renderLoggedOutPage();
