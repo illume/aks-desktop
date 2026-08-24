@@ -108,6 +108,20 @@ describe('AzureLoginPage telemetry', () => {
     );
   });
 
+  test('starts only one login attempt on repeated clicks', async () => {
+    mocks.initiateLogin.mockReturnValue(new Promise(() => {}));
+    await renderLoggedOutPage();
+    const signInButton = screen.getByRole('button', { name: 'Sign in with Azure' });
+
+    await act(async () => {
+      signInButton.click();
+      signInButton.click();
+    });
+
+    expect(mocks.initiateLogin).toHaveBeenCalledTimes(1);
+    expect(mocks.trackAksFeature).toHaveBeenCalledTimes(1);
+  });
+
   test('ignores an unsuccessful initiation result after the attempt is cancelled', async () => {
     const deferred = createDeferred<{ success: boolean; message: string }>();
     mocks.initiateLogin.mockReturnValue(deferred.promise);

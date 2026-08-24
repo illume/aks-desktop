@@ -157,6 +157,9 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
   };
 
   const handleLogin = async () => {
+    if (loginAttemptOutcomeRef.current === 'active') {
+      return;
+    }
     const attemptGeneration = ++loginAttemptGenerationRef.current;
     loginAttemptOutcomeRef.current = 'active';
     trackAksFeature('aksd.auth-login', 'started');
