@@ -121,7 +121,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         return;
       }
 
-      setStatusMessage(`${t('Checking authentication status')}...`);
+      setStatusMessage(t('Checking authentication status'));
 
       // Check immediately, then poll for login completion
       let pollCount = 0;

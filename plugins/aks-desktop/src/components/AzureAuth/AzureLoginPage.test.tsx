@@ -215,7 +215,7 @@ describe('AzureLoginPage telemetry', () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
-    expect(await screen.findByText('Checking authentication status...')).toBeTruthy();
+    expect(await screen.findByText('Checking authentication status')).toBeTruthy();
     await act(async () => {
       statusDeferred.resolve({
         isLoggedIn: true,
