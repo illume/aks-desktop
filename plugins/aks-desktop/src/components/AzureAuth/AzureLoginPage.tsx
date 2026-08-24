@@ -18,7 +18,11 @@ import { useTelemetryFeatureOpened } from '../../hooks/useTelemetryFeatureOpened
 import { trackError } from '../../telemetry';
 import { trackAksFeature } from '../../telemetry/aksFeature';
 import { getLoginStatus, initiateLogin } from '../../utils/azure/az-auth';
-import { LOGIN_POLL_INTERVAL_MS, LOGIN_TIMEOUT_MS } from '../../utils/constants/timing';
+import {
+  LOGIN_POLL_INTERVAL_MS,
+  LOGIN_RETRY_DELAY_MS,
+  LOGIN_TIMEOUT_MS,
+} from '../../utils/constants/timing';
 
 interface AzureLoginPageProps {
   redirectTo?: string;
@@ -42,7 +46,9 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
   const [checking, setChecking] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showRetry, setShowRetry] = useState(false);
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loginRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginAttemptOutcomeRef = useRef<LoginAttemptOutcome>('idle');
   const loginAttemptGenerationRef = useRef(0);
@@ -61,6 +67,13 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     }
   };
 
+  const clearLoginRetryTimeout = () => {
+    if (loginRetryTimeoutRef.current) {
+      clearTimeout(loginRetryTimeoutRef.current);
+      loginRetryTimeoutRef.current = null;
+    }
+  };
+
   const handleLoginTimeout = (attemptGeneration: number) => {
     if (!isActiveAttempt(attemptGeneration)) {
       return;
@@ -69,6 +82,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
+    clearLoginRetryTimeout();
     clearLoginTimeout();
     loginAttemptOutcomeRef.current = 'failed';
     trackLoginFailure('TimeoutError');
@@ -82,6 +96,16 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       () => handleLoginTimeout(attemptGeneration),
       LOGIN_TIMEOUT_MS
     );
+  };
+
+  const startLoginRetryTimeout = (attemptGeneration: number) => {
+    clearLoginRetryTimeout();
+    loginRetryTimeoutRef.current = setTimeout(() => {
+      loginRetryTimeoutRef.current = null;
+      if (isActiveAttempt(attemptGeneration)) {
+        setShowRetry(true);
+      }
+    }, LOGIN_RETRY_DELAY_MS);
   };
 
   // Get redirect target from URL query parameter or prop, fallback to profile page
@@ -102,6 +126,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
+      clearLoginRetryTimeout();
       clearLoginTimeout();
     };
   }, []);
@@ -135,8 +160,10 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     loginAttemptOutcomeRef.current = 'active';
     trackAksFeature('aksd.auth-login', 'started');
     setLoading(true);
+    setShowRetry(false);
     setErrorMessage('');
     setStatusMessage(`${t('Initiating Azure login')}...`);
+    startLoginRetryTimeout(attemptGeneration);
     startLoginTimeout(attemptGeneration);
 
     try {
@@ -147,6 +174,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       }
 
       if (!result.success) {
+        clearLoginRetryTimeout();
         clearLoginTimeout();
         loginAttemptOutcomeRef.current = 'failed';
         trackLoginFailure('UnknownError');
@@ -182,6 +210,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
               clearInterval(pollingIntervalRef.current);
             }
             pollingIntervalRef.current = null;
+            clearLoginRetryTimeout();
             clearLoginTimeout();
             loginAttemptOutcomeRef.current = 'succeeded';
             trackAksFeature('aksd.auth-login', 'succeeded');
@@ -219,6 +248,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
         return;
       }
       console.error('Error initiating login:', error);
+      clearLoginRetryTimeout();
       clearLoginTimeout();
       loginAttemptOutcomeRef.current = 'failed';
       trackLoginFailure('UnknownError');
@@ -242,10 +272,20 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
+    clearLoginRetryTimeout();
     clearLoginTimeout();
     setLoading(false);
+    setShowRetry(false);
     setStatusMessage('');
     setErrorMessage('');
+  };
+
+  const handleRetry = async () => {
+    if (loginAttemptOutcomeRef.current !== 'active') {
+      return;
+    }
+    handleCancel();
+    await handleLogin();
   };
 
   const rootSx = {
@@ -322,20 +362,38 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
                 {t('Sign in with Azure')}
               </Button>
             ) : (
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={handleCancel}
-                sx={{
-                  minWidth: 200,
-                  py: 1.5,
-                  px: 4,
-                  textTransform: 'none',
-                  fontSize: 16,
-                }}
-              >
-                {t('Cancel')}
-              </Button>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={handleCancel}
+                  sx={{
+                    minWidth: 200,
+                    py: 1.5,
+                    px: 4,
+                    textTransform: 'none',
+                    fontSize: 16,
+                  }}
+                >
+                  {t('Cancel')}
+                </Button>
+                {showRetry && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleRetry}
+                    sx={{
+                      minWidth: 200,
+                      py: 1.5,
+                      px: 4,
+                      textTransform: 'none',
+                      fontSize: 16,
+                    }}
+                  >
+                    {t('Retry')}
+                  </Button>
+                )}
+              </Box>
             )}
 
             {statusMessage && (

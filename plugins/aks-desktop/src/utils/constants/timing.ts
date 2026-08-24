@@ -19,6 +19,9 @@ export const PROMETHEUS_STEP_SECONDS = 60;
 /** How often to poll for login completion (ms). */
 export const LOGIN_POLL_INTERVAL_MS = 5_000;
 
+/** Delay before offering to retry an Azure CLI login attempt (ms). */
+export const LOGIN_RETRY_DELAY_MS = 20_000;
+
 /** TTL for access-tab role-assignment cache (ms). */
 export const ACCESS_TAB_CACHE_TTL_MS = 60_000;
 

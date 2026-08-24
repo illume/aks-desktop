@@ -6,7 +6,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { LOGIN_POLL_INTERVAL_MS, LOGIN_TIMEOUT_MS } from '../../utils/constants/timing';
+import {
+  LOGIN_POLL_INTERVAL_MS,
+  LOGIN_RETRY_DELAY_MS,
+  LOGIN_TIMEOUT_MS,
+} from '../../utils/constants/timing';
 
 const mocks = vi.hoisted(() => ({
   getLoginStatus: vi.fn(),
@@ -200,6 +204,42 @@ describe('AzureLoginPage telemetry', () => {
       ['aksd.auth-login', 'succeeded'],
     ]);
     expect(mocks.trackError).not.toHaveBeenCalled();
+  });
+
+  test('offers retry after 20 seconds and starts a fresh login attempt', async () => {
+    const firstAttempt = createDeferred<{ success: boolean; message: string }>();
+    const secondAttempt = createDeferred<{ success: boolean; message: string }>();
+    mocks.initiateLogin
+      .mockReturnValueOnce(firstAttempt.promise)
+      .mockReturnValueOnce(secondAttempt.promise);
+    await renderLoggedOutPage();
+    mocks.getLoginStatus.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Azure' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_RETRY_DELAY_MS / 2);
+    });
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOGIN_RETRY_DELAY_MS / 2);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(mocks.initiateLogin).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(mocks.trackAksFeature.mock.calls).toEqual([
+      ['aksd.auth-login', 'started'],
+      ['aksd.auth-login', 'cancelled'],
+      ['aksd.auth-login', 'started'],
+    ]);
+
+    await act(async () => {
+      firstAttempt.resolve({ success: true, message: 'late success' });
+      await firstAttempt.promise;
+    });
+    expect(mocks.getLoginStatus).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   test('checks for login completion and redirects without waiting for the polling interval', async () => {
