@@ -62,6 +62,7 @@ describe('registerAKSCluster', () => {
     await firstStarted;
     const second = registerAKSCluster('sub-2', 'rg-2', 'cluster-2');
 
+    expect(registeredClusters).toEqual([]);
     releaseFirst();
 
     await Promise.all([first, second]);
