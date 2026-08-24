@@ -18,11 +18,7 @@ import { useTelemetryFeatureOpened } from '../../hooks/useTelemetryFeatureOpened
 import { trackError } from '../../telemetry';
 import { trackAksFeature } from '../../telemetry/aksFeature';
 import { getLoginStatus, initiateLogin } from '../../utils/azure/az-auth';
-import {
-  LOGIN_POLL_INTERVAL_MS,
-  LOGIN_REDIRECT_DELAY_MS,
-  LOGIN_TIMEOUT_MS,
-} from '../../utils/constants/timing';
+import { LOGIN_POLL_INTERVAL_MS, LOGIN_TIMEOUT_MS } from '../../utils/constants/timing';
 
 interface AzureLoginPageProps {
   redirectTo?: string;
@@ -47,7 +43,6 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loginAttemptOutcomeRef = useRef<LoginAttemptOutcome>('idle');
   const loginAttemptGenerationRef = useRef(0);
   const mountedRef = useRef(true);
@@ -75,10 +70,6 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
-      }
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-        redirectTimeoutRef.current = null;
       }
     };
   }, []);
@@ -167,16 +158,8 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
             // Trigger update event for sidebar label
             window.dispatchEvent(new CustomEvent('azure-auth-update'));
 
-            // Wait a moment before redirecting
-            redirectTimeoutRef.current = setTimeout(() => {
-              if (
-                isCurrentAttempt(attemptGeneration) &&
-                loginAttemptOutcomeRef.current === 'succeeded'
-              ) {
-                const target = getRedirectTarget();
-                history.push(target);
-              }
-            }, LOGIN_REDIRECT_DELAY_MS);
+            const target = getRedirectTarget();
+            history.push(target);
           } else if (pollCount >= maxPolls) {
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current);
