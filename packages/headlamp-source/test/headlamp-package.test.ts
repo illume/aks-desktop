@@ -147,7 +147,7 @@ test('source builds use explicit, reviewed install scripts', () => {
       'utf8'
     )
   );
-  assert.equal(frontendManifest.dependencies.tsx, undefined);
+  assert.equal(frontendManifest.dependencies.tsx, '4.23.1');
   assert.equal(frontendManifest.allowScripts, undefined);
   assert.equal(frontendManifest.scripts.postbuild, 'tsx ./scripts/precompress-build.ts build');
   assert.equal(
@@ -229,6 +229,11 @@ test('root builds package supported host targets independently', () => {
     assert.match(rootManifest.scripts[`build:${target}`], /build\/package-target\.ts/);
   }
   assert.equal(rootManifest.scripts['build:linux:armv7l'], undefined);
+  assert.equal(
+    rootManifest.scripts['headlamp:translations'],
+    'node Localize/translation-manager.mjs distribute-headlamp'
+  );
+  assert.match(rootManifest.scripts['headlamp:assemble'], /headlamp:translations/);
 });
 
 test('ARM64 package targets have verified external tool runtimes', () => {
