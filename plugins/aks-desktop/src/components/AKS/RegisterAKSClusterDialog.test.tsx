@@ -1139,7 +1139,6 @@ describe('RegisterAKSClusterDialog telemetry', () => {
     );
     expect(mocks.onRegistrationFinished).toHaveBeenCalledWith('succeeded');
     expect(mocks.registerAKSCluster).not.toHaveBeenCalled();
-    expect(currentDialogProps().registrationSucceeded).toBe(true);
   });
 
   test('reports a failed outcome when an Arc cluster is unreachable', async () => {

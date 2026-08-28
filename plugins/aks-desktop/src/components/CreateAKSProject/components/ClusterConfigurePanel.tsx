@@ -23,8 +23,6 @@ interface ClusterConfigurePanelProps {
   resourceGroup: string;
   clusterName: string;
   onConfigured: () => void;
-  /** Set to false when the caller already surfaces the network policy note. */
-  showNetworkPolicyNote?: boolean;
 }
 
 interface AddonOption {
@@ -67,7 +65,6 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
   resourceGroup,
   clusterName,
   onConfigured,
-  showNetworkPolicyNote = true,
 }) => {
   const { t } = useTranslation();
   const [selectedAddons, setSelectedAddons] = useState<Set<AddonKey>>(new Set());
@@ -85,7 +82,7 @@ export const ClusterConfigurePanel: React.FC<ClusterConfigurePanelProps> = ({
   const enabledAddons = ADDON_OPTIONS.filter(addon => capabilities[addon.capabilityField] === true);
 
   const hasNetworkPolicyWarning =
-    showNetworkPolicyNote && (!capabilities.networkPolicy || capabilities.networkPolicy === 'none');
+    !capabilities.networkPolicy || capabilities.networkPolicy === 'none';
 
   // Clean up polling timer on unmount
   useEffect(() => {
