@@ -146,9 +146,6 @@
   "headlampSource": {
     "revision": "be382f1e2413dcdd1854b578e2af1633a1064a76"
   },
-  "headlampSourceTagsToo": {
-    "baseTag": "v0.44.0"
-  },
   "headlamp": {
     "product": {
       "name": "aks-desktop",
