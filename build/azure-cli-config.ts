@@ -1,6 +1,11 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
+/**
+ * Resolves the reviewed Azure CLI/Python artifacts for a package target and provides stable
+ * identities used by download caching, extension installation, and checksum verification.
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,6 +37,7 @@ export interface AzureCliTarget {
   windowsPackage?: RuntimeConfig;
 }
 
+/** Returns the stable fields that determine whether an Azure CLI staging cache is reusable. */
 export function azureCliCacheIdentity(target: AzureCliTarget) {
   return {
     platform: target.platform,
@@ -43,6 +49,7 @@ export function azureCliCacheIdentity(target: AzureCliTarget) {
   };
 }
 
+/** Requires an asynchronously verified build artifact. */
 export async function verifyRequiredArtifact(
   verification: Promise<boolean>,
   artifactName: string
@@ -52,6 +59,7 @@ export async function verifyRequiredArtifact(
   }
 }
 
+/** Installs every configured Azure CLI extension through the caller-provided installer. */
 export function installRequiredExtensions(
   extensions: string[],
   install: (extension: string) => void
@@ -64,6 +72,7 @@ export function installRequiredExtensions(
 const SUPPORTED_ARCHES = new Set(['arm64', 'x64']);
 const SUPPORTED_PLATFORMS = new Set(['darwin', 'linux', 'win32']);
 
+/** Resolves and validates the platform-specific Azure CLI runtime configuration. */
 export function resolveAzureCliTarget(
   rootDir: string,
   platform: string = process.platform,

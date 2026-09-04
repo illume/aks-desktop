@@ -1,4 +1,4 @@
-From 083f1eb6fc376baa368c7934024080155fb81e88 Mon Sep 17 00:00:00 2001
+From 860535f3ddd33b33c479aa8cd8c77d9bf7c57301 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 3 Sep 2026 21:07:15 +0200
 Subject: [PATCH 1/2] app: electron: Share development plugin profile
@@ -107,7 +107,7 @@ index ae123501d..6ae69046c 100644
 2.54.0
 
 
-From 917c14dd343e3ff4fc9900ea8a3212b004b0493e Mon Sep 17 00:00:00 2001
+From fd6b02d182fc73fa50faf127cbe7a8de8c5d8218 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Mon, 7 Sep 2026 11:45:26 +0200
 Subject: [PATCH 2/2] app: e2e-tests: Verify branded config directories

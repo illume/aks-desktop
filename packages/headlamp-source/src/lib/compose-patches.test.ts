@@ -6,13 +6,14 @@ const test = require('node:test');
 
 const { composePatchSeries, parsePatchSeries } = require('./compose-patches.ts');
 
-test('accepts an ordered patch series with leading and internal numbering gaps', () => {
+test('accepts ordered patch series gaps and suffixed entries', () => {
   assert.deepEqual(
     parsePatchSeries(
-      '0002 source 0002-first-change.patch\n0004 package 0004-second-change.patch\n'
+      '0002 source 0002-first-change.patch\n0002b source 0002b-follow-up.patch\n0004 package 0004-second-change.patch\n'
     ),
     [
       { file: '0002-first-change.patch', scope: 'source' },
+      { file: '0002b-follow-up.patch', scope: 'source' },
       { file: '0004-second-change.patch', scope: 'package' },
     ]
   );
@@ -23,6 +24,8 @@ test('rejects unsafe or unordered patch series entries', () => {
     '',
     '0001 source ../0001-change.patch\n',
     '0001 source 0002-change.patch\n',
+    '0001b source 0001-change.patch\n',
+    '0001 source 0001-change.patch\n0001b source 0001b-follow-up.patch\n0001a source 0001a-other.patch\n',
     '0001 source 0001-change.patch\n0003 package 0003-other-change.patch\n0002 source 0002-change.patch\n',
     '0001 source 0001-change.patch\n0001 package 0001-other-change.patch\n',
   ]) {

@@ -145,7 +145,7 @@
     }
   },
   "headlampSource": {
-    "revision": "be382f1e2413dcdd1854b578e2af1633a1064a76"
+    "revision": "2cf70bab71e29a6544d9573053851a34d692fce8"
   },
   "headlamp": {
     "product": {
@@ -366,6 +366,13 @@
           {
             "tool": "az",
             "args": [
+              "provider"
+            ],
+            "allowTrailingArgs": true
+          },
+          {
+            "tool": "az",
+            "args": [
               "rest"
             ],
             "allowTrailingArgs": true
@@ -550,6 +557,13 @@
           {
             "tool": "az",
             "args": [
+              "provider"
+            ],
+            "allowTrailingArgs": true
+          },
+          {
+            "tool": "az",
+            "args": [
               "rest"
             ],
             "allowTrailingArgs": true
@@ -645,7 +659,7 @@
     ]
   },
   "devDependencies": {
-    "@headlamp-k8s/headlamp-source": "0.0.0-main.be382f1e",
+    "@headlamp-k8s/headlamp-source": "0.0.0-main.2cf70bab",
     "@types/node": "^26.1.1",
     "concurrently": "^9.1.2",
     "cross-env": "10.1.0",
@@ -656,7 +670,7 @@
     "typescript": "^6.0.3"
   },
   "patchedDependencies": {
-    "@headlamp-k8s/headlamp-source@0.0.0-main.be382f1e": "patches/headlamp-source@0.0.0-main.be382f1e.patch"
+    "@headlamp-k8s/headlamp-source@0.0.0-main.2cf70bab": "patches/headlamp-source@0.0.0-main.2cf70bab.patch"
   },
   "lint-staged": {
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx}": [

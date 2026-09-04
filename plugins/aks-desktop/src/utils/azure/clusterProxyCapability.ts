@@ -1,6 +1,11 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
+/**
+ * Accesses the private cluster-proxy function that Headlamp injects only while executing the
+ * trusted AKS Desktop plugin. Browser deployments and untrusted plugins receive no capability.
+ */
+
 /** Result returned by the injected desktop proxy capability. */
 export interface ClusterProxyCapabilityResult {
   success: boolean;

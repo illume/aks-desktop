@@ -42,7 +42,7 @@ test('the installed package is a complete pinned source distribution', () => {
   assert.deepEqual(packageManifest.files, ['source', 'src']);
   assert.equal(packageManifest.repository.url, 'https://github.com/kubernetes-sigs/headlamp.git');
   assert.deepEqual(rootManifest.headlampSource, {
-    revision: 'be382f1e2413dcdd1854b578e2af1633a1064a76',
+    revision: '2cf70bab71e29a6544d9573053851a34d692fce8',
   });
   assert.deepEqual(packageManifest.headlampSource, rootManifest.headlampSource);
   for (const file of [
@@ -82,11 +82,14 @@ test('npm owns and verifies the Headlamp patch', () => {
   assert.equal(lockEntry.version, VERSION);
   assert.equal(lockEntry.patched.path, patchPath);
   assert.match(lockEntry.patched.integrity, /^sha512-/);
+  const patch = fs.readFileSync(path.join(ROOT_DIR, patchPath));
   assert.equal(
-    fs
-      .readFileSync(path.join(ROOT_DIR, patchPath))
-      .equals(composePatchSeries(ROOT_DIR)),
+    patch.equals(composePatchSeries(ROOT_DIR)),
     true
+  );
+  assert.doesNotMatch(
+    patch.toString('utf8'),
+    /^\+\s+"resolved": "https:\/\/[^\n"]*pkgs\.visualstudio\.com/m
   );
   assert.equal(
     fs.statSync(
@@ -116,6 +119,23 @@ test('the source package exports app and container build scripts', () => {
   assert.match(
     rootManifest.scripts['test:distribution'],
     /npm run headlamp:smoke --$/
+  );
+});
+
+test('the Headlamp loader gates development plugins through the hardened preload API', () => {
+  const pluginLoader = fs.readFileSync(
+    path.join(HEADLAMP_SOURCE_DIR, 'frontend', 'src', 'plugin', 'index.ts'),
+    'utf8'
+  );
+  const preload = fs.readFileSync(
+    path.join(HEADLAMP_SOURCE_DIR, 'app', 'electron', 'preload.ts'),
+    'utf8'
+  );
+
+  assert.match(pluginLoader, /await filterDisabledDevelopmentPlugins\(/);
+  assert.match(
+    preload,
+    /getDevelopmentPluginsEnabled: \(\) => ipcRenderer\.invoke\('get-development-plugins'\)/
   );
 });
 
@@ -324,7 +344,7 @@ test('AKS product policy owns development and production command grants', () => 
   const productGrants = policies[0].commands;
   assert.equal(productGrants.some(grant => 'command' in grant), false);
   assert.equal(productGrants.some(grant => 'executable' in grant), false);
-  for (const group of ['ad', 'identity', 'rest']) {
+  for (const group of ['ad', 'identity', 'provider', 'rest']) {
     assert.ok(
       productGrants.some(
         grant => grant.tool === 'az' && grant.args[0] === group && grant.allowTrailingArgs

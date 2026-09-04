@@ -1,6 +1,7 @@
 /**
  * Resolves packaged application executables, reserves readiness ports, launches Headlamp
  * headlessly, and terminates the complete process tree after a bounded HTTP probe.
+ * Run `npm --prefix packages/headlamp-source test -- smoke-app` for focused coverage.
  */
 const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');

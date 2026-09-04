@@ -719,10 +719,25 @@ index 663f90b32f4c1fc6b262d2de704532f039140c38..509765943583971b1ae384e2d75b7536
        }
  
 diff --git a/source/app/electron/preload.test.ts b/source/app/electron/preload.test.ts
-index 03d3c0834bf5b6b15db4ac27585a45da5e9ba28f..d497de5bb2d584f1737c7548bb255a5999c792b0 100644
+index 03d3c0834bf5b6b15db4ac27585a45da5e9ba28f..d967e12cf9e2f0c12498a8510a98ba2b42372399 100644
 --- a/source/app/electron/preload.test.ts
 +++ b/source/app/electron/preload.test.ts
-@@ -52,6 +52,23 @@ describe('desktop preload API', () => {
+@@ -36,7 +36,14 @@ vi.mock('electron', () => ({
+   },
+ }));
+ 
++const originalElectronDev = process.env.ELECTRON_DEV;
++process.env.ELECTRON_DEV = 'true';
+ await import('./preload');
++if (originalElectronDev === undefined) {
++  delete process.env.ELECTRON_DEV;
++} else {
++  process.env.ELECTRON_DEV = originalElectronDev;
++}
+ 
+ const desktopApi = electronMocks.exposeInMainWorld.mock.calls[0][1];
+ 
+@@ -52,6 +59,27 @@ describe('desktop preload API', () => {
      expect(desktopApi.platform).toBe(process.platform);
    });
  
@@ -743,11 +758,15 @@ index 03d3c0834bf5b6b15db4ac27585a45da5e9ba28f..d497de5bb2d584f1737c7548bb255a59
 +    });
 +  });
 +
++  it('exposes Electron development mode to a built renderer', () => {
++    expect(desktopApi.isDevelopment).toBe(true);
++  });
++
    it('sends messages only on allowed channels', () => {
      desktopApi.send('locale', 'en');
      desktopApi.send('not-allowed', 'ignored');
 diff --git a/source/app/electron/preload.ts b/source/app/electron/preload.ts
-index f56c2eaf31343b090a503fff9d245d4f7fd625fb..84a71a990afea67544f36b73d08e7873e2a037f2 100644
+index f56c2eaf31343b090a503fff9d245d4f7fd625fb..49d81ca2730505b4aae818c02060d29aa1597202 100644
 --- a/source/app/electron/preload.ts
 +++ b/source/app/electron/preload.ts
 @@ -16,6 +16,7 @@
@@ -758,7 +777,7 @@ index f56c2eaf31343b090a503fff9d245d4f7fd625fb..84a71a990afea67544f36b73d08e7873
  
  // Keeps the mapping between a caller-provided listener and the wrapped one we
  // actually register with ipcRenderer, so removeListener can still unsubscribe
-@@ -32,6 +33,13 @@ const wrappedListeners = new WeakMap<
+@@ -32,6 +33,14 @@ const wrappedListeners = new WeakMap<
  // Expose protected methods that allow the renderer process to use
  // the ipcRenderer without exposing the entire object
  contextBridge.exposeInMainWorld('desktopApi', {
@@ -768,11 +787,12 @@ index f56c2eaf31343b090a503fff9d245d4f7fd625fb..84a71a990afea67544f36b73d08e7873
 +    capabilitySecret: string
 +  ): Promise<StartProxyResult> =>
 +    ipcRenderer.invoke('start-cluster-proxy', { ...target, capabilitySecret }),
++  isDevelopment: Boolean(process.env.ELECTRON_DEV),
 +  getDevelopmentPluginsEnabled: () => ipcRenderer.invoke('get-development-plugins'),
    send: (channel: string, data: unknown) => {
      // allowed channels
      const validChannels = [
-@@ -47,6 +55,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
+@@ -47,6 +56,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
        'request-backend-port',
        'request-tray-icon',
        'set-tray-icon',
@@ -781,7 +801,7 @@ index f56c2eaf31343b090a503fff9d245d4f7fd625fb..84a71a990afea67544f36b73d08e7873
        'cluster-changed',
        'route-changed',
      ];
-@@ -69,6 +79,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
+@@ -69,6 +80,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
        'open-about-dialog',
        'backend-port',
        'tray-icon',
@@ -3079,6 +3099,49 @@ index 80690abf49fdc26bca97fb63b703ec8a5d7388ab..e3ee370b17f66c9d7b3f11f89d796860
      "i18n-check": "npm run i18n -- --fail-on-update",
      "lint": "cd .. && npm run frontend:lint",
      "lint-fix": "cd .. && npm run frontend:lint:fix",
+diff --git a/source/docs/development/api/interfaces/plugin_lib.DesktopApi.md b/source/docs/development/api/interfaces/plugin_lib.DesktopApi.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f29a6cf19613ef39e8d254e177f9ed2298f9503e
+--- /dev/null
++++ b/source/docs/development/api/interfaces/plugin_lib.DesktopApi.md
+@@ -0,0 +1,37 @@
++[API](../API.md) / [plugin/lib](../modules/plugin_lib.md) / DesktopApi
++
++# Interface: DesktopApi
++
++[plugin/lib](../modules/plugin_lib.md).DesktopApi
++
++APIs exposed to Headlamp's renderer process by the desktop preload bridge.
++
++## Indexable
++
++▪ [key: `string`]: `any`
++
++Additional APIs exposed by the desktop preload bridge.
++
++## Properties
++
++### isDevelopment
++
++• `Optional` **isDevelopment**: `boolean`
++
++Whether Electron is running in development mode, independent of the frontend build mode.
++
++#### Defined in
++
++[plugin/lib.ts:75](https://github.com/kubernetes-sigs/headlamp/blob/449ae946d/frontend/src/plugin/lib.ts#L75)
++
++___
++
++### platform
++
++• **platform**: `Platform`
++
++Operating system platform hosting the desktop app.
++
++#### Defined in
++
++[plugin/lib.ts:73](https://github.com/kubernetes-sigs/headlamp/blob/449ae946d/frontend/src/plugin/lib.ts#L73)
 diff --git a/source/docs/development/api/interfaces/plugin_registry.ClusterPreOpenContext.md b/source/docs/development/api/interfaces/plugin_registry.ClusterPreOpenContext.md
 new file mode 100644
 index 0000000000000000000000000000000000000000..7860e0a2846b6e3f4eeedc8330f780b065f6620f
@@ -3159,6 +3222,15 @@ index 0000000000000000000000000000000000000000..7860e0a2846b6e3f4eeedc8330f780b0
 +#### Defined in
 +
 +[redux/clusterProviderSlice.ts:70](https://github.com/kubernetes-sigs/headlamp/blob/1079044ed/frontend/src/redux/clusterProviderSlice.ts#L70)
+diff --git a/source/docs/development/api/modules/plugin_lib.md b/source/docs/development/api/modules/plugin_lib.md
+index a3883312351d685d31b8729f252bb0d6c4b29984..6d8a7b263c0134838a9a22e1dd40905a796896e6 100644
+--- a/source/docs/development/api/modules/plugin_lib.md
++++ b/source/docs/development/api/modules/plugin_lib.md
+@@ -10,3 +10,4 @@
+ ## Interfaces
+ 
+ - [AppMenu](../interfaces/plugin_lib.AppMenu.md)
++- [DesktopApi](../interfaces/plugin_lib.DesktopApi.md)
 diff --git a/source/docs/development/api/modules/plugin_registry.md b/source/docs/development/api/modules/plugin_registry.md
 index 6fec43fd49dc7de94ec5091c780f19b50bf81e1b..47366b42925d015b57f529b7557c8b8f5b457564 100644
 --- a/source/docs/development/api/modules/plugin_registry.md
@@ -4083,7 +4155,7 @@ index 8f73a0ba305d1a53c37b7ea1eb931c8de1e5e29b..23562a62410473c3d71f6ed480fde651
   * createDemoData function will create example data objects to act as plugin data.
   * The function will return an array of demo data objects based on the number specified.
 diff --git a/source/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx b/source/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx
-index 3c9280a049bfa0b74b44d54eb7ba1a9c5270c2cb..b7775f9f22f67c0855a983ec0b611568d11df306 100644
+index 3c9280a049bfa0b74b44d54eb7ba1a9c5270c2cb..7af6b3de4cecf3e938471193ee7807521f23200f 100644
 --- a/source/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx
 +++ b/source/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx
 @@ -15,7 +15,8 @@
@@ -4096,20 +4168,15 @@ index 3c9280a049bfa0b74b44d54eb7ba1a9c5270c2cb..b7775f9f22f67c0855a983ec0b611568
  import { afterEach, describe, expect, it, vi } from 'vitest';
  import { createMuiTheme } from '../../../lib/themes';
  import { PluginInfo, setPluginSettings } from '../../../plugin/pluginsSlice';
-@@ -29,7 +30,12 @@ vi.mock('../../../helpers/isElectron', () => ({
-   isElectron: () => true,
+@@ -30,6 +31,7 @@ vi.mock('../../../helpers/isElectron', () => ({
  }));
  
-+vi.mock('../../../helpers/isDevMode', () => ({
-+  isDevMode: () => false,
-+}));
-+
  const theme = createMuiTheme({ name: lightTheme.name, base: 'light' });
 +const originalDesktopApi = window.desktopApi;
  
  function createPlugins(count: number): PluginInfo[] {
    return Array.from({ length: count }, (_, i) => ({
-@@ -77,6 +83,24 @@ describe('PluginSettingsPure', () => {
+@@ -77,6 +79,45 @@ describe('PluginSettingsPure', () => {
      expect(deleteButtons).toHaveLength(3);
    });
  
@@ -4125,16 +4192,37 @@ index 3c9280a049bfa0b74b44d54eb7ba1a9c5270c2cb..b7775f9f22f67c0855a983ec0b611568
 +      name: 'Load development plugins',
 +    });
 +    expect(pluginDevelopmentMode).not.toBeChecked();
++    expect(pluginDevelopmentMode).toHaveAccessibleDescription(
++      'Load plugins from your local development directory. Only enable this when you trust every plugin in that directory.'
++    );
 +
 +    await userEvent.click(pluginDevelopmentMode);
 +
 +    expect(onDevelopmentPluginsChange).toHaveBeenCalledWith(true);
 +  });
 +
++  it('shows globally blocked development plugins as not loaded without changing preference', () => {
++    renderPluginSettings({
++      plugins: [
++        {
++          ...createPlugins(1)[0],
++          type: 'development',
++          source: 'development',
++          isEnabled: true,
++          isLoaded: false,
++          isDevelopmentModeBlocked: true,
++        },
++      ],
++    });
++
++    expect(screen.getByText('Not Loaded')).toBeInTheDocument();
++    expect(screen.queryByRole('checkbox', { name: 'Toggle plugin-0' })).toBeNull();
++  });
++
    it('calls onDelete when delete is confirmed', () => {
      const onDelete = vi.fn();
      confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-@@ -204,6 +228,48 @@ describe('PluginSettingsPure', () => {
+@@ -204,6 +245,65 @@ describe('PluginSettingsPure', () => {
  });
  
  describe('PluginSettings events', () => {
@@ -4147,6 +4235,7 @@ index 3c9280a049bfa0b74b44d54eb7ba1a9c5270c2cb..b7775f9f22f67c0855a983ec0b611568
 +    const unsubscribe = vi.fn();
 +    let receiveDevelopmentPlugins: ((enabled: boolean) => void) | undefined;
 +    window.desktopApi = {
++      isDevelopment: false,
 +      send,
 +      receive: vi.fn((channel: string, callback: (enabled: boolean) => void) => {
 +        if (channel === 'development-plugins') {
@@ -4180,22 +4269,30 @@ index 3c9280a049bfa0b74b44d54eb7ba1a9c5270c2cb..b7775f9f22f67c0855a983ec0b611568
 +    expect(unsubscribe).toHaveBeenCalledOnce();
 +  });
 +
++  it('hides packaged-only controls in Electron development mode', () => {
++    const send = vi.fn();
++    window.desktopApi = { isDevelopment: true, send } as any;
++
++    render(
++      <TestContext>
++        <ThemeProvider theme={theme}>
++          <PluginSettings />
++        </ThemeProvider>
++      </TestContext>
++    );
++
++    expect(screen.queryByRole('checkbox', { name: 'Load development plugins' })).toBeNull();
++    expect(send).not.toHaveBeenCalledWith('request-development-plugins');
++  });
++
    it('dispatches PLUGIN_LIST_VIEW with the configured plugins', async () => {
      const plugins = createPlugins(2);
      store.dispatch(setPluginSettings(plugins));
 diff --git a/source/frontend/src/components/App/PluginSettings/PluginSettings.tsx b/source/frontend/src/components/App/PluginSettings/PluginSettings.tsx
-index 1dc20d41f353daf5dda420488549cb535d009537..90bef7383a7b6cec419612214c9365eedd65abcb 100644
+index 1dc20d41f353daf5dda420488549cb535d009537..dbdc3953b66288b157ad9833e5da9d7e809cf50a 100644
 --- a/source/frontend/src/components/App/PluginSettings/PluginSettings.tsx
 +++ b/source/frontend/src/components/App/PluginSettings/PluginSettings.tsx
-@@ -27,6 +27,7 @@ import { MRT_Row } from 'material-react-table';
- import { useEffect, useState } from 'react';
- import { useTranslation } from 'react-i18next';
- import { useDispatch } from 'react-redux';
-+import { isDevMode } from '../../../helpers/isDevMode';
- import { isElectron } from '../../../helpers/isElectron';
- import { useFilterFunc } from '../../../lib/util';
- import { PluginInfo, reloadPage, setPluginSettings } from '../../../plugin/pluginsSlice';
-@@ -53,6 +54,9 @@ export interface PluginSettingsPureProps {
+@@ -53,6 +53,9 @@ export interface PluginSettingsPureProps {
    onSave: (plugins: PluginInfo[]) => void;
    onDelete?: (plugin: PluginInfo) => Promise<void> | void;
    saveAlwaysEnable?: boolean;
@@ -4205,7 +4302,17 @@ index 1dc20d41f353daf5dda420488549cb535d009537..90bef7383a7b6cec419612214c9365ee
  }
  
  /** PluginSettingsProp intentially left empty to remain malleable */
-@@ -245,6 +249,37 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+@@ -143,7 +146,8 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+         displayName: name ?? plugin.name,
+         origin: plugin.origin ?? author?.substring(1) ?? t('translation|Unknown'),
+         // If the plugin is not loaded, ensure it's disabled
+-        isEnabled: plugin.isLoaded === false ? false : plugin.isEnabled,
++        isEnabled:
++          plugin.isLoaded === false && !plugin.isDevelopmentModeBlocked ? false : plugin.isEnabled,
+       };
+     })
+   );
+@@ -245,6 +249,42 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
  
    return (
      <>
@@ -4223,7 +4330,11 @@ index 1dc20d41f353daf5dda420488549cb535d009537..90bef7383a7b6cec419612214c9365ee
 +              <Typography id="development-plugins-label">
 +                {t('translation|Load development plugins')}
 +              </Typography>
-+              <Typography variant="body2" color="text.secondary">
++              <Typography
++                id="development-plugins-description"
++                variant="body2"
++                color="text.secondary"
++              >
 +                {t(
 +                  'translation|Load plugins from your local development directory. Only enable this when you trust every plugin in that directory.'
 +                )}
@@ -4235,6 +4346,7 @@ index 1dc20d41f353daf5dda420488549cb535d009537..90bef7383a7b6cec419612214c9365ee
 +              onChange={event => props.onDevelopmentPluginsChange?.(event.target.checked)}
 +              inputProps={{
 +                'aria-labelledby': 'development-plugins-label',
++                'aria-describedby': 'development-plugins-description',
 +              }}
 +            />
 +          </Box>
@@ -4243,11 +4355,42 @@ index 1dc20d41f353daf5dda420488549cb535d009537..90bef7383a7b6cec419612214c9365ee
        <SectionBox
          title={<SectionFilterHeader title={t('translation|Plugins')} noNamespaceFilter />}
        >
-@@ -512,15 +547,36 @@ export default function PluginSettings() {
+@@ -352,6 +392,21 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+             {
+               header: t('translation|Status'),
+               Cell: ({ row: { original: plugin } }: { row: MRT_Row<PluginInfo> }) => {
++                if (plugin.isDevelopmentModeBlocked) {
++                  return (
++                    <Tooltip
++                      title={t('translation|Enable Plugin Development Mode to load this plugin')}
++                    >
++                      <Chip
++                        label={t('translation|Not Loaded')}
++                        size="small"
++                        color="warning"
++                        variant="outlined"
++                      />
++                    </Tooltip>
++                  );
++                }
++
+                 if (plugin.isCompatible === false) {
+                   return (
+                     <Tooltip
+@@ -407,7 +462,7 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+               header: t('translation|Enable'),
+               accessorFn: (plugin: PluginInfo) => plugin.isEnabled,
+               Cell: ({ row: { original: plugin } }: { row: MRT_Row<PluginInfo> }) => {
+-                if (!plugin.isCompatible || !isElectron()) {
++                if (plugin.isDevelopmentModeBlocked || !plugin.isCompatible || !isElectron()) {
+                   return null;
+                 }
+ 
+@@ -512,15 +567,36 @@ export default function PluginSettings() {
    const pluginSettings = useTypedSelector(state => state.plugins.pluginSettings);
    const handleDelete = usePluginDelete();
    const dispatchHeadlampEvent = useEventCallback(HeadlampEventType.PLUGIN_LIST_VIEW);
-+  const showDevelopmentPluginsSetting = isElectron() && !isDevMode();
++  const showDevelopmentPluginsSetting = isElectron() && window.desktopApi?.isDevelopment !== true;
 +  const [developmentPluginsEnabled, setDevelopmentPluginsEnabled] = useState(false);
  
    useEffect(() => {
@@ -5429,7 +5572,7 @@ index 42c3e51605a47537f2b58ce9d13d16000da0d1d5..c9a006c5e5c4d6e68e456a3c543ee219
    "An error occurred while fetching plugin info from {{  URL }}.": "حدث خطأ أثناء جلب معلومات الإضافة من {{ URL }}.",
    "Yes": "نعم",
 diff --git a/source/frontend/src/i18n/locales/ar/translation.json b/source/frontend/src/i18n/locales/ar/translation.json
-index 10ec807e32348809da98be2591b771228d0d1133..826f18efc5285fb6411357697b7b8efa6a533ed1 100644
+index 10ec807e32348809da98be2591b771228d0d1133..a59d93aea2f12bbb336bce7628c5eb6881683fc4 100644
 --- a/source/frontend/src/i18n/locales/ar/translation.json
 +++ b/source/frontend/src/i18n/locales/ar/translation.json
 @@ -52,6 +52,8 @@
@@ -5451,7 +5594,20 @@ index 10ec807e32348809da98be2591b771228d0d1133..826f18efc5285fb6411357697b7b8efa
    "Plugins": "الإضافات",
    "Multiple versions": "إصدارات متعددة",
    "Description": "الوصف",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "قيد التطوير",
+   "User-installed": "مثبت بواسطة المستخدم",
+   "Shipped": "مرفق",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "غير محمّل",
+   "This plugin is not compatible with this version of Headlamp": "هذه الإضافة غير متوافقة مع هذا الإصدار من Headlamp",
+   "Incompatible": "غير متوافق",
+   "Overridden by {{type}} version": "تم الاستبدال بواسطة إصدار {{type}}",
+-  "Not Loaded": "غير محمّل",
+   "Disabled": "معطّل",
+   "Loaded": "محمّل",
+   "Enable": "تفعيل",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "حدث خطأ أثناء حذف الإضافة {{ itemName }}",
    "Uh-oh! Something went wrong.": "عذرًا! حدث خطأ ما.",
    "Error loading {{ routeName }}": "حدث خطأ أثناء تحميل {{ routeName }}",
@@ -5475,7 +5631,7 @@ index b7681d0a85650af00da49a5c7338219bbadf3338..57149ac6f62ee2ea25c97096478f99ba
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} থেকে Plugin এর তথ্য আনার সময় একটি Error ঘটেছে।",
    "Yes": "হ্যাঁ",
 diff --git a/source/frontend/src/i18n/locales/bn/translation.json b/source/frontend/src/i18n/locales/bn/translation.json
-index 70834dee1062628e5612c0743fab99672a5a0a5b..3a0cae9bd121797e481dd3bcd643ac588bc0d0be 100644
+index 70834dee1062628e5612c0743fab99672a5a0a5b..c8e8b9d3b691e9d28e590f2a80ce0d1d814b0588 100644
 --- a/source/frontend/src/i18n/locales/bn/translation.json
 +++ b/source/frontend/src/i18n/locales/bn/translation.json
 @@ -52,6 +52,8 @@
@@ -5497,7 +5653,20 @@ index 70834dee1062628e5612c0743fab99672a5a0a5b..3a0cae9bd121797e481dd3bcd643ac58
    "Plugins": "Plugin",
    "Multiple versions": "একাধিক Version",
    "Description": "বর্ণনা",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "ডেভেলপমেন্ট",
+   "User-installed": "ব্যবহারকারী ইনস্টল করা",
+   "Shipped": "প্রেরিত",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "লোড হয়নি",
+   "This plugin is not compatible with this version of Headlamp": "এই Plugin Headlamp-এর এই Version-এর সাথে সামঞ্জস্যপূর্ণ নয়",
+   "Incompatible": "বেমানান",
+   "Overridden by {{type}} version": "{{type}} Version দ্বারা প্রতিস্থাপিত",
+-  "Not Loaded": "লোড হয়নি",
+   "Disabled": "অক্ষম",
+   "Loaded": "লোড হয়েছে",
+   "Enable": "সক্ষম করুন",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Plugin delete করতে Error {{ itemName }}।",
    "Uh-oh! Something went wrong.": "আহ-ওহ! ",
    "Error loading {{ routeName }}": "Loading Error {{ routeName }}",
@@ -5521,7 +5690,7 @@ index 721ff5ac7384f565f8e08e182dab24927e116659..ba6af90a2e62d5ec0cc836e6a6374a2a
    "An error occurred while fetching plugin info from {{  URL }}.": "Při načítání informací o modulu plug-in z {{  URL }} došlo k chybě.",
    "Yes": "Ano",
 diff --git a/source/frontend/src/i18n/locales/cs/translation.json b/source/frontend/src/i18n/locales/cs/translation.json
-index b3feeb449ba7643020b05e448f17e733bc96e438..50f4a96fa2b8d789d0c464c3bfd2570725769b4c 100644
+index b3feeb449ba7643020b05e448f17e733bc96e438..eee00ad29f10eaabb057172ff000e99f451d1ab0 100644
 --- a/source/frontend/src/i18n/locales/cs/translation.json
 +++ b/source/frontend/src/i18n/locales/cs/translation.json
 @@ -52,6 +52,8 @@
@@ -5543,7 +5712,20 @@ index b3feeb449ba7643020b05e448f17e733bc96e438..50f4a96fa2b8d789d0c464c3bfd25707
    "Plugins": "Moduly plug-in",
    "Multiple versions": "Více verzí",
    "Description": "Popis",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Vývoj",
+   "User-installed": "Nainstalováno uživatelem",
+   "Shipped": "Expedováno",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Nenačtené",
+   "This plugin is not compatible with this version of Headlamp": "Tento modul plug-in není kompatibilní s touto verzí aplikace Headlamp.",
+   "Incompatible": "Nekompatibilní",
+   "Overridden by {{type}} version": "Přepsáno verzí {{type}}",
+-  "Not Loaded": "Nenačtené",
+   "Disabled": "Zakázáno",
+   "Loaded": "Načteno",
+   "Enable": "Povolit",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Při odstraňování modulu plug-in {{ itemName }} došlo k chybě.",
    "Uh-oh! Something went wrong.": "Ale ne! Něco se nepovedlo.",
    "Error loading {{ routeName }}": "Chyba při načítání {{ routeName }}",
@@ -5567,7 +5749,7 @@ index 6019eff98317516a0c6eb34402cabc5ddbffeeb6..8546dfef003a297b5860ade5da465c3c
    "An error occurred while fetching plugin info from {{  URL }}.": "",
    "Yes": "",
 diff --git a/source/frontend/src/i18n/locales/de/translation.json b/source/frontend/src/i18n/locales/de/translation.json
-index 3837548db5a7f8dc7185c8070a653ef76f01d38c..5908a48f39bdf54f3274c181b9e39fe7b23f0be2 100644
+index 3837548db5a7f8dc7185c8070a653ef76f01d38c..5eccdc9e1152a169d059535e33896ca4865cf45e 100644
 --- a/source/frontend/src/i18n/locales/de/translation.json
 +++ b/source/frontend/src/i18n/locales/de/translation.json
 @@ -52,6 +52,8 @@
@@ -5589,7 +5771,20 @@ index 3837548db5a7f8dc7185c8070a653ef76f01d38c..5908a48f39bdf54f3274c181b9e39fe7
    "Plugins": "Plugins",
    "Multiple versions": "",
    "Description": "Beschreibung",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "Inkompatibel",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "",
+   "Loaded": "",
+   "Enable": "",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "Oh-oh! Etwas ist schief gelaufen.",
    "Error loading {{ routeName }}": "",
@@ -5613,7 +5808,7 @@ index b9c586be62959f921301fa96672a94dfa426eeee..1f1bc4fd8c386c6a1269a1ab62b8fcaf
    "An error occurred while fetching plugin info from {{  URL }}.": "An error occurred while fetching plugin info from {{  URL }}.",
    "Yes": "Yes",
 diff --git a/source/frontend/src/i18n/locales/en/translation.json b/source/frontend/src/i18n/locales/en/translation.json
-index d51662a5a2e455cd925e0991502225e7983f9452..92c8e5c39df1399b67537da1bfdcbf4351410794 100644
+index d51662a5a2e455cd925e0991502225e7983f9452..e29409e115d7c6fff1045d0f63f321aaae5890b0 100644
 --- a/source/frontend/src/i18n/locales/en/translation.json
 +++ b/source/frontend/src/i18n/locales/en/translation.json
 @@ -52,6 +52,8 @@
@@ -5635,7 +5830,20 @@ index d51662a5a2e455cd925e0991502225e7983f9452..92c8e5c39df1399b67537da1bfdcbf43
    "Plugins": "Plugins",
    "Multiple versions": "Multiple versions",
    "Description": "Description",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Development",
+   "User-installed": "User-installed",
+   "Shipped": "Shipped",
++  "Enable Plugin Development Mode to load this plugin": "Enable Plugin Development Mode to load this plugin",
++  "Not Loaded": "Not Loaded",
+   "This plugin is not compatible with this version of Headlamp": "This plugin is not compatible with this version of Headlamp",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "Overridden by {{type}} version",
+-  "Not Loaded": "Not Loaded",
+   "Disabled": "Disabled",
+   "Loaded": "Loaded",
+   "Enable": "Enable",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Error deleting plugin {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Uh-oh! Something went wrong.",
    "Error loading {{ routeName }}": "Error loading {{ routeName }}",
@@ -5659,7 +5867,7 @@ index 5c1f4ff17c48f7fd8c157c888c839c7b409f1e14..bdc3193a093a9ef9cf8db86a3546e1b4
    "An error occurred while fetching plugin info from {{  URL }}.": "",
    "Yes": "",
 diff --git a/source/frontend/src/i18n/locales/es/translation.json b/source/frontend/src/i18n/locales/es/translation.json
-index 97731c2ec611194081d08105bd4bd36f80ea05e5..d5ef5fbb1ac7e5695c6685493a195a528de535d1 100644
+index 97731c2ec611194081d08105bd4bd36f80ea05e5..5f673dd72cc9387f3755119029d9d366386c8fb4 100644
 --- a/source/frontend/src/i18n/locales/es/translation.json
 +++ b/source/frontend/src/i18n/locales/es/translation.json
 @@ -52,6 +52,8 @@
@@ -5681,7 +5889,20 @@ index 97731c2ec611194081d08105bd4bd36f80ea05e5..d5ef5fbb1ac7e5695c6685493a195a52
    "Plugins": "Plugins",
    "Multiple versions": "",
    "Description": "Descripción",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "Desactivado",
+   "Loaded": "",
+   "Enable": "Activar",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "¡Ups! Algo ha fallado.",
    "Error loading {{ routeName }}": "Error al cargar {{ routeName }}",
@@ -5705,7 +5926,7 @@ index e2d68d0db001eed45435c631888cfa245dd35a39..ff584a2dd217086a0e92a67f2312d040
    "An error occurred while fetching plugin info from {{  URL }}.": "Une erreur s'est produite lors de la récupération des informations du plugin depuis {{  URL }}.",
    "Yes": "Oui",
 diff --git a/source/frontend/src/i18n/locales/fr/translation.json b/source/frontend/src/i18n/locales/fr/translation.json
-index 12b65f07bf66b5a5697eb60bad81cf9f81cbc003..fce124115293fe9b2e53767982d8b5df00f2642f 100644
+index 12b65f07bf66b5a5697eb60bad81cf9f81cbc003..41afd7031cf72b56fc6464fa66595ccb6bd38964 100644
 --- a/source/frontend/src/i18n/locales/fr/translation.json
 +++ b/source/frontend/src/i18n/locales/fr/translation.json
 @@ -52,6 +52,8 @@
@@ -5727,7 +5948,20 @@ index 12b65f07bf66b5a5697eb60bad81cf9f81cbc003..fce124115293fe9b2e53767982d8b5df
    "Plugins": "Plugins",
    "Multiple versions": "Versions multiples",
    "Description": "Description",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Développement",
+   "User-installed": "Installé par l'utilisateur",
+   "Shipped": "Fourni",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Non chargé",
+   "This plugin is not compatible with this version of Headlamp": "Ce plugin n'est pas compatible avec cette version de Headlamp",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "Remplacé par la version {{type}}",
+-  "Not Loaded": "Non chargé",
+   "Disabled": "Désactivé",
+   "Loaded": "Chargé",
+   "Enable": "Activer",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Erreur lors de la suppression du plugin {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Uh-oh ! Quelque chose s'est mal passé.",
    "Error loading {{ routeName }}": "Erreur lors du chargement de {{ routeName }}",
@@ -5751,7 +5985,7 @@ index 89b2d6929deaa5de230342286d9a4f3482912c78..eefdcb22f4cce6466a375e2e09e2caba
    "An error occurred while fetching plugin info from {{  URL }}.": "An error occurred while fetching plugin info from {{  URL }}.",
    "Yes": "Yes",
 diff --git a/source/frontend/src/i18n/locales/he/translation.json b/source/frontend/src/i18n/locales/he/translation.json
-index 9032b8d99da6f3bbbd401b43ec67a854f3ec63ed..c08b76900a76f9b27ba47f7682f5eeb37fe21781 100644
+index 9032b8d99da6f3bbbd401b43ec67a854f3ec63ed..efa46113b1b28985017ebb59aa27f5336da0602c 100644
 --- a/source/frontend/src/i18n/locales/he/translation.json
 +++ b/source/frontend/src/i18n/locales/he/translation.json
 @@ -52,6 +52,8 @@
@@ -5773,7 +6007,20 @@ index 9032b8d99da6f3bbbd401b43ec67a854f3ec63ed..c08b76900a76f9b27ba47f7682f5eeb3
    "Plugins": "Plugins",
    "Multiple versions": "Multiple versions",
    "Description": "Description",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Development",
+   "User-installed": "User-installed",
+   "Shipped": "Shipped",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Not Loaded",
+   "This plugin is not compatible with this version of Headlamp": "This plugin is not compatible with this version of Headlamp",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "Overridden by {{type}} version",
+-  "Not Loaded": "Not Loaded",
+   "Disabled": "Disabled",
+   "Loaded": "Loaded",
+   "Enable": "Enable",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Error deleting plugin {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Uh-oh! Something went wrong.",
    "Error loading {{ routeName }}": "Error loading {{ routeName }}",
@@ -5797,7 +6044,7 @@ index c0cecbd6fe44b3961750c9e0486ecd88dfb84efb..b9f8a2211a12b4495fc405b73b93ba29
    "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} से प्लगिन जानकारी प्राप्त करते समय एक त्रुटि हुई।",
    "Yes": "हां",
 diff --git a/source/frontend/src/i18n/locales/hi/translation.json b/source/frontend/src/i18n/locales/hi/translation.json
-index 73c7590b26942505a945788ba00ecf78c702213f..a3a273aa3410f7aef687aa2db3ce3c10ecbb637d 100644
+index 73c7590b26942505a945788ba00ecf78c702213f..ea46499d14536dbf7ffede92eaed43967c15b5c3 100644
 --- a/source/frontend/src/i18n/locales/hi/translation.json
 +++ b/source/frontend/src/i18n/locales/hi/translation.json
 @@ -52,6 +52,8 @@
@@ -5819,7 +6066,20 @@ index 73c7590b26942505a945788ba00ecf78c702213f..a3a273aa3410f7aef687aa2db3ce3c10
    "Plugins": "",
    "Multiple versions": "",
    "Description": "",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "",
+   "Loaded": "",
+   "Enable": "",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "",
    "Error loading {{ routeName }}": "",
@@ -5843,7 +6103,7 @@ index 0ed7f9865a1d6f7281ccc411ddbe71b6c1ee095c..cbcffed21e3a0bbb44701f6b3d70181a
    "An error occurred while fetching plugin info from {{  URL }}.": "Hiba történt a beépülő modul adatainak beolvasása során innen: {{  URL }}.",
    "Yes": "Igen",
 diff --git a/source/frontend/src/i18n/locales/hu/translation.json b/source/frontend/src/i18n/locales/hu/translation.json
-index 98b070d3e30de4082b28f409aacafb38db428b6c..276cc84db69dd90611cb6ccada6e6b26ca1ebfae 100644
+index 98b070d3e30de4082b28f409aacafb38db428b6c..de6a731f168ffef274905e956826e781b24c8333 100644
 --- a/source/frontend/src/i18n/locales/hu/translation.json
 +++ b/source/frontend/src/i18n/locales/hu/translation.json
 @@ -52,6 +52,8 @@
@@ -5865,7 +6125,20 @@ index 98b070d3e30de4082b28f409aacafb38db428b6c..276cc84db69dd90611cb6ccada6e6b26
    "Plugins": "Beépülő modulok",
    "Multiple versions": "Több verzió",
    "Description": "Leírás",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Fejlesztés",
+   "User-installed": "Felhasználó által telepített",
+   "Shipped": "Kiszállítva",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Nincs betöltve",
+   "This plugin is not compatible with this version of Headlamp": "Ez a beépülő modul nem kompatibilis a Headlamp ezen verziójával",
+   "Incompatible": "Nem kompatibilis",
+   "Overridden by {{type}} version": "Felülírta a(z) {{type}} verzió",
+-  "Not Loaded": "Nincs betöltve",
+   "Disabled": "Letiltva",
+   "Loaded": "Betöltve",
+   "Enable": "Engedélyezés",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Hiba történt a(z) {{ itemName }} beépülő modul törlése során.",
    "Uh-oh! Something went wrong.": "Hoppá! Hiba történt.",
    "Error loading {{ routeName }}": "Hiba a(z) {{ routeName }} betöltése során",
@@ -5889,7 +6162,7 @@ index cc77a03b2ce814c6a14f6d43fced32054c324c7b..e54aa12315dec48a77440305aaeb1921
    "An error occurred while fetching plugin info from {{  URL }}.": "Terjadi kesalahan saat mengambil info plugin dari {{  URL }}.",
    "Yes": "Ya",
 diff --git a/source/frontend/src/i18n/locales/id/translation.json b/source/frontend/src/i18n/locales/id/translation.json
-index d01cbafa7d1b85a498bfaebc826f380f7c6b2287..68b278d6c144ae0047441629951b306072d76d90 100644
+index d01cbafa7d1b85a498bfaebc826f380f7c6b2287..68b9a90c0b8eb9e8a76802b20a53f1a8bd896233 100644
 --- a/source/frontend/src/i18n/locales/id/translation.json
 +++ b/source/frontend/src/i18n/locales/id/translation.json
 @@ -52,6 +52,8 @@
@@ -5911,7 +6184,20 @@ index d01cbafa7d1b85a498bfaebc826f380f7c6b2287..68b278d6c144ae0047441629951b3060
    "Plugins": "Plugin",
    "Multiple versions": "Beberapa versi",
    "Description": "Deskripsi",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Pengembangan",
+   "User-installed": "Diinstal oleh pengguna",
+   "Shipped": "Dikirim",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Tidak Dimuat",
+   "This plugin is not compatible with this version of Headlamp": "Plugin ini tidak kompatibel dengan versi Headlamp ini",
+   "Incompatible": "Tidak kompatibel",
+   "Overridden by {{type}} version": "Ditimpa oleh versi {{type}}",
+-  "Not Loaded": "Tidak Dimuat",
+   "Disabled": "Dinonaktifkan",
+   "Loaded": "Dimuat",
+   "Enable": "Aktifkan",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Kesalahan saat menghapus plugin {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Oh, tidak! Terjadi kesalahan.",
    "Error loading {{ routeName }}": "Kesalahan saat memuat {{ routeName }}",
@@ -5935,7 +6221,7 @@ index 7d7537a75471481cdf4345c963b75240776f7bd4..1eb42dab28f7ed44a97381569a78f5e8
    "An error occurred while fetching plugin info from {{  URL }}.": "Si è verificato un errore durante il recupero delle informazioni dell'estensione da {{  URL }}.",
    "Yes": "Sì",
 diff --git a/source/frontend/src/i18n/locales/it/translation.json b/source/frontend/src/i18n/locales/it/translation.json
-index ce844d6941a0faa8a276b3c3be919fe387ab989c..cc215378e1964eef7190ba826d486c938d2cbf38 100644
+index ce844d6941a0faa8a276b3c3be919fe387ab989c..94373b20e7053dc63d744f5907fcaaba409d35e0 100644
 --- a/source/frontend/src/i18n/locales/it/translation.json
 +++ b/source/frontend/src/i18n/locales/it/translation.json
 @@ -52,6 +52,8 @@
@@ -5957,7 +6243,20 @@ index ce844d6941a0faa8a276b3c3be919fe387ab989c..cc215378e1964eef7190ba826d486c93
    "Plugins": "Estensioni",
    "Multiple versions": "",
    "Description": "Descrizione",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "Incompatibile",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "Disabilitato",
+   "Loaded": "",
+   "Enable": "Abilita",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "Ops! Qualcosa è andato storto.",
    "Error loading {{ routeName }}": "Errore durante il caricamento di {{ routeName }}",
@@ -5981,7 +6280,7 @@ index 5f343ed3b01ac6342a95ee70a0661d15bbbedddb..86ed05e03223cc34a5fc63f5888be80f
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} からプラグイン情報を取得中にエラーが発生しました。",
    "Yes": "はい",
 diff --git a/source/frontend/src/i18n/locales/ja/translation.json b/source/frontend/src/i18n/locales/ja/translation.json
-index 5653d967019e4b2e720fdf385d5d001a9dd92355..407ef0f7f504c0369d3b171ed1ea0b6bcf01b5f5 100644
+index 5653d967019e4b2e720fdf385d5d001a9dd92355..d51664600d21a137f66436fc500796f347b6f93f 100644
 --- a/source/frontend/src/i18n/locales/ja/translation.json
 +++ b/source/frontend/src/i18n/locales/ja/translation.json
 @@ -52,6 +52,8 @@
@@ -6003,7 +6302,20 @@ index 5653d967019e4b2e720fdf385d5d001a9dd92355..407ef0f7f504c0369d3b171ed1ea0b6b
    "Plugins": "プラグイン",
    "Multiple versions": "",
    "Description": "説明",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "互換性なし",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "無効",
+   "Loaded": "",
+   "Enable": "有効にする",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "あれっ！何か問題が発生しました。",
    "Error loading {{ routeName }}": "{{ routeName }} の読み込み中にエラーが発生しました",
@@ -6027,7 +6339,7 @@ index 25a577925b39b74ddc1ae1e88d58e37f6f734030..0a430d781a1a8d1afbe6c9aeda3b3c51
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }}에서 플러그인 정보를 가져오는 중 오류가 발생했습니다.",
    "Yes": "네",
 diff --git a/source/frontend/src/i18n/locales/ko/translation.json b/source/frontend/src/i18n/locales/ko/translation.json
-index e89abd3b1058deebc489aebe662418a9a45f92ef..5dcd316a859983e4435543c1e64753d221aebd8c 100644
+index e89abd3b1058deebc489aebe662418a9a45f92ef..f36f99e7988efe389610aec758a66259e2863eac 100644
 --- a/source/frontend/src/i18n/locales/ko/translation.json
 +++ b/source/frontend/src/i18n/locales/ko/translation.json
 @@ -52,6 +52,8 @@
@@ -6049,7 +6361,20 @@ index e89abd3b1058deebc489aebe662418a9a45f92ef..5dcd316a859983e4435543c1e64753d2
    "Plugins": "플러그인",
    "Multiple versions": "",
    "Description": "설명",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "호환되지 않음",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "사용 안 함",
+   "Loaded": "",
+   "Enable": "사용",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "앗! 문제가 발생했습니다.",
    "Error loading {{ routeName }}": "{{ routeName }} 로드를 실패했습니다.",
@@ -6073,7 +6398,7 @@ index b5fe35d0cd77de7bd9d7b1617d2b416a6b71777d..d3fa6d5544c39c8079e68801e06ec96f
    "An error occurred while fetching plugin info from {{  URL }}.": "Er is een fout opgetreden bij het ophalen van informatie over de invoegtoepassing van {{  URL }}.",
    "Yes": "Ja",
 diff --git a/source/frontend/src/i18n/locales/nl/translation.json b/source/frontend/src/i18n/locales/nl/translation.json
-index 104279a47070e23d0312571105da7d7bca4ffb35..24ecd9c04100a1376e42ba111c8411437c1d6ee8 100644
+index 104279a47070e23d0312571105da7d7bca4ffb35..eee87de0ddc219aabb804922d5d2a7dd9a10fa29 100644
 --- a/source/frontend/src/i18n/locales/nl/translation.json
 +++ b/source/frontend/src/i18n/locales/nl/translation.json
 @@ -52,6 +52,8 @@
@@ -6095,7 +6420,20 @@ index 104279a47070e23d0312571105da7d7bca4ffb35..24ecd9c04100a1376e42ba111c841143
    "Plugins": "Invoegtoepassingen",
    "Multiple versions": "Meerdere versies",
    "Description": "Beschrijving",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Ontwikkeling",
+   "User-installed": "Door de gebruiker geïnstalleerd",
+   "Shipped": "Verzonden",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Niet geladen",
+   "This plugin is not compatible with this version of Headlamp": "Deze invoegtoepassing is niet compatibel met deze versie van Headlamp",
+   "Incompatible": "Incompatibel",
+   "Overridden by {{type}} version": "Overschreven door versie {{type}}",
+-  "Not Loaded": "Niet geladen",
+   "Disabled": "Uitgeschakeld",
+   "Loaded": "Geladen",
+   "Enable": "Inschakelen",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Fout bij het verwijderen van invoegtoepassing {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Oeps! Er is iets misgegaan.",
    "Error loading {{ routeName }}": "Fout bij het laden van {{ routeName }}",
@@ -6119,7 +6457,7 @@ index a9c77734bd19fceba13674227cfe38f848a542cb..5e4d4f56099e3592f31e84ebda50cbbb
    "An error occurred while fetching plugin info from {{  URL }}.": "Wystąpił błąd podczas pobierania informacji o wtyczce z {{  URL }}.",
    "Yes": "Tak",
 diff --git a/source/frontend/src/i18n/locales/pl/translation.json b/source/frontend/src/i18n/locales/pl/translation.json
-index 62349effca106aa910abd6e816c3b704a4732d73..1939d741dbd55df94cf5602edf04764fa49775ac 100644
+index 62349effca106aa910abd6e816c3b704a4732d73..b26dab5b6cca8dcae89af62290254307a7f30a30 100644
 --- a/source/frontend/src/i18n/locales/pl/translation.json
 +++ b/source/frontend/src/i18n/locales/pl/translation.json
 @@ -52,6 +52,8 @@
@@ -6141,7 +6479,20 @@ index 62349effca106aa910abd6e816c3b704a4732d73..1939d741dbd55df94cf5602edf04764f
    "Plugins": "Wtyczki",
    "Multiple versions": "Wiele wersji",
    "Description": "Opis",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Programowanie",
+   "User-installed": "Zainstalowane przez użytkownika",
+   "Shipped": "Wysłano",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Nie załadowano",
+   "This plugin is not compatible with this version of Headlamp": "Ta wtyczka nie jest zgodna z tą wersją programu Headlamp",
+   "Incompatible": "Niezgodne",
+   "Overridden by {{type}} version": "Zastąpione przez wersję {{type}}",
+-  "Not Loaded": "Nie załadowano",
+   "Disabled": "Wyłączono",
+   "Loaded": "Załadowano",
+   "Enable": "Włącz",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Błąd podczas usuwania wtyczki {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Niestety Wystąpił problem.",
    "Error loading {{ routeName }}": "Błąd ładowania {{ routeName }}",
@@ -6165,7 +6516,7 @@ index 41bf718c0369a85f3c69d1af59216126000e842f..451e4802779074201310a9ecd96166e5
    "An error occurred while fetching plugin info from {{  URL }}.": "Ocorreu um erro ao buscar informações do plugin em {{  URL }}.",
    "Yes": "Sim",
 diff --git a/source/frontend/src/i18n/locales/pt-br/translation.json b/source/frontend/src/i18n/locales/pt-br/translation.json
-index dd13653a2309dbb5d9aa958439224b84b6da4991..a463db601c231d99176917af5f9a289e41ecf963 100644
+index dd13653a2309dbb5d9aa958439224b84b6da4991..5b50e7852b8ae8e7403cad84e471f16e87a29d42 100644
 --- a/source/frontend/src/i18n/locales/pt-br/translation.json
 +++ b/source/frontend/src/i18n/locales/pt-br/translation.json
 @@ -52,6 +52,8 @@
@@ -6187,7 +6538,20 @@ index dd13653a2309dbb5d9aa958439224b84b6da4991..a463db601c231d99176917af5f9a289e
    "Plugins": "Plugins",
    "Multiple versions": "Várias versões",
    "Description": "Descrição",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Desenvolvimento",
+   "User-installed": "Instalado pelo usuário",
+   "Shipped": "Enviado",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Não Carregado",
+   "This plugin is not compatible with this version of Headlamp": "Esse plug-in não é compatível com essa versão do Headlamp",
+   "Incompatible": "Incompatível",
+   "Overridden by {{type}} version": "Substituído pela versão de {{type}}",
+-  "Not Loaded": "Não Carregado",
+   "Disabled": "Desactivado",
+   "Loaded": "Carregado",
+   "Enable": "Activar",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Erro ao excluir o plug-in {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Oh-oh! Algo correu mal.",
    "Error loading {{ routeName }}": "Erro ao carregar {{ routeName }}",
@@ -6211,7 +6575,7 @@ index 3ac280051fac6830f15ab969b2167642e9095135..b2fd10a5f8afd0e183d5c8be7d108c52
    "An error occurred while fetching plugin info from {{  URL }}.": "",
    "Yes": "",
 diff --git a/source/frontend/src/i18n/locales/pt-pt/translation.json b/source/frontend/src/i18n/locales/pt-pt/translation.json
-index badfcf5173f69631135388c4d27d753af8e19fec..0731cc7d4da8fcdb977023218fd45046bf0717cd 100644
+index badfcf5173f69631135388c4d27d753af8e19fec..6428e9c5748323d4429d28f7f1a360069151cd33 100644
 --- a/source/frontend/src/i18n/locales/pt-pt/translation.json
 +++ b/source/frontend/src/i18n/locales/pt-pt/translation.json
 @@ -52,6 +52,8 @@
@@ -6233,7 +6597,20 @@ index badfcf5173f69631135388c4d27d753af8e19fec..0731cc7d4da8fcdb977023218fd45046
    "Plugins": "",
    "Multiple versions": "",
    "Description": "",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "",
+   "Loaded": "",
+   "Enable": "",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "",
    "Error loading {{ routeName }}": "",
@@ -6257,7 +6634,7 @@ index f57a594acbebe7b9b42f2f9eceec8fae219049ef..0155b3560681095485771d348cdbc163
    "An error occurred while fetching plugin info from {{  URL }}.": "Произошла ошибка при получении информации о плагине из {{  URL }}.",
    "Yes": "Да",
 diff --git a/source/frontend/src/i18n/locales/ru/translation.json b/source/frontend/src/i18n/locales/ru/translation.json
-index c75c6517fb9d7f6209ad84b92393a93e6ba29038..dc1c76dcc0c25929b2d334572580dbfea851039b 100644
+index c75c6517fb9d7f6209ad84b92393a93e6ba29038..a7aee0500e81ab321f1fa7f3804632d89f3509c6 100644
 --- a/source/frontend/src/i18n/locales/ru/translation.json
 +++ b/source/frontend/src/i18n/locales/ru/translation.json
 @@ -52,6 +52,8 @@
@@ -6279,7 +6656,20 @@ index c75c6517fb9d7f6209ad84b92393a93e6ba29038..dc1c76dcc0c25929b2d334572580dbfe
    "Plugins": "Плагины",
    "Multiple versions": "Несколько версий",
    "Description": "Описание",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Разработка",
+   "User-installed": "Установленный пользователем",
+   "Shipped": "Встроенный",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Не загружено",
+   "This plugin is not compatible with this version of Headlamp": "Этот плагин несовместим с этой версией Headlamp.",
+   "Incompatible": "Несовместимый",
+   "Overridden by {{type}} version": "Переопределено версией {{type}}",
+-  "Not Loaded": "Не загружено",
+   "Disabled": "Отключено",
+   "Loaded": "Загружено",
+   "Enable": "Включить",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Ошибка удаления плагина {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Ой-ой! Что-то пошло не так.",
    "Error loading {{ routeName }}": "Ошибка загрузки {{ routeName }}.",
@@ -6303,7 +6693,7 @@ index e2390325cf1208472438df9e7c4e59c0c18e7bf1..bf500fa5242d324ab95ff216b9ee1bf8
    "An error occurred while fetching plugin info from {{  URL }}.": "Ett fel inträffade när info om plugin skulle hämtas från {{  URL }}.",
    "Yes": "Ja",
 diff --git a/source/frontend/src/i18n/locales/sv/translation.json b/source/frontend/src/i18n/locales/sv/translation.json
-index 3c49dcfcd45b4ab9ce681a61ab93612094467b5f..c75c5a3f174365a1701b6b179218a390bb203a60 100644
+index 3c49dcfcd45b4ab9ce681a61ab93612094467b5f..df0091d176134681881a6508d3222bc57a50faec 100644
 --- a/source/frontend/src/i18n/locales/sv/translation.json
 +++ b/source/frontend/src/i18n/locales/sv/translation.json
 @@ -52,6 +52,8 @@
@@ -6325,7 +6715,20 @@ index 3c49dcfcd45b4ab9ce681a61ab93612094467b5f..c75c5a3f174365a1701b6b179218a390
    "Plugins": "Plugin-program",
    "Multiple versions": "Flera versioner",
    "Description": "Beskrivning",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Utveckling",
+   "User-installed": "Användarinstallerad",
+   "Shipped": "Skickat",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Inte inläst",
+   "This plugin is not compatible with this version of Headlamp": "Det här pluginprogrammet är inte kompatibelt med den här versionen av Headlamp",
+   "Incompatible": "Inkompatibelt",
+   "Overridden by {{type}} version": "Har åsidosatts av {{type}}-version",
+-  "Not Loaded": "Inte inläst",
+   "Disabled": "Inaktiverat",
+   "Loaded": "Inläst",
+   "Enable": "Aktivera",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "Fel vid borttagning av plugin {{ itemName }}.",
    "Uh-oh! Something went wrong.": "Hoppsan! Något blev fel.",
    "Error loading {{ routeName }}": "Fel vid inläsning av {{ routeName }}",
@@ -6349,7 +6752,7 @@ index e4d4f3446e1fbafb271583e26e56204d118489e1..cccd87f1542c88274d6663dd7b051964
    "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} இலிருந்து பிளக்-இன் தகவலைப் பெறும்போது ஒரு பிழை ஏற்பட்டது.",
    "Yes": "ஆம்",
 diff --git a/source/frontend/src/i18n/locales/ta/translation.json b/source/frontend/src/i18n/locales/ta/translation.json
-index f1c2cdcf1228da2eb4be46d64377254818e47416..591aa39f21c21bae839b11fdbb26977309ad9d67 100644
+index f1c2cdcf1228da2eb4be46d64377254818e47416..3a799a77cd4677d4f474725a17e89bc2f80cd2a1 100644
 --- a/source/frontend/src/i18n/locales/ta/translation.json
 +++ b/source/frontend/src/i18n/locales/ta/translation.json
 @@ -52,6 +52,8 @@
@@ -6371,7 +6774,20 @@ index f1c2cdcf1228da2eb4be46d64377254818e47416..591aa39f21c21bae839b11fdbb269773
    "Plugins": "பிளக்-இன்கள்",
    "Multiple versions": "",
    "Description": "விளக்கம்",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "பொருந்தாதது",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "முடக்கப்பட்டது",
+   "Loaded": "",
+   "Enable": "இயக்கு",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "",
    "Uh-oh! Something went wrong.": "அய்யோ! ஏதோ பிழை நேர்ந்தது.",
    "Error loading {{ routeName }}": "{{ routeName }} ஏற்றுவதில் பிழை",
@@ -6395,7 +6811,7 @@ index 87954ab89b0bde3d0e8c4769056f7c58c340cda0..c1616d3b16df42e10c061e56be7eb95d
    "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} konumundan eklenti bilgileri getirilirken hata oluştu.",
    "Yes": "Evet",
 diff --git a/source/frontend/src/i18n/locales/tr/translation.json b/source/frontend/src/i18n/locales/tr/translation.json
-index dd553dffd255fb8806d4b0507c4908d0f903080e..8a4f6911c6596bf4f09310d862957d4bccbed7d1 100644
+index dd553dffd255fb8806d4b0507c4908d0f903080e..c61e7cccf2a26b4862144037bb24fd3f37c0a476 100644
 --- a/source/frontend/src/i18n/locales/tr/translation.json
 +++ b/source/frontend/src/i18n/locales/tr/translation.json
 @@ -52,6 +52,8 @@
@@ -6417,7 +6833,20 @@ index dd553dffd255fb8806d4b0507c4908d0f903080e..8a4f6911c6596bf4f09310d862957d4b
    "Plugins": "Eklentiler",
    "Multiple versions": "Birden çok sürüm",
    "Description": "Açıklama",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "Geliştirme",
+   "User-installed": "Kullanıcı tarafından yüklenen",
+   "Shipped": "Gönderildi",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Yüklenmedi",
+   "This plugin is not compatible with this version of Headlamp": "Bu eklenti, Headlamp'in bu sürümüyle uyumlu değil",
+   "Incompatible": "Uyumsuz",
+   "Overridden by {{type}} version": "{{type}} sürümü tarafından geçersiz kılındı",
+-  "Not Loaded": "Yüklenmedi",
+   "Disabled": "Devre dışı",
+   "Loaded": "Yüklendi",
+   "Enable": "Etkinleştir",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "{{ itemName }} eklentisi silinirken hata oluştu.",
    "Uh-oh! Something went wrong.": "Hay aksi! Bir sorun oluştu.",
    "Error loading {{ routeName }}": "{{ routeName }} yüklenirken hata oluştu",
@@ -6441,7 +6870,7 @@ index 857986606afa14d7741196d2b354d5595b6d9059..ad0304c0f11de41485c073e20dcbd6fc
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} سے پلگ اِن کی معلومات حاصل کرتے وقت ایک خرابی پیش آئی۔",
    "Yes": "ہاں",
 diff --git a/source/frontend/src/i18n/locales/ur/translation.json b/source/frontend/src/i18n/locales/ur/translation.json
-index aebc10ff883a5e4306e7a82249dabb71b3241968..321b8d626597fcded16d277146d8c8f887c0218a 100644
+index aebc10ff883a5e4306e7a82249dabb71b3241968..23f2f108d2fed5f8511fce68d4ddaba645188bf8 100644
 --- a/source/frontend/src/i18n/locales/ur/translation.json
 +++ b/source/frontend/src/i18n/locales/ur/translation.json
 @@ -52,6 +52,8 @@
@@ -6463,7 +6892,20 @@ index aebc10ff883a5e4306e7a82249dabb71b3241968..321b8d626597fcded16d277146d8c8f8
    "Plugins": "پلگ انز",
    "Multiple versions": "متعدد ورژنز",
    "Description": "تفصیل",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "ترقیاتی",
+   "User-installed": "صارف کی جانب سے نصب شدہ",
+   "Shipped": "شامل شدہ",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "لوڈ نہیں ہوا",
+   "This plugin is not compatible with this version of Headlamp": "یہ پلگ ان ہیڈلیمپ کے اس ورژن کے ساتھ مطابقت نہیں رکھتا",
+   "Incompatible": "غیر مطابقت پذیر",
+   "Overridden by {{type}} version": "{{type}} ورژن کے ذریعے تبدیل کیا گیا",
+-  "Not Loaded": "لوڈ نہیں ہوا",
+   "Disabled": "غیر فعال",
+   "Loaded": "لوڈ ہو گیا",
+   "Enable": "فعال کریں",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "پلگ ان {{ itemName }} حذف کرنے میں خرابی",
    "Uh-oh! Something went wrong.": "اوہ! کچھ غلط ہو گیا",
    "Error loading {{ routeName }}": "{{ routeName }} لوڈ کرنے میں خرابی",
@@ -6487,7 +6929,7 @@ index 85361c9140d50f4912d8336dc3ced5a4aea80025..a22c12cc966ae09625cffaf19789a19e
    "An error occurred while fetching plugin info from {{  URL }}.": "從{{  URL }}獲取外掛資訊時發生錯誤。",
    "Yes": "是",
 diff --git a/source/frontend/src/i18n/locales/zh-tw/translation.json b/source/frontend/src/i18n/locales/zh-tw/translation.json
-index 655465d02b076cdbf3f0784db3332b93dcbfc69c..e136fc849e54e81ff6b69d5b1f2d3b4a3226fe92 100644
+index 655465d02b076cdbf3f0784db3332b93dcbfc69c..bcac55d8ff127e9a71c99e9e5f011f2c95cf39d4 100644
 --- a/source/frontend/src/i18n/locales/zh-tw/translation.json
 +++ b/source/frontend/src/i18n/locales/zh-tw/translation.json
 @@ -52,6 +52,8 @@
@@ -6509,7 +6951,20 @@ index 655465d02b076cdbf3f0784db3332b93dcbfc69c..e136fc849e54e81ff6b69d5b1f2d3b4a
    "Plugins": "外掛",
    "Multiple versions": "多個版本",
    "Description": "描述",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "開發中",
+   "User-installed": "使用者安裝",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "沒有載入",
+   "This plugin is not compatible with this version of Headlamp": "此外掛與此版本的 Headlamp 不相容",
+   "Incompatible": "不相容",
+   "Overridden by {{type}} version": "已被 {{type}} 版本覆寫",
+-  "Not Loaded": "沒有載入",
+   "Disabled": "已停用",
+   "Loaded": "已載入",
+   "Enable": "啟用",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "刪除外掛 {{ itemName }} 時出錯。",
    "Uh-oh! Something went wrong.": "哎呀！出現問題。",
    "Error loading {{ routeName }}": "讀取 {{ routeName }} 時出錯",
@@ -6533,7 +6988,7 @@ index 335548d40fce456bce107fdcdaaf82af955905a0..4764fb70b798c3d08a23defeff4a2573
    "An error occurred while fetching plugin info from {{  URL }}.": "从{{  URL }}获取插件信息失败.",
    "Yes": "是",
 diff --git a/source/frontend/src/i18n/locales/zh/translation.json b/source/frontend/src/i18n/locales/zh/translation.json
-index 7761ba94522e0fe7b2e5b4f3f9f68aa5250eb33a..ae0360e687854c6356c80cc212956a1915b24c1d 100644
+index 7761ba94522e0fe7b2e5b4f3f9f68aa5250eb33a..fd6e697f7b6a26fe6aa3157e3d695cca7be1b344 100644
 --- a/source/frontend/src/i18n/locales/zh/translation.json
 +++ b/source/frontend/src/i18n/locales/zh/translation.json
 @@ -52,6 +52,8 @@
@@ -6555,7 +7010,20 @@ index 7761ba94522e0fe7b2e5b4f3f9f68aa5250eb33a..ae0360e687854c6356c80cc212956a19
    "Plugins": "插件",
    "Multiple versions": "多个版本",
    "Description": "描述",
-@@ -136,6 +141,8 @@
+@@ -118,10 +123,11 @@
+   "Development": "开发版",
+   "User-installed": "用户安装",
+   "Shipped": "内置",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "未加载",
+   "This plugin is not compatible with this version of Headlamp": "此插件与当前版本的 Headlamp 不兼容",
+   "Incompatible": "不兼容",
+   "Overridden by {{type}} version": "已被 {{type}} 版本覆盖",
+-  "Not Loaded": "未加载",
+   "Disabled": "已停用",
+   "Loaded": "已加载",
+   "Enable": "启用",
+@@ -136,6 +142,8 @@
    "Error deleting plugin {{ itemName }}.": "删除插件 {{ itemName }} 时出错。",
    "Uh-oh! Something went wrong.": "哎呀！出现问题。",
    "Error loading {{ routeName }}": "读取 {{ routeName }} 时出错",
@@ -6988,10 +7456,10 @@ index 0000000000000000000000000000000000000000..2fc8d0598b38af4a1e49a44b8292638b
 +}
 diff --git a/source/frontend/src/plugin/developmentPlugins.test.ts b/source/frontend/src/plugin/developmentPlugins.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..cd17996e93f14e21b9e6ac53cedd236f82a2ea42
+index 0000000000000000000000000000000000000000..a3cea8a5667bfc129e0a1dfb70551ea691c18e53
 --- /dev/null
 +++ b/source/frontend/src/plugin/developmentPlugins.test.ts
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,121 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -7009,9 +7477,11 @@ index 0000000000000000000000000000000000000000..cd17996e93f14e21b9e6ac53cedd236f
 + */
 +
 +import { afterEach, expect, test, vi } from 'vitest';
-+import * as devModeHelpers from '../helpers/isDevMode';
 +import * as electronHelpers from '../helpers/isElectron';
-+import { filterDisabledDevelopmentPlugins } from './developmentPlugins';
++import {
++  filterDisabledDevelopmentPlugins,
++  getDormantDevelopmentPluginSettings,
++} from './developmentPlugins';
 +
 +const plugins = [
 +  { name: 'local', source: 'development' as const, type: 'development' as const },
@@ -7026,8 +7496,8 @@ index 0000000000000000000000000000000000000000..cd17996e93f14e21b9e6ac53cedd236f
 +
 +test('filters every plugin served from the development source when disabled', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(false);
 +  window.desktopApi = {
++    isDevelopment: false,
 +    getDevelopmentPluginsEnabled: vi.fn().mockResolvedValue(false),
 +  } as any;
 +
@@ -7037,17 +7507,17 @@ index 0000000000000000000000000000000000000000..cd17996e93f14e21b9e6ac53cedd236f
 +  ]);
 +});
 +
-+test('keeps development plugins in Electron development builds', async () => {
++test('keeps development plugins for a built renderer launched in Electron development mode', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(true);
++  window.desktopApi = { isDevelopment: true } as any;
 +
 +  await expect(filterDisabledDevelopmentPlugins(plugins)).resolves.toBe(plugins);
 +});
 +
 +test('keeps development plugins when packaged users enable them', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(false);
 +  window.desktopApi = {
++    isDevelopment: false,
 +    getDevelopmentPluginsEnabled: vi.fn().mockResolvedValue(true),
 +  } as any;
 +
@@ -7056,8 +7526,8 @@ index 0000000000000000000000000000000000000000..cd17996e93f14e21b9e6ac53cedd236f
 +
 +test('fails closed for development plugins when the setting cannot be read', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(false);
 +  window.desktopApi = {
++    isDevelopment: false,
 +    getDevelopmentPluginsEnabled: vi.fn().mockRejectedValue(new Error('IPC unavailable')),
 +  } as any;
 +
@@ -7066,12 +7536,57 @@ index 0000000000000000000000000000000000000000..cd17996e93f14e21b9e6ac53cedd236f
 +    { name: 'bundled', source: 'shipped', type: 'shipped' },
 +  ]);
 +});
++
++test('preserves disabled preferences only for present dormant development plugins', () => {
++  const settings = [
++    {
++      name: 'local-package',
++      folderName: 'local',
++      type: 'development' as const,
++      description: 'Local plugin',
++      homepage: '',
++      isEnabled: false,
++      isLoaded: true,
++      isCompatible: true,
++      overriddenBy: 'user' as const,
++    },
++    {
++      name: 'removed-package',
++      folderName: 'removed',
++      source: 'development' as const,
++      type: 'development' as const,
++      description: 'Removed plugin',
++      homepage: '',
++      isEnabled: false,
++    },
++    {
++      name: 'managed-package',
++      folderName: 'managed',
++      source: 'user' as const,
++      type: 'user' as const,
++      description: 'Managed plugin',
++      homepage: '',
++      isEnabled: false,
++    },
++  ];
++
++  expect(getDormantDevelopmentPluginSettings(plugins, plugins.slice(2), settings)).toEqual([
++    {
++      ...settings[0],
++      isLoaded: false,
++      isDevelopmentModeBlocked: true,
++      isCompatible: undefined,
++      overriddenBy: undefined,
++    },
++  ]);
++  expect(getDormantDevelopmentPluginSettings(plugins, plugins, settings)).toEqual([]);
++});
 diff --git a/source/frontend/src/plugin/developmentPlugins.ts b/source/frontend/src/plugin/developmentPlugins.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..395538151ee1cd426c8a54f11dbdf237c85808af
+index 0000000000000000000000000000000000000000..ed3ea787ebc78a197f53cae0ccf51ff0471122f4
 --- /dev/null
 +++ b/source/frontend/src/plugin/developmentPlugins.ts
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,94 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -7088,13 +7603,56 @@ index 0000000000000000000000000000000000000000..395538151ee1cd426c8a54f11dbdf237
 + * limitations under the License.
 + */
 +
-+import { isDevMode } from '../helpers/isDevMode';
 +import { isElectron } from '../helpers/isElectron';
++import type { PluginInfo } from './pluginsSlice';
 +
 +/** Minimum inventory metadata needed to apply the development-plugin loading policy. */
 +export interface PluginSourceMetadata {
++  /** Inventory folder name used to associate an entry with persisted settings. */
++  name: string;
 +  /** Inventory directory where Headlamp discovered the plugin. */
 +  source: 'development' | 'user' | 'shipped';
++}
++
++/**
++ * Keeps settings for development plugins that are present but currently blocked from loading.
++ *
++ * @param discoveredPlugins - Complete trusted backend inventory.
++ * @param loadablePlugins - Inventory entries allowed to fetch and execute.
++ * @param settingsPlugins - Persisted plugin preferences from previous loads.
++ * @returns Existing settings for currently blocked development inventory entries.
++ */
++export function getDormantDevelopmentPluginSettings<T extends PluginSourceMetadata>(
++  discoveredPlugins: T[],
++  loadablePlugins: T[],
++  settingsPlugins: PluginInfo[]
++): PluginInfo[] {
++  const loadableDevelopmentFolders = new Set(
++    loadablePlugins.filter(plugin => plugin.source === 'development').map(plugin => plugin.name)
++  );
++  const dormantDevelopmentFolders = new Set(
++    discoveredPlugins
++      .filter(
++        plugin => plugin.source === 'development' && !loadableDevelopmentFolders.has(plugin.name)
++      )
++      .map(plugin => plugin.name)
++  );
++
++  return settingsPlugins
++    .filter(
++      plugin =>
++        (plugin.source === 'development' ||
++          (plugin.source === undefined && plugin.type === 'development')) &&
++        typeof plugin.folderName === 'string' &&
++        dormantDevelopmentFolders.has(plugin.folderName)
++    )
++    .map(plugin => ({
++      ...plugin,
++      isLoaded: false,
++      isDevelopmentModeBlocked: true,
++      isCompatible: undefined,
++      overriddenBy: undefined,
++    }));
 +}
 +
 +/**
@@ -7111,7 +7669,7 @@ index 0000000000000000000000000000000000000000..395538151ee1cd426c8a54f11dbdf237
 +export async function filterDisabledDevelopmentPlugins<T extends PluginSourceMetadata>(
 +  plugins: T[]
 +): Promise<T[]> {
-+  if (!isElectron() || isDevMode()) {
++  if (!isElectron() || window.desktopApi?.isDevelopment === true) {
 +    return plugins;
 +  }
 +
@@ -7124,14 +7682,17 @@ index 0000000000000000000000000000000000000000..395538151ee1cd426c8a54f11dbdf237
 +  return enabled ? plugins : plugins.filter(plugin => plugin.source !== 'development');
 +}
 diff --git a/source/frontend/src/plugin/index.ts b/source/frontend/src/plugin/index.ts
-index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f3fa2859c 100644
+index 08dc8fd298a509078ce7f9810e249126d4e7065a..4ac88a924f453bb0b9d65c0df2aec3269e05eb60 100644
 --- a/source/frontend/src/plugin/index.ts
 +++ b/source/frontend/src/plugin/index.ts
-@@ -59,16 +59,22 @@ import {
+@@ -59,16 +59,25 @@ import {
    PluginCommandCapability,
    preparePluginCommandCapabilities,
  } from './commandCapabilities';
-+import { filterDisabledDevelopmentPlugins } from './developmentPlugins';
++import {
++  filterDisabledDevelopmentPlugins,
++  getDormantDevelopmentPluginSettings,
++} from './developmentPlugins';
  import { fetchPluginResource } from './fetchPluginResource';
 +import {
 +  getAksDesktopCommandPermissions,
@@ -7152,7 +7713,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
    ApiProxy,
    ReactMonacoEditor: {
      ...ReactMonacoEditor,
-@@ -115,6 +121,18 @@ window.pluginLib = {
+@@ -115,6 +124,18 @@ window.pluginLib = {
    Activity,
    stateless,
  };
@@ -7171,7 +7732,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
  
  // backwards compat.
  window.pluginLib.MuiCore = window.pluginLib.MuiMaterial;
-@@ -365,26 +383,6 @@ export function updateSettingsPackages(
+@@ -365,26 +386,6 @@ export function updateSettingsPackages(
    });
  }
  
@@ -7198,26 +7759,27 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
  const PLUGIN_LOADING_ERROR = HeadlampEventType.PLUGIN_LOADING_ERROR;
  const consoleError = console.error;
  const storeDispatch = store.dispatch;
-@@ -489,11 +487,13 @@ export async function fetchAndExecutePlugins(
+@@ -489,12 +490,18 @@ export async function fetchAndExecutePlugins(
      name: string;
    }
  
 -  const pluginMetadataList = await fetchWithRetry<PluginMetadata[]>(
--    `${getAppUrl()}plugins`,
--    headers,
--    response => response.json(),
--    deadline
-+  const pluginMetadataList = await filterDisabledDevelopmentPlugins(
-+    await fetchWithRetry<PluginMetadata[]>(
-+      `${getAppUrl()}plugins`,
-+      headers,
-+      response => response.json(),
-+      deadline
-+    )
++  const discoveredPluginMetadata = await fetchWithRetry<PluginMetadata[]>(
+     `${getAppUrl()}plugins`,
+     headers,
+     response => response.json(),
+     deadline
    );
++  const pluginMetadataList = await filterDisabledDevelopmentPlugins(discoveredPluginMetadata);
++  const dormantDevelopmentPluginSettings = getDormantDevelopmentPluginSettings(
++    discoveredPluginMetadata,
++    pluginMetadataList,
++    settingsPackages
++  );
  
    // Extract paths for fetching plugin files
-@@ -552,6 +552,15 @@ export async function fetchAndExecutePlugins(
+   const pluginPaths = pluginMetadataList.map(metadata => metadata.path);
+@@ -552,6 +559,15 @@ export async function fetchAndExecutePlugins(
    const sources = await sourcesPromise;
    const packageInfos = await packageInfosPromise;
    const permissionSecrets = await beforePluginStartupDeadline(permissionSecretsPromise, deadline);
@@ -7233,7 +7795,25 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
  
    // Update settings to include all plugin versions (by name + type)
    let updatedSettingsPackages = updateSettingsPackages(packageInfos, settingsPackages);
-@@ -649,6 +658,7 @@ export async function fetchAndExecutePlugins(
+@@ -560,7 +576,7 @@ export async function fetchAndExecutePlugins(
+   updatedSettingsPackages = applyPluginPriority(updatedSettingsPackages);
+ 
+   // Notify settings of changes
+-  onSettingsChange(updatedSettingsPackages);
++  onSettingsChange([...updatedSettingsPackages, ...dormantDevelopmentPluginSettings]);
+ 
+   // Can set this to a semver version range like '>=0.8.0-alpha.3'.
+   // '' means all versions.
+@@ -589,7 +605,7 @@ export async function fetchAndExecutePlugins(
+   }
+ 
+   // Update settings with compatibility info
+-  onSettingsChange(updatedSettingsPackages);
++  onSettingsChange([...updatedSettingsPackages, ...dormantDevelopmentPluginSettings]);
+ 
+   // Filter to only execute plugins that should be loaded
+   // A plugin is executed if:
+@@ -649,6 +665,7 @@ export async function fetchAndExecutePlugins(
    // This is to prevent plugins from snooping on the permission secrets.
    const pluginDesktopApiSend = window?.desktopApi?.send;
    const pluginDesktopApiReceive = window?.desktopApi?.receive;
@@ -7241,7 +7821,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
    const internalRunCommand = runCommand;
    const PrivateFunction = Function;
    const internalRunPlugin = runPlugin;
-@@ -671,7 +681,7 @@ export async function fetchAndExecutePlugins(
+@@ -671,7 +688,7 @@ export async function fetchAndExecutePlugins(
          pluginPath: pluginPathsToExecute[index],
          packageName: packageInfosToExecute[index].name,
          packageVersion: packageInfosToExecute[index].version || '',
@@ -7250,7 +7830,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
          handleError: handlePluginRunError,
          getAllowedPermissions: (pluginName, pluginPath, secrets): Record<string, number> => {
            const secretsToReturn: Record<string, number> = {};
-@@ -697,16 +707,27 @@ export async function fetchAndExecutePlugins(
+@@ -697,16 +714,27 @@ export async function fetchAndExecutePlugins(
              secretsToReturn['runCmd-az'] = secrets['runCmd-az'];
            }
  
@@ -7282,7 +7862,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
            const commandCapability = findCommandCapability(
              commandCapabilities,
              packageInfosToExecute[index]
-@@ -722,6 +743,16 @@ export async function fetchAndExecutePlugins(
+@@ -722,6 +750,16 @@ export async function fetchAndExecutePlugins(
              argumentNames.push('pluginRunCommand', 'pluginPath');
              argumentValues.push(productRunCommand, pluginPath);
            }
@@ -7299,7 +7879,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
            const storageNamespace = secureStorageNamespaces[index];
            const storageCapability = storageNamespace
              ? secureStorageCapabilities[storageNamespace]
-@@ -749,7 +780,9 @@ export async function fetchAndExecutePlugins(
+@@ -749,7 +787,9 @@ export async function fetchAndExecutePlugins(
      return 0;
    });
  
@@ -7310,7 +7890,7 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
  
    // Initialize plugin i18n after plugins are loaded
    await initializePluginsI18n(packageInfos, pluginPaths, deadline);
-@@ -826,11 +859,11 @@ async function afterPluginsRun(
+@@ -826,11 +866,11 @@ async function afterPluginsRun(
   *
   * @returns promise with permissions secrets like { 'runCmd-minikube': 1235555 }
   */
@@ -7324,6 +7904,19 @@ index 08dc8fd298a509078ce7f9810e249126d4e7065a..7c6be36bb0e0cbcac1058235f644522f
          resolve(secrets);
        });
        desktopApi.send('request-plugin-permission-secrets');
+diff --git a/source/frontend/src/plugin/lib.ts b/source/frontend/src/plugin/lib.ts
+index 44912b14ccec3c97e36364711fd9cc5d764e0453..8b4ad5d187a3ffc58bd385b9355acc8c40087838 100644
+--- a/source/frontend/src/plugin/lib.ts
++++ b/source/frontend/src/plugin/lib.ts
+@@ -71,6 +71,8 @@ export abstract class Plugin {
+ export interface DesktopApi {
+   /** Operating system platform hosting the desktop app. */
+   platform: NodeJS.Platform;
++  /** Whether Electron is running in development mode, independent of the frontend build mode. */
++  isDevelopment?: boolean;
+   /** Additional APIs exposed by the desktop preload bridge. */
+   [key: string]: any;
+ }
 diff --git a/source/frontend/src/plugin/pluginLib.test.ts b/source/frontend/src/plugin/pluginLib.test.ts
 index c6d4ab70ec0675d754c78aa4a5c8a5e0ef6a3051..0f9f15d9e19b6c500dda15872f3d8c26da8e64b9 100644
 --- a/source/frontend/src/plugin/pluginLib.test.ts
@@ -7344,6 +7937,20 @@ index c6d4ab70ec0675d754c78aa4a5c8a5e0ef6a3051..0f9f15d9e19b6c500dda15872f3d8c26
 +    expect(registrationDescriptor).toMatchObject({ configurable: false, writable: false });
 +  });
  });
+diff --git a/source/frontend/src/plugin/pluginsSlice.ts b/source/frontend/src/plugin/pluginsSlice.ts
+index 6038fb3c1625c31686cc484c5dfa3d884c229e5e..b57d44cbb6a2ead0881544f4ff1fd8b21e209332 100644
+--- a/source/frontend/src/plugin/pluginsSlice.ts
++++ b/source/frontend/src/plugin/pluginsSlice.ts
+@@ -104,6 +104,9 @@ export type PluginInfo = {
+    */
+   isLoaded?: boolean;
+ 
++  /** Whether Plugin Development Mode currently blocks this plugin from loading. */
++  isDevelopmentModeBlocked?: boolean;
++
+   /**
+    * overriddenBy indicates which higher-priority version is loaded instead of this one.
+    * Format: "type" (e.g., "development" or "user")
 diff --git a/source/frontend/src/plugin/registry.test.ts b/source/frontend/src/plugin/registry.test.ts
 index af944db55faf5a56ea2f06dc3e1d51dcaea78251..d945a567ca4609ec97d69e497807074cc2e12616 100644
 --- a/source/frontend/src/plugin/registry.test.ts

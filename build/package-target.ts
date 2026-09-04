@@ -3,6 +3,11 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
+/**
+ * Validates a requested desktop package target, stages its verified tools and product metadata,
+ * and delegates the final application build to the installed Headlamp source package.
+ */
+
 import { spawnSync } from 'child_process';
 import * as path from 'path';
 
@@ -27,6 +32,7 @@ const PACKAGE_ARGS: Record<string, string[]> = {
   'win32:arm64': ['--win', '--arm64'],
 };
 
+/** Maps a supported package target to its Electron Builder arguments. */
 export function packageArguments(platform: NodeJS.Platform, arch: string): string[] {
   const args = PACKAGE_ARGS[`${platform}:${arch}`];
   if (!args) {
@@ -35,6 +41,7 @@ export function packageArguments(platform: NodeJS.Platform, arch: string): strin
   return [...args];
 }
 
+/** Rejects package targets that cannot execute their required tools on the current host. */
 export function validatePackageHost(
   target: PackageTarget,
   hostPlatform: NodeJS.Platform = process.platform,
@@ -50,10 +57,12 @@ export function validatePackageHost(
   }
 }
 
+/** Returns the platform-specific npm executable used by child build steps. */
 export function npmExecutable(platform: NodeJS.Platform = process.platform): string {
   return platform === 'win32' ? 'npm.cmd' : 'npm';
 }
 
+/** Runs one npm build step and surfaces spawn or non-zero exit failures. */
 function runNpm(args: string[], cwd: string, env = process.env): void {
   const result = spawnSync(npmExecutable(), args, { cwd, env, stdio: 'inherit' });
   if (result.error) {
@@ -64,6 +73,7 @@ function runNpm(args: string[], cwd: string, env = process.env): void {
   }
 }
 
+/** Stages all product inputs and builds one validated platform/architecture package. */
 export function packageTarget(
   target: PackageTarget,
   rootDir = ROOT_DIR
@@ -94,6 +104,7 @@ export function packageTarget(
   runNpm(['run', 'package', '--', ...packageArguments(target.platform, target.arch)], appDir, buildEnv);
 }
 
+/** Reads a `--name=value` option from the package-target command line. */
 function readOption(name: string): string | undefined {
   const prefix = `--${name}=`;
   return process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length);

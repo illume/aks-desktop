@@ -1,4 +1,4 @@
-From 469c0fcd7aa4efce80305b41b5c5255f9d3b23c1 Mon Sep 17 00:00:00 2001
+From 62bffa0a50ac2f415e095806cc4c0b848d168519 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 27 Aug 2026 14:44:44 +0200
 Subject: [PATCH 01/10] app: proxies: Cover secure Azure proxy lifecycle
@@ -1341,7 +1341,7 @@ index fd313b5ba..bd9774e10 100644
 2.54.0
 
 
-From 2688e58b1849b075184e0d573eef3a3aef5dad42 Mon Sep 17 00:00:00 2001
+From 20877b86d1f70c32b4e773848b68cac593a9ab08 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 27 Aug 2026 14:44:52 +0200
 Subject: [PATCH 02/10] frontend: e2e-tests: Cover scoped cluster pre-open flow
@@ -1530,7 +1530,7 @@ index 000000000..78f8417b4
 2.54.0
 
 
-From 07c804fe8c0c98dccf93677b260e05519dc72297 Mon Sep 17 00:00:00 2001
+From b1b9f2967c85f4fff7d5e87100ec720ef073e67d Mon Sep 17 00:00:00 2001
 From: yolossn <sannagaraj@microsoft.com>
 Date: Wed, 22 Jul 2026 14:03:45 +0530
 Subject: [PATCH 03/10] app: proxies: Add scoped Azure proxy lifecycle
@@ -2713,7 +2713,7 @@ index 08dc8fd29..9cef30a5e 100644
 2.54.0
 
 
-From 985ff5b8ab46c5cea49e594882930b10c0495598 Mon Sep 17 00:00:00 2001
+From d1e997ddac574c9c50d4edee7bf5f14649cc9251 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 27 Aug 2026 14:45:12 +0200
 Subject: [PATCH 04/10] frontend: ClusterPreOpenGate: Cover preparation
@@ -3971,7 +3971,7 @@ index 5b8b25aa9..6257502e6 100644
 2.54.0
 
 
-From fc556f6b213634aa72f2119ffc3a0d2307bca74a Mon Sep 17 00:00:00 2001
+From f5874c08b5c78dabf9fd0008d06eb3c228abef5b Mon Sep 17 00:00:00 2001
 From: yolossn <sannagaraj@microsoft.com>
 Date: Wed, 22 Jul 2026 13:58:15 +0530
 Subject: [PATCH 05/10] frontend: clusterProviderSlice: Add cluster pre-open
@@ -5519,7 +5519,7 @@ index 20333b976..6a864f5d3 100644
 2.54.0
 
 
-From 5bc83f084b6bdae89d13940e75759c6caf2cb885 Mon Sep 17 00:00:00 2001
+From 9c052455f20f087d79dd38ff41f507b85fb73d0c Mon Sep 17 00:00:00 2001
 From: yolossn <sannagaraj@microsoft.com>
 Date: Wed, 22 Jul 2026 13:58:34 +0530
 Subject: [PATCH 06/10] frontend: i18n: Regenerate cluster pre-open locales
@@ -6114,7 +6114,7 @@ index 7761ba945..f7b48e15f 100644
 2.54.0
 
 
-From 047e5795516053f390edcce4cd7cf16e4b86c972 Mon Sep 17 00:00:00 2001
+From 294eb2b882643cc43bf4ee43a2a14d3e164b5279 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 27 Aug 2026 14:45:44 +0200
 Subject: [PATCH 07/10] frontend: ClusterTable: Cover additive cluster actions
@@ -6182,7 +6182,7 @@ index 746f7d2b7..a49a4ad21 100644
 2.54.0
 
 
-From b7e090140dc2a6cd4459ff19f82cb6bf293d273c Mon Sep 17 00:00:00 2001
+From c9036dded15be0ebe935f6b238bf864012cab6db Mon Sep 17 00:00:00 2001
 From: yolossn <sannagaraj@microsoft.com>
 Date: Wed, 22 Jul 2026 14:04:30 +0530
 Subject: [PATCH 08/10] frontend: ClusterContextMenu: Keep built-in Delete
@@ -6242,7 +6242,7 @@ index 3e4942e0f..f8bd763a3 100644
 2.54.0
 
 
-From 324c3dc9028b27bc9feb7922712df87b7fe7ce56 Mon Sep 17 00:00:00 2001
+From cce8155301fec597c80909fb685060e57b833f5f Mon Sep 17 00:00:00 2001
 From: yolossn <sannagaraj@microsoft.com>
 Date: Tue, 25 Aug 2026 18:04:32 +0530
 Subject: [PATCH 09/10] frontend: stories: Add cluster pre-open states
@@ -6537,7 +6537,7 @@ index 000000000..c1e434674
 2.54.0
 
 
-From 89b7b7e2db31c5e7256838ac476dcc1139658b1b Mon Sep 17 00:00:00 2001
+From 7d3ca79b22b7cf79f9e5dce635621387dd884362 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 27 Aug 2026 14:46:21 +0200
 Subject: [PATCH 10/10] docs: api: Document cluster pre-open hooks

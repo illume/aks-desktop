@@ -10,7 +10,7 @@ const path = require('node:path');
 
 const PACKAGE_NAME: string = '@headlamp-k8s/headlamp-source';
 const SERIES_ENTRY_PATTERN =
-  /^(\d{4}) (source|package) ((\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.patch)$/;
+  /^(\d{4}[a-z]?) (source|package) ((\d{4}[a-z]?)-[a-z0-9]+(?:-[a-z0-9]+)*\.patch)$/;
 
 /**
  * Reads and parses a JSON file.
@@ -55,18 +55,17 @@ function parsePatchSeries(value) {
     throw new Error('Headlamp patch series is empty');
   }
   const files = new Set();
-  let previousNumber = 0;
+  let previousLabel = '';
   return lines.map(line => {
     const match = SERIES_ENTRY_PATTERN.exec(line);
-    const number = Number(match?.[1]);
     if (
       !match ||
       match[1] !== match[4] ||
-      number <= previousNumber
+      match[1] <= previousLabel
     ) {
       throw new Error(`Invalid Headlamp patch series entry: ${line}`);
     }
-    previousNumber = number;
+    previousLabel = match[1];
     const [, , scope, file] = match;
     if (files.has(file)) {
       throw new Error(`Duplicate Headlamp patch series entry: ${file}`);

@@ -1,12 +1,12 @@
 {
   "name": "@headlamp-k8s/headlamp-source",
-  "version": "0.0.0-main.be382f1e",
+  "version": "0.0.0-main.2cf70bab",
   "description": "Headlamp source assembly and npm build entry points",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/kubernetes-sigs/headlamp.git",
-    "commit": "be382f1e2413dcdd1854b578e2af1633a1064a76"
+    "commit": "2cf70bab71e29a6544d9573053851a34d692fce8"
   },
   "engines": {
     "node": ">=22.22.2",
@@ -30,8 +30,8 @@
     "build:app:mac": "npm --prefix source run app:package:mac",
     "build:app:win": "npm --prefix source run app:package:win",
     "build:app:unpacked": "npm --prefix source run app:build",
-    "build:container": "docker buildx build --pull --platform=local --build-arg HEADLAMP_SOURCE_COMMIT=be382f1e2413dcdd1854b578e2af1633a1064a76 --build-arg HEADLAMP_BUILD_MANIFEST -t ghcr.io/headlamp-k8s/headlamp:0.0.0-main.be382f1e -f source/Dockerfile source",
-    "build:plugins-container": "docker buildx build --pull --platform=local -t ghcr.io/headlamp-k8s/plugins:0.0.0-main.be382f1e -f source/Dockerfile.plugins source",
+    "build:container": "docker buildx build --pull --platform=local --build-arg HEADLAMP_SOURCE_COMMIT=2cf70bab71e29a6544d9573053851a34d692fce8 --build-arg HEADLAMP_BUILD_MANIFEST -t ghcr.io/headlamp-k8s/headlamp:0.0.0-main.2cf70bab -f source/Dockerfile source",
+    "build:plugins-container": "docker buildx build --pull --platform=local -t ghcr.io/headlamp-k8s/plugins:0.0.0-main.2cf70bab -f source/Dockerfile.plugins source",
     "start": "npm --prefix source run start:with-app",
     "start:backend": "npm --prefix source run start:backend",
     "start:frontend": "npm --prefix source run start:frontend",
@@ -52,6 +52,6 @@
     "verify:images": "npm --prefix source run image:verify-image-digests"
   },
   "headlampSource": {
-    "revision": "be382f1e2413dcdd1854b578e2af1633a1064a76"
+    "revision": "2cf70bab71e29a6544d9573053851a34d692fce8"
   }
 }

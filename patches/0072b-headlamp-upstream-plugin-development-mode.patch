@@ -1,7 +1,7 @@
-From 2d0b07b84e9e05dfcc4d1251c58dafc525488176 Mon Sep 17 00:00:00 2001
+From 0dcb2ba32b2c156f0c3ee71b235484efe3c22ef9 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 3 Sep 2026 12:38:51 +0200
-Subject: [PATCH 1/5] app: developmentPlugins: Require explicit user
+Subject: [PATCH 1/4] app: developmentPlugins: Require explicit user
  confirmation
 
 Require a native Electron confirmation before packaged users can load local development plugins. Renderer UI alone is not a sufficient trust boundary: development plugins execute local code and may request command capabilities, so enabling them requires an explicit app-owned choice that defaults to denial and fails closed.
@@ -9,7 +9,8 @@ Require a native Electron confirmation before packaged users can load local deve
  app/electron/developmentPlugins.test.ts  | 205 +++++++++++++++++++++++
  app/electron/developmentPlugins.ts       | 125 ++++++++++++++
  app/electron/main.ts                     |   7 +-
- app/electron/preload.ts                  |   3 +
+ app/electron/preload.test.ts             |  11 ++
+ app/electron/preload.ts                  |   4 +
  app/electron/settings.test.ts            |  37 +++-
  app/electron/settings.ts                 |  32 ++++
  app/package.json                         |   2 +-
@@ -38,7 +39,7 @@ Require a native Electron confirmation before packaged users can load local deve
  frontend/src/i18n/locales/ur/app.json    |   5 +
  frontend/src/i18n/locales/zh-tw/app.json |   5 +
  frontend/src/i18n/locales/zh/app.json    |   5 +
- 32 files changed, 532 insertions(+), 4 deletions(-)
+ 33 files changed, 544 insertions(+), 4 deletions(-)
  create mode 100644 app/electron/developmentPlugins.test.ts
  create mode 100644 app/electron/developmentPlugins.ts
 
@@ -255,7 +256,7 @@ index 000000000..83373f919
 +});
 diff --git a/app/electron/developmentPlugins.ts b/app/electron/developmentPlugins.ts
 new file mode 100644
-index 000000000..9eac36b1f
+index 000000000..7f9140410
 --- /dev/null
 +++ b/app/electron/developmentPlugins.ts
 @@ -0,0 +1,125 @@
@@ -304,15 +305,15 @@ index 000000000..9eac36b1f
 +      defaultId: 1,
 +      cancelId: 1,
 +      noLink: true,
-+      title: i18n.t('Development Mode'),
-+      message: i18n.t('Enable Development Mode?'),
++      title: i18n.t('Plugin Development Mode'),
++      message: i18n.t('Enable Plugin Development Mode?'),
 +      detail: i18n.t(
 +        'Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.'
 +      ),
 +    });
 +    return response === 0;
 +  } catch (error) {
-+    console.error('Failed to confirm Development Mode:', error);
++    console.error('Failed to confirm Plugin Development Mode:', error);
 +    return false;
 +  }
 +}
@@ -423,11 +424,49 @@ index 9d3b12a0c..5b5a7b8a0 100644
      setupSecureStorageHandlers(mainWindow, startUrl);
  
      new PluginManagerEventListeners(mainWindow).setupEventHandlers();
+diff --git a/app/electron/preload.test.ts b/app/electron/preload.test.ts
+index d497de5bb..d967e12cf 100644
+--- a/app/electron/preload.test.ts
++++ b/app/electron/preload.test.ts
+@@ -36,7 +36,14 @@ vi.mock('electron', () => ({
+   },
+ }));
+ 
++const originalElectronDev = process.env.ELECTRON_DEV;
++process.env.ELECTRON_DEV = 'true';
+ await import('./preload');
++if (originalElectronDev === undefined) {
++  delete process.env.ELECTRON_DEV;
++} else {
++  process.env.ELECTRON_DEV = originalElectronDev;
++}
+ 
+ const desktopApi = electronMocks.exposeInMainWorld.mock.calls[0][1];
+ 
+@@ -69,6 +76,10 @@ describe('desktop preload API', () => {
+     });
+   });
+ 
++  it('exposes Electron development mode to a built renderer', () => {
++    expect(desktopApi.isDevelopment).toBe(true);
++  });
++
+   it('sends messages only on allowed channels', () => {
+     desktopApi.send('locale', 'en');
+     desktopApi.send('not-allowed', 'ignored');
 diff --git a/app/electron/preload.ts b/app/electron/preload.ts
-index 8fcf27b7a..569ed1ece 100644
+index 8fcf27b7a..7f6a8d5ed 100644
 --- a/app/electron/preload.ts
 +++ b/app/electron/preload.ts
-@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
+@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
+     capabilitySecret: string
+   ): Promise<StartProxyResult> =>
+     ipcRenderer.invoke('start-cluster-proxy', { ...target, capabilitySecret }),
++  isDevelopment: Boolean(process.env.ELECTRON_DEV),
+   send: (channel: string, data: unknown) => {
+     // allowed channels
+     const validChannels = [
+@@ -54,6 +55,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
        'request-backend-port',
        'request-tray-icon',
        'set-tray-icon',
@@ -436,7 +475,7 @@ index 8fcf27b7a..569ed1ece 100644
        'cluster-changed',
        'route-changed',
      ];
-@@ -76,6 +78,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
+@@ -76,6 +79,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
        'open-about-dialog',
        'backend-port',
        'tray-icon',
@@ -558,351 +597,351 @@ index 80690abf4..e3ee370b1 100644
      "lint": "cd .. && npm run frontend:lint",
      "lint-fix": "cd .. && npm run frontend:lint:fix",
 diff --git a/frontend/src/i18n/locales/ar/app.json b/frontend/src/i18n/locales/ar/app.json
-index 42c3e5160..6e83220e6 100644
+index 42c3e5160..c9a006c5e 100644
 --- a/frontend/src/i18n/locales/ar/app.json
 +++ b/frontend/src/i18n/locales/ar/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "فشل جلب معلومات الإضافة",
    "An error occurred while fetching plugin info from {{  URL }}.": "حدث خطأ أثناء جلب معلومات الإضافة من {{ URL }}.",
    "Yes": "نعم",
 diff --git a/frontend/src/i18n/locales/bn/app.json b/frontend/src/i18n/locales/bn/app.json
-index b7681d0a8..e0f67e510 100644
+index b7681d0a8..57149ac6f 100644
 --- a/frontend/src/i18n/locales/bn/app.json
 +++ b/frontend/src/i18n/locales/bn/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Plugin এর তথ্য আনতে Failed হয়েছে",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} থেকে Plugin এর তথ্য আনার সময় একটি Error ঘটেছে।",
    "Yes": "হ্যাঁ",
 diff --git a/frontend/src/i18n/locales/cs/app.json b/frontend/src/i18n/locales/cs/app.json
-index 721ff5ac7..e67913e76 100644
+index 721ff5ac7..ba6af90a2 100644
 --- a/frontend/src/i18n/locales/cs/app.json
 +++ b/frontend/src/i18n/locales/cs/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Nepovedlo se načíst informace o modulu plug-in.",
    "An error occurred while fetching plugin info from {{  URL }}.": "Při načítání informací o modulu plug-in z {{  URL }} došlo k chybě.",
    "Yes": "Ano",
 diff --git a/frontend/src/i18n/locales/de/app.json b/frontend/src/i18n/locales/de/app.json
-index 6019eff98..a9a3fc04a 100644
+index 6019eff98..8546dfef0 100644
 --- a/frontend/src/i18n/locales/de/app.json
 +++ b/frontend/src/i18n/locales/de/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "",
    "An error occurred while fetching plugin info from {{  URL }}.": "",
    "Yes": "",
 diff --git a/frontend/src/i18n/locales/en/app.json b/frontend/src/i18n/locales/en/app.json
-index b9c586be6..bdf0ab47a 100644
+index b9c586be6..1f1bc4fd8 100644
 --- a/frontend/src/i18n/locales/en/app.json
 +++ b/frontend/src/i18n/locales/en/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Failed to fetch plugin info",
    "An error occurred while fetching plugin info from {{  URL }}.": "An error occurred while fetching plugin info from {{  URL }}.",
    "Yes": "Yes",
 diff --git a/frontend/src/i18n/locales/es/app.json b/frontend/src/i18n/locales/es/app.json
-index 5c1f4ff17..f38543fe5 100644
+index 5c1f4ff17..bdc3193a0 100644
 --- a/frontend/src/i18n/locales/es/app.json
 +++ b/frontend/src/i18n/locales/es/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "",
    "An error occurred while fetching plugin info from {{  URL }}.": "",
    "Yes": "",
 diff --git a/frontend/src/i18n/locales/fr/app.json b/frontend/src/i18n/locales/fr/app.json
-index e2d68d0db..135d6f1e7 100644
+index e2d68d0db..ff584a2dd 100644
 --- a/frontend/src/i18n/locales/fr/app.json
 +++ b/frontend/src/i18n/locales/fr/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Échec de la récupération des informations du plugin",
    "An error occurred while fetching plugin info from {{  URL }}.": "Une erreur s'est produite lors de la récupération des informations du plugin depuis {{  URL }}.",
    "Yes": "Oui",
 diff --git a/frontend/src/i18n/locales/he/app.json b/frontend/src/i18n/locales/he/app.json
-index 89b2d6929..63cee1483 100644
+index 89b2d6929..eefdcb22f 100644
 --- a/frontend/src/i18n/locales/he/app.json
 +++ b/frontend/src/i18n/locales/he/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Failed to fetch plugin info",
    "An error occurred while fetching plugin info from {{  URL }}.": "An error occurred while fetching plugin info from {{  URL }}.",
    "Yes": "Yes",
 diff --git a/frontend/src/i18n/locales/hi/app.json b/frontend/src/i18n/locales/hi/app.json
-index c0cecbd6f..9f39ed3a8 100644
+index c0cecbd6f..b9f8a2211 100644
 --- a/frontend/src/i18n/locales/hi/app.json
 +++ b/frontend/src/i18n/locales/hi/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "प्लगिन जानकारी प्राप्त करने में विफल",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} से प्लगिन जानकारी प्राप्त करते समय एक त्रुटि हुई।",
    "Yes": "हां",
 diff --git a/frontend/src/i18n/locales/hu/app.json b/frontend/src/i18n/locales/hu/app.json
-index 0ed7f9865..4d40a288a 100644
+index 0ed7f9865..cbcffed21 100644
 --- a/frontend/src/i18n/locales/hu/app.json
 +++ b/frontend/src/i18n/locales/hu/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Nem sikerült beolvasni a beépülő modul adatait",
    "An error occurred while fetching plugin info from {{  URL }}.": "Hiba történt a beépülő modul adatainak beolvasása során innen: {{  URL }}.",
    "Yes": "Igen",
 diff --git a/frontend/src/i18n/locales/id/app.json b/frontend/src/i18n/locales/id/app.json
-index cc77a03b2..4c7623801 100644
+index cc77a03b2..e54aa1231 100644
 --- a/frontend/src/i18n/locales/id/app.json
 +++ b/frontend/src/i18n/locales/id/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Gagal mengambil info plugin",
    "An error occurred while fetching plugin info from {{  URL }}.": "Terjadi kesalahan saat mengambil info plugin dari {{  URL }}.",
    "Yes": "Ya",
 diff --git a/frontend/src/i18n/locales/it/app.json b/frontend/src/i18n/locales/it/app.json
-index 7d7537a75..adf70668b 100644
+index 7d7537a75..1eb42dab2 100644
 --- a/frontend/src/i18n/locales/it/app.json
 +++ b/frontend/src/i18n/locales/it/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Impossibile recuperare le informazioni dell'estensione",
    "An error occurred while fetching plugin info from {{  URL }}.": "Si è verificato un errore durante il recupero delle informazioni dell'estensione da {{  URL }}.",
    "Yes": "Sì",
 diff --git a/frontend/src/i18n/locales/ja/app.json b/frontend/src/i18n/locales/ja/app.json
-index 5f343ed3b..ac4fb7b04 100644
+index 5f343ed3b..86ed05e03 100644
 --- a/frontend/src/i18n/locales/ja/app.json
 +++ b/frontend/src/i18n/locales/ja/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "プラグイン情報の取得に失敗しました",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} からプラグイン情報を取得中にエラーが発生しました。",
    "Yes": "はい",
 diff --git a/frontend/src/i18n/locales/ko/app.json b/frontend/src/i18n/locales/ko/app.json
-index 25a577925..4af8f0795 100644
+index 25a577925..0a430d781 100644
 --- a/frontend/src/i18n/locales/ko/app.json
 +++ b/frontend/src/i18n/locales/ko/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "플러그인 정보를 가져오지 못했습니다",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }}에서 플러그인 정보를 가져오는 중 오류가 발생했습니다.",
    "Yes": "네",
 diff --git a/frontend/src/i18n/locales/nl/app.json b/frontend/src/i18n/locales/nl/app.json
-index b5fe35d0c..14234563e 100644
+index b5fe35d0c..d3fa6d554 100644
 --- a/frontend/src/i18n/locales/nl/app.json
 +++ b/frontend/src/i18n/locales/nl/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Kan de informatie over de invoegtoepassing niet ophalen",
    "An error occurred while fetching plugin info from {{  URL }}.": "Er is een fout opgetreden bij het ophalen van informatie over de invoegtoepassing van {{  URL }}.",
    "Yes": "Ja",
 diff --git a/frontend/src/i18n/locales/pl/app.json b/frontend/src/i18n/locales/pl/app.json
-index a9c77734b..6a81d1dfb 100644
+index a9c77734b..5e4d4f560 100644
 --- a/frontend/src/i18n/locales/pl/app.json
 +++ b/frontend/src/i18n/locales/pl/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Nie można pobrać informacji o wtyczce",
    "An error occurred while fetching plugin info from {{  URL }}.": "Wystąpił błąd podczas pobierania informacji o wtyczce z {{  URL }}.",
    "Yes": "Tak",
 diff --git a/frontend/src/i18n/locales/pt-br/app.json b/frontend/src/i18n/locales/pt-br/app.json
-index 41bf718c0..ba67eda45 100644
+index 41bf718c0..451e48027 100644
 --- a/frontend/src/i18n/locales/pt-br/app.json
 +++ b/frontend/src/i18n/locales/pt-br/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Falha\u00a0ao buscar informações do plugin",
    "An error occurred while fetching plugin info from {{  URL }}.": "Ocorreu um erro ao buscar informações do plugin em {{  URL }}.",
    "Yes": "Sim",
 diff --git a/frontend/src/i18n/locales/pt-pt/app.json b/frontend/src/i18n/locales/pt-pt/app.json
-index 3ac280051..e13eb45dc 100644
+index 3ac280051..b2fd10a5f 100644
 --- a/frontend/src/i18n/locales/pt-pt/app.json
 +++ b/frontend/src/i18n/locales/pt-pt/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "",
    "An error occurred while fetching plugin info from {{  URL }}.": "",
    "Yes": "",
 diff --git a/frontend/src/i18n/locales/ru/app.json b/frontend/src/i18n/locales/ru/app.json
-index f57a594ac..0413e01f9 100644
+index f57a594ac..0155b3560 100644
 --- a/frontend/src/i18n/locales/ru/app.json
 +++ b/frontend/src/i18n/locales/ru/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Не удалось получить информацию о плагине",
    "An error occurred while fetching plugin info from {{  URL }}.": "Произошла ошибка при получении информации о плагине из {{  URL }}.",
    "Yes": "Да",
 diff --git a/frontend/src/i18n/locales/sv/app.json b/frontend/src/i18n/locales/sv/app.json
-index e2390325c..45153b9e9 100644
+index e2390325c..bf500fa52 100644
 --- a/frontend/src/i18n/locales/sv/app.json
 +++ b/frontend/src/i18n/locales/sv/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Det gick inte att hämta info om plugin",
    "An error occurred while fetching plugin info from {{  URL }}.": "Ett fel inträffade när info om plugin skulle hämtas från {{  URL }}.",
    "Yes": "Ja",
 diff --git a/frontend/src/i18n/locales/ta/app.json b/frontend/src/i18n/locales/ta/app.json
-index e4d4f3446..fcf094dd5 100644
+index e4d4f3446..cccd87f15 100644
 --- a/frontend/src/i18n/locales/ta/app.json
 +++ b/frontend/src/i18n/locales/ta/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "பிளக்-இன் தகவலைப் பெறுவதில் தோல்வி",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} இலிருந்து பிளக்-இன் தகவலைப் பெறும்போது ஒரு பிழை ஏற்பட்டது.",
    "Yes": "ஆம்",
 diff --git a/frontend/src/i18n/locales/tr/app.json b/frontend/src/i18n/locales/tr/app.json
-index 87954ab89..5d6c12be2 100644
+index 87954ab89..c1616d3b1 100644
 --- a/frontend/src/i18n/locales/tr/app.json
 +++ b/frontend/src/i18n/locales/tr/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "Eklenti bilgileri getirilemedi",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} konumundan eklenti bilgileri getirilirken hata oluştu.",
    "Yes": "Evet",
 diff --git a/frontend/src/i18n/locales/ur/app.json b/frontend/src/i18n/locales/ur/app.json
-index 857986606..6802551ed 100644
+index 857986606..ad0304c0f 100644
 --- a/frontend/src/i18n/locales/ur/app.json
 +++ b/frontend/src/i18n/locales/ur/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "پلگ اِن کی معلومات حاصل کرنے میں ناکامی",
    "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} سے پلگ اِن کی معلومات حاصل کرتے وقت ایک خرابی پیش آئی۔",
    "Yes": "ہاں",
 diff --git a/frontend/src/i18n/locales/zh-tw/app.json b/frontend/src/i18n/locales/zh-tw/app.json
-index 85361c914..00a9ebc7d 100644
+index 85361c914..a22c12cc9 100644
 --- a/frontend/src/i18n/locales/zh-tw/app.json
 +++ b/frontend/src/i18n/locales/zh-tw/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "獲取外掛資訊失敗",
    "An error occurred while fetching plugin info from {{  URL }}.": "從{{  URL }}獲取外掛資訊時發生錯誤。",
    "Yes": "是",
 diff --git a/frontend/src/i18n/locales/zh/app.json b/frontend/src/i18n/locales/zh/app.json
-index 335548d40..30ea9d62b 100644
+index 335548d40..4764fb70b 100644
 --- a/frontend/src/i18n/locales/zh/app.json
 +++ b/frontend/src/i18n/locales/zh/app.json
 @@ -1,4 +1,9 @@
  {
 +  "Enable": "",
 +  "Cancel": "",
-+  "Development Mode": "",
-+  "Enable Development Mode?": "",
++  "Plugin Development Mode": "",
++  "Enable Plugin Development Mode?": "",
 +  "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
    "Failed to fetch plugin info": "获取插件信息失败",
    "An error occurred while fetching plugin info from {{  URL }}.": "从{{  URL }}获取插件信息失败.",
@@ -911,70 +950,102 @@ index 335548d40..30ea9d62b 100644
 2.54.0
 
 
-From 341005defa583cee87b60a1042a184dad7f8b72a Mon Sep 17 00:00:00 2001
+From a257074c868d4b54a9093b4b39783d0ca3c0e113 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Thu, 3 Sep 2026 12:39:21 +0200
-Subject: [PATCH 2/5] frontend: PluginSettings: Add Development Mode control
+Subject: [PATCH 2/4] frontend: PluginSettings: Add Development Mode control
 
 Keep packaged development-plugin access explicit and place the control
 with plugin settings using the final responsive layout.
 ---
- .../PluginSettings/PluginSettings.stories.tsx | 24 +++++++
- .../PluginSettings/PluginSettings.test.tsx    | 68 ++++++++++++++++++-
- .../App/PluginSettings/PluginSettings.tsx     | 56 +++++++++++++++
- .../components/App/Settings/Settings.test.tsx |  5 +-
- frontend/src/i18n/locales/ar/app.json         |  4 +-
- frontend/src/i18n/locales/ar/translation.json |  3 +
- frontend/src/i18n/locales/bn/app.json         |  4 +-
- frontend/src/i18n/locales/bn/translation.json |  3 +
- frontend/src/i18n/locales/cs/app.json         |  4 +-
- frontend/src/i18n/locales/cs/translation.json |  3 +
- frontend/src/i18n/locales/de/app.json         |  4 +-
- frontend/src/i18n/locales/de/translation.json |  3 +
- frontend/src/i18n/locales/en/app.json         |  4 +-
- frontend/src/i18n/locales/en/translation.json |  3 +
- frontend/src/i18n/locales/es/app.json         |  4 +-
- frontend/src/i18n/locales/es/translation.json |  3 +
- frontend/src/i18n/locales/fr/app.json         |  4 +-
- frontend/src/i18n/locales/fr/translation.json |  3 +
- frontend/src/i18n/locales/he/app.json         |  4 +-
- frontend/src/i18n/locales/he/translation.json |  3 +
- frontend/src/i18n/locales/hi/app.json         |  4 +-
- frontend/src/i18n/locales/hi/translation.json |  3 +
- frontend/src/i18n/locales/hu/app.json         |  4 +-
- frontend/src/i18n/locales/hu/translation.json |  3 +
- frontend/src/i18n/locales/id/app.json         |  4 +-
- frontend/src/i18n/locales/id/translation.json |  3 +
- frontend/src/i18n/locales/it/app.json         |  4 +-
- frontend/src/i18n/locales/it/translation.json |  3 +
- frontend/src/i18n/locales/ja/app.json         |  4 +-
- frontend/src/i18n/locales/ja/translation.json |  3 +
- frontend/src/i18n/locales/ko/app.json         |  4 +-
- frontend/src/i18n/locales/ko/translation.json |  3 +
- frontend/src/i18n/locales/nl/app.json         |  4 +-
- frontend/src/i18n/locales/nl/translation.json |  3 +
- frontend/src/i18n/locales/pl/app.json         |  4 +-
- frontend/src/i18n/locales/pl/translation.json |  3 +
- frontend/src/i18n/locales/pt-br/app.json      |  4 +-
- .../src/i18n/locales/pt-br/translation.json   |  3 +
- frontend/src/i18n/locales/pt-pt/app.json      |  4 +-
- .../src/i18n/locales/pt-pt/translation.json   |  3 +
- frontend/src/i18n/locales/ru/app.json         |  4 +-
- frontend/src/i18n/locales/ru/translation.json |  3 +
- frontend/src/i18n/locales/sv/app.json         |  4 +-
- frontend/src/i18n/locales/sv/translation.json |  3 +
- frontend/src/i18n/locales/ta/app.json         |  4 +-
- frontend/src/i18n/locales/ta/translation.json |  3 +
- frontend/src/i18n/locales/tr/app.json         |  4 +-
- frontend/src/i18n/locales/tr/translation.json |  3 +
- frontend/src/i18n/locales/ur/app.json         |  4 +-
- frontend/src/i18n/locales/ur/translation.json |  3 +
- frontend/src/i18n/locales/zh-tw/app.json      |  4 +-
- .../src/i18n/locales/zh-tw/translation.json   |  3 +
- frontend/src/i18n/locales/zh/app.json         |  4 +-
- frontend/src/i18n/locales/zh/translation.json |  3 +
- 54 files changed, 276 insertions(+), 52 deletions(-)
+ .../api/interfaces/plugin_lib.DesktopApi.md   |  37 +++++++
+ docs/development/api/modules/plugin_lib.md    |   1 +
+ .../PluginSettings/PluginSettings.stories.tsx |  24 +++++
+ .../PluginSettings/PluginSettings.test.tsx    | 102 +++++++++++++++++-
+ .../App/PluginSettings/PluginSettings.tsx     |  80 +++++++++++++-
+ .../components/App/Settings/Settings.test.tsx |   5 +-
+ frontend/src/i18n/locales/ar/translation.json |   6 +-
+ frontend/src/i18n/locales/bn/translation.json |   6 +-
+ frontend/src/i18n/locales/cs/translation.json |   6 +-
+ frontend/src/i18n/locales/de/translation.json |   6 +-
+ frontend/src/i18n/locales/en/translation.json |   6 +-
+ frontend/src/i18n/locales/es/translation.json |   6 +-
+ frontend/src/i18n/locales/fr/translation.json |   6 +-
+ frontend/src/i18n/locales/he/translation.json |   6 +-
+ frontend/src/i18n/locales/hi/translation.json |   6 +-
+ frontend/src/i18n/locales/hu/translation.json |   6 +-
+ frontend/src/i18n/locales/id/translation.json |   6 +-
+ frontend/src/i18n/locales/it/translation.json |   6 +-
+ frontend/src/i18n/locales/ja/translation.json |   6 +-
+ frontend/src/i18n/locales/ko/translation.json |   6 +-
+ frontend/src/i18n/locales/nl/translation.json |   6 +-
+ frontend/src/i18n/locales/pl/translation.json |   6 +-
+ .../src/i18n/locales/pt-br/translation.json   |   6 +-
+ .../src/i18n/locales/pt-pt/translation.json   |   6 +-
+ frontend/src/i18n/locales/ru/translation.json |   6 +-
+ frontend/src/i18n/locales/sv/translation.json |   6 +-
+ frontend/src/i18n/locales/ta/translation.json |   6 +-
+ frontend/src/i18n/locales/tr/translation.json |   6 +-
+ frontend/src/i18n/locales/ur/translation.json |   6 +-
+ .../src/i18n/locales/zh-tw/translation.json   |   6 +-
+ frontend/src/i18n/locales/zh/translation.json |   6 +-
+ frontend/src/plugin/lib.ts                    |   2 +
+ frontend/src/plugin/pluginsSlice.ts           |   3 +
+ 33 files changed, 375 insertions(+), 29 deletions(-)
+ create mode 100644 docs/development/api/interfaces/plugin_lib.DesktopApi.md
 
+diff --git a/docs/development/api/interfaces/plugin_lib.DesktopApi.md b/docs/development/api/interfaces/plugin_lib.DesktopApi.md
+new file mode 100644
+index 000000000..f29a6cf19
+--- /dev/null
++++ b/docs/development/api/interfaces/plugin_lib.DesktopApi.md
+@@ -0,0 +1,37 @@
++[API](../API.md) / [plugin/lib](../modules/plugin_lib.md) / DesktopApi
++
++# Interface: DesktopApi
++
++[plugin/lib](../modules/plugin_lib.md).DesktopApi
++
++APIs exposed to Headlamp's renderer process by the desktop preload bridge.
++
++## Indexable
++
++▪ [key: `string`]: `any`
++
++Additional APIs exposed by the desktop preload bridge.
++
++## Properties
++
++### isDevelopment
++
++• `Optional` **isDevelopment**: `boolean`
++
++Whether Electron is running in development mode, independent of the frontend build mode.
++
++#### Defined in
++
++[plugin/lib.ts:75](https://github.com/kubernetes-sigs/headlamp/blob/449ae946d/frontend/src/plugin/lib.ts#L75)
++
++___
++
++### platform
++
++• **platform**: `Platform`
++
++Operating system platform hosting the desktop app.
++
++#### Defined in
++
++[plugin/lib.ts:73](https://github.com/kubernetes-sigs/headlamp/blob/449ae946d/frontend/src/plugin/lib.ts#L73)
+diff --git a/docs/development/api/modules/plugin_lib.md b/docs/development/api/modules/plugin_lib.md
+index a38833123..6d8a7b263 100644
+--- a/docs/development/api/modules/plugin_lib.md
++++ b/docs/development/api/modules/plugin_lib.md
+@@ -10,3 +10,4 @@
+ ## Interfaces
+ 
+ - [AppMenu](../interfaces/plugin_lib.AppMenu.md)
++- [DesktopApi](../interfaces/plugin_lib.DesktopApi.md)
 diff --git a/frontend/src/components/App/PluginSettings/PluginSettings.stories.tsx b/frontend/src/components/App/PluginSettings/PluginSettings.stories.tsx
 index 8f73a0ba3..23562a624 100644
 --- a/frontend/src/components/App/PluginSettings/PluginSettings.stories.tsx
@@ -1018,7 +1089,7 @@ index 8f73a0ba3..23562a624 100644
   * createDemoData function will create example data objects to act as plugin data.
   * The function will return an array of demo data objects based on the number specified.
 diff --git a/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx b/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx
-index 3c9280a04..b7775f9f2 100644
+index 3c9280a04..7af6b3de4 100644
 --- a/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx
 +++ b/frontend/src/components/App/PluginSettings/PluginSettings.test.tsx
 @@ -15,7 +15,8 @@
@@ -1031,20 +1102,15 @@ index 3c9280a04..b7775f9f2 100644
  import { afterEach, describe, expect, it, vi } from 'vitest';
  import { createMuiTheme } from '../../../lib/themes';
  import { PluginInfo, setPluginSettings } from '../../../plugin/pluginsSlice';
-@@ -29,7 +30,12 @@ vi.mock('../../../helpers/isElectron', () => ({
-   isElectron: () => true,
+@@ -30,6 +31,7 @@ vi.mock('../../../helpers/isElectron', () => ({
  }));
  
-+vi.mock('../../../helpers/isDevMode', () => ({
-+  isDevMode: () => false,
-+}));
-+
  const theme = createMuiTheme({ name: lightTheme.name, base: 'light' });
 +const originalDesktopApi = window.desktopApi;
  
  function createPlugins(count: number): PluginInfo[] {
    return Array.from({ length: count }, (_, i) => ({
-@@ -77,6 +83,24 @@ describe('PluginSettingsPure', () => {
+@@ -77,6 +79,45 @@ describe('PluginSettingsPure', () => {
      expect(deleteButtons).toHaveLength(3);
    });
  
@@ -1060,16 +1126,37 @@ index 3c9280a04..b7775f9f2 100644
 +      name: 'Load development plugins',
 +    });
 +    expect(pluginDevelopmentMode).not.toBeChecked();
++    expect(pluginDevelopmentMode).toHaveAccessibleDescription(
++      'Load plugins from your local development directory. Only enable this when you trust every plugin in that directory.'
++    );
 +
 +    await userEvent.click(pluginDevelopmentMode);
 +
 +    expect(onDevelopmentPluginsChange).toHaveBeenCalledWith(true);
 +  });
 +
++  it('shows globally blocked development plugins as not loaded without changing preference', () => {
++    renderPluginSettings({
++      plugins: [
++        {
++          ...createPlugins(1)[0],
++          type: 'development',
++          source: 'development',
++          isEnabled: true,
++          isLoaded: false,
++          isDevelopmentModeBlocked: true,
++        },
++      ],
++    });
++
++    expect(screen.getByText('Not Loaded')).toBeInTheDocument();
++    expect(screen.queryByRole('checkbox', { name: 'Toggle plugin-0' })).toBeNull();
++  });
++
    it('calls onDelete when delete is confirmed', () => {
      const onDelete = vi.fn();
      confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-@@ -204,6 +228,48 @@ describe('PluginSettingsPure', () => {
+@@ -204,6 +245,65 @@ describe('PluginSettingsPure', () => {
  });
  
  describe('PluginSettings events', () => {
@@ -1082,6 +1169,7 @@ index 3c9280a04..b7775f9f2 100644
 +    const unsubscribe = vi.fn();
 +    let receiveDevelopmentPlugins: ((enabled: boolean) => void) | undefined;
 +    window.desktopApi = {
++      isDevelopment: false,
 +      send,
 +      receive: vi.fn((channel: string, callback: (enabled: boolean) => void) => {
 +        if (channel === 'development-plugins') {
@@ -1115,22 +1203,30 @@ index 3c9280a04..b7775f9f2 100644
 +    expect(unsubscribe).toHaveBeenCalledOnce();
 +  });
 +
++  it('hides packaged-only controls in Electron development mode', () => {
++    const send = vi.fn();
++    window.desktopApi = { isDevelopment: true, send } as any;
++
++    render(
++      <TestContext>
++        <ThemeProvider theme={theme}>
++          <PluginSettings />
++        </ThemeProvider>
++      </TestContext>
++    );
++
++    expect(screen.queryByRole('checkbox', { name: 'Load development plugins' })).toBeNull();
++    expect(send).not.toHaveBeenCalledWith('request-development-plugins');
++  });
++
    it('dispatches PLUGIN_LIST_VIEW with the configured plugins', async () => {
      const plugins = createPlugins(2);
      store.dispatch(setPluginSettings(plugins));
 diff --git a/frontend/src/components/App/PluginSettings/PluginSettings.tsx b/frontend/src/components/App/PluginSettings/PluginSettings.tsx
-index 1dc20d41f..90bef7383 100644
+index 1dc20d41f..dbdc3953b 100644
 --- a/frontend/src/components/App/PluginSettings/PluginSettings.tsx
 +++ b/frontend/src/components/App/PluginSettings/PluginSettings.tsx
-@@ -27,6 +27,7 @@ import { MRT_Row } from 'material-react-table';
- import { useEffect, useState } from 'react';
- import { useTranslation } from 'react-i18next';
- import { useDispatch } from 'react-redux';
-+import { isDevMode } from '../../../helpers/isDevMode';
- import { isElectron } from '../../../helpers/isElectron';
- import { useFilterFunc } from '../../../lib/util';
- import { PluginInfo, reloadPage, setPluginSettings } from '../../../plugin/pluginsSlice';
-@@ -53,6 +54,9 @@ export interface PluginSettingsPureProps {
+@@ -53,6 +53,9 @@ export interface PluginSettingsPureProps {
    onSave: (plugins: PluginInfo[]) => void;
    onDelete?: (plugin: PluginInfo) => Promise<void> | void;
    saveAlwaysEnable?: boolean;
@@ -1140,7 +1236,17 @@ index 1dc20d41f..90bef7383 100644
  }
  
  /** PluginSettingsProp intentially left empty to remain malleable */
-@@ -245,6 +249,37 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+@@ -143,7 +146,8 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+         displayName: name ?? plugin.name,
+         origin: plugin.origin ?? author?.substring(1) ?? t('translation|Unknown'),
+         // If the plugin is not loaded, ensure it's disabled
+-        isEnabled: plugin.isLoaded === false ? false : plugin.isEnabled,
++        isEnabled:
++          plugin.isLoaded === false && !plugin.isDevelopmentModeBlocked ? false : plugin.isEnabled,
+       };
+     })
+   );
+@@ -245,6 +249,42 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
  
    return (
      <>
@@ -1158,7 +1264,11 @@ index 1dc20d41f..90bef7383 100644
 +              <Typography id="development-plugins-label">
 +                {t('translation|Load development plugins')}
 +              </Typography>
-+              <Typography variant="body2" color="text.secondary">
++              <Typography
++                id="development-plugins-description"
++                variant="body2"
++                color="text.secondary"
++              >
 +                {t(
 +                  'translation|Load plugins from your local development directory. Only enable this when you trust every plugin in that directory.'
 +                )}
@@ -1170,6 +1280,7 @@ index 1dc20d41f..90bef7383 100644
 +              onChange={event => props.onDevelopmentPluginsChange?.(event.target.checked)}
 +              inputProps={{
 +                'aria-labelledby': 'development-plugins-label',
++                'aria-describedby': 'development-plugins-description',
 +              }}
 +            />
 +          </Box>
@@ -1178,11 +1289,42 @@ index 1dc20d41f..90bef7383 100644
        <SectionBox
          title={<SectionFilterHeader title={t('translation|Plugins')} noNamespaceFilter />}
        >
-@@ -512,15 +547,36 @@ export default function PluginSettings() {
+@@ -352,6 +392,21 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+             {
+               header: t('translation|Status'),
+               Cell: ({ row: { original: plugin } }: { row: MRT_Row<PluginInfo> }) => {
++                if (plugin.isDevelopmentModeBlocked) {
++                  return (
++                    <Tooltip
++                      title={t('translation|Enable Plugin Development Mode to load this plugin')}
++                    >
++                      <Chip
++                        label={t('translation|Not Loaded')}
++                        size="small"
++                        color="warning"
++                        variant="outlined"
++                      />
++                    </Tooltip>
++                  );
++                }
++
+                 if (plugin.isCompatible === false) {
+                   return (
+                     <Tooltip
+@@ -407,7 +462,7 @@ export function PluginSettingsPure(props: PluginSettingsPureProps) {
+               header: t('translation|Enable'),
+               accessorFn: (plugin: PluginInfo) => plugin.isEnabled,
+               Cell: ({ row: { original: plugin } }: { row: MRT_Row<PluginInfo> }) => {
+-                if (!plugin.isCompatible || !isElectron()) {
++                if (plugin.isDevelopmentModeBlocked || !plugin.isCompatible || !isElectron()) {
+                   return null;
+                 }
+ 
+@@ -512,15 +567,36 @@ export default function PluginSettings() {
    const pluginSettings = useTypedSelector(state => state.plugins.pluginSettings);
    const handleDelete = usePluginDelete();
    const dispatchHeadlampEvent = useEventCallback(HeadlampEventType.PLUGIN_LIST_VIEW);
-+  const showDevelopmentPluginsSetting = isElectron() && !isDevMode();
++  const showDevelopmentPluginsSetting = isElectron() && window.desktopApi?.isDevelopment !== true;
 +  const [developmentPluginsEnabled, setDevelopmentPluginsEnabled] = useState(false);
  
    useEffect(() => {
@@ -1245,23 +1387,8 @@ index 85653eb04..57a1effd9 100644
    });
  
    it('resolves the theme-picker grid breakpoint from the live theme, not a static import', async () => {
-diff --git a/frontend/src/i18n/locales/ar/app.json b/frontend/src/i18n/locales/ar/app.json
-index 6e83220e6..c9a006c5e 100644
---- a/frontend/src/i18n/locales/ar/app.json
-+++ b/frontend/src/i18n/locales/ar/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "فشل جلب معلومات الإضافة",
-   "An error occurred while fetching plugin info from {{  URL }}.": "حدث خطأ أثناء جلب معلومات الإضافة من {{ URL }}.",
 diff --git a/frontend/src/i18n/locales/ar/translation.json b/frontend/src/i18n/locales/ar/translation.json
-index 8465651bd..826f18efc 100644
+index 8465651bd..a59d93aea 100644
 --- a/frontend/src/i18n/locales/ar/translation.json
 +++ b/frontend/src/i18n/locales/ar/translation.json
 @@ -113,6 +113,9 @@
@@ -1274,23 +1401,21 @@ index 8465651bd..826f18efc 100644
    "Plugins": "الإضافات",
    "Multiple versions": "إصدارات متعددة",
    "Description": "الوصف",
-diff --git a/frontend/src/i18n/locales/bn/app.json b/frontend/src/i18n/locales/bn/app.json
-index e0f67e510..57149ac6f 100644
---- a/frontend/src/i18n/locales/bn/app.json
-+++ b/frontend/src/i18n/locales/bn/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Plugin এর তথ্য আনতে Failed হয়েছে",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} থেকে Plugin এর তথ্য আনার সময় একটি Error ঘটেছে।",
+@@ -120,10 +123,11 @@
+   "Development": "قيد التطوير",
+   "User-installed": "مثبت بواسطة المستخدم",
+   "Shipped": "مرفق",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "غير محمّل",
+   "This plugin is not compatible with this version of Headlamp": "هذه الإضافة غير متوافقة مع هذا الإصدار من Headlamp",
+   "Incompatible": "غير متوافق",
+   "Overridden by {{type}} version": "تم الاستبدال بواسطة إصدار {{type}}",
+-  "Not Loaded": "غير محمّل",
+   "Disabled": "معطّل",
+   "Loaded": "محمّل",
+   "Enable": "تفعيل",
 diff --git a/frontend/src/i18n/locales/bn/translation.json b/frontend/src/i18n/locales/bn/translation.json
-index b6b46947d..3a0cae9bd 100644
+index b6b46947d..c8e8b9d3b 100644
 --- a/frontend/src/i18n/locales/bn/translation.json
 +++ b/frontend/src/i18n/locales/bn/translation.json
 @@ -113,6 +113,9 @@
@@ -1303,23 +1428,21 @@ index b6b46947d..3a0cae9bd 100644
    "Plugins": "Plugin",
    "Multiple versions": "একাধিক Version",
    "Description": "বর্ণনা",
-diff --git a/frontend/src/i18n/locales/cs/app.json b/frontend/src/i18n/locales/cs/app.json
-index e67913e76..ba6af90a2 100644
---- a/frontend/src/i18n/locales/cs/app.json
-+++ b/frontend/src/i18n/locales/cs/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Nepovedlo se načíst informace o modulu plug-in.",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Při načítání informací o modulu plug-in z {{  URL }} došlo k chybě.",
+@@ -120,10 +123,11 @@
+   "Development": "ডেভেলপমেন্ট",
+   "User-installed": "ব্যবহারকারী ইনস্টল করা",
+   "Shipped": "প্রেরিত",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "লোড হয়নি",
+   "This plugin is not compatible with this version of Headlamp": "এই Plugin Headlamp-এর এই Version-এর সাথে সামঞ্জস্যপূর্ণ নয়",
+   "Incompatible": "বেমানান",
+   "Overridden by {{type}} version": "{{type}} Version দ্বারা প্রতিস্থাপিত",
+-  "Not Loaded": "লোড হয়নি",
+   "Disabled": "অক্ষম",
+   "Loaded": "লোড হয়েছে",
+   "Enable": "সক্ষম করুন",
 diff --git a/frontend/src/i18n/locales/cs/translation.json b/frontend/src/i18n/locales/cs/translation.json
-index 47df8383b..50f4a96fa 100644
+index 47df8383b..eee00ad29 100644
 --- a/frontend/src/i18n/locales/cs/translation.json
 +++ b/frontend/src/i18n/locales/cs/translation.json
 @@ -113,6 +113,9 @@
@@ -1332,23 +1455,21 @@ index 47df8383b..50f4a96fa 100644
    "Plugins": "Moduly plug-in",
    "Multiple versions": "Více verzí",
    "Description": "Popis",
-diff --git a/frontend/src/i18n/locales/de/app.json b/frontend/src/i18n/locales/de/app.json
-index a9a3fc04a..8546dfef0 100644
---- a/frontend/src/i18n/locales/de/app.json
-+++ b/frontend/src/i18n/locales/de/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "",
-   "An error occurred while fetching plugin info from {{  URL }}.": "",
+@@ -120,10 +123,11 @@
+   "Development": "Vývoj",
+   "User-installed": "Nainstalováno uživatelem",
+   "Shipped": "Expedováno",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Nenačtené",
+   "This plugin is not compatible with this version of Headlamp": "Tento modul plug-in není kompatibilní s touto verzí aplikace Headlamp.",
+   "Incompatible": "Nekompatibilní",
+   "Overridden by {{type}} version": "Přepsáno verzí {{type}}",
+-  "Not Loaded": "Nenačtené",
+   "Disabled": "Zakázáno",
+   "Loaded": "Načteno",
+   "Enable": "Povolit",
 diff --git a/frontend/src/i18n/locales/de/translation.json b/frontend/src/i18n/locales/de/translation.json
-index 69a645c77..5908a48f3 100644
+index 69a645c77..5eccdc9e1 100644
 --- a/frontend/src/i18n/locales/de/translation.json
 +++ b/frontend/src/i18n/locales/de/translation.json
 @@ -113,6 +113,9 @@
@@ -1361,23 +1482,21 @@ index 69a645c77..5908a48f3 100644
    "Plugins": "Plugins",
    "Multiple versions": "",
    "Description": "Beschreibung",
-diff --git a/frontend/src/i18n/locales/en/app.json b/frontend/src/i18n/locales/en/app.json
-index bdf0ab47a..1f1bc4fd8 100644
---- a/frontend/src/i18n/locales/en/app.json
-+++ b/frontend/src/i18n/locales/en/app.json
-@@ -1,8 +1,8 @@
- {
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "Inkompatibel",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "",
+   "Loaded": "",
    "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Failed to fetch plugin info",
-   "An error occurred while fetching plugin info from {{  URL }}.": "An error occurred while fetching plugin info from {{  URL }}.",
 diff --git a/frontend/src/i18n/locales/en/translation.json b/frontend/src/i18n/locales/en/translation.json
-index 812708f63..92c8e5c39 100644
+index 812708f63..e29409e11 100644
 --- a/frontend/src/i18n/locales/en/translation.json
 +++ b/frontend/src/i18n/locales/en/translation.json
 @@ -113,6 +113,9 @@
@@ -1390,23 +1509,21 @@ index 812708f63..92c8e5c39 100644
    "Plugins": "Plugins",
    "Multiple versions": "Multiple versions",
    "Description": "Description",
-diff --git a/frontend/src/i18n/locales/es/app.json b/frontend/src/i18n/locales/es/app.json
-index f38543fe5..bdc3193a0 100644
---- a/frontend/src/i18n/locales/es/app.json
-+++ b/frontend/src/i18n/locales/es/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "",
-   "An error occurred while fetching plugin info from {{  URL }}.": "",
+@@ -120,10 +123,11 @@
+   "Development": "Development",
+   "User-installed": "User-installed",
+   "Shipped": "Shipped",
++  "Enable Plugin Development Mode to load this plugin": "Enable Plugin Development Mode to load this plugin",
++  "Not Loaded": "Not Loaded",
+   "This plugin is not compatible with this version of Headlamp": "This plugin is not compatible with this version of Headlamp",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "Overridden by {{type}} version",
+-  "Not Loaded": "Not Loaded",
+   "Disabled": "Disabled",
+   "Loaded": "Loaded",
+   "Enable": "Enable",
 diff --git a/frontend/src/i18n/locales/es/translation.json b/frontend/src/i18n/locales/es/translation.json
-index b7023215d..d5ef5fbb1 100644
+index b7023215d..5f673dd72 100644
 --- a/frontend/src/i18n/locales/es/translation.json
 +++ b/frontend/src/i18n/locales/es/translation.json
 @@ -113,6 +113,9 @@
@@ -1419,23 +1536,21 @@ index b7023215d..d5ef5fbb1 100644
    "Plugins": "Plugins",
    "Multiple versions": "",
    "Description": "Descripción",
-diff --git a/frontend/src/i18n/locales/fr/app.json b/frontend/src/i18n/locales/fr/app.json
-index 135d6f1e7..ff584a2dd 100644
---- a/frontend/src/i18n/locales/fr/app.json
-+++ b/frontend/src/i18n/locales/fr/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Échec de la récupération des informations du plugin",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Une erreur s'est produite lors de la récupération des informations du plugin depuis {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "Desactivado",
+   "Loaded": "",
+   "Enable": "Activar",
 diff --git a/frontend/src/i18n/locales/fr/translation.json b/frontend/src/i18n/locales/fr/translation.json
-index 1e06b9ee6..fce124115 100644
+index 1e06b9ee6..41afd7031 100644
 --- a/frontend/src/i18n/locales/fr/translation.json
 +++ b/frontend/src/i18n/locales/fr/translation.json
 @@ -113,6 +113,9 @@
@@ -1448,23 +1563,21 @@ index 1e06b9ee6..fce124115 100644
    "Plugins": "Plugins",
    "Multiple versions": "Versions multiples",
    "Description": "Description",
-diff --git a/frontend/src/i18n/locales/he/app.json b/frontend/src/i18n/locales/he/app.json
-index 63cee1483..eefdcb22f 100644
---- a/frontend/src/i18n/locales/he/app.json
-+++ b/frontend/src/i18n/locales/he/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Failed to fetch plugin info",
-   "An error occurred while fetching plugin info from {{  URL }}.": "An error occurred while fetching plugin info from {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "Développement",
+   "User-installed": "Installé par l'utilisateur",
+   "Shipped": "Fourni",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Non chargé",
+   "This plugin is not compatible with this version of Headlamp": "Ce plugin n'est pas compatible avec cette version de Headlamp",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "Remplacé par la version {{type}}",
+-  "Not Loaded": "Non chargé",
+   "Disabled": "Désactivé",
+   "Loaded": "Chargé",
+   "Enable": "Activer",
 diff --git a/frontend/src/i18n/locales/he/translation.json b/frontend/src/i18n/locales/he/translation.json
-index c9635b794..c08b76900 100644
+index c9635b794..efa46113b 100644
 --- a/frontend/src/i18n/locales/he/translation.json
 +++ b/frontend/src/i18n/locales/he/translation.json
 @@ -113,6 +113,9 @@
@@ -1477,23 +1590,21 @@ index c9635b794..c08b76900 100644
    "Plugins": "Plugins",
    "Multiple versions": "Multiple versions",
    "Description": "Description",
-diff --git a/frontend/src/i18n/locales/hi/app.json b/frontend/src/i18n/locales/hi/app.json
-index 9f39ed3a8..b9f8a2211 100644
---- a/frontend/src/i18n/locales/hi/app.json
-+++ b/frontend/src/i18n/locales/hi/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "प्लगिन जानकारी प्राप्त करने में विफल",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} से प्लगिन जानकारी प्राप्त करते समय एक त्रुटि हुई।",
+@@ -120,10 +123,11 @@
+   "Development": "Development",
+   "User-installed": "User-installed",
+   "Shipped": "Shipped",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Not Loaded",
+   "This plugin is not compatible with this version of Headlamp": "This plugin is not compatible with this version of Headlamp",
+   "Incompatible": "Incompatible",
+   "Overridden by {{type}} version": "Overridden by {{type}} version",
+-  "Not Loaded": "Not Loaded",
+   "Disabled": "Disabled",
+   "Loaded": "Loaded",
+   "Enable": "Enable",
 diff --git a/frontend/src/i18n/locales/hi/translation.json b/frontend/src/i18n/locales/hi/translation.json
-index 560f511e4..a3a273aa3 100644
+index 560f511e4..ea46499d1 100644
 --- a/frontend/src/i18n/locales/hi/translation.json
 +++ b/frontend/src/i18n/locales/hi/translation.json
 @@ -113,6 +113,9 @@
@@ -1506,23 +1617,21 @@ index 560f511e4..a3a273aa3 100644
    "Plugins": "",
    "Multiple versions": "",
    "Description": "",
-diff --git a/frontend/src/i18n/locales/hu/app.json b/frontend/src/i18n/locales/hu/app.json
-index 4d40a288a..cbcffed21 100644
---- a/frontend/src/i18n/locales/hu/app.json
-+++ b/frontend/src/i18n/locales/hu/app.json
-@@ -1,8 +1,8 @@
- {
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "",
+   "Loaded": "",
    "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Nem sikerült beolvasni a beépülő modul adatait",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Hiba történt a beépülő modul adatainak beolvasása során innen: {{  URL }}.",
 diff --git a/frontend/src/i18n/locales/hu/translation.json b/frontend/src/i18n/locales/hu/translation.json
-index 2d60d9050..276cc84db 100644
+index 2d60d9050..de6a731f1 100644
 --- a/frontend/src/i18n/locales/hu/translation.json
 +++ b/frontend/src/i18n/locales/hu/translation.json
 @@ -113,6 +113,9 @@
@@ -1535,23 +1644,21 @@ index 2d60d9050..276cc84db 100644
    "Plugins": "Beépülő modulok",
    "Multiple versions": "Több verzió",
    "Description": "Leírás",
-diff --git a/frontend/src/i18n/locales/id/app.json b/frontend/src/i18n/locales/id/app.json
-index 4c7623801..e54aa1231 100644
---- a/frontend/src/i18n/locales/id/app.json
-+++ b/frontend/src/i18n/locales/id/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Gagal mengambil info plugin",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Terjadi kesalahan saat mengambil info plugin dari {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "Fejlesztés",
+   "User-installed": "Felhasználó által telepített",
+   "Shipped": "Kiszállítva",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Nincs betöltve",
+   "This plugin is not compatible with this version of Headlamp": "Ez a beépülő modul nem kompatibilis a Headlamp ezen verziójával",
+   "Incompatible": "Nem kompatibilis",
+   "Overridden by {{type}} version": "Felülírta a(z) {{type}} verzió",
+-  "Not Loaded": "Nincs betöltve",
+   "Disabled": "Letiltva",
+   "Loaded": "Betöltve",
+   "Enable": "Engedélyezés",
 diff --git a/frontend/src/i18n/locales/id/translation.json b/frontend/src/i18n/locales/id/translation.json
-index 9ed386c47..68b278d6c 100644
+index 9ed386c47..68b9a90c0 100644
 --- a/frontend/src/i18n/locales/id/translation.json
 +++ b/frontend/src/i18n/locales/id/translation.json
 @@ -113,6 +113,9 @@
@@ -1564,23 +1671,21 @@ index 9ed386c47..68b278d6c 100644
    "Plugins": "Plugin",
    "Multiple versions": "Beberapa versi",
    "Description": "Deskripsi",
-diff --git a/frontend/src/i18n/locales/it/app.json b/frontend/src/i18n/locales/it/app.json
-index adf70668b..1eb42dab2 100644
---- a/frontend/src/i18n/locales/it/app.json
-+++ b/frontend/src/i18n/locales/it/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Impossibile recuperare le informazioni dell'estensione",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Si è verificato un errore durante il recupero delle informazioni dell'estensione da {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "Pengembangan",
+   "User-installed": "Diinstal oleh pengguna",
+   "Shipped": "Dikirim",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Tidak Dimuat",
+   "This plugin is not compatible with this version of Headlamp": "Plugin ini tidak kompatibel dengan versi Headlamp ini",
+   "Incompatible": "Tidak kompatibel",
+   "Overridden by {{type}} version": "Ditimpa oleh versi {{type}}",
+-  "Not Loaded": "Tidak Dimuat",
+   "Disabled": "Dinonaktifkan",
+   "Loaded": "Dimuat",
+   "Enable": "Aktifkan",
 diff --git a/frontend/src/i18n/locales/it/translation.json b/frontend/src/i18n/locales/it/translation.json
-index b456f5fa1..cc215378e 100644
+index b456f5fa1..94373b20e 100644
 --- a/frontend/src/i18n/locales/it/translation.json
 +++ b/frontend/src/i18n/locales/it/translation.json
 @@ -113,6 +113,9 @@
@@ -1593,23 +1698,21 @@ index b456f5fa1..cc215378e 100644
    "Plugins": "Estensioni",
    "Multiple versions": "",
    "Description": "Descrizione",
-diff --git a/frontend/src/i18n/locales/ja/app.json b/frontend/src/i18n/locales/ja/app.json
-index ac4fb7b04..86ed05e03 100644
---- a/frontend/src/i18n/locales/ja/app.json
-+++ b/frontend/src/i18n/locales/ja/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "プラグイン情報の取得に失敗しました",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} からプラグイン情報を取得中にエラーが発生しました。",
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "Incompatibile",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "Disabilitato",
+   "Loaded": "",
+   "Enable": "Abilita",
 diff --git a/frontend/src/i18n/locales/ja/translation.json b/frontend/src/i18n/locales/ja/translation.json
-index e950663fb..407ef0f7f 100644
+index e950663fb..d51664600 100644
 --- a/frontend/src/i18n/locales/ja/translation.json
 +++ b/frontend/src/i18n/locales/ja/translation.json
 @@ -113,6 +113,9 @@
@@ -1622,23 +1725,21 @@ index e950663fb..407ef0f7f 100644
    "Plugins": "プラグイン",
    "Multiple versions": "",
    "Description": "説明",
-diff --git a/frontend/src/i18n/locales/ko/app.json b/frontend/src/i18n/locales/ko/app.json
-index 4af8f0795..0a430d781 100644
---- a/frontend/src/i18n/locales/ko/app.json
-+++ b/frontend/src/i18n/locales/ko/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "플러그인 정보를 가져오지 못했습니다",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }}에서 플러그인 정보를 가져오는 중 오류가 발생했습니다.",
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "互換性なし",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "無効",
+   "Loaded": "",
+   "Enable": "有効にする",
 diff --git a/frontend/src/i18n/locales/ko/translation.json b/frontend/src/i18n/locales/ko/translation.json
-index 009ec8226..5dcd316a8 100644
+index 009ec8226..f36f99e79 100644
 --- a/frontend/src/i18n/locales/ko/translation.json
 +++ b/frontend/src/i18n/locales/ko/translation.json
 @@ -113,6 +113,9 @@
@@ -1651,23 +1752,21 @@ index 009ec8226..5dcd316a8 100644
    "Plugins": "플러그인",
    "Multiple versions": "",
    "Description": "설명",
-diff --git a/frontend/src/i18n/locales/nl/app.json b/frontend/src/i18n/locales/nl/app.json
-index 14234563e..d3fa6d554 100644
---- a/frontend/src/i18n/locales/nl/app.json
-+++ b/frontend/src/i18n/locales/nl/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Kan de informatie over de invoegtoepassing niet ophalen",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Er is een fout opgetreden bij het ophalen van informatie over de invoegtoepassing van {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "호환되지 않음",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "사용 안 함",
+   "Loaded": "",
+   "Enable": "사용",
 diff --git a/frontend/src/i18n/locales/nl/translation.json b/frontend/src/i18n/locales/nl/translation.json
-index 41af49699..24ecd9c04 100644
+index 41af49699..eee87de0d 100644
 --- a/frontend/src/i18n/locales/nl/translation.json
 +++ b/frontend/src/i18n/locales/nl/translation.json
 @@ -113,6 +113,9 @@
@@ -1680,23 +1779,21 @@ index 41af49699..24ecd9c04 100644
    "Plugins": "Invoegtoepassingen",
    "Multiple versions": "Meerdere versies",
    "Description": "Beschrijving",
-diff --git a/frontend/src/i18n/locales/pl/app.json b/frontend/src/i18n/locales/pl/app.json
-index 6a81d1dfb..5e4d4f560 100644
---- a/frontend/src/i18n/locales/pl/app.json
-+++ b/frontend/src/i18n/locales/pl/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Nie można pobrać informacji o wtyczce",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Wystąpił błąd podczas pobierania informacji o wtyczce z {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "Ontwikkeling",
+   "User-installed": "Door de gebruiker geïnstalleerd",
+   "Shipped": "Verzonden",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Niet geladen",
+   "This plugin is not compatible with this version of Headlamp": "Deze invoegtoepassing is niet compatibel met deze versie van Headlamp",
+   "Incompatible": "Incompatibel",
+   "Overridden by {{type}} version": "Overschreven door versie {{type}}",
+-  "Not Loaded": "Niet geladen",
+   "Disabled": "Uitgeschakeld",
+   "Loaded": "Geladen",
+   "Enable": "Inschakelen",
 diff --git a/frontend/src/i18n/locales/pl/translation.json b/frontend/src/i18n/locales/pl/translation.json
-index be826db24..1939d741d 100644
+index be826db24..b26dab5b6 100644
 --- a/frontend/src/i18n/locales/pl/translation.json
 +++ b/frontend/src/i18n/locales/pl/translation.json
 @@ -113,6 +113,9 @@
@@ -1709,23 +1806,21 @@ index be826db24..1939d741d 100644
    "Plugins": "Wtyczki",
    "Multiple versions": "Wiele wersji",
    "Description": "Opis",
-diff --git a/frontend/src/i18n/locales/pt-br/app.json b/frontend/src/i18n/locales/pt-br/app.json
-index ba67eda45..451e48027 100644
---- a/frontend/src/i18n/locales/pt-br/app.json
-+++ b/frontend/src/i18n/locales/pt-br/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Falha\u00a0ao buscar informações do plugin",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Ocorreu um erro ao buscar informações do plugin em {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "Programowanie",
+   "User-installed": "Zainstalowane przez użytkownika",
+   "Shipped": "Wysłano",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Nie załadowano",
+   "This plugin is not compatible with this version of Headlamp": "Ta wtyczka nie jest zgodna z tą wersją programu Headlamp",
+   "Incompatible": "Niezgodne",
+   "Overridden by {{type}} version": "Zastąpione przez wersję {{type}}",
+-  "Not Loaded": "Nie załadowano",
+   "Disabled": "Wyłączono",
+   "Loaded": "Załadowano",
+   "Enable": "Włącz",
 diff --git a/frontend/src/i18n/locales/pt-br/translation.json b/frontend/src/i18n/locales/pt-br/translation.json
-index d69c6e4eb..a463db601 100644
+index d69c6e4eb..5b50e7852 100644
 --- a/frontend/src/i18n/locales/pt-br/translation.json
 +++ b/frontend/src/i18n/locales/pt-br/translation.json
 @@ -113,6 +113,9 @@
@@ -1738,23 +1833,21 @@ index d69c6e4eb..a463db601 100644
    "Plugins": "Plugins",
    "Multiple versions": "Várias versões",
    "Description": "Descrição",
-diff --git a/frontend/src/i18n/locales/pt-pt/app.json b/frontend/src/i18n/locales/pt-pt/app.json
-index e13eb45dc..b2fd10a5f 100644
---- a/frontend/src/i18n/locales/pt-pt/app.json
-+++ b/frontend/src/i18n/locales/pt-pt/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "",
-   "An error occurred while fetching plugin info from {{  URL }}.": "",
+@@ -120,10 +123,11 @@
+   "Development": "Desenvolvimento",
+   "User-installed": "Instalado pelo usuário",
+   "Shipped": "Enviado",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Não Carregado",
+   "This plugin is not compatible with this version of Headlamp": "Esse plug-in não é compatível com essa versão do Headlamp",
+   "Incompatible": "Incompatível",
+   "Overridden by {{type}} version": "Substituído pela versão de {{type}}",
+-  "Not Loaded": "Não Carregado",
+   "Disabled": "Desactivado",
+   "Loaded": "Carregado",
+   "Enable": "Activar",
 diff --git a/frontend/src/i18n/locales/pt-pt/translation.json b/frontend/src/i18n/locales/pt-pt/translation.json
-index b26f9e4e2..0731cc7d4 100644
+index b26f9e4e2..6428e9c57 100644
 --- a/frontend/src/i18n/locales/pt-pt/translation.json
 +++ b/frontend/src/i18n/locales/pt-pt/translation.json
 @@ -113,6 +113,9 @@
@@ -1767,23 +1860,21 @@ index b26f9e4e2..0731cc7d4 100644
    "Plugins": "",
    "Multiple versions": "",
    "Description": "",
-diff --git a/frontend/src/i18n/locales/ru/app.json b/frontend/src/i18n/locales/ru/app.json
-index 0413e01f9..0155b3560 100644
---- a/frontend/src/i18n/locales/ru/app.json
-+++ b/frontend/src/i18n/locales/ru/app.json
-@@ -1,8 +1,8 @@
- {
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "",
+   "Loaded": "",
    "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Не удалось получить информацию о плагине",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Произошла ошибка при получении информации о плагине из {{  URL }}.",
 diff --git a/frontend/src/i18n/locales/ru/translation.json b/frontend/src/i18n/locales/ru/translation.json
-index f300a3e0d..dc1c76dcc 100644
+index f300a3e0d..a7aee0500 100644
 --- a/frontend/src/i18n/locales/ru/translation.json
 +++ b/frontend/src/i18n/locales/ru/translation.json
 @@ -113,6 +113,9 @@
@@ -1796,23 +1887,21 @@ index f300a3e0d..dc1c76dcc 100644
    "Plugins": "Плагины",
    "Multiple versions": "Несколько версий",
    "Description": "Описание",
-diff --git a/frontend/src/i18n/locales/sv/app.json b/frontend/src/i18n/locales/sv/app.json
-index 45153b9e9..bf500fa52 100644
---- a/frontend/src/i18n/locales/sv/app.json
-+++ b/frontend/src/i18n/locales/sv/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Det gick inte att hämta info om plugin",
-   "An error occurred while fetching plugin info from {{  URL }}.": "Ett fel inträffade när info om plugin skulle hämtas från {{  URL }}.",
+@@ -120,10 +123,11 @@
+   "Development": "Разработка",
+   "User-installed": "Установленный пользователем",
+   "Shipped": "Встроенный",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Не загружено",
+   "This plugin is not compatible with this version of Headlamp": "Этот плагин несовместим с этой версией Headlamp.",
+   "Incompatible": "Несовместимый",
+   "Overridden by {{type}} version": "Переопределено версией {{type}}",
+-  "Not Loaded": "Не загружено",
+   "Disabled": "Отключено",
+   "Loaded": "Загружено",
+   "Enable": "Включить",
 diff --git a/frontend/src/i18n/locales/sv/translation.json b/frontend/src/i18n/locales/sv/translation.json
-index 80b9ac200..c75c5a3f1 100644
+index 80b9ac200..df0091d17 100644
 --- a/frontend/src/i18n/locales/sv/translation.json
 +++ b/frontend/src/i18n/locales/sv/translation.json
 @@ -113,6 +113,9 @@
@@ -1825,23 +1914,21 @@ index 80b9ac200..c75c5a3f1 100644
    "Plugins": "Plugin-program",
    "Multiple versions": "Flera versioner",
    "Description": "Beskrivning",
-diff --git a/frontend/src/i18n/locales/ta/app.json b/frontend/src/i18n/locales/ta/app.json
-index fcf094dd5..cccd87f15 100644
---- a/frontend/src/i18n/locales/ta/app.json
-+++ b/frontend/src/i18n/locales/ta/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "பிளக்-இன் தகவலைப் பெறுவதில் தோல்வி",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} இலிருந்து பிளக்-இன் தகவலைப் பெறும்போது ஒரு பிழை ஏற்பட்டது.",
+@@ -120,10 +123,11 @@
+   "Development": "Utveckling",
+   "User-installed": "Användarinstallerad",
+   "Shipped": "Skickat",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Inte inläst",
+   "This plugin is not compatible with this version of Headlamp": "Det här pluginprogrammet är inte kompatibelt med den här versionen av Headlamp",
+   "Incompatible": "Inkompatibelt",
+   "Overridden by {{type}} version": "Har åsidosatts av {{type}}-version",
+-  "Not Loaded": "Inte inläst",
+   "Disabled": "Inaktiverat",
+   "Loaded": "Inläst",
+   "Enable": "Aktivera",
 diff --git a/frontend/src/i18n/locales/ta/translation.json b/frontend/src/i18n/locales/ta/translation.json
-index d50199066..591aa39f2 100644
+index d50199066..3a799a77c 100644
 --- a/frontend/src/i18n/locales/ta/translation.json
 +++ b/frontend/src/i18n/locales/ta/translation.json
 @@ -113,6 +113,9 @@
@@ -1854,23 +1941,21 @@ index d50199066..591aa39f2 100644
    "Plugins": "பிளக்-இன்கள்",
    "Multiple versions": "",
    "Description": "விளக்கம்",
-diff --git a/frontend/src/i18n/locales/tr/app.json b/frontend/src/i18n/locales/tr/app.json
-index 5d6c12be2..c1616d3b1 100644
---- a/frontend/src/i18n/locales/tr/app.json
-+++ b/frontend/src/i18n/locales/tr/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "Eklenti bilgileri getirilemedi",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{  URL }} konumundan eklenti bilgileri getirilirken hata oluştu.",
+@@ -120,10 +123,11 @@
+   "Development": "",
+   "User-installed": "",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "",
+   "This plugin is not compatible with this version of Headlamp": "",
+   "Incompatible": "பொருந்தாதது",
+   "Overridden by {{type}} version": "",
+-  "Not Loaded": "",
+   "Disabled": "முடக்கப்பட்டது",
+   "Loaded": "",
+   "Enable": "இயக்கு",
 diff --git a/frontend/src/i18n/locales/tr/translation.json b/frontend/src/i18n/locales/tr/translation.json
-index 3841aca30..8a4f6911c 100644
+index 3841aca30..c61e7cccf 100644
 --- a/frontend/src/i18n/locales/tr/translation.json
 +++ b/frontend/src/i18n/locales/tr/translation.json
 @@ -113,6 +113,9 @@
@@ -1883,23 +1968,21 @@ index 3841aca30..8a4f6911c 100644
    "Plugins": "Eklentiler",
    "Multiple versions": "Birden çok sürüm",
    "Description": "Açıklama",
-diff --git a/frontend/src/i18n/locales/ur/app.json b/frontend/src/i18n/locales/ur/app.json
-index 6802551ed..ad0304c0f 100644
---- a/frontend/src/i18n/locales/ur/app.json
-+++ b/frontend/src/i18n/locales/ur/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "پلگ اِن کی معلومات حاصل کرنے میں ناکامی",
-   "An error occurred while fetching plugin info from {{  URL }}.": "{{ URL }} سے پلگ اِن کی معلومات حاصل کرتے وقت ایک خرابی پیش آئی۔",
+@@ -120,10 +123,11 @@
+   "Development": "Geliştirme",
+   "User-installed": "Kullanıcı tarafından yüklenen",
+   "Shipped": "Gönderildi",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "Yüklenmedi",
+   "This plugin is not compatible with this version of Headlamp": "Bu eklenti, Headlamp'in bu sürümüyle uyumlu değil",
+   "Incompatible": "Uyumsuz",
+   "Overridden by {{type}} version": "{{type}} sürümü tarafından geçersiz kılındı",
+-  "Not Loaded": "Yüklenmedi",
+   "Disabled": "Devre dışı",
+   "Loaded": "Yüklendi",
+   "Enable": "Etkinleştir",
 diff --git a/frontend/src/i18n/locales/ur/translation.json b/frontend/src/i18n/locales/ur/translation.json
-index 7c92e4e6c..321b8d626 100644
+index 7c92e4e6c..23f2f108d 100644
 --- a/frontend/src/i18n/locales/ur/translation.json
 +++ b/frontend/src/i18n/locales/ur/translation.json
 @@ -113,6 +113,9 @@
@@ -1912,23 +1995,21 @@ index 7c92e4e6c..321b8d626 100644
    "Plugins": "پلگ انز",
    "Multiple versions": "متعدد ورژنز",
    "Description": "تفصیل",
-diff --git a/frontend/src/i18n/locales/zh-tw/app.json b/frontend/src/i18n/locales/zh-tw/app.json
-index 00a9ebc7d..a22c12cc9 100644
---- a/frontend/src/i18n/locales/zh-tw/app.json
-+++ b/frontend/src/i18n/locales/zh-tw/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "獲取外掛資訊失敗",
-   "An error occurred while fetching plugin info from {{  URL }}.": "從{{  URL }}獲取外掛資訊時發生錯誤。",
+@@ -120,10 +123,11 @@
+   "Development": "ترقیاتی",
+   "User-installed": "صارف کی جانب سے نصب شدہ",
+   "Shipped": "شامل شدہ",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "لوڈ نہیں ہوا",
+   "This plugin is not compatible with this version of Headlamp": "یہ پلگ ان ہیڈلیمپ کے اس ورژن کے ساتھ مطابقت نہیں رکھتا",
+   "Incompatible": "غیر مطابقت پذیر",
+   "Overridden by {{type}} version": "{{type}} ورژن کے ذریعے تبدیل کیا گیا",
+-  "Not Loaded": "لوڈ نہیں ہوا",
+   "Disabled": "غیر فعال",
+   "Loaded": "لوڈ ہو گیا",
+   "Enable": "فعال کریں",
 diff --git a/frontend/src/i18n/locales/zh-tw/translation.json b/frontend/src/i18n/locales/zh-tw/translation.json
-index 649860567..e136fc849 100644
+index 649860567..bcac55d8f 100644
 --- a/frontend/src/i18n/locales/zh-tw/translation.json
 +++ b/frontend/src/i18n/locales/zh-tw/translation.json
 @@ -113,6 +113,9 @@
@@ -1941,23 +2022,21 @@ index 649860567..e136fc849 100644
    "Plugins": "外掛",
    "Multiple versions": "多個版本",
    "Description": "描述",
-diff --git a/frontend/src/i18n/locales/zh/app.json b/frontend/src/i18n/locales/zh/app.json
-index 30ea9d62b..4764fb70b 100644
---- a/frontend/src/i18n/locales/zh/app.json
-+++ b/frontend/src/i18n/locales/zh/app.json
-@@ -1,8 +1,8 @@
- {
-   "Enable": "",
-   "Cancel": "",
--  "Development Mode": "",
--  "Enable Development Mode?": "",
-+  "Plugin Development Mode": "",
-+  "Enable Plugin Development Mode?": "",
-   "Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.": "",
-   "Failed to fetch plugin info": "获取插件信息失败",
-   "An error occurred while fetching plugin info from {{  URL }}.": "从{{  URL }}获取插件信息失败.",
+@@ -120,10 +123,11 @@
+   "Development": "開發中",
+   "User-installed": "使用者安裝",
+   "Shipped": "",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "沒有載入",
+   "This plugin is not compatible with this version of Headlamp": "此外掛與此版本的 Headlamp 不相容",
+   "Incompatible": "不相容",
+   "Overridden by {{type}} version": "已被 {{type}} 版本覆寫",
+-  "Not Loaded": "沒有載入",
+   "Disabled": "已停用",
+   "Loaded": "已載入",
+   "Enable": "啟用",
 diff --git a/frontend/src/i18n/locales/zh/translation.json b/frontend/src/i18n/locales/zh/translation.json
-index f7b48e15f..ae0360e68 100644
+index f7b48e15f..fd6e697f7 100644
 --- a/frontend/src/i18n/locales/zh/translation.json
 +++ b/frontend/src/i18n/locales/zh/translation.json
 @@ -113,6 +113,9 @@
@@ -1970,55 +2049,64 @@ index f7b48e15f..ae0360e68 100644
    "Plugins": "插件",
    "Multiple versions": "多个版本",
    "Description": "描述",
--- 
-2.54.0
-
-
-From 7fba79d6540528516241d32d79bfacf113fe4696 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
-Date: Thu, 3 Sep 2026 12:39:55 +0200
-Subject: [PATCH 3/5] docs: plugins: Explain Development Mode command access
-
----
- docs/development/plugins/command-capabilities.md | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/docs/development/plugins/command-capabilities.md b/docs/development/plugins/command-capabilities.md
-index 8d783cbee..d7a2d0012 100644
---- a/docs/development/plugins/command-capabilities.md
-+++ b/docs/development/plugins/command-capabilities.md
-@@ -246,6 +246,13 @@ developed and legacy plugins such as Minikube. It does not apply to the `user`
- inventory, whose plugins must have plugin-manager installation receipts for
- production capabilities.
+@@ -120,10 +123,11 @@
+   "Development": "开发版",
+   "User-installed": "用户安装",
+   "Shipped": "内置",
++  "Enable Plugin Development Mode to load this plugin": "",
++  "Not Loaded": "未加载",
+   "This plugin is not compatible with this version of Headlamp": "此插件与当前版本的 Headlamp 不兼容",
+   "Incompatible": "不兼容",
+   "Overridden by {{type}} version": "已被 {{type}} 版本覆盖",
+-  "Not Loaded": "未加载",
+   "Disabled": "已停用",
+   "Loaded": "已加载",
+   "Enable": "启用",
+diff --git a/frontend/src/plugin/lib.ts b/frontend/src/plugin/lib.ts
+index 44912b14c..8b4ad5d18 100644
+--- a/frontend/src/plugin/lib.ts
++++ b/frontend/src/plugin/lib.ts
+@@ -71,6 +71,8 @@ export abstract class Plugin {
+ export interface DesktopApi {
+   /** Operating system platform hosting the desktop app. */
+   platform: NodeJS.Platform;
++  /** Whether Electron is running in development mode, independent of the frontend build mode. */
++  isDevelopment?: boolean;
+   /** Additional APIs exposed by the desktop preload bridge. */
+   [key: string]: any;
+ }
+diff --git a/frontend/src/plugin/pluginsSlice.ts b/frontend/src/plugin/pluginsSlice.ts
+index 6038fb3c1..b57d44cbb 100644
+--- a/frontend/src/plugin/pluginsSlice.ts
++++ b/frontend/src/plugin/pluginsSlice.ts
+@@ -104,6 +104,9 @@ export type PluginInfo = {
+    */
+   isLoaded?: boolean;
  
-+Packaged apps disable development-inventory command capabilities by default.
-+Users must explicitly enable **Development Mode** in General Settings before
-+those plugins can receive capabilities, then approve a native Electron warning.
-+Changing the setting revokes existing capabilities and reloads the app. Electron
-+development builds remain enabled so local plugin development does not require
-+changing the packaged-app setting.
++  /** Whether Plugin Development Mode currently blocks this plugin from loading. */
++  isDevelopmentModeBlocked?: boolean;
 +
- The manifest does not have a `capabilities` wrapper. Internally, Headlamp still
- uses an opaque, short-lived capability token to avoid exposing product policy to
- plugin code or trusting a plugin identity on every invocation. Tokens are
+   /**
+    * overriddenBy indicates which higher-priority version is loaded instead of this one.
+    * Format: "type" (e.g., "development" or "user")
 -- 
 2.54.0
 
 
-From 6aaeea979a7824c4b1435ad13b00140e9179ae42 Mon Sep 17 00:00:00 2001
+From 7c7b7a7f66c35096a5d8aa60ca2644896dfcbffd Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Fri, 4 Sep 2026 09:30:22 +0200
-Subject: [PATCH 4/5] app: frontend: Gate development plugin loading
+Subject: [PATCH 3/4] app: frontend: Gate development plugin loading
 
 Keep local plugin code unloaded until packaged users explicitly trust it.
 ---
- app/electron/developmentPlugins.test.ts       | 29 +++++++-
- app/electron/developmentPlugins.ts            | 23 +++++-
- app/electron/preload.ts                       |  1 +
- .../src/plugin/developmentPlugins.test.ts     | 74 +++++++++++++++++++
- frontend/src/plugin/developmentPlugins.ts     | 51 +++++++++++++
- frontend/src/plugin/index.ts                  | 13 ++--
- 6 files changed, 181 insertions(+), 10 deletions(-)
+ app/electron/developmentPlugins.test.ts       |  29 ++++-
+ app/electron/developmentPlugins.ts            |  17 ++-
+ app/electron/preload.ts                       |   1 +
+ .../src/plugin/developmentPlugins.test.ts     | 121 ++++++++++++++++++
+ frontend/src/plugin/developmentPlugins.ts     |  94 ++++++++++++++
+ frontend/src/plugin/index.ts                  |  16 ++-
+ 6 files changed, 273 insertions(+), 5 deletions(-)
  create mode 100644 frontend/src/plugin/developmentPlugins.test.ts
  create mode 100644 frontend/src/plugin/developmentPlugins.ts
 
@@ -2092,7 +2180,7 @@ index 83373f919..1f4694a9a 100644
        sender: replacementWindow.webContents,
        senderFrame: replacementWindow.webContents.mainFrame,
 diff --git a/app/electron/developmentPlugins.ts b/app/electron/developmentPlugins.ts
-index 9eac36b1f..c795d28d1 100644
+index 7f9140410..c795d28d1 100644
 --- a/app/electron/developmentPlugins.ts
 +++ b/app/electron/developmentPlugins.ts
 @@ -14,7 +14,7 @@
@@ -2112,25 +2200,6 @@ index 9eac36b1f..c795d28d1 100644
  };
  
  const developmentPluginsIpcListeners = new WeakMap<IpcMain, DevelopmentPluginsIpcListeners>();
-@@ -43,15 +44,15 @@ export function confirmEnableDevelopmentPlugins(mainWindow: BrowserWindow): bool
-       defaultId: 1,
-       cancelId: 1,
-       noLink: true,
--      title: i18n.t('Development Mode'),
--      message: i18n.t('Enable Development Mode?'),
-+      title: i18n.t('Plugin Development Mode'),
-+      message: i18n.t('Enable Plugin Development Mode?'),
-       detail: i18n.t(
-         'Development plugins run local code and may request command access. Only enable this mode if you trust every plugin in the development plugins directory.'
-       ),
-     });
-     return response === 0;
-   } catch (error) {
--    console.error('Failed to confirm Development Mode:', error);
-+    console.error('Failed to confirm Plugin Development Mode:', error);
-     return false;
-   }
- }
 @@ -76,6 +77,7 @@ export function setupDevelopmentPluginsHandlers(
    if (previousListeners) {
      ipcMain.off('request-development-plugins', previousListeners.requestDevelopmentPlugins);
@@ -2164,23 +2233,23 @@ index 9eac36b1f..c795d28d1 100644
    });
  }
 diff --git a/app/electron/preload.ts b/app/electron/preload.ts
-index 569ed1ece..84a71a990 100644
+index 7f6a8d5ed..49d81ca27 100644
 --- a/app/electron/preload.ts
 +++ b/app/electron/preload.ts
-@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
-     capabilitySecret: string
+@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
    ): Promise<StartProxyResult> =>
      ipcRenderer.invoke('start-cluster-proxy', { ...target, capabilitySecret }),
+   isDevelopment: Boolean(process.env.ELECTRON_DEV),
 +  getDevelopmentPluginsEnabled: () => ipcRenderer.invoke('get-development-plugins'),
    send: (channel: string, data: unknown) => {
      // allowed channels
      const validChannels = [
 diff --git a/frontend/src/plugin/developmentPlugins.test.ts b/frontend/src/plugin/developmentPlugins.test.ts
 new file mode 100644
-index 000000000..cd17996e9
+index 000000000..a3cea8a56
 --- /dev/null
 +++ b/frontend/src/plugin/developmentPlugins.test.ts
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,121 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -2198,9 +2267,11 @@ index 000000000..cd17996e9
 + */
 +
 +import { afterEach, expect, test, vi } from 'vitest';
-+import * as devModeHelpers from '../helpers/isDevMode';
 +import * as electronHelpers from '../helpers/isElectron';
-+import { filterDisabledDevelopmentPlugins } from './developmentPlugins';
++import {
++  filterDisabledDevelopmentPlugins,
++  getDormantDevelopmentPluginSettings,
++} from './developmentPlugins';
 +
 +const plugins = [
 +  { name: 'local', source: 'development' as const, type: 'development' as const },
@@ -2215,8 +2286,8 @@ index 000000000..cd17996e9
 +
 +test('filters every plugin served from the development source when disabled', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(false);
 +  window.desktopApi = {
++    isDevelopment: false,
 +    getDevelopmentPluginsEnabled: vi.fn().mockResolvedValue(false),
 +  } as any;
 +
@@ -2226,17 +2297,17 @@ index 000000000..cd17996e9
 +  ]);
 +});
 +
-+test('keeps development plugins in Electron development builds', async () => {
++test('keeps development plugins for a built renderer launched in Electron development mode', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(true);
++  window.desktopApi = { isDevelopment: true } as any;
 +
 +  await expect(filterDisabledDevelopmentPlugins(plugins)).resolves.toBe(plugins);
 +});
 +
 +test('keeps development plugins when packaged users enable them', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(false);
 +  window.desktopApi = {
++    isDevelopment: false,
 +    getDevelopmentPluginsEnabled: vi.fn().mockResolvedValue(true),
 +  } as any;
 +
@@ -2245,8 +2316,8 @@ index 000000000..cd17996e9
 +
 +test('fails closed for development plugins when the setting cannot be read', async () => {
 +  vi.spyOn(electronHelpers, 'isElectron').mockReturnValue(true);
-+  vi.spyOn(devModeHelpers, 'isDevMode').mockReturnValue(false);
 +  window.desktopApi = {
++    isDevelopment: false,
 +    getDevelopmentPluginsEnabled: vi.fn().mockRejectedValue(new Error('IPC unavailable')),
 +  } as any;
 +
@@ -2255,12 +2326,57 @@ index 000000000..cd17996e9
 +    { name: 'bundled', source: 'shipped', type: 'shipped' },
 +  ]);
 +});
++
++test('preserves disabled preferences only for present dormant development plugins', () => {
++  const settings = [
++    {
++      name: 'local-package',
++      folderName: 'local',
++      type: 'development' as const,
++      description: 'Local plugin',
++      homepage: '',
++      isEnabled: false,
++      isLoaded: true,
++      isCompatible: true,
++      overriddenBy: 'user' as const,
++    },
++    {
++      name: 'removed-package',
++      folderName: 'removed',
++      source: 'development' as const,
++      type: 'development' as const,
++      description: 'Removed plugin',
++      homepage: '',
++      isEnabled: false,
++    },
++    {
++      name: 'managed-package',
++      folderName: 'managed',
++      source: 'user' as const,
++      type: 'user' as const,
++      description: 'Managed plugin',
++      homepage: '',
++      isEnabled: false,
++    },
++  ];
++
++  expect(getDormantDevelopmentPluginSettings(plugins, plugins.slice(2), settings)).toEqual([
++    {
++      ...settings[0],
++      isLoaded: false,
++      isDevelopmentModeBlocked: true,
++      isCompatible: undefined,
++      overriddenBy: undefined,
++    },
++  ]);
++  expect(getDormantDevelopmentPluginSettings(plugins, plugins, settings)).toEqual([]);
++});
 diff --git a/frontend/src/plugin/developmentPlugins.ts b/frontend/src/plugin/developmentPlugins.ts
 new file mode 100644
-index 000000000..395538151
+index 000000000..ed3ea787e
 --- /dev/null
 +++ b/frontend/src/plugin/developmentPlugins.ts
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,94 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -2277,13 +2393,56 @@ index 000000000..395538151
 + * limitations under the License.
 + */
 +
-+import { isDevMode } from '../helpers/isDevMode';
 +import { isElectron } from '../helpers/isElectron';
++import type { PluginInfo } from './pluginsSlice';
 +
 +/** Minimum inventory metadata needed to apply the development-plugin loading policy. */
 +export interface PluginSourceMetadata {
++  /** Inventory folder name used to associate an entry with persisted settings. */
++  name: string;
 +  /** Inventory directory where Headlamp discovered the plugin. */
 +  source: 'development' | 'user' | 'shipped';
++}
++
++/**
++ * Keeps settings for development plugins that are present but currently blocked from loading.
++ *
++ * @param discoveredPlugins - Complete trusted backend inventory.
++ * @param loadablePlugins - Inventory entries allowed to fetch and execute.
++ * @param settingsPlugins - Persisted plugin preferences from previous loads.
++ * @returns Existing settings for currently blocked development inventory entries.
++ */
++export function getDormantDevelopmentPluginSettings<T extends PluginSourceMetadata>(
++  discoveredPlugins: T[],
++  loadablePlugins: T[],
++  settingsPlugins: PluginInfo[]
++): PluginInfo[] {
++  const loadableDevelopmentFolders = new Set(
++    loadablePlugins.filter(plugin => plugin.source === 'development').map(plugin => plugin.name)
++  );
++  const dormantDevelopmentFolders = new Set(
++    discoveredPlugins
++      .filter(
++        plugin => plugin.source === 'development' && !loadableDevelopmentFolders.has(plugin.name)
++      )
++      .map(plugin => plugin.name)
++  );
++
++  return settingsPlugins
++    .filter(
++      plugin =>
++        (plugin.source === 'development' ||
++          (plugin.source === undefined && plugin.type === 'development')) &&
++        typeof plugin.folderName === 'string' &&
++        dormantDevelopmentFolders.has(plugin.folderName)
++    )
++    .map(plugin => ({
++      ...plugin,
++      isLoaded: false,
++      isDevelopmentModeBlocked: true,
++      isCompatible: undefined,
++      overriddenBy: undefined,
++    }));
 +}
 +
 +/**
@@ -2300,7 +2459,7 @@ index 000000000..395538151
 +export async function filterDisabledDevelopmentPlugins<T extends PluginSourceMetadata>(
 +  plugins: T[]
 +): Promise<T[]> {
-+  if (!isElectron() || isDevMode()) {
++  if (!isElectron() || window.desktopApi?.isDevelopment === true) {
 +    return plugins;
 +  }
 +
@@ -2313,66 +2472,82 @@ index 000000000..395538151
 +  return enabled ? plugins : plugins.filter(plugin => plugin.source !== 'development');
 +}
 diff --git a/frontend/src/plugin/index.ts b/frontend/src/plugin/index.ts
-index b58fa691a..7c6be36bb 100644
+index b58fa691a..4ac88a924 100644
 --- a/frontend/src/plugin/index.ts
 +++ b/frontend/src/plugin/index.ts
-@@ -59,6 +59,7 @@ import {
+@@ -59,6 +59,10 @@ import {
    PluginCommandCapability,
    preparePluginCommandCapabilities,
  } from './commandCapabilities';
-+import { filterDisabledDevelopmentPlugins } from './developmentPlugins';
++import {
++  filterDisabledDevelopmentPlugins,
++  getDormantDevelopmentPluginSettings,
++} from './developmentPlugins';
  import { fetchPluginResource } from './fetchPluginResource';
  import {
    getAksDesktopCommandPermissions,
-@@ -486,11 +487,13 @@ export async function fetchAndExecutePlugins(
+@@ -486,12 +490,18 @@ export async function fetchAndExecutePlugins(
      name: string;
    }
  
 -  const pluginMetadataList = await fetchWithRetry<PluginMetadata[]>(
--    `${getAppUrl()}plugins`,
--    headers,
--    response => response.json(),
--    deadline
-+  const pluginMetadataList = await filterDisabledDevelopmentPlugins(
-+    await fetchWithRetry<PluginMetadata[]>(
-+      `${getAppUrl()}plugins`,
-+      headers,
-+      response => response.json(),
-+      deadline
-+    )
++  const discoveredPluginMetadata = await fetchWithRetry<PluginMetadata[]>(
+     `${getAppUrl()}plugins`,
+     headers,
+     response => response.json(),
+     deadline
    );
++  const pluginMetadataList = await filterDisabledDevelopmentPlugins(discoveredPluginMetadata);
++  const dormantDevelopmentPluginSettings = getDormantDevelopmentPluginSettings(
++    discoveredPluginMetadata,
++    pluginMetadataList,
++    settingsPackages
++  );
  
    // Extract paths for fetching plugin files
+   const pluginPaths = pluginMetadataList.map(metadata => metadata.path);
+@@ -566,7 +576,7 @@ export async function fetchAndExecutePlugins(
+   updatedSettingsPackages = applyPluginPriority(updatedSettingsPackages);
+ 
+   // Notify settings of changes
+-  onSettingsChange(updatedSettingsPackages);
++  onSettingsChange([...updatedSettingsPackages, ...dormantDevelopmentPluginSettings]);
+ 
+   // Can set this to a semver version range like '>=0.8.0-alpha.3'.
+   // '' means all versions.
+@@ -595,7 +605,7 @@ export async function fetchAndExecutePlugins(
+   }
+ 
+   // Update settings with compatibility info
+-  onSettingsChange(updatedSettingsPackages);
++  onSettingsChange([...updatedSettingsPackages, ...dormantDevelopmentPluginSettings]);
+ 
+   // Filter to only execute plugins that should be loaded
+   // A plugin is executed if:
 -- 
 2.54.0
 
 
-From c46a5364e17c72aba5f3b2d9d8c6286b30dc4811 Mon Sep 17 00:00:00 2001
+From 9a77a70b12f2183357775c7677463bc097ee3776 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ren=C3=A9=20Dudfield?= <renedudfield@microsoft.com>
 Date: Fri, 4 Sep 2026 09:32:50 +0200
-Subject: [PATCH 5/5] docs: plugins: Explain Plugin Development Mode
+Subject: [PATCH 4/4] docs: plugins: Explain Plugin Development Mode
 
 Tell packaged-app developers where to enable local plugin loading.
 ---
- docs/development/plugins/command-capabilities.md | 13 +++++++------
+ docs/development/plugins/command-capabilities.md |  8 ++++++++
  docs/development/plugins/getting-started.md      | 16 ++++++++++++++--
  plugins/headlamp-plugin/bin/headlamp-plugin.js   |  5 +++++
- 3 files changed, 26 insertions(+), 8 deletions(-)
+ 3 files changed, 27 insertions(+), 2 deletions(-)
 
 diff --git a/docs/development/plugins/command-capabilities.md b/docs/development/plugins/command-capabilities.md
-index d7a2d0012..bea2e680f 100644
+index 8d783cbee..bea2e680f 100644
 --- a/docs/development/plugins/command-capabilities.md
 +++ b/docs/development/plugins/command-capabilities.md
-@@ -246,12 +246,13 @@ developed and legacy plugins such as Minikube. It does not apply to the `user`
+@@ -246,6 +246,14 @@ developed and legacy plugins such as Minikube. It does not apply to the `user`
  inventory, whose plugins must have plugin-manager installation receipts for
  production capabilities.
  
--Packaged apps disable development-inventory command capabilities by default.
--Users must explicitly enable **Development Mode** in General Settings before
--those plugins can receive capabilities, then approve a native Electron warning.
--Changing the setting revokes existing capabilities and reloads the app. Electron
--development builds remain enabled so local plugin development does not require
--changing the packaged-app setting.
 +Packaged apps do not load development-inventory plugins by default. Users must
 +explicitly enable **Plugin Development Mode** in **Settings > Plugins**, then
 +approve a native Electron warning. Enabling the setting permits plugins from
@@ -2380,9 +2555,10 @@ index d7a2d0012..bea2e680f 100644
 +capabilities. Changing the setting revokes existing capabilities and reloads the
 +app. Electron development builds remain enabled so local plugin development
 +does not require changing the packaged-app setting.
- 
++
  The manifest does not have a `capabilities` wrapper. Internally, Headlamp still
  uses an opaque, short-lived capability token to avoid exposing product policy to
+ plugin code or trusting a plugin identity on every invocation. Tokens are
 diff --git a/docs/development/plugins/getting-started.md b/docs/development/plugins/getting-started.md
 index 5c2583ff8..9bea66595 100644
 --- a/docs/development/plugins/getting-started.md

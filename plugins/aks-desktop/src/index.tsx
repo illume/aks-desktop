@@ -76,12 +76,14 @@ type ConditionalProjectOverviewRegistration = ProjectOverviewRegistration & {
   isEnabled?: (props: { project: ProjectDefinition }) => Promise<boolean>;
 };
 
+/** Registers an overview section whose asynchronous predicate is evaluated by AKS Desktop. */
 function registerConditionalProjectOverviewSection(
   registration: ConditionalProjectOverviewRegistration
 ) {
   registerProjectOverviewSection(registration);
 }
 
+/** Wraps the pipeline action with the GitHub authentication state it consumes. */
 function ConfigurePipelineHeaderAction(
   props: React.ComponentProps<typeof ConfigurePipelineButton>
 ) {

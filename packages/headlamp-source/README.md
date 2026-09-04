@@ -22,7 +22,7 @@ workflow.
 ```json
 {
   "headlampSource": {
-    "revision": "69bfa236dab6c1c00658e11af1d21762d00c0700"
+    "revision": "2cf70bab71e29a6544d9573053851a34d692fce8"
   }
 }
 ```
