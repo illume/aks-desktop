@@ -71,6 +71,8 @@ export interface UserAssignment {
    * typed by hand and the directory could not be read.
    */
   upn?: string;
+  /** Whether the UPN was entered independently and may be kept while replacing the object ID. */
+  upnManuallyEntered?: boolean;
   role: string;
 }
 
@@ -155,6 +157,8 @@ export interface BasicsStepProps extends StepProps {
   loadingClusters: boolean;
   /** Non-fatal cluster discovery error. */
   clusterError: string | null;
+  /** Error raised while persisting an adopted managed-cluster scope. */
+  scopeAdoptionError?: string | null;
   /** Whether Arc discovery is unavailable because `connectedk8s` is missing. */
   arcDiscoveryUnavailable?: boolean;
   /** Availability state for the requested project namespace. */

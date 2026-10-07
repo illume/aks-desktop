@@ -34,6 +34,31 @@ import {
 } from './aks';
 
 const desktopRegisterAKSCluster = vi.fn();
+const registerClusterCapability = vi.fn(
+  (
+    provider: string,
+    options: {
+      subscriptionId: string;
+      resourceGroup: string;
+      clusterName: string;
+      isAzureRBACEnabled: boolean;
+      managedNamespace?: string;
+      clusterType?: 'aks' | 'aksarc';
+    }
+  ) => {
+    if (provider !== 'azure') {
+      return Promise.resolve({ success: false, message: 'unsupported provider' });
+    }
+    return desktopRegisterAKSCluster(
+      options.subscriptionId,
+      options.resourceGroup,
+      options.clusterName,
+      options.isAzureRBACEnabled,
+      options.managedNamespace,
+      options.clusterType
+    );
+  }
+);
 const successResult = { success: true, message: 'registered' };
 
 describe('Azure AKS utilities', () => {
@@ -42,9 +67,7 @@ describe('Azure AKS utilities', () => {
     mocks.getClusterSettings.mockReturnValue({ allowedNamespaces: ['existing'] });
     mocks.getConnectedClusters.mockResolvedValue([]);
     mocks.isExtensionInstalled.mockResolvedValue({ installed: true });
-    (window as any).desktopApi = {
-      registerAKSCluster: desktopRegisterAKSCluster,
-    };
+    vi.stubGlobal('registerCluster', registerClusterCapability);
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -53,7 +76,7 @@ describe('Azure AKS utilities', () => {
   afterEach(() => {
     reconcileRegisteredClusterNames(desktopRegisterAKSCluster.mock.calls.map(call => call[2]));
     reconcileRegisteredClusterNames([]);
-    delete (window as any).desktopApi;
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -260,20 +283,37 @@ describe('Azure AKS utilities', () => {
 
     await registerAKSCluster('sub-1', 'rg-1', 'cluster-1', 'namespace-1');
 
-    expect(desktopRegisterAKSCluster).toHaveBeenCalledWith(
-      'sub-1',
-      'rg-1',
-      'cluster-1',
-      false,
-      'namespace-1',
-      'aks'
-    );
+    expect(registerClusterCapability).toHaveBeenCalledWith('azure', {
+      subscriptionId: 'sub-1',
+      resourceGroup: 'rg-1',
+      clusterName: 'cluster-1',
+      isAzureRBACEnabled: false,
+      managedNamespace: 'namespace-1',
+      clusterType: 'aks',
+    });
     expect(mocks.setClusterSettings).toHaveBeenCalledWith('cluster-1', {
       allowedNamespaces: ['existing'],
       azureRegistration: {
         subscriptionId: 'sub-1',
         resourceGroup: 'rg-1',
       },
+    });
+  });
+
+  test('drops stale Arc metadata when persisting a managed registration', async () => {
+    desktopRegisterAKSCluster.mockResolvedValue(successResult);
+    mocks.getClusterSettings.mockReturnValue({
+      clusterType: 'aksarc',
+      subscriptionId: 'arc-sub',
+      resourceGroup: 'arc-rg',
+      allowedNamespaces: ['keep'],
+    });
+
+    await registerAKSCluster('sub-1', 'rg-1', 'cluster-1');
+
+    expect(mocks.setClusterSettings).toHaveBeenCalledWith('cluster-1', {
+      allowedNamespaces: ['keep'],
+      azureRegistration: { subscriptionId: 'sub-1', resourceGroup: 'rg-1' },
     });
   });
 
@@ -302,7 +342,7 @@ describe('Azure AKS utilities', () => {
   });
 
   test('reports when the desktop registration API is unavailable', async () => {
-    delete (window as any).desktopApi;
+    vi.stubGlobal('registerCluster', undefined);
 
     await expect(registerAKSCluster('sub-1', 'rg-1', 'cluster-1')).resolves.toEqual({
       success: false,
@@ -320,9 +360,54 @@ describe('Azure AKS utilities', () => {
     ).resolves.toEqual({
       success: false,
       message:
-        "Cluster 'shared-name' is already registered from a different or unknown Azure scope.",
+        "Cluster 'shared-name' is already registered with a different cluster kind or Azure scope.",
     });
     expect(desktopRegisterAKSCluster).not.toHaveBeenCalled();
+  });
+
+  test('rejects an active same-name Arc cluster', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      clusterType: 'aksarc',
+      subscriptionId: 'sub-1',
+      resourceGroup: 'rg-1',
+    });
+
+    await expect(
+      registerAKSCluster('sub-1', 'rg-1', 'shared-name', undefined, true)
+    ).resolves.toEqual({
+      success: false,
+      message:
+        "Cluster 'shared-name' is already registered with a different cluster kind or Azure scope.",
+    });
+    expect(desktopRegisterAKSCluster).not.toHaveBeenCalled();
+  });
+
+  test('rejects a same-name Arc replacement after a completed managed reservation', async () => {
+    desktopRegisterAKSCluster.mockResolvedValue(successResult);
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: { subscriptionId: 'sub-1', resourceGroup: 'rg-1' },
+    });
+
+    await expect(registerAKSCluster('sub-1', 'rg-1', 'shared-name')).resolves.toEqual(
+      successResult
+    );
+
+    mocks.setClusterSettings.mockClear();
+    mocks.getClusterSettings.mockReturnValue({
+      clusterType: 'aksarc',
+      subscriptionId: 'sub-1',
+      resourceGroup: 'rg-1',
+    });
+
+    await expect(
+      registerAKSCluster('sub-1', 'rg-1', 'shared-name', undefined, true)
+    ).resolves.toEqual({
+      success: false,
+      message:
+        "Cluster 'shared-name' is already registered with a different cluster kind or Azure scope.",
+    });
+    expect(mocks.setClusterSettings).not.toHaveBeenCalled();
+    expect(desktopRegisterAKSCluster).toHaveBeenCalledTimes(1);
   });
 
   test.each([
@@ -330,17 +415,22 @@ describe('Azure AKS utilities', () => {
     { azureRegistration: { subscriptionId: 'sub-1' } },
     { azureRegistration: { subscriptionId: { id: 'sub-1' }, resourceGroup: 'rg-1' } },
     { azureRegistration: { subscriptionId: 'sub-1', resourceGroup: 42 } },
-  ])('treats malformed active scope metadata as unknown: %s', async settings => {
+  ])('adopts an active same-name cluster with unknown scope metadata: %s', async settings => {
     mocks.getClusterSettings.mockReturnValue(settings);
 
     await expect(
       registerAKSCluster('sub-1', 'rg-1', 'shared-name', undefined, true)
     ).resolves.toEqual({
-      success: false,
-      message:
-        "Cluster 'shared-name' is already registered from a different or unknown Azure scope.",
+      success: true,
+      message: "Cluster 'shared-name' is already registered from this Azure scope.",
     });
     expect(desktopRegisterAKSCluster).not.toHaveBeenCalled();
+    expect(mocks.setClusterSettings).toHaveBeenCalledWith(
+      'shared-name',
+      expect.objectContaining({
+        azureRegistration: { subscriptionId: 'sub-1', resourceGroup: 'rg-1' },
+      })
+    );
   });
 
   test('allows stale scope metadata when the cluster name is not active', async () => {
@@ -402,7 +492,7 @@ describe('Azure AKS utilities', () => {
     await expect(second).resolves.toEqual({
       success: false,
       message:
-        "Cluster 'shared-queued-name' is already registered from a different or unknown Azure scope.",
+        "Cluster 'shared-queued-name' is already registered with a different cluster kind or Azure scope.",
     });
     expect(desktopRegisterAKSCluster).toHaveBeenCalledTimes(1);
 
@@ -422,7 +512,7 @@ describe('Azure AKS utilities', () => {
     ).resolves.toEqual({
       success: false,
       message:
-        "Cluster 'removed-cluster-name' is already registered from a different or unknown Azure scope.",
+        "Cluster 'removed-cluster-name' is already registered with a different cluster kind or Azure scope.",
     });
 
     reconcileRegisteredClusterNames(['removed-cluster-name']);
@@ -477,7 +567,8 @@ describe('Azure AKS utilities', () => {
     });
     await expect(registerAKSCluster('sub-2', 'rg-2', 'cluster-1')).resolves.toEqual({
       success: false,
-      message: "Cluster 'cluster-1' is already registered from a different or unknown Azure scope.",
+      message:
+        "Cluster 'cluster-1' is already registered with a different cluster kind or Azure scope.",
     });
     await expect(registerAKSCluster('sub-1', 'rg-1', 'cluster-1')).resolves.toEqual({
       success: false,

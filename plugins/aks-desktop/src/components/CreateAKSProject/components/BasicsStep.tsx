@@ -160,7 +160,7 @@ function ConnectArcCluster({ cluster, resourceGroup, subscription }: ConnectArcC
         subscriptionId: subscription,
         resourceGroup,
       });
-      await aksHybridEdgePreOpenHook({ cluster });
+      await aksHybridEdgePreOpenHook({ cluster, clusterConf: null });
       setSuccess(t("Cluster '{{cluster}}' successfully connected", { cluster }));
     } catch (err) {
       setError(
@@ -250,6 +250,7 @@ export const BasicsStep: React.FC<BasicsStepProps> = props => {
     error = null,
     loadingClusters,
     clusterError,
+    scopeAdoptionError,
     arcDiscoveryUnavailable,
     namespaceStatus,
     clusterAccessStatus,
@@ -276,8 +277,8 @@ export const BasicsStep: React.FC<BasicsStepProps> = props => {
   } = useBasicsStep(props);
 
   // Arc (AKS Hybrid & Edge) clusters apply a native manifest via the K8s API, so
-  // the managed-namespace prerequisites (aks-preview extension, ManagedNamespacePreview
-  // feature) and the `az aks get-credentials` register affordance do not apply.
+  // the AKS managed-namespace capability checks and the `az aks get-credentials`
+  // register affordance do not apply.
   const isArc = selectedCluster?.clusterType === 'aksarc';
 
   return (
@@ -386,10 +387,12 @@ export const BasicsStep: React.FC<BasicsStepProps> = props => {
           <ValidationAlert
             type="error"
             message={t(
-              'A different or unknown Azure cluster scope is already registered with this name. Remove it before continuing.'
+              'A cluster with a different kind or Azure scope is already registered with this name. Remove it before continuing.'
             )}
           />
         )}
+
+        {scopeAdoptionError && <ValidationAlert type="error" message={scopeAdoptionError} />}
 
         {arcDiscoveryUnavailable && (
           <ValidationAlert

@@ -11,9 +11,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
+const { stageAksToolEnvironment } = require('./aks-tool-environment.cjs');
+import {
+  parseTargetArgs,
+  removeRetiredAksMcpArtifacts,
+  resolveTargetArch,
+  writeBuildTarget,
+} from './build-target';
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.dirname(SCRIPT_DIR);
+const { appDir: HEADLAMP_APP_DIR } = require(
+  '../packages/headlamp-source/src/lib/paths.ts'
+).resolveInstalledHeadlampPaths(ROOT_DIR);
 
 console.log('==========================================');
 console.log('Setting up external tools for AKS desktop');
@@ -31,20 +41,28 @@ console.log(`Platform: ${PLATFORM}`);
 console.log('');
 
 // Define paths after platform is detected
-const EXTERNAL_TOOLS_DIR = path.join(ROOT_DIR, 'headlamp', 'app', 'resources', 'external-tools');
+const EXTERNAL_TOOLS_DIR = path.join(HEADLAMP_APP_DIR, 'resources', 'external-tools');
 const EXTERNAL_TOOLS_BIN = path.join(EXTERNAL_TOOLS_DIR, 'bin');
 const AZ_CLI_DIR = path.join(EXTERNAL_TOOLS_DIR, 'az-cli', PLATFORM);
+removeRetiredAksMcpArtifacts(ROOT_DIR);
 
 // Download and install Azure CLI
 console.log('==========================================');
 console.log('Installing Azure CLI...');
 console.log('==========================================');
 
+// Forward --platform/--arch so each package target stages matching tools.
+const targetArgs = process.argv
+  .slice(2)
+  .filter(argument => /^--(platform|arch)=[a-z0-9_]+$/.test(argument));
+
 try {
-  execSync(`npx --yes tsx "${path.join(SCRIPT_DIR, 'download-az-cli.ts')}"`, {
+  execSync(
+    `npx --yes tsx "${path.join(SCRIPT_DIR, 'download-az-cli.ts')}" ${targetArgs.join(' ')}`.trim(), {
     stdio: 'inherit',
     cwd: ROOT_DIR
-  });
+    }
+  );
 } catch (error) {
   console.error('❌ ERROR: Failed to install Azure CLI');
   process.exit(1);
@@ -54,6 +72,7 @@ console.log('');
 
 // Create bin directory for external tools scripts
 fs.mkdirSync(EXTERNAL_TOOLS_BIN, { recursive: true });
+stageAksToolEnvironment(path.join(HEADLAMP_APP_DIR, 'resources'));
 
 // Install az-kubelogin.py script
 const KUBELOGIN_SCRIPT = path.join(SCRIPT_DIR, 'az-kubelogin.py');
@@ -75,30 +94,10 @@ if (fs.existsSync(KUBELOGIN_SCRIPT)) {
   console.log('');
 }
 
-// Install aks-mcp binary
-console.log('==========================================');
-console.log('Installing aks-mcp...');
-console.log('==========================================');
-
-// Forward --platform/--arch so cross-architecture packaging stages the right binary.
-const targetArgs = process.argv
-  .slice(2)
-  .filter(argument => /^--(platform|arch)=[a-z0-9_]+$/.test(argument));
-
-try {
-  execSync(
-    `npx --yes tsx "${path.join(SCRIPT_DIR, 'download-aks-mcp.ts')}" ${targetArgs.join(' ')}`.trim(),
-    {
-      stdio: 'inherit',
-      cwd: ROOT_DIR
-    }
-  );
-} catch (error) {
-  console.error('❌ ERROR: Failed to install aks-mcp');
-  process.exit(1);
-}
-
-console.log('');
+writeBuildTarget(ROOT_DIR, {
+  platform: PLATFORM,
+  arch: resolveTargetArch(parseTargetArgs(process.argv.slice(2)).arch),
+});
 
 console.log('==========================================');
 console.log('✅ External tools setup complete!');
@@ -119,11 +118,6 @@ if (fs.existsSync(azPath)) {
 const kubeloginScriptPath = path.join(EXTERNAL_TOOLS_BIN, 'az-kubelogin.py');
 if (fs.existsSync(kubeloginScriptPath)) {
   console.log(`  - az-kubelogin.py (${kubeloginScriptPath})`);
-}
-
-const aksMcpPath = path.join(EXTERNAL_TOOLS_BIN, PLATFORM === 'win32' ? 'aks-mcp.exe' : 'aks-mcp');
-if (fs.existsSync(aksMcpPath)) {
-  console.log(`  - aks-mcp (${aksMcpPath})`);
 }
 
 console.log('');

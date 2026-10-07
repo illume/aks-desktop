@@ -2,6 +2,7 @@ import { getClusterSettings, setClusterSettings } from '../shared/clusterSetting
 import { getClusters, getConnectedClusters } from './az-clusters';
 import { isExtensionInstalled } from './az-extensions';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
+import { getClusterRegistrationCapability } from './clusterRegistrationCapability';
 
 export interface Subscription {
   id: string;
@@ -101,6 +102,23 @@ function scopeMatches(
 }
 
 /**
+ * Whether scope metadata has a usable Azure identity (both fields are non-empty).
+ *
+ * @param scope - Scope metadata to inspect.
+ * @returns `true` when both scope fields are non-empty strings.
+ */
+function scopeIsKnown(
+  scope: { subscriptionId?: unknown; resourceGroup?: unknown } | undefined
+): boolean {
+  return (
+    typeof scope?.subscriptionId === 'string' &&
+    scope.subscriptionId !== '' &&
+    typeof scope.resourceGroup === 'string' &&
+    scope.resourceGroup !== ''
+  );
+}
+
+/**
  * Saves the Azure scope required to validate later same-name registrations.
  *
  * @param clusterName - Kubeconfig cluster name whose settings are updated.
@@ -113,7 +131,11 @@ function persistRegistrationScope(
   subscriptionId: string,
   resourceGroup: string
 ): void {
+  // This is a managed registration, so delete any stale Arc-only markers left under this name.
   const settings = getClusterSettings(clusterName);
+  delete settings.clusterType;
+  delete settings.subscriptionId;
+  delete settings.resourceGroup;
   setClusterSettings(clusterName, {
     ...settings,
     azureRegistration: { subscriptionId, resourceGroup },
@@ -277,7 +299,7 @@ export async function registerAKSCluster(
   if (existingReservation && !scopeMatches(existingReservation, subscriptionId, resourceGroup)) {
     return {
       success: false,
-      message: `Cluster '${clusterName}' is already registered from a different or unknown Azure scope.`,
+      message: `Cluster '${clusterName}' is already registered with a different cluster kind or Azure scope.`,
     };
   }
   if (existingReservation?.indeterminate) {
@@ -286,12 +308,17 @@ export async function registerAKSCluster(
       message: `Cluster '${clusterName}' registration has an unknown outcome. Wait for cluster configuration to refresh before retrying.`,
     };
   }
-  if (clusterAlreadyRegistered && !existingReservation?.registered) {
-    const registeredScope = getClusterSettings(clusterName).azureRegistration;
-    if (!scopeMatches(registeredScope, subscriptionId, resourceGroup)) {
+  if (clusterAlreadyRegistered) {
+    const settings = getClusterSettings(clusterName);
+    // Re-check even for a completed reservation, in case an Arc cluster replaced this name.
+    const conflictsWithRegistered =
+      settings.clusterType === 'aksarc' ||
+      (scopeIsKnown(settings.azureRegistration) &&
+        !scopeMatches(settings.azureRegistration, subscriptionId, resourceGroup));
+    if (conflictsWithRegistered) {
       return {
         success: false,
-        message: `Cluster '${clusterName}' is already registered from a different or unknown Azure scope.`,
+        message: `Cluster '${clusterName}' is already registered with a different cluster kind or Azure scope.`,
       };
     }
   }
@@ -333,25 +360,23 @@ export async function registerAKSCluster(
       managedNamespace ? `with managed namespace: ${managedNamespace}` : ''
     );
 
-    // Call the Electron IPC handler
-    const desktopApi = (window as any).desktopApi;
-
-    if (!desktopApi || !desktopApi.registerAKSCluster) {
-      console.error('[AKS] Desktop API not available - running in non-desktop mode?');
+    const registerCluster = getClusterRegistrationCapability();
+    if (!registerCluster) {
+      console.error('[AKS] Desktop cluster registration capability is not available');
       return {
         success: false,
         message: 'Desktop API not available. This feature is only available in desktop mode.',
       };
     }
 
-    const result: unknown = await desktopApi.registerAKSCluster(
+    const result: unknown = await registerCluster('azure', {
       subscriptionId,
       resourceGroup,
       clusterName,
-      false, // isAzureRBACEnabled
+      isAzureRBACEnabled: false,
       managedNamespace,
-      'aks'
-    );
+      clusterType: 'aks',
+    });
 
     if (
       typeof result !== 'object' ||
