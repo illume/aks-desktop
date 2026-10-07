@@ -7868,6 +7868,57 @@ index 15a4f4af271aab02328b05d837de2bb854525fbb..89f4c4af492f9a88c31e515b6790a54d
      <title>Branded &amp; Headlamp</title>
      <script>var headlampBaseUrl = '/custom';</script>
      <link rel="stylesheet" href="/custom/styles.css">
+diff --git a/source/backend/pkg/config/config.go b/source/backend/pkg/config/config.go
+index b53aed9e0999fbd98452c0e2d865d54298198a20..6d1b69c898a7f847de20c8a77b76f8d1b560af3c 100644
+--- a/source/backend/pkg/config/config.go
++++ b/source/backend/pkg/config/config.go
+@@ -527,13 +527,7 @@ func MakeKubeConfigsDir(kubeConfigDir string) (string, error) {
+ 		}
+ 	}
+ 
+-	// if any error occurred, fallback to the current directory.
+-	ex, err := os.Executable()
+-	if err == nil {
+-		return filepath.Dir(ex), nil
+-	}
+-
+-	return "", fmt.Errorf("failed to get default kubeconfig persistence directory: %w", err)
++	return "", fmt.Errorf("failed to create default kubeconfig persistence directory: %w", err)
+ }
+ 
+ // makeConfiguredKubeConfigsDir creates and returns the configured kubeconfig directory.
+diff --git a/source/backend/pkg/config/config_test.go b/source/backend/pkg/config/config_test.go
+index bd6fd23afadc45d8f7253b8f5ef125a2924c7699..70ae2f2a6167003e1adae93a9cbe019aa4f98aab 100644
+--- a/source/backend/pkg/config/config_test.go
++++ b/source/backend/pkg/config/config_test.go
+@@ -1101,20 +1101,15 @@ func TestMakeKubeConfigsDir(t *testing.T) {
+ 		assert.Contains(t, dir, filepath.Join("Headlamp", "kubeconfigs"))
+ 	})
+ 
+-	t.Run("falls back to the executable directory", func(t *testing.T) {
+-		if runtime.GOOS == "windows" {
+-			t.Skip("UserConfigDir uses a Windows API instead of an environment variable")
+-		}
+-
+-		setUserConfigDir(t, "")
+-		t.Setenv("HOME", "")
++	t.Run("does not fall back to the executable directory", func(t *testing.T) {
++		configPath := filepath.Join(t.TempDir(), "config-file")
++		require.NoError(t, os.WriteFile(configPath, nil, 0o600))
++		setUserConfigDir(t, configPath)
+ 
+ 		dir, err := config.MakeKubeConfigsDir("")
+-		require.NoError(t, err)
+-
+-		executable, err := os.Executable()
+-		require.NoError(t, err)
+-		assert.Equal(t, filepath.Dir(executable), dir)
++		require.Error(t, err)
++		assert.Empty(t, dir)
++		assert.Contains(t, err.Error(), "failed to create default kubeconfig persistence directory")
+ 	})
+ 
+ 	t.Run("reports configured directory creation errors", func(t *testing.T) {
 diff --git a/source/backend/pkg/spa/embeddedSPAHandler.go b/source/backend/pkg/spa/embeddedSPAHandler.go
 index 1ffbea862783526a19c3b54ca519799f3c3e29d4..19dde02625164e244fd78a5d8d55a343dda4acc2 100644
 --- a/source/backend/pkg/spa/embeddedSPAHandler.go
