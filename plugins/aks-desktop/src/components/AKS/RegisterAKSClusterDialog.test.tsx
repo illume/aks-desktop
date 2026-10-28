@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   getClusterSettings: vi.fn(),
   getSubscriptions: vi.fn(),
   isExtensionInstalled: vi.fn(),
+  lookupAKSCluster: vi.fn(),
   markAksHybridEdgeAppearance: vi.fn(),
   onClose: vi.fn(),
   onClusterRegistered: vi.fn(),
@@ -90,6 +91,10 @@ vi.mock('../../utils/azure/aks', () => ({
 
 vi.mock('../../utils/azure/az-clusters', () => ({
   getClusterCapabilities: mocks.getClusterCapabilities,
+}));
+
+vi.mock('../../utils/azure/az-cluster-lookup', () => ({
+  lookupAKSCluster: mocks.lookupAKSCluster,
 }));
 
 vi.mock('../../utils/azure/aksHybridEdgeProxy', () => ({
@@ -211,6 +216,92 @@ describe('RegisterAKSClusterDialog telemetry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select subscription' }));
 
     expect(await screen.findByText(/az extension add --name connectedk8s/i)).toBeTruthy();
+  });
+
+  test('direct lookup bypasses cluster listing and reuses registration', async () => {
+    mocks.lookupAKSCluster.mockResolvedValue({
+      subscriptionId: subscription.id,
+      cluster,
+    });
+    mocks.registerAKSCluster.mockResolvedValue({ success: true, message: 'Registered' });
+    renderDialog();
+    await act(async () => currentDialogProps().onDirectEntryChange(true));
+    mocks.getSubscriptions.mockClear();
+    act(() => currentDialogProps().onClusterAddressChange('cluster.example.com'));
+    await act(async () => currentDialogProps().onLookupCluster());
+
+    expect(mocks.lookupAKSCluster).toHaveBeenCalledWith('cluster.example.com');
+    expect(mocks.getSubscriptions).not.toHaveBeenCalled();
+    expect(mocks.getAKSClusters).not.toHaveBeenCalled();
+    expect(currentDialogProps().selectedCluster).toEqual(cluster);
+    expect(currentDialogProps().selectedSubscription.id).toBe(subscription.id);
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }));
+    await waitFor(() =>
+      expect(mocks.registerAKSCluster).toHaveBeenCalledWith(
+        subscription.id,
+        cluster.resourceGroup,
+        cluster.name,
+        undefined,
+        false
+      )
+    );
+    expect(telemetryCallsAsJson()).not.toContain('cluster.example.com');
+  });
+
+  test('direct lookup is usable while subscription discovery is pending', async () => {
+    mocks.getSubscriptions.mockReturnValue(new Promise(() => {}));
+    mocks.lookupAKSCluster.mockResolvedValue({ subscriptionId: subscription.id, cluster });
+    renderDialog();
+    await act(async () => currentDialogProps().onDirectEntryChange(true));
+    act(() => currentDialogProps().onClusterAddressChange('cluster.example.com'));
+    await act(async () => currentDialogProps().onLookupCluster());
+    expect(currentDialogProps().selectedCluster).toEqual(cluster);
+    expect(currentDialogProps().loadingSubscriptions).toBe(false);
+  });
+
+  test.each(['edit', 'browse', 'close'])(
+    'ignores stale direct lookup results after %s',
+    async change => {
+      let resolveLookup!: (value: unknown) => void;
+      mocks.lookupAKSCluster.mockReturnValue(
+        new Promise(resolve => {
+          resolveLookup = resolve;
+        })
+      );
+      const { rerender } = renderDialog();
+      await act(async () => currentDialogProps().onDirectEntryChange(true));
+      act(() => currentDialogProps().onClusterAddressChange('cluster.example.com'));
+      let pending: Promise<void>;
+      act(() => {
+        pending = currentDialogProps().onLookupCluster();
+      });
+      if (change === 'edit') {
+        act(() => currentDialogProps().onClusterAddressChange('other.example.com'));
+      } else if (change === 'browse') {
+        await act(async () => currentDialogProps().onDirectEntryChange(false));
+      } else {
+        rerender(<RegisterAKSClusterDialog open={false} onClose={mocks.onClose} />);
+      }
+      await act(async () => {
+        resolveLookup({ subscriptionId: subscription.id, cluster });
+        await pending;
+      });
+      expect(currentDialogProps().selectedCluster).toBeNull();
+      expect(currentDialogProps().lookingUpCluster).toBe(false);
+    }
+  );
+
+  test('shows lookup errors and clears the previous selection when the address changes', async () => {
+    mocks.lookupAKSCluster.mockRejectedValue(new Error('No accessible AKS cluster'));
+    renderDialog();
+    await act(async () => currentDialogProps().onDirectEntryChange(true));
+    act(() => currentDialogProps().onClusterAddressChange('cluster.example.com'));
+    await act(async () => currentDialogProps().onLookupCluster());
+    expect(currentDialogProps().error).toBe('No accessible AKS cluster');
+    expect(currentDialogProps().selectedCluster).toBeNull();
+    expect(currentDialogProps().lookingUpCluster).toBe(false);
+    act(() => currentDialogProps().onClusterAddressChange('other.example.com'));
+    expect(currentDialogProps().error).toBe('');
   });
 
   test('shows the runtime reason instead of install guidance when extension checking fails', async () => {
