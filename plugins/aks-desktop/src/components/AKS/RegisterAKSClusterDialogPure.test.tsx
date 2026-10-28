@@ -206,6 +206,71 @@ describe('RegisterAKSClusterDialogPure subscription refresh notices', () => {
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
+  describe('RegisterAKSClusterDialogPure direct entry', () => {
+    afterEach(cleanup);
+
+    test('allows switching to direct entry while subscriptions are loading', async () => {
+      const onDirectEntryChange = vi.fn();
+      render(
+        <RegisterAKSClusterDialogPure
+          {...baseArgs}
+          loadingSubscriptions
+          onDirectEntryChange={onDirectEntryChange}
+        />
+      );
+      await userEvent
+        .setup()
+        .click(screen.getByRole('button', { name: 'Paste FQDN or resource ID' }));
+      expect(onDirectEntryChange).toHaveBeenCalledWith(true);
+    });
+
+    test('provides a labelled text field and supports submitting with Enter', async () => {
+      const onLookupCluster = vi.fn();
+      const onClusterAddressChange = vi.fn();
+      const onDirectEntryChange = vi.fn();
+      render(
+        <RegisterAKSClusterDialogPure
+          {...baseArgs}
+          directEntry
+          clusterAddress="cluster.example.com"
+          onLookupCluster={onLookupCluster}
+          onClusterAddressChange={onClusterAddressChange}
+          onDirectEntryChange={onDirectEntryChange}
+        />
+      );
+      expect(screen.queryByRole('combobox', { name: 'Subscription' })).not.toBeInTheDocument();
+      const input = screen.getByRole('textbox', { name: 'Cluster FQDN or ARM resource ID' });
+      const user = userEvent.setup();
+      await user.click(input);
+      await user.keyboard('{Enter}');
+      expect(onLookupCluster).toHaveBeenCalledOnce();
+      await user.type(input, 'x');
+      expect(onClusterAddressChange).toHaveBeenCalledWith('cluster.example.comx');
+      await user.click(screen.getByRole('button', { name: 'Browse subscriptions and clusters' }));
+      expect(onDirectEntryChange).toHaveBeenCalledWith(false);
+    });
+
+    test.each([
+      { clusterAddress: '' },
+      { clusterAddress: '   ' },
+      { clusterAddress: 'cluster.example.com', lookingUpCluster: true },
+      { clusterAddress: 'cluster.example.com', loading: true },
+      { clusterAddress: 'cluster.example.com', registrationSucceeded: true },
+    ])('disables lookup when unavailable: %j', overrides => {
+      render(<RegisterAKSClusterDialogPure {...baseArgs} directEntry {...overrides} />);
+      expect(screen.getByRole('button', { name: /Find(?:ing)? cluster/ })).toBeDisabled();
+      if (overrides.lookingUpCluster) {
+        expect(screen.getByRole('status')).toHaveTextContent('Finding cluster...');
+      }
+      if (overrides.loading || overrides.registrationSucceeded) {
+        expect(screen.getByRole('textbox')).toBeDisabled();
+        expect(
+          screen.getByRole('button', { name: 'Browse subscriptions and clusters' })
+        ).toBeDisabled();
+      }
+    });
+  });
+
   test('shows no refresh notice when cached and refreshed subscriptions match', () => {
     render(<RegisterAKSClusterDialogPure {...baseArgs} />);
 

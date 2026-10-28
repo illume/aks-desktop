@@ -11,6 +11,7 @@ import { trackAksFeature } from '../../telemetry/aksFeature';
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import { getAKSClusters, getSubscriptions, registerAKSCluster } from '../../utils/azure/aks';
 import { startProxy, verifyAksHybridEdgeCluster } from '../../utils/azure/aksHybridEdgeProxy';
+import { lookupAKSCluster } from '../../utils/azure/az-cluster-lookup';
 import { getClusterCapabilities } from '../../utils/azure/az-clusters';
 import { isExtensionInstalled } from '../../utils/azure/az-extensions';
 import { normalizeClusterName } from '../../utils/kubernetes/k8sNames';
@@ -130,6 +131,10 @@ export default function RegisterAKSClusterDialog({
     addedCount: 0,
   });
   const [loadingClusters, setLoadingClusters] = useState(false);
+  const [directEntry, setDirectEntry] = useState(false);
+  const [clusterAddress, setClusterAddress] = useState('');
+  const [lookingUpCluster, setLookingUpCluster] = useState(false);
+  const lookupRequestIdRef = useRef(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [success, setSuccess] = useState('');
@@ -206,6 +211,8 @@ export default function RegisterAKSClusterDialog({
   }
 
   const resetClusterState = () => {
+    lookupRequestIdRef.current++;
+    setLookingUpCluster(false);
     clusterRequestIdRef.current++;
     capabilityRequestIdRef.current++;
     setLoadingClusters(false);
@@ -220,6 +227,7 @@ export default function RegisterAKSClusterDialog({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      lookupRequestIdRef.current++;
       clusterRequestIdRef.current++;
       capabilityRequestIdRef.current++;
       registrationRequestIdRef.current++;
@@ -229,6 +237,9 @@ export default function RegisterAKSClusterDialog({
 
   useEffect(() => {
     if (!open) {
+      lookupRequestIdRef.current++;
+      setLookingUpCluster(false);
+      setClusterAddress('');
       clusterRequestIdRef.current++;
       capabilityRequestIdRef.current++;
       registrationRequestIdRef.current++;
@@ -255,6 +266,8 @@ export default function RegisterAKSClusterDialog({
 
   useEffect(() => {
     let active = true;
+    lookupRequestIdRef.current++;
+    setLookingUpCluster(false);
     if (open && authStatus.isLoggedIn) {
       clusterRequestIdRef.current++;
       capabilityRequestIdRef.current++;
@@ -272,7 +285,12 @@ export default function RegisterAKSClusterDialog({
       setClusterInputValue('');
       setCapabilities(null);
       setCapabilitiesLoading(false);
-      loadSubscriptions(() => active);
+      if (!directEntry) {
+        loadSubscriptions(() => active);
+      } else {
+        setLoadingSubscriptions(false);
+        setSubscriptionRefresh({ status: 'idle', addedCount: 0 });
+      }
     } else {
       setLoadingSubscriptions(false);
       if (open) {
@@ -304,9 +322,11 @@ export default function RegisterAKSClusterDialog({
     authStatus.subscriptionId,
     authStatus.tenantId,
     authStatus.username,
+    directEntry,
   ]);
 
   useEffect(() => {
+    if (directEntry) return;
     if (selectedSubscription) {
       loadClusters(selectedSubscription.id);
     } else {
@@ -315,7 +335,7 @@ export default function RegisterAKSClusterDialog({
       setClusters([]);
       setSelectedCluster(null);
     }
-  }, [selectedSubscription]);
+  }, [selectedSubscription, directEntry]);
 
   const loadSubscriptions = async (isCurrent: () => boolean) => {
     setLoadingSubscriptions(true);
@@ -527,6 +547,41 @@ export default function RegisterAKSClusterDialog({
       setSelectedCluster(null);
       setCapabilities(null);
       setCapabilitiesLoading(false);
+    }
+  };
+
+  const handleClusterAddressChange = (value: string) => {
+    setClusterAddress(value);
+    updateSelectedSubscription(null);
+    resetClusterState();
+    setError('');
+  };
+
+  const handleLookupCluster = async () => {
+    const requestId = ++lookupRequestIdRef.current;
+    setLookingUpCluster(true);
+    setError('');
+    updateSelectedSubscription(null);
+    setSelectedCluster(null);
+    setCapabilities(null);
+    capabilityRequestIdRef.current++;
+    setCapabilitiesLoading(false);
+    try {
+      const { subscriptionId, cluster } = await lookupAKSCluster(clusterAddress);
+      if (requestId !== lookupRequestIdRef.current) return;
+      updateSelectedSubscription({
+        id: subscriptionId,
+        name: subscriptionId,
+        state: 'Enabled',
+        tenantId: '',
+      });
+      setSelectedCluster(cluster);
+      setClusterInputValue(cluster.name);
+    } catch (err) {
+      if (requestId !== lookupRequestIdRef.current) return;
+      setError(err instanceof Error ? err.message : t('Failed to find AKS cluster'));
+    } finally {
+      if (requestId === lookupRequestIdRef.current) setLookingUpCluster(false);
     }
   };
 
@@ -784,6 +839,16 @@ export default function RegisterAKSClusterDialog({
       loadingSubscriptions={loadingSubscriptions}
       subscriptionRefresh={subscriptionRefresh}
       loadingClusters={loadingClusters}
+      directEntry={directEntry}
+      onDirectEntryChange={value => {
+        resetClusterState();
+        setNotice('');
+        setDirectEntry(value);
+      }}
+      clusterAddress={clusterAddress}
+      onClusterAddressChange={handleClusterAddressChange}
+      lookingUpCluster={lookingUpCluster}
+      onLookupCluster={handleLookupCluster}
       capabilitiesLoading={capabilitiesLoading}
       error={error}
       success={success}

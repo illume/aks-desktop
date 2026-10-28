@@ -56,6 +56,12 @@ export interface SubscriptionRefreshState {
 }
 
 export interface RegisterAKSClusterDialogPureProps {
+  directEntry?: boolean;
+  onDirectEntryChange?: (value: boolean) => void;
+  clusterAddress?: string;
+  onClusterAddressChange?: (value: string) => void;
+  lookingUpCluster?: boolean;
+  onLookupCluster?: () => void;
   open: boolean;
   isChecking: boolean;
   isLoggedIn: boolean;
@@ -99,6 +105,12 @@ export interface RegisterAKSClusterDialogPureProps {
 }
 
 export default function RegisterAKSClusterDialogPure({
+  directEntry = false,
+  onDirectEntryChange,
+  clusterAddress = '',
+  onClusterAddressChange,
+  lookingUpCluster = false,
+  onLookupCluster,
   open,
   isChecking,
   isLoggedIn,
@@ -263,189 +275,243 @@ export default function RegisterAKSClusterDialogPure({
 
           {!isChecking && isLoggedIn && (
             <>
-              <Autocomplete
-                fullWidth
-                options={tenants}
-                value={selectedTenant}
-                onChange={onTenantChange}
-                inputValue={tenantInputValue}
-                onInputChange={onTenantInputChange}
-                getOptionKey={option => option.id}
-                getOptionLabel={option => option.name}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                disabled={
-                  loading || registrationCompleted || loadingSubscriptions || tenants.length <= 1
-                }
-                renderInput={params => (
+              <Button
+                onClick={() => onDirectEntryChange?.(!directEntry)}
+                disabled={loading || registrationCompleted}
+              >
+                {directEntry
+                  ? t('Browse subscriptions and clusters')
+                  : t('Paste FQDN or resource ID')}
+              </Button>
+              {directEntry && (
+                <Box
+                  component="form"
+                  display="flex"
+                  flexDirection="column"
+                  gap={2}
+                  onSubmit={event => {
+                    event.preventDefault();
+                    if (
+                      clusterAddress.trim() &&
+                      !lookingUpCluster &&
+                      !loading &&
+                      !registrationCompleted
+                    ) {
+                      onLookupCluster?.();
+                    }
+                  }}
+                >
                   <TextField
-                    {...params}
-                    label={t('Tenant')}
-                    placeholder={t('Select an Azure tenant')}
+                    fullWidth
+                    label={t('Cluster FQDN or ARM resource ID')}
+                    value={clusterAddress}
+                    onChange={event => onClusterAddressChange?.(event.target.value)}
+                    disabled={loading || registrationCompleted}
+                    helperText={t(
+                      'Paste the public or private AKS API server FQDN, or the full ARM resource ID.'
+                    )}
                   />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.id}>
-                    <Box>
-                      <Typography variant="body1">{option.name}</Typography>
-                      {/* When the display name is unresolvable the name falls back to the
+                  <Button
+                    type="submit"
+                    disabled={
+                      !clusterAddress.trim() || lookingUpCluster || loading || registrationCompleted
+                    }
+                  >
+                    {lookingUpCluster ? t('Finding cluster...') : t('Find cluster')}
+                  </Button>
+                </Box>
+              )}
+              {!directEntry && (
+                <>
+                  <Autocomplete
+                    fullWidth
+                    options={tenants}
+                    value={selectedTenant}
+                    onChange={onTenantChange}
+                    inputValue={tenantInputValue}
+                    onInputChange={onTenantInputChange}
+                    getOptionKey={option => option.id}
+                    getOptionLabel={option => option.name}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    disabled={
+                      loading ||
+                      registrationCompleted ||
+                      loadingSubscriptions ||
+                      tenants.length <= 1
+                    }
+                    renderInput={params => (
+                      <TextField
+                        {...params}
+                        label={t('Tenant')}
+                        placeholder={t('Select an Azure tenant')}
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>
+                        <Box>
+                          <Typography variant="body1">{option.name}</Typography>
+                          {/* When the display name is unresolvable the name falls back to the
                           tenant ID; showing it twice reads as a rendering bug. */}
-                      {option.name !== option.id && (
-                        <Typography variant="caption" color="textSecondary">
-                          {option.id}
-                        </Typography>
-                      )}
-                    </Box>
-                  </li>
-                )}
-              />
-
-              <Autocomplete
-                fullWidth
-                options={subscriptions}
-                value={selectedSubscription}
-                onChange={onSubscriptionChange}
-                inputValue={subscriptionInputValue}
-                onInputChange={onSubscriptionInputChange}
-                filterOptions={x => x}
-                getOptionKey={option => option.id}
-                getOptionLabel={option =>
-                  `${option.name}${option.state !== 'Enabled' ? ` (${option.state})` : ''}`
-                }
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                disabled={
-                  loading ||
-                  registrationCompleted ||
-                  loadingSubscriptions ||
-                  (tenants.length > 1 && !selectedTenant)
-                }
-                loading={loadingSubscriptions}
-                renderInput={params => (
-                  <TextField
-                    {...params}
-                    label={t('Subscription')}
-                    placeholder={t('Select an Azure subscription')}
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {loadingSubscriptions ? (
-                            <CircularProgress color="inherit" size={20} aria-hidden="true" />
-                          ) : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.id}>
-                    <Box>
-                      <Typography variant="body1">{option.name}</Typography>
-                      {option.state !== 'Enabled' && (
-                        <Typography variant="caption" color="textSecondary">
-                          {option.state}
-                        </Typography>
-                      )}
-                    </Box>
-                  </li>
-                )}
-              />
-
-              {loadingSubscriptions && (
-                <Box display="flex" alignItems="center" gap={1}>
-                  <CircularProgress size={20} aria-hidden="true" />
-                  <Typography variant="body2" color="textSecondary">
-                    {t('Loading subscriptions')}...
-                  </Typography>
-                </Box>
-              )}
-
-              {loadingClusters && (
-                <Box display="flex" alignItems="center" gap={1}>
-                  <CircularProgress size={20} aria-hidden="true" />
-                  <Typography variant="body2" color="textSecondary">
-                    {t('Loading AKS clusters')}...
-                  </Typography>
-                </Box>
-              )}
-
-              {!loadingClusters && selectedSubscription && clusters.length === 0 && (
-                <Alert severity="info">{t('No AKS clusters found in this subscription.')}</Alert>
-              )}
-
-              {!loadingClusters && selectedSubscription && clusters.length > 0 && (
-                <Autocomplete
-                  fullWidth
-                  options={filteredClusters}
-                  value={selectedCluster}
-                  onChange={onClusterChange}
-                  inputValue={clusterInputValue}
-                  onInputChange={onClusterInputChange}
-                  filterOptions={x => x}
-                  // Identity includes the cluster kind: a managed AKS cluster and an
-                  // Arc-connected one are different resource types, so they may share
-                  // a name and resource group. Without it the two are the same option
-                  // and the wrong kind can be selected and registered.
-                  getOptionKey={option =>
-                    `${option.clusterType ?? 'aks'}/${option.resourceGroup}/${option.name}`
-                  }
-                  getOptionLabel={option => option.name}
-                  getOptionDisabled={option => !isAksHybridEdgeOnline(option)}
-                  isOptionEqualToValue={(option, value) =>
-                    option.name === value.name &&
-                    option.resourceGroup === value.resourceGroup &&
-                    (option.clusterType ?? 'aks') === (value.clusterType ?? 'aks')
-                  }
-                  disabled={loading || registrationCompleted}
-                  renderInput={params => (
-                    <TextField
-                      {...params}
-                      label={t('AKS Cluster')}
-                      placeholder={t('Select an AKS cluster')}
-                    />
-                  )}
-                  renderOption={(props, option) => {
-                    const offline = !isAksHybridEdgeOnline(option);
-                    return (
-                      <li
-                        {...props}
-                        key={`${option.clusterType ?? 'aks'}/${option.resourceGroup}/${
-                          option.name
-                        }`}
-                      >
-                        <Box width="100%">
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="body1">{option.name}</Typography>
-                            {option.clusterType === 'aksarc' && (
-                              <Chip
-                                label={t('AKS Hybrid & Edge')}
-                                size="small"
-                                color="info"
-                                variant="outlined"
-                                icon={<Icon icon="mdi:server" aria-hidden="true" />}
-                              />
-                            )}
-                            {offline && (
-                              <Chip
-                                label={t('Offline')}
-                                size="small"
-                                color="default"
-                                variant="outlined"
-                                icon={<Icon icon="mdi:cloud-off-outline" aria-hidden="true" />}
-                              />
-                            )}
-                          </Box>
-                          <Typography variant="caption" color="textSecondary">
-                            {option.location} • v{option.kubernetesVersion} •{' '}
-                            {getClusterStateLabel(option)}
-                          </Typography>
+                          {option.name !== option.id && (
+                            <Typography variant="caption" color="textSecondary">
+                              {option.id}
+                            </Typography>
+                          )}
                         </Box>
                       </li>
-                    );
-                  }}
-                />
-              )}
+                    )}
+                  />
 
+                  <Autocomplete
+                    fullWidth
+                    options={subscriptions}
+                    value={selectedSubscription}
+                    onChange={onSubscriptionChange}
+                    inputValue={subscriptionInputValue}
+                    onInputChange={onSubscriptionInputChange}
+                    filterOptions={x => x}
+                    getOptionKey={option => option.id}
+                    getOptionLabel={option =>
+                      `${option.name}${option.state !== 'Enabled' ? ` (${option.state})` : ''}`
+                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    disabled={
+                      loading ||
+                      registrationCompleted ||
+                      loadingSubscriptions ||
+                      (tenants.length > 1 && !selectedTenant)
+                    }
+                    loading={loadingSubscriptions}
+                    renderInput={params => (
+                      <TextField
+                        {...params}
+                        label={t('Subscription')}
+                        placeholder={t('Select an Azure subscription')}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {loadingSubscriptions ? (
+                                <CircularProgress color="inherit" size={20} aria-hidden="true" />
+                              ) : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>
+                        <Box>
+                          <Typography variant="body1">{option.name}</Typography>
+                          {option.state !== 'Enabled' && (
+                            <Typography variant="caption" color="textSecondary">
+                              {option.state}
+                            </Typography>
+                          )}
+                        </Box>
+                      </li>
+                    )}
+                  />
+
+                  {loadingSubscriptions && (
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <CircularProgress size={20} aria-hidden="true" />
+                      <Typography variant="body2" color="textSecondary">
+                        {t('Loading subscriptions')}...
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {loadingClusters && (
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <CircularProgress size={20} aria-hidden="true" />
+                      <Typography variant="body2" color="textSecondary">
+                        {t('Loading AKS clusters')}...
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {!loadingClusters && selectedSubscription && clusters.length === 0 && (
+                    <Alert severity="info">
+                      {t('No AKS clusters found in this subscription.')}
+                    </Alert>
+                  )}
+
+                  {!loadingClusters && selectedSubscription && clusters.length > 0 && (
+                    <Autocomplete
+                      fullWidth
+                      options={filteredClusters}
+                      value={selectedCluster}
+                      onChange={onClusterChange}
+                      inputValue={clusterInputValue}
+                      onInputChange={onClusterInputChange}
+                      filterOptions={x => x}
+                      // Identity includes the cluster kind: a managed AKS cluster and an
+                      // Arc-connected one are different resource types, so they may share
+                      // a name and resource group. Without it the two are the same option
+                      // and the wrong kind can be selected and registered.
+                      getOptionKey={option =>
+                        `${option.clusterType ?? 'aks'}/${option.resourceGroup}/${option.name}`
+                      }
+                      getOptionLabel={option => option.name}
+                      getOptionDisabled={option => !isAksHybridEdgeOnline(option)}
+                      isOptionEqualToValue={(option, value) =>
+                        option.name === value.name &&
+                        option.resourceGroup === value.resourceGroup &&
+                        (option.clusterType ?? 'aks') === (value.clusterType ?? 'aks')
+                      }
+                      disabled={loading || registrationCompleted}
+                      renderInput={params => (
+                        <TextField
+                          {...params}
+                          label={t('AKS Cluster')}
+                          placeholder={t('Select an AKS cluster')}
+                        />
+                      )}
+                      renderOption={(props, option) => {
+                        const offline = !isAksHybridEdgeOnline(option);
+                        return (
+                          <li
+                            {...props}
+                            key={`${option.clusterType ?? 'aks'}/${option.resourceGroup}/${
+                              option.name
+                            }`}
+                          >
+                            <Box width="100%">
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <Typography variant="body1">{option.name}</Typography>
+                                {option.clusterType === 'aksarc' && (
+                                  <Chip
+                                    label={t('AKS Hybrid & Edge')}
+                                    size="small"
+                                    color="info"
+                                    variant="outlined"
+                                    icon={<Icon icon="mdi:server" aria-hidden="true" />}
+                                  />
+                                )}
+                                {offline && (
+                                  <Chip
+                                    label={t('Offline')}
+                                    size="small"
+                                    color="default"
+                                    variant="outlined"
+                                    icon={<Icon icon="mdi:cloud-off-outline" aria-hidden="true" />}
+                                  />
+                                )}
+                              </Box>
+                              <Typography variant="caption" color="textSecondary">
+                                {option.location} • v{option.kubernetesVersion} •{' '}
+                                {getClusterStateLabel(option)}
+                              </Typography>
+                            </Box>
+                          </li>
+                        );
+                      }}
+                    />
+                  )}
+                </>
+              )}
               {selectedCluster &&
                 clusterInputValue === selectedCluster.name &&
                 !registrationCompleted && (
@@ -506,6 +572,8 @@ export default function RegisterAKSClusterDialogPure({
               ? `${t('Loading subscriptions')}...`
               : loadingClusters
               ? `${t('Loading AKS clusters')}...`
+              : lookingUpCluster
+              ? t('Finding cluster...')
               : capabilitiesLoading
               ? 'Checking cluster capabilities...'
               : ''}
