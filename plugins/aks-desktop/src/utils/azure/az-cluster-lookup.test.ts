@@ -44,8 +44,12 @@ describe('lookupAKSCluster', () => {
     expect(runCommandAsync).toHaveBeenCalledExactlyOnceWith('az', [
       'aks',
       'show',
-      '--ids',
-      resourceId,
+      '--subscription',
+      subscriptionId,
+      '--resource-group',
+      'my-group',
+      '--name',
+      'my-cluster',
       '--output',
       'json',
     ]);
@@ -69,7 +73,18 @@ describe('lookupAKSCluster', () => {
     expect(args[3]).toContain('properties.privateFQDN =~');
     expect(args[3]).toContain('limit 2');
     expect(args).not.toContain('--subscription');
-    expect(runCommandAsync.mock.calls[1][1]).toContain(resourceId);
+    expect(runCommandAsync.mock.calls[1][1]).toEqual([
+      'aks',
+      'show',
+      '--subscription',
+      subscriptionId,
+      '--resource-group',
+      'my-group',
+      '--name',
+      'my-cluster',
+      '--output',
+      'json',
+    ]);
   });
 
   it.each([

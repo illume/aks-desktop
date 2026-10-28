@@ -66,7 +66,18 @@ export async function lookupAKSCluster(
     privateFqdn?: string;
     aadProfile?: { enableAzureRbac?: boolean };
   }>(
-    ['aks', 'show', '--ids', quoteForPlatform(resourceId), '--output', 'json'],
+    [
+      'aks',
+      'show',
+      '--subscription',
+      scope[1],
+      '--resource-group',
+      quoteForPlatform(scope[2]),
+      '--name',
+      scope[3],
+      '--output',
+      'json',
+    ],
     'Looking up AKS cluster',
     'get AKS cluster',
     JSON.parse
