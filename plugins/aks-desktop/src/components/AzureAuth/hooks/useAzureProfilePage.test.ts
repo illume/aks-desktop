@@ -279,6 +279,77 @@ describe('useAzureProfilePage', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  test.each(['', 'pluginRunCommand is not available.'])(
+    'keeps the reload-risk warning visible when sign-out policy cannot be saved: %s',
+    async stderr => {
+      nativeAuthMocks.logoutNative.mockReturnValueOnce(false);
+      mockRunCommandAsync.mockResolvedValue({ stderr });
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+      const { result, rerender } = renderHook(() => useAzureProfilePage());
+
+      await act(() => result.current.handleLogout());
+      mockUseAzureAuth.mockReturnValue(AUTH_LOGGED_OUT);
+      rerender();
+
+      expect(mockRunCommandAsync).toHaveBeenCalledWith('az', ['logout']);
+      expect(result.current.logoutError).toContain('could not be saved');
+      expect(result.current.logoutError).toContain('may be reused after the app reloads');
+      if (stderr) expect(result.current.logoutError).toContain('Azure CLI was not available');
+      expect(result.current.logoutNotice).toBe('');
+      expect(result.current.loggingOut).toBe(false);
+      expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'failed');
+      expect(telemetryMocks.trackAksFeature).not.toHaveBeenCalledWith(
+        'aksd.auth-logout',
+        'succeeded'
+      );
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'azure-auth-update' })
+      );
+      act(() => vi.runAllTimers());
+      expect(mockPush).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each([false, true])(
+    'preserves the policy warning when CLI sign-out fails (throws: %s)',
+    async throws => {
+      nativeAuthMocks.logoutNative.mockReturnValueOnce(false);
+      if (throws) {
+        mockRunCommandAsync.mockRejectedValue(new Error('bridge disconnected'));
+      } else {
+        mockRunCommandAsync.mockResolvedValue({ stderr: 'Command execution error: disconnected' });
+      }
+      const { result } = renderHook(() => useAzureProfilePage());
+
+      await act(() => result.current.handleLogout());
+
+      expect(result.current.logoutError).toContain(
+        throws ? 'could not be completed' : 'Azure CLI sign-out failed'
+      );
+      expect(result.current.logoutError).toContain('could not be saved');
+      expect(result.current.loggingOut).toBe(false);
+      expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'failed');
+      act(() => vi.runAllTimers());
+      expect(mockPush).not.toHaveBeenCalled();
+    }
+  );
+
+  test('allows retry after sign-out policy persistence fails', async () => {
+    nativeAuthMocks.logoutNative.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    mockRunCommandAsync.mockResolvedValue({ stderr: '' });
+    const { result } = renderHook(() => useAzureProfilePage());
+
+    await act(() => result.current.handleLogout());
+    expect(result.current.logoutError).toContain('could not be saved');
+
+    await act(() => result.current.handleLogout());
+    expect(result.current.logoutError).toBe('');
+    expect(result.current.loggingOut).toBe(true);
+    expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
+    act(() => vi.runAllTimers());
+    expect(mockPush).toHaveBeenCalledWith('/azure/login');
+  });
+
   test('redirect guard defers to timeout during active logout flow', async () => {
     mockRunCommandAsync.mockResolvedValue({ stderr: '' });
 

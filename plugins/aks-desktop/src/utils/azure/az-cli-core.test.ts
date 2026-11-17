@@ -214,6 +214,16 @@ describe('runAzCommand', () => {
       });
     }
 
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      let reject!: (error: Error) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
     test('allows matching identities and checks the requested subscription', async () => {
       acceptNative();
       mockCli();
@@ -363,7 +373,7 @@ describe('runAzCommand', () => {
       await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
     });
 
-    test('restores CLI fallback after a real native device login fails', async () => {
+    test('requires explicit CLI sign-in after a real native device login fails', async () => {
       const nativeAuth = await vi.importActual<typeof import('./native-auth')>('./native-auth');
       mocks.native.mockImplementation(nativeAuth.getNativeAccount);
       mocks.generation.mockImplementation(nativeAuth.getNativeAuthGeneration);
@@ -400,6 +410,21 @@ describe('runAzCommand', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(nativeAuth.getNativeLoginError()).toBe('Denied');
         expect(nativeAuth.hasNativeSession()).toBe(false);
+        await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+        mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+          if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+          if (args[0] === 'account' && args[1] === 'show') {
+            return Promise.resolve({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' });
+          }
+          return Promise.resolve(commandResult);
+        });
+        await expect(runCommandAsync('az', ['login'])).resolves.toEqual({
+          stdout: '[{}]',
+          stderr: '',
+        });
+        await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+        nativeAuth.allowAzureCliFallback();
+        allowCliOperations();
         await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
       } finally {
         nativeAuth.logoutNative();
@@ -480,6 +505,65 @@ describe('runAzCommand', () => {
       await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
     });
 
+    test('a successful login queued behind logout clears its failure barrier', async () => {
+      const logoutResult = deferred<typeof commandResult>();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'logout') return logoutResult.promise;
+        if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+        if (args[0] === 'account' && args[1] === 'show') {
+          return Promise.resolve({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+      const logout = runCommandAsync('az', ['logout']);
+      const login = runCommandAsync('az', ['login']);
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', ['login']);
+      logoutResult.resolve(commandResult);
+      await logout;
+      await expect(login).resolves.toEqual({ stdout: '[{}]', stderr: '' });
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
+    });
+
+    test('a newer logout cannot be undone by an in-flight login', async () => {
+      const loginResult = deferred<typeof commandResult>();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') return loginResult.promise;
+        if (args[0] === 'account' && args[1] === 'show') {
+          return Promise.resolve({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+      const login = runCommandAsync('az', ['login']);
+      const logout = runCommandAsync('az', ['logout']);
+      loginResult.resolve({ stdout: '[{}]', stderr: '' });
+      await expect(login).resolves.toEqual(denied);
+      await expect(logout).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+    });
+
+    test('a successful queued login recovers from an earlier failed login', async () => {
+      const firstResult = deferred<typeof commandResult>();
+      let loginCalls = 0;
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') {
+          return ++loginCalls === 1
+            ? firstResult.promise
+            : Promise.resolve({ stdout: '[{}]', stderr: '' });
+        }
+        if (args[0] === 'account' && args[1] === 'show') {
+          return Promise.resolve({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+      const first = runCommandAsync('az', ['login']);
+      const second = runCommandAsync('az', ['login']);
+      firstResult.resolve({ stdout: '', stderr: 'ERROR: failed' });
+      await first;
+      await expect(second).resolves.toEqual({ stdout: '[{}]', stderr: '' });
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
+    });
+
     test('rejects a stale verification when login starts during the check', async () => {
       acceptNative();
       let finishAccount!: (value: { stdout: string; stderr: string }) => void;
@@ -531,6 +615,215 @@ describe('runAzCommand', () => {
       finishSet(commandResult);
       await change;
       await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
+    });
+
+    test.each([
+      ['login'],
+      ['logout'],
+      ['account', 'set', '--subscription', 'sub'],
+      ['account', 'clear'],
+      ['account', 'list', '--refresh'],
+      ['cloud', 'set', '--name', 'AzureCloud'],
+      ['cloud', 'register', '--name', 'custom'],
+      ['cloud', 'unregister', '--name', 'custom'],
+      ['cloud', 'update', '--name', 'custom'],
+    ])('reserves writer %j until every running reader completes', async (...args) => {
+      const readers = [deferred<typeof commandResult>(), deferred<typeof commandResult>()];
+      let started = 0;
+      mocks.execCommand.mockImplementation((_command: string, commandArgs: string[]) => {
+        if (commandArgs[0] === 'group') return readers[started++].promise;
+        if (commandArgs[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+        if (commandArgs[0] === 'account' && commandArgs[1] === 'show') {
+          return Promise.resolve({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+      const first = runCommandAsync('az', ['group', 'list']);
+      const second = runCommandAsync('az', ['group', 'show']);
+      const writer = runCommandAsync('az', args);
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', args);
+      await expect(runCommandAsync('az', ['group', 'create'])).resolves.toEqual(denied);
+      await expect(runCommandAsync('az', ['version'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['cloud', 'show'])).resolves.toEqual(commandResult);
+      readers[0].resolve(commandResult);
+      await first;
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', args);
+      readers[1].resolve(commandResult);
+      await second;
+      await writer;
+      expect(mocks.execCommand).toHaveBeenCalledWith('/bundled/az', args);
+    });
+
+    test('serializes writers and releases the lease when a writer rejects', async () => {
+      const firstWriter = deferred<typeof commandResult>();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) =>
+        args[0] === 'account' && args[1] === 'set'
+          ? firstWriter.promise
+          : Promise.resolve(commandResult)
+      );
+      const first = runCommandAsync('az', ['account', 'set', '-s', 'sub']);
+      const second = runCommandAsync('az', ['cloud', 'set', '--name', 'AzureCloud']);
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', [
+        'cloud',
+        'set',
+        '--name',
+        'AzureCloud',
+      ]);
+      firstWriter.reject(new Error('bridge failed'));
+      await expect(first).rejects.toThrow('bridge failed');
+      await expect(second).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
+    });
+
+    test('keeps metadata available while a writer is running', async () => {
+      const writerResult = deferred<typeof commandResult>();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) =>
+        args[0] === 'cloud' && args[1] === 'set'
+          ? writerResult.promise
+          : Promise.resolve(commandResult)
+      );
+      const writer = runCommandAsync('az', ['cloud', 'set', '--name', 'AzureCloud']);
+      await expect(runCommandAsync('az', ['account', 'show'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['cloud', 'show'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['version'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+      writerResult.resolve(commandResult);
+      await writer;
+    });
+
+    test('releases reader lease after command rejection', async () => {
+      const reader = deferred<typeof commandResult>();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) =>
+        args[0] === 'group' ? reader.promise : Promise.resolve(commandResult)
+      );
+      const operation = runCommandAsync('az', ['group', 'list']);
+      const writer = runCommandAsync('az', ['logout']);
+      reader.reject(new Error('bridge failed'));
+      await expect(operation).rejects.toThrow('bridge failed');
+      await expect(writer).resolves.toEqual(commandResult);
+    });
+
+    test('waits for all identity lookups even when one rejects before starting a writer', async () => {
+      acceptNative();
+      const cloud = deferred<typeof commandResult>();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'account') return Promise.reject(new Error('lookup failed'));
+        if (args[0] === 'cloud' && args[1] === 'show') return cloud.promise;
+        return Promise.resolve(commandResult);
+      });
+      const operation = runCommandAsync('az', ['group', 'list']);
+      const writer = runCommandAsync('az', ['logout']);
+      await Promise.resolve();
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', ['logout']);
+      cloud.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+      await expect(operation).resolves.toEqual(denied);
+      await expect(writer).resolves.toEqual(commandResult);
+    });
+
+    test('revalidates a queued writer against the current native generation', async () => {
+      acceptNative();
+      const reader = deferred<typeof commandResult>();
+      const readerStarted = deferred<void>();
+      mockCli();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'group') {
+          readerStarted.resolve();
+          return reader.promise;
+        }
+        if (args[0] === 'account' && args[1] === 'show')
+          return Promise.resolve({ stdout: JSON.stringify(account), stderr: '' });
+        if (args[0] === 'cloud')
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        return Promise.resolve(commandResult);
+      });
+      const operation = runCommandAsync('az', ['group', 'list']);
+      await readerStarted.promise;
+      const writer = runCommandAsync('az', ['account', 'set', '-s', 'sub']);
+      mocks.generation.mockReturnValue(1);
+      reader.resolve(commandResult);
+      await operation;
+      await expect(writer).resolves.toEqual(denied);
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', [
+        'account',
+        'set',
+        '-s',
+        'sub',
+      ]);
+    });
+
+    test('verifies the short account-set subscription selector before mutation', async () => {
+      acceptNative();
+      mockCli();
+      await expect(runCommandAsync('az', ['account', 'set', '-s', 'sub'])).resolves.toEqual(
+        commandResult
+      );
+      expect(mocks.execCommand).toHaveBeenCalledWith('/bundled/az', [
+        'account',
+        'show',
+        '--subscription',
+        'sub',
+        '-o',
+        'json',
+      ]);
+    });
+
+    test.each([['-ssub'], ['-s=sub'], ['--subscription=sub']])(
+      'verifies account-set selector %j',
+      async selector => {
+        acceptNative();
+        mockCli();
+        await expect(runCommandAsync('az', ['account', 'set', selector])).resolves.toEqual(
+          commandResult
+        );
+        expect(mocks.execCommand).toHaveBeenCalledWith('/bundled/az', [
+          'account',
+          'show',
+          '--subscription',
+          'sub',
+          '-o',
+          'json',
+        ]);
+      }
+    );
+
+    test('rejects account-set selectors it cannot verify', async () => {
+      acceptNative();
+      mockCli();
+      await expect(runCommandAsync('az', ['account', 'set', '--sub', 'other'])).resolves.toEqual(
+        denied
+      );
+      expect(mocks.execCommand).not.toHaveBeenCalled();
+    });
+
+    test('rechecks CLI identity after a preceding writer changes it', async () => {
+      acceptNative();
+      const firstWriter = deferred<typeof commandResult>();
+      const firstStarted = deferred<void>();
+      let currentAccount = account;
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'account' && args[1] === 'show')
+          return Promise.resolve({ stdout: JSON.stringify(currentAccount), stderr: '' });
+        if (args[0] === 'cloud' && args[1] === 'show')
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        if (args[0] === 'account' && args[1] === 'clear') {
+          firstStarted.resolve();
+          return firstWriter.promise;
+        }
+        return Promise.resolve(commandResult);
+      });
+      const first = runCommandAsync('az', ['account', 'clear']);
+      await firstStarted.promise;
+      const second = runCommandAsync('az', ['cloud', 'set', '--name', 'AzureCloud']);
+      currentAccount = { ...account, user: { name: 'other@example.com' } };
+      firstWriter.resolve(commandResult);
+      await first;
+      await expect(second).resolves.toEqual(denied);
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', [
+        'cloud',
+        'set',
+        '--name',
+        'AzureCloud',
+      ]);
     });
 
     test('keeps the login barrier until post-login verification completes', async () => {

@@ -106,9 +106,12 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
     setLoggingOut(true);
     setLogoutError('');
     setLogoutNotice('');
+    let policyNotSaved = false;
+    const policyWarning =
+      'Azure sign-out could not be saved. Azure CLI accounts may be reused after the app reloads. Retry sign-out.';
     try {
       const { logoutNative } = await import('../../../utils/azure/native-auth');
-      logoutNative();
+      policyNotSaved = logoutNative() === false;
       // Dynamic import avoids circular dependencies at module load time.
       const { runCommandAsync, isCliNotFoundError } = await import(
         '../../../utils/azure/az-cli-core'
@@ -118,21 +121,34 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
         return;
       }
       const stderr = result.stderr?.trim() ?? '';
+      let cliUnavailable = false;
       if (
         stderr &&
         (isCliNotFoundError(stderr) || stderr === 'pluginRunCommand is not available.')
       ) {
-        setLogoutNotice('Azure CLI was not available. Native Azure sign-out completed.');
+        cliUnavailable = true;
       } else if (stderr && !stderr.split('\n').every(line => line.trim().startsWith('WARNING:'))) {
         console.error('Azure CLI logout error:', stderr);
         trackLogoutFailure();
         setLogoutError(
-          'Native Azure sign-out completed, but Azure CLI sign-out failed. Retry or run az logout manually.'
+          'Native Azure sign-out completed, but Azure CLI sign-out failed. Retry or run az logout manually.' +
+            (policyNotSaved ? ` ${policyWarning}` : '')
         );
         setLoggingOut(false);
         return;
       }
 
+      if (policyNotSaved) {
+        trackLogoutFailure();
+        setLogoutError((cliUnavailable ? 'Azure CLI was not available. ' : '') + policyWarning);
+        setLoggingOut(false);
+        window.dispatchEvent(new CustomEvent('azure-auth-update'));
+        return;
+      }
+
+      if (cliUnavailable) {
+        setLogoutNotice('Azure CLI was not available. Native Azure sign-out completed.');
+      }
       trackAksFeature('aksd.auth-logout', 'succeeded');
 
       // Notify the sidebar label to refresh its auth state.
@@ -150,7 +166,10 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
       }
       console.error('Error logging out:', error);
       trackLogoutFailure();
-      setLogoutError('Azure sign-out could not be completed. Retry or run az logout manually.');
+      setLogoutError(
+        'Azure sign-out could not be completed. Retry or run az logout manually.' +
+          (policyNotSaved ? ` ${policyWarning}` : '')
+      );
       setLoggingOut(false);
     } finally {
       logoutInFlightRef.current = false;

@@ -464,6 +464,71 @@ describe('native Azure authentication', () => {
     expect(getNativeAccount()).toBeUndefined();
     expect(getNativeLoginError()).toBe('ARM returned HTTP 403');
     expect(hasNativeSession()).toBe(false);
+    expect(isAzureExplicitlySignedOut()).toBe(true);
+  });
+
+  test('reports terminal home-tenant refresh failure during login discovery', async () => {
+    mocks.getSubscriptions.mockImplementationOnce(async () => {
+      await nativeCredential.getToken('discovery-scope', { tenantId: 'home-tenant' });
+      return [];
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(deviceResponse())
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: 'arm',
+          refresh_token: 'refresh',
+          id_token: jwt({ tid: 'home-tenant' }),
+          expires_in: 3600,
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ error: 'invalid_grant', error_description: 'Refresh token revoked' }, 400)
+      );
+    const observedErrors: Array<string | undefined> = [];
+    const onChange = () => observedErrors.push(getNativeLoginError());
+    window.addEventListener('azure-account-change', onChange);
+    try {
+      await initiateNativeLogin();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(getNativeLoginError()).toBe('Refresh token revoked');
+      expect(observedErrors).toContain('Refresh token revoked');
+      expect(hasNativeSession()).toBe(false);
+      expect(getNativeAccount()).toBeUndefined();
+      expect(isAzureExplicitlySignedOut()).toBe(true);
+    } finally {
+      window.removeEventListener('azure-account-change', onChange);
+    }
+  });
+
+  test('a cancelled discovery ignores a late terminal refresh failure', async () => {
+    const refresh = deferred<Response>();
+    const controller = new AbortController();
+    mocks.getSubscriptions.mockImplementationOnce(async () => {
+      await nativeCredential.getToken('discovery-scope', { tenantId: 'home-tenant' });
+      return [];
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(deviceResponse())
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: 'arm',
+          refresh_token: 'refresh',
+          id_token: jwt({ tid: 'home-tenant' }),
+          expires_in: 3600,
+        })
+      )
+      .mockReturnValueOnce(refresh.promise);
+    await initiateNativeLogin(controller.signal);
+    await vi.advanceTimersByTimeAsync(1_000);
+    controller.abort();
+    await establishSession();
+    refresh.resolve(
+      jsonResponse({ error: 'invalid_grant', error_description: 'Old refresh revoked' }, 400)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getNativeLoginError()).toBeUndefined();
+    expect(getNativeAccount()?.subscriptionId).toBe('subscription-id');
     expect(isAzureExplicitlySignedOut()).toBe(false);
   });
 
@@ -543,12 +608,9 @@ describe('native Azure authentication', () => {
       expect(signal?.aborted).toBe(true);
       expect(hasNativeSession()).toBe(true);
 
-      vi.mocked(fetch).mockResolvedValueOnce(
-        jsonResponse({ access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 })
-      );
-      await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
-        token: 'fresh',
-      });
+      const retry = deferred<Response>();
+      vi.mocked(fetch).mockReturnValueOnce(retry.promise);
+      const fresh = nativeCredential.getToken('other-scope');
       if (stage === 'fetch') {
         request.resolve(
           jsonResponse({ access_token: 'late', refresh_token: 'late-refresh', expires_in: 3600 })
@@ -557,6 +619,10 @@ describe('native Azure authentication', () => {
         body.resolve({ access_token: 'late', refresh_token: 'late-refresh', expires_in: 3600 });
       }
       await vi.advanceTimersByTimeAsync(0);
+      retry.resolve(
+        jsonResponse({ access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 })
+      );
+      await expect(fresh).resolves.toMatchObject({ token: 'fresh' });
       await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
         token: 'fresh',
       });
@@ -584,6 +650,31 @@ describe('native Azure authentication', () => {
     expect(isAzureExplicitlySignedOut()).toBe(false);
   });
 
+  test('a refresh response after logout cannot affect a new session', async () => {
+    await establishSession();
+    const request = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(request.promise);
+    const result = expect(nativeCredential.getToken('other-scope')).rejects.toThrow(
+      'Azure login was cancelled'
+    );
+    logoutNative();
+    await establishSession();
+    request.resolve(
+      jsonResponse({ access_token: 'stale', refresh_token: 'stale', expires_in: 3600 })
+    );
+    await result;
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ access_token: 'fresh', expires_in: 3600 })
+    );
+    await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
+      token: 'fresh',
+    });
+    expect(String(vi.mocked(fetch).mock.calls[5][1]?.body)).toContain(
+      'refresh_token=refresh-token'
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   test('caller cancellation does not abort a shared refresh or evict its result', async () => {
     await establishSession();
     const controller = new AbortController();
@@ -601,6 +692,29 @@ describe('native Azure authentication', () => {
       token: 'shared',
     });
     expect(fetch).toHaveBeenCalledTimes(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test('an aborted caller leaves the shared timeout and retry available to other callers', async () => {
+    await establishSession();
+    const controller = new AbortController();
+    const reason = new Error('caller cancelled');
+    const request = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(request.promise);
+    const cancelled = nativeCredential.getToken('other-scope', { abortSignal: controller.signal });
+    const other = nativeCredential.getToken('other-scope');
+    const cancellation = expect(cancelled).rejects.toBe(reason);
+    const timeout = expect(other).rejects.toThrow('Azure token refresh timed out');
+    controller.abort(reason);
+    await cancellation;
+    await vi.advanceTimersByTimeAsync(30_000);
+    await timeout;
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ access_token: 'fresh', expires_in: 3600 })
+    );
+    await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
+      token: 'fresh',
+    });
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -840,12 +954,12 @@ describe('native Azure authentication', () => {
     expect(isAzureExplicitlySignedOut()).toBe(false);
   });
 
-  test('cancelling native sign-in preserves the previous explicit sign-out choice', async () => {
+  test('cancelling native sign-in blocks implicit CLI access', async () => {
     const controller = new AbortController();
     vi.mocked(fetch).mockResolvedValueOnce(deviceResponse());
     await initiateNativeLogin(controller.signal);
     controller.abort();
-    expect(isAzureExplicitlySignedOut()).toBe(false);
+    expect(isAzureExplicitlySignedOut()).toBe(true);
 
     logoutNative();
     const second = new AbortController();

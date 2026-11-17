@@ -47,8 +47,44 @@ let cliLoginEpoch = 0;
 let cliIdentityChangesPending = 0;
 let cliOperationsAllowed = true;
 let approvedNativeGeneration: number | undefined;
+let cliReaders = 0;
+let cliWriterActive = false;
+const cliWriters: Array<() => void> = [];
 let nativeSubscriptionTenantLookup: (subscriptionId: string) => string | undefined = () =>
   undefined;
+
+function drainCliWriters(): void {
+  if (cliWriterActive || cliReaders || !cliWriters.length) return;
+  cliWriterActive = true;
+  cliWriters.shift()!();
+}
+
+function withCliWriter<T>(run: (epoch: number) => Promise<T>): Promise<T> {
+  // Reserve before waiting so new readers cannot overtake the writer.
+  const epoch = ++cliLoginEpoch;
+  cliIdentityChangesPending++;
+  return new Promise((resolve, reject) => {
+    cliWriters.push(() => {
+      void (async () => {
+        try {
+          resolve(await run(epoch));
+        } catch (error) {
+          reject(error);
+        } finally {
+          cliIdentityChangesPending--;
+          cliWriterActive = false;
+          drainCliWriters();
+        }
+      })();
+    });
+    drainCliWriters();
+  });
+}
+
+function releaseCliReader(): void {
+  cliReaders--;
+  drainCliWriters();
+}
 
 /** Blocks CLI-dependent operations until the user completes the CLI sign-in step. */
 export function blockCliOperations(): void {
@@ -81,7 +117,10 @@ function isIdentityIndependent(args: string[]): boolean {
 
 function changesCliIdentity(args: string[]): boolean {
   return (
-    (args[0] === 'account' && ['set', 'clear'].includes(args[1])) ||
+    (args[0] === 'account' &&
+      (['set', 'clear'].includes(args[1]) ||
+        (args[1] === 'list' &&
+          args.some(arg => arg === '--refresh' || arg.startsWith('--refresh='))))) ||
     (args[0] === 'cloud' && ['set', 'register', 'unregister', 'update'].includes(args[1]))
   );
 }
@@ -104,7 +143,11 @@ async function verifyCliIdentity(
   try {
     const subscriptions: string[] = [];
     for (let i = 0; i < args.length; i++) {
-      if (args[i] === '--subscription' || args[i] === '--subscriptions') {
+      if (
+        args[i] === '--subscription' ||
+        args[i] === '--subscriptions' ||
+        (args[0] === 'account' && args[1] === 'set' && args[i] === '-s')
+      ) {
         const plural = args[i] === '--subscriptions';
         if (!args[i + 1] || args[i + 1].startsWith('-')) return false;
         subscriptions.push(args[++i]);
@@ -119,16 +162,28 @@ async function verifyCliIdentity(
         const value = args[i].slice('--subscriptions='.length);
         if (!value) return false;
         subscriptions.push(value);
+      } else if (args[0] === 'account' && args[1] === 'set' && args[i].startsWith('-s')) {
+        const value = args[i].slice(2).replace(/^=/, '');
+        if (!value) return false;
+        subscriptions.push(value);
       } else if (args[i] === '--tenant') {
         if (!sameValue(args[++i], native.tenantId)) return false;
       } else if (args[i].startsWith('--tenant=')) {
         if (!sameValue(args[i].slice('--tenant='.length), native.tenantId)) return false;
       }
     }
+    if (args[0] === 'account' && args[1] === 'set' && subscriptions.length !== 1) return false;
+    const readIdentity = async (identityArgs: string[]) => {
+      try {
+        return await execCommand(az, identityArgs);
+      } catch {
+        return { stdout: '', stderr: 'identity lookup failed' };
+      }
+    };
     const [accountResults, cloudResult] = await Promise.all([
       Promise.all(
         (subscriptions.length ? subscriptions : [undefined]).map(subscription =>
-          execCommand(az, [
+          readIdentity([
             'account',
             'show',
             ...(subscription ? ['--subscription', subscription] : []),
@@ -137,7 +192,7 @@ async function verifyCliIdentity(
           ])
         )
       ),
-      execCommand(az, ['cloud', 'show', '-o', 'json']),
+      readIdentity(['cloud', 'show', '-o', 'json']),
     ]);
     if (isCommandError(cloudResult.stderr) || !cloudResult.stdout) {
       return false;
@@ -191,10 +246,9 @@ async function hasCliAccount(az: string): Promise<boolean> {
 
 async function runCliLogin(
   az: string,
-  args: string[]
+  args: string[],
+  epoch: number
 ): Promise<{ stdout: string; stderr: string }> {
-  if (cliLoginsPending++ === 0) cliLoginFailed = false;
-  const epoch = ++cliLoginEpoch;
   try {
     const result = await execCommand(az, args);
     let accounts: unknown;
@@ -217,6 +271,8 @@ async function runCliLogin(
     if (!valid) {
       cliLoginFailed = true;
       if (!isCommandError(result.stderr)) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+    } else {
+      cliLoginFailed = false;
     }
     return result;
   } catch (error) {
@@ -225,6 +281,44 @@ async function runCliLogin(
   } finally {
     cliLoginsPending--;
   }
+}
+
+async function runVerifiedCliCommand(
+  az: string,
+  args: string[],
+  writer: boolean
+): Promise<{ stdout: string; stderr: string }> {
+  if (
+    !cliOperationsAllowed ||
+    cliLoginsPending ||
+    (!writer && cliIdentityChangesPending) ||
+    cliLoginFailed ||
+    isAzureExplicitlySignedOut()
+  ) {
+    return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+  }
+  const native = getNativeAccount();
+  if (!native) {
+    if (hasNativeSession()) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+  } else {
+    const generation = getNativeAuthGeneration();
+    if (generation !== approvedNativeGeneration) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+    const epoch = cliLoginEpoch;
+    const verified = await verifyCliIdentity(az, native, args);
+    if (
+      !verified ||
+      !cliOperationsAllowed ||
+      generation !== getNativeAuthGeneration() ||
+      epoch !== cliLoginEpoch ||
+      cliLoginsPending ||
+      (!writer && cliIdentityChangesPending) ||
+      cliLoginFailed ||
+      isAzureExplicitlySignedOut()
+    ) {
+      return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+    }
+  }
+  return execCommand(az, args);
 }
 
 export async function runCommandAsync(
@@ -238,54 +332,27 @@ export async function runCommandAsync(
   }
   debugLog('[AZ-CLI] Executing command:', actualCommand, 'with args:', args);
   if (command === 'az') {
-    if (args[0] === 'login') return runCliLogin(actualCommand, args);
+    if (args[0] === 'login') {
+      cliLoginsPending++;
+      return withCliWriter(epoch => runCliLogin(actualCommand, args, epoch));
+    }
     if (args[0] === 'logout') {
-      cliLoginEpoch++;
       cliLoginFailed = true;
+      return withCliWriter(async () => {
+        cliLoginFailed = true;
+        return execCommand(actualCommand, args);
+      });
+    }
+    if (changesCliIdentity(args)) {
+      return withCliWriter(() => runVerifiedCliCommand(actualCommand, args, true));
     }
     if (!isIdentityIndependent(args)) {
-      if (
-        !cliOperationsAllowed ||
-        cliLoginsPending ||
-        cliIdentityChangesPending ||
-        cliLoginFailed ||
-        isAzureExplicitlySignedOut()
-      ) {
-        return { stdout: '', stderr: CLI_IDENTITY_ERROR };
-      }
-      const native = getNativeAccount();
-      if (!native) {
-        if (hasNativeSession()) {
-          return { stdout: '', stderr: CLI_IDENTITY_ERROR };
-        }
-      } else {
-        const generation = getNativeAuthGeneration();
-        if (generation !== approvedNativeGeneration) {
-          return { stdout: '', stderr: CLI_IDENTITY_ERROR };
-        }
-        const epoch = cliLoginEpoch;
-        const verified = await verifyCliIdentity(actualCommand, native, args);
-        if (
-          !verified ||
-          !cliOperationsAllowed ||
-          generation !== getNativeAuthGeneration() ||
-          epoch !== cliLoginEpoch ||
-          cliLoginsPending ||
-          cliIdentityChangesPending ||
-          cliLoginFailed ||
-          isAzureExplicitlySignedOut()
-        ) {
-          return { stdout: '', stderr: CLI_IDENTITY_ERROR };
-        }
-      }
-      if (changesCliIdentity(args)) {
-        cliLoginEpoch++;
-        cliIdentityChangesPending++;
-        try {
-          return await execCommand(actualCommand, args);
-        } finally {
-          cliIdentityChangesPending--;
-        }
+      if (cliIdentityChangesPending) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+      cliReaders++;
+      try {
+        return await runVerifiedCliCommand(actualCommand, args, false);
+      } finally {
+        releaseCliReader();
       }
     }
   }

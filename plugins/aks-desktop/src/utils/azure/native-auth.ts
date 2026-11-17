@@ -3,6 +3,11 @@
 
 import type { AccessToken, GetTokenOptions, TokenCredential } from '@azure/identity';
 import { openExternalUrl } from '../shared/openExternalUrl';
+import {
+  allowImplicitAzureCli,
+  blockImplicitAzureCli,
+  isImplicitAzureCliBlocked,
+} from './azure-auth-policy';
 import { getNativeCloudConfiguration, NativeCloudConfiguration } from './azure-cloud-config';
 
 const AZURE_CLI_CLIENT_ID = '04b07795-8ddb-461a-bbee-02f9e1bf7b46';
@@ -238,6 +243,11 @@ export async function initiateNativeLogin(
 ): Promise<NativeLoginPrompt> {
   if (signal?.aborted) throw new Error('Azure login was cancelled');
   const cloud = getNativeCloudConfiguration(cloudName);
+  if (!blockImplicitAzureCli()) {
+    throw new Error(
+      'Azure sign-in policy could not be saved; enable application storage and retry.'
+    );
+  }
   resetNativeSession();
   nativeCloud = cloud;
   const generation = loginGeneration;
@@ -357,21 +367,24 @@ function resetNativeSession(): void {
 
 /** Returns whether sign-out or a terminal credential failure blocks implicit CLI access. */
 export function isAzureExplicitlySignedOut(): boolean {
-  return explicitlySignedOut;
+  return explicitlySignedOut || (!hasNativeSession() && isImplicitAzureCliBlocked());
 }
 
 /** Allows CLI account discovery following an explicit choice to sign in with the CLI. */
 export function allowAzureCliFallback(): void {
+  allowImplicitAzureCli();
   explicitlySignedOut = false;
 }
 
 /** Signs out and prevents automatic reuse of an Azure CLI account. */
-export function logoutNative(): void {
+export function logoutNative(): boolean {
+  const persisted = blockImplicitAzureCli();
   resetNativeSession();
   explicitlySignedOut = true;
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('azure-account-change'));
   }
+  return persisted;
 }
 
 async function requestToken(scope: string, tenantId?: string): Promise<AccessToken> {
@@ -408,6 +421,10 @@ async function requestToken(scope: string, tenantId?: string): Promise<AccessTok
     }
   } catch (error) {
     if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
+    if (Date.now() >= deadline) {
+      controller.abort();
+      throw timeoutError();
+    }
     const requestedTenant = tenantId ?? account?.tenantId;
     const isHomeTenant =
       !!homeTenantId &&
@@ -421,7 +438,9 @@ async function requestToken(scope: string, tenantId?: string): Promise<AccessTok
       ) &&
       isHomeTenant
     ) {
+      const wasLoggingIn = loginPending;
       resetNativeSession();
+      if (wasLoggingIn) loginError = error.message;
       explicitlySignedOut = true;
       window.dispatchEvent(new CustomEvent('azure-account-change'));
     }
@@ -442,7 +461,8 @@ export const nativeCredential: TokenCredential = {
     }
     const signal = options?.abortSignal;
     const abortError = () =>
-      signal?.reason ?? new DOMException('Token request was aborted', 'AbortError');
+      (signal as { reason?: unknown } | undefined)?.reason ??
+      new DOMException('Token request was aborted', 'AbortError');
     if (signal?.aborted) throw abortError();
     const load = async () => {
       const key = `${options?.tenantId ?? ''}|${scope}`;
