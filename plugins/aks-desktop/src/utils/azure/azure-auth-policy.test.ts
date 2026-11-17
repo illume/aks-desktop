@@ -23,6 +23,32 @@ let cliAccount = CLI_ACCOUNT;
 
 async function reload() {
   vi.resetModules();
+  vi.stubGlobal('pluginAzureOAuth', {
+    startAzureLogin: vi.fn().mockResolvedValue({
+      success: true,
+      pending: true,
+      prompt: {
+        userCode: 'code',
+        verificationUri: 'https://microsoft.com/devicelogin',
+        message: 'Enter code',
+      },
+    }),
+    getAzureLoginStatus: vi.fn().mockResolvedValue({
+      success: true,
+      pending: false,
+      account: {
+        username: 'native@example.com',
+        tenantId: CLI_ACCOUNT.tenantId,
+      },
+    }),
+    getAzureToken: vi.fn().mockResolvedValue({
+      success: true,
+      accessToken: 'native-token',
+      expiresOnTimestamp: Date.now() + 3_600_000,
+    }),
+    cancelAzureLogin: vi.fn().mockResolvedValue({ success: true }),
+    logoutAzure: vi.fn().mockResolvedValue({ success: true }),
+  });
   return {
     native: await import('./native-auth'),
     auth: await import('./az-auth'),
@@ -76,7 +102,7 @@ describe('Azure authentication policy across renderer reloads', () => {
       isLoggedIn: true,
       username: 'cli@example.com',
     });
-    app.native.logoutNative();
+    await app.native.logoutNative();
     app = await reload();
     expect(await app.auth.getLoginStatus()).toMatchObject({ isLoggedIn: false });
     expect((await app.auth.initiateCliLogin()).success).toBe(true);
@@ -91,7 +117,7 @@ describe('Azure authentication policy across renderer reloads', () => {
 
   test('sign-out blocks account discovery, CLI operations and tokens after reload', async () => {
     let app = await reload();
-    app.native.logoutNative();
+    await app.native.logoutNative();
     app = await reload();
     mocks.command.mockClear();
     expect(await app.auth.getLoginStatus()).toMatchObject({ isLoggedIn: false });
@@ -103,38 +129,9 @@ describe('Azure authentication policy across renderer reloads', () => {
   });
 
   test('native login and skipped CLI cannot switch to an unrelated CLI account on reload', async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              device_code: 'device',
-              user_code: 'code',
-              verification_uri: 'https://microsoft.com/devicelogin',
-              expires_in: 900,
-              interval: 1,
-            })
-          )
-        )
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              access_token: 'secret-access',
-              refresh_token: 'secret-refresh',
-              id_token: `header.${btoa(
-                JSON.stringify({ preferred_username: 'native@example.com' })
-              )}.signature`,
-              expires_in: 3600,
-            })
-          )
-        )
-    );
     let app = await reload();
     await app.native.initiateNativeLogin();
-    await vi.advanceTimersByTimeAsync(1000);
+    await app.native.synchronizeNativeLogin();
     expect(app.native.getNativeAccount()).toBeDefined();
     cliAccount = { ...CLI_ACCOUNT, user: { name: 'native@example.com' } };
     app.cli.allowCliOperations();
@@ -154,21 +151,6 @@ describe('Azure authentication policy across renderer reloads', () => {
   });
 
   test('cancelled native sign-in still requires an explicit login after reload', async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            device_code: 'device',
-            user_code: 'code',
-            verification_uri: 'https://microsoft.com/devicelogin',
-            expires_in: 900,
-            interval: 1,
-          })
-        )
-      )
-    );
     let app = await reload();
     const controller = new AbortController();
     await app.native.initiateNativeLogin(controller.signal);
@@ -235,13 +217,13 @@ describe('Azure authentication policy across renderer reloads', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('unavailable');
     });
-    expect(app.native.logoutNative()).toBe(false);
+    expect(await app.native.logoutNative()).toBe(false);
     expect(await app.auth.getLoginStatus()).toMatchObject({ isLoggedIn: false });
   });
 
   test('explicit CLI fallback is usable in memory if the persisted block cannot be cleared', async () => {
     let app = await reload();
-    app.native.logoutNative();
+    await app.native.logoutNative();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('unavailable');
