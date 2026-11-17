@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const mockCheckClusterReachable = vi.hoisted(() => vi.fn());
 const mockStartProxy = vi.hoisted(() => vi.fn());
 const mockVerify = vi.hoisted(() => vi.fn());
+const mockWaitForProxySessionInvalidation = vi.hoisted(() => vi.fn());
 const mockGetClusterSettings = vi.hoisted(() => vi.fn());
 const mockMarkAppearance = vi.hoisted(() => vi.fn());
 
@@ -13,6 +14,7 @@ vi.mock('../../utils/azure/aksHybridEdgeProxy', () => ({
   checkClusterReachable: mockCheckClusterReachable,
   startProxy: mockStartProxy,
   verifyAksHybridEdgeCluster: mockVerify,
+  waitForProxySessionInvalidation: mockWaitForProxySessionInvalidation,
 }));
 
 vi.mock('../../utils/shared/clusterSettings', () => ({
@@ -62,6 +64,7 @@ describe('looksLikeArcProxiedCluster', () => {
 describe('aksHybridEdgePreOpenHook — manually-added cluster handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWaitForProxySessionInvalidation.mockResolvedValue(undefined);
   });
 
   test('no-op for a genuine non-Arc cluster (not proxy-looking)', async () => {
@@ -100,6 +103,7 @@ describe('aksHybridEdgePreOpenHook — manually-added cluster handling', () => {
 describe('aksHybridEdgePreOpenHook — cancellation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWaitForProxySessionInvalidation.mockResolvedValue(undefined);
     mockGetClusterSettings.mockReturnValue({
       clusterType: 'aksarc',
       subscriptionId: 'sub-a',
@@ -112,6 +116,10 @@ describe('aksHybridEdgePreOpenHook — cancellation', () => {
     mockCheckClusterReachable.mockImplementation(
       (_cluster, signal) =>
         new Promise((_resolve, reject) => {
+          if (signal.aborted) {
+            reject(signal.reason);
+            return;
+          }
           signal.addEventListener('abort', () => reject(signal.reason), { once: true });
         })
     );

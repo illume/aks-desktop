@@ -85,16 +85,19 @@ async function proxyAccountIsUsable(target: ProxyAuthTarget): Promise<boolean> {
     args.push('--tenant', target.tenantId);
   }
   const result = await runCommandAsync('az', args);
-  return !!result.stdout.trim() && !(result.stderr && isAzError(result.stderr));
+  const expiresOnSeconds = Number(result.stdout.trim());
+  return (
+    Number.isFinite(expiresOnSeconds) &&
+    expiresOnSeconds * 1000 > Date.now() &&
+    !(result.stderr && isAzError(result.stderr))
+  );
 }
 
 /**
  * Ensures the app-owned Azure CLI profile has the same account, tenant, and
  * subscription as the app identity before `az connectedk8s proxy` starts.
  */
-export async function ensureProxyAuthentication(
-  target: ProxyAuthTarget
-): Promise<ProxyAuthResult> {
+export async function ensureProxyAuthentication(target: ProxyAuthTarget): Promise<ProxyAuthResult> {
   try {
     if (!target.tenantId || !target.accountName) {
       return {
@@ -113,7 +116,10 @@ export async function ensureProxyAuthentication(
       target.tenantId,
       '--allow-no-subscriptions',
     ]);
-    if ((login.stderr && isAzError(login.stderr)) || (!login.stdout.trim() && login.stderr.trim())) {
+    if (
+      (login.stderr && isAzError(login.stderr)) ||
+      (!login.stdout.trim() && login.stderr.trim())
+    ) {
       return {
         success: false,
         error: login.stderr.trim() || 'Azure CLI login was cancelled.',

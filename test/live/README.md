@@ -16,6 +16,13 @@ Run a suite, for example:
 AZ_LIVE_TESTS=1 npm --prefix plugins/aks-desktop run test:unit -- az-resource-providers.live.test.ts
 ```
 
+Validate that connectedk8s proxy authentication reuses the selected account only
+after checking a live tenant-scoped token:
+
+```sh
+AZ_LIVE_TESTS=1 npm --prefix plugins/aks-desktop run test:unit -- aksHybridEdgeProxyAuth.live.test.ts
+```
+
 The production-credential case runs real `az account get-access-token` and local
 `az cloud show` commands through a native-bridge adapter, not injected tokens or
 mocked ARM responses. It checks the selected subscription argument, the actual

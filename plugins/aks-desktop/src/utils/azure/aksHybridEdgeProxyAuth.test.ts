@@ -100,7 +100,12 @@ describe('ensureProxyAuthentication', () => {
     expect(mockRunCommandAsync).toHaveBeenNthCalledWith(
       2,
       'az',
-      expect.arrayContaining(['account', 'get-access-token', '--subscription', target.subscriptionId])
+      expect.arrayContaining([
+        'account',
+        'get-access-token',
+        '--subscription',
+        target.subscriptionId,
+      ])
     );
     expect(mockRunCommandAsync).toHaveBeenNthCalledWith(
       3,
@@ -108,6 +113,26 @@ describe('ensureProxyAuthentication', () => {
       expect.arrayContaining(['login', '--tenant', target.tenantId])
     );
   });
+
+  test.each(['1', 'not-a-timestamp'])(
+    'prompts again when Azure CLI reports unusable token expiry %s',
+    async expiresOn => {
+      mockRunCommandAsync
+        .mockResolvedValueOnce(account())
+        .mockResolvedValueOnce({ stdout: expiresOn, stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce(account())
+        .mockResolvedValueOnce({ stdout: '4102444800', stderr: '' });
+
+      await expect(ensureProxyAuthentication(target)).resolves.toEqual({ success: true });
+      expect(mockRunCommandAsync).toHaveBeenNthCalledWith(3, 'az', [
+        'login',
+        '--tenant',
+        target.tenantId,
+        '--allow-no-subscriptions',
+      ]);
+    }
+  );
 
   test('requires tenant metadata before a replacement login', async () => {
     mockRunCommandAsync.mockResolvedValue({ stdout: '', stderr: 'ERROR: Please run az login' });
