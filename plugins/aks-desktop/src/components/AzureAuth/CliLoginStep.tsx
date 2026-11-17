@@ -10,7 +10,11 @@ import {
   blockCliOperations,
   isAzCliInstalled,
 } from '../../utils/azure/az-cli-core';
-import { allowAzureCliFallback, logoutNative } from '../../utils/azure/native-auth';
+import {
+  allowAzureCliFallback,
+  getNativeAuthGeneration,
+  logoutNative,
+} from '../../utils/azure/native-auth';
 
 interface CliLoginStepProps {
   onContinue: () => void;
@@ -39,6 +43,12 @@ export default function CliLoginStep({
     onContinueRef.current();
   };
 
+  const continueWithoutCli = () => {
+    if (continued.current) return;
+    blockCliOperations();
+    continueOnce();
+  };
+
   const goBack = () => {
     if (continued.current) return;
     continued.current = true;
@@ -52,9 +62,15 @@ export default function CliLoginStep({
     setState('pending');
     setError('');
     if (!nativeAuthenticated) logoutNative();
+    const generation = getNativeAuthGeneration();
     const result = await initiateCliLogin();
     pending.current = false;
     if (!mounted.current || continued.current) return;
+    if (generation !== getNativeAuthGeneration()) {
+      setError('Azure account changed during CLI sign-in. Please retry.');
+      setState('failed');
+      return;
+    }
     if (result.success) {
       if (!nativeAuthenticated) allowAzureCliFallback();
       allowCliOperations();
@@ -71,7 +87,7 @@ export default function CliLoginStep({
     isAzCliInstalled().then(installed => {
       if (!mounted.current || continued.current) return;
       if (installed) void signIn();
-      else if (nativeAuthenticated) continueOnce();
+      else if (nativeAuthenticated) continueWithoutCli();
       else setState('unavailable');
     });
     return () => {
@@ -84,7 +100,7 @@ export default function CliLoginStep({
       <Box>
         <Typography>{t('Checking Azure CLI availability')}...</Typography>
         {nativeAuthenticated ? (
-          <Button onClick={continueOnce}>{t('Continue without Azure CLI')}</Button>
+          <Button onClick={continueWithoutCli}>{t('Continue without Azure CLI')}</Button>
         ) : (
           <Button onClick={goBack}>{t('Back')}</Button>
         )}
@@ -129,7 +145,9 @@ export default function CliLoginStep({
             )}
           </Typography>
           {nativeAuthenticated ? (
-            <Button onClick={continueOnce}>{t('Continue without waiting for Azure CLI')}</Button>
+            <Button onClick={continueWithoutCli}>
+              {t('Continue without waiting for Azure CLI')}
+            </Button>
           ) : (
             <Button onClick={goBack}>{t('Back')}</Button>
           )}
@@ -140,7 +158,7 @@ export default function CliLoginStep({
             {t('Retry Azure CLI sign-in')}
           </Button>
           {nativeAuthenticated ? (
-            <Button variant="outlined" onClick={continueOnce}>
+            <Button variant="outlined" onClick={continueWithoutCli}>
               {t('Continue without Azure CLI')}
             </Button>
           ) : (

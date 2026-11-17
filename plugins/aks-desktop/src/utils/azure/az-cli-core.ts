@@ -209,7 +209,9 @@ async function runCliLogin(
       !isCommandError(result.stderr) &&
       Array.isArray(accounts) &&
       accounts.length > 0 &&
-      (native ? await verifyCliIdentity(az, native) : await hasCliAccount(az)) &&
+      (native
+        ? await verifyCliIdentity(az, native, ['--subscription', native.subscriptionId])
+        : await hasCliAccount(az)) &&
       generation === getNativeAuthGeneration() &&
       epoch === cliLoginEpoch;
     if (!valid) {

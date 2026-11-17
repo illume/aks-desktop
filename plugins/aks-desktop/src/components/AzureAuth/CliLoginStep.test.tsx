@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   initiateCliLogin: vi.fn(),
   allowAzureCliFallback: vi.fn(),
   logoutNative: vi.fn(),
+  getNativeAuthGeneration: vi.fn(),
   allowCliOperations: vi.fn(),
   blockCliOperations: vi.fn(),
 }));
@@ -26,6 +27,7 @@ vi.mock('../../utils/azure/az-auth', () => ({ initiateCliLogin: mocks.initiateCl
 vi.mock('../../utils/azure/native-auth', () => ({
   allowAzureCliFallback: mocks.allowAzureCliFallback,
   logoutNative: mocks.logoutNative,
+  getNativeAuthGeneration: mocks.getNativeAuthGeneration,
 }));
 
 import CliLoginStep from './CliLoginStep';
@@ -97,6 +99,7 @@ describe('CliLoginStep', () => {
     await screen.findByRole('status');
     expect(screen.getByText(/may change the CLI account after you leave/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Continue without waiting for Azure CLI' }));
+    expect(mocks.blockCliOperations).toHaveBeenCalledTimes(2);
     await act(async () => resolve({ success: true, message: 'done' }));
     expect(onContinue).toHaveBeenCalledOnce();
     expect(mocks.allowCliOperations).not.toHaveBeenCalled();
@@ -137,6 +140,19 @@ describe('CliLoginStep', () => {
     expect(onContinue).not.toHaveBeenCalled();
     expect(mocks.logoutNative).toHaveBeenCalledOnce();
     expect(mocks.allowAzureCliFallback).not.toHaveBeenCalled();
+    expect(mocks.allowCliOperations).not.toHaveBeenCalled();
+  });
+
+  test('does not approve a CLI login for a different native session', async () => {
+    let resolve!: (result: { success: boolean; message: string }) => void;
+    mocks.getNativeAuthGeneration.mockReturnValueOnce(1).mockReturnValueOnce(2);
+    mocks.initiateCliLogin.mockReturnValue(new Promise(r => (resolve = r)));
+    const onContinue = vi.fn();
+    render(<CliLoginStep onContinue={onContinue} />);
+    await screen.findByRole('status');
+    await act(async () => resolve({ success: true, message: 'done' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('account changed');
+    expect(onContinue).not.toHaveBeenCalled();
     expect(mocks.allowCliOperations).not.toHaveBeenCalled();
   });
 });
