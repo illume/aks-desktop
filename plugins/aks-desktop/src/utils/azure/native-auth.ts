@@ -80,9 +80,16 @@ function resetNativeSession(): void {
   removeAbortListener = undefined;
 }
 
-function failSession(message: string, signedOut = false): void {
+async function failSession(message: string, signedOut = false): Promise<void> {
+  const generation = loginGeneration;
+  const cleanup = await bridge().logoutAzure();
+  if (generation !== loginGeneration) return;
   resetNativeSession();
-  loginError = message;
+  loginError = cleanup.success
+    ? message
+    : `${message}. Main-process session cleanup failed: ${
+        cleanup.error ?? 'Azure authentication failed'
+      }`;
   explicitlySignedOut ||= signedOut;
   dispatchAccountChange();
 }
@@ -92,12 +99,15 @@ async function completeNativeLogin(generation: number): Promise<void> {
   const status = await bridge().getAzureLoginStatus();
   if (generation !== loginGeneration) return;
   if (!status.success) {
-    failSession(status.error ?? 'Azure authentication failed', status.sessionExpired === true);
+    await failSession(
+      status.error ?? 'Azure authentication failed',
+      status.sessionExpired === true
+    );
     return;
   }
   if (status.pending) return;
   if (!status.account?.tenantId) {
-    failSession('Azure authentication response did not include a tenant.');
+    await failSession('Azure authentication response did not include a tenant.');
     return;
   }
   homeTenantId = status.account.tenantId;
@@ -109,7 +119,7 @@ async function completeNativeLogin(generation: number): Promise<void> {
     value => value.status === 'Enabled' && typeof value.id === 'string' && value.id
   );
   if (!subscription) {
-    failSession('No enabled Azure subscriptions were found for this account');
+    await failSession('No enabled Azure subscriptions were found for this account');
     return;
   }
   account = {
@@ -164,7 +174,7 @@ export async function initiateNativeLogin(
     throw new Error('Azure login was cancelled');
   }
   if (!result.success || !result.prompt) {
-    failSession(result.error ?? 'Azure authentication failed');
+    await failSession(result.error ?? 'Azure authentication failed');
     throw new Error(result.error ?? 'Azure authentication failed');
   }
   openExternalUrl(result.prompt.verificationUri || cloud.deviceLoginUrl);
@@ -176,9 +186,9 @@ export async function synchronizeNativeLogin(): Promise<void> {
   if (!loginPending) return;
   if (!completion) {
     const generation = loginGeneration;
-    const operation = completeNativeLogin(generation).catch(error => {
+    const operation = completeNativeLogin(generation).catch(async error => {
       if (generation !== loginGeneration) return;
-      failSession(error instanceof Error ? error.message : 'Azure authentication failed');
+      await failSession(error instanceof Error ? error.message : 'Azure authentication failed');
     });
     const tracked = operation.finally(() => {
       if (completion === tracked) completion = undefined;
@@ -227,19 +237,20 @@ export function allowAzureCliFallback(): void {
 /** Signs out and prevents automatic reuse of an Azure CLI account. */
 export async function logoutNative(): Promise<boolean> {
   const persisted = blockImplicitAzureCli();
-  resetNativeSession();
-  explicitlySignedOut = true;
   const result = await bridge().logoutAzure();
-  dispatchAccountChange();
   if (!result.success) {
     throw new Error(result.error ?? 'Azure native sign-out failed');
   }
+  resetNativeSession();
+  explicitlySignedOut = true;
+  dispatchAccountChange();
   return persisted;
 }
 
 /** In-memory credential backed by the main-process public-client session. */
 export const nativeCredential: TokenCredential = {
   async getToken(scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken> {
+    if (!hasNativeSession()) throw new Error('Azure login is required');
     const scope = Array.isArray(scopes) ? scopes[0] : scopes;
     if (!scope || (Array.isArray(scopes) && scopes.length !== 1)) {
       throw new Error('Exactly one token scope is required');
@@ -260,7 +271,7 @@ export const nativeCredential: TokenCredential = {
         typeof result.expiresOnTimestamp !== 'number'
       ) {
         if (result.sessionExpired) {
-          failSession(result.error ?? 'Azure login expired', true);
+          await failSession(result.error ?? 'Azure login expired', true);
         }
         throw new Error(result.error ?? 'Azure token request failed');
       }

@@ -15,8 +15,10 @@ refresh tokens are not exposed to plugin code or persisted in browser storage.
 
 The product manifest limits the capability to the exact shipped plugin identity,
 known Azure clouds, and approved token scopes. Main-process handlers also require
-the trusted main frame and clear sessions when the document navigates or the app
-closes.
+the trusted main frame. Every login attempt has an unguessable identifier so a
+late cancellation or failure cannot clear a newer session. Terminal login
+failures, document navigation, and application shutdown clear refresh tokens and
+abort pending authorization.
 
 Azure Resource Manager callers sometimes identify ARM by its request endpoint,
 while the app registration uses the cloud's configured token resource. AKS Desktop
@@ -26,6 +28,16 @@ normalizes that endpoint scope before requesting a token. Microsoft documents th
 Public Azure, Azure US Government, and Azure China use separate, explicitly
 allowlisted authorities and endpoints, following Microsoft's
 [national cloud authentication guidance](https://learn.microsoft.com/en-us/entra/identity-platform/authentication-national-cloud).
+Microsoft Graph requests likewise use the matching national-cloud host and token
+scope documented in
+[Microsoft Graph national cloud deployments](https://learn.microsoft.com/en-us/graph/deployments).
+
+Subscription discovery first reads the signed-in account's tenants, then requests
+subscriptions with a token issued by each tenant. The discovered subscription-to-
+tenant binding is retained for subsequent ARM and Graph requests; callers cannot
+silently substitute another tenant for a selected subscription. This follows
+Microsoft's tenant-specific authority guidance for
+[single- and multitenant apps](https://learn.microsoft.com/en-us/entra/identity-platform/howto-convert-app-to-be-multi-tenant#update-your-code-to-send-requests-to-common).
 
 ## Azure CLI boundary
 
@@ -42,4 +54,3 @@ cloud switch cannot create a check/use race.
 
 Signing out clears the in-memory native session, cancels pending device
 authorization, blocks implicit CLI reuse, and separately attempts `az logout`.
-

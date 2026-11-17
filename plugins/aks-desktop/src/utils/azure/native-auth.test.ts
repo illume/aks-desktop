@@ -210,7 +210,7 @@ describe('native authentication facade', () => {
   });
 
   test('reports the genuine empty-subscription case separately', async () => {
-    capability();
+    const api = capability();
     mocks.getSubscriptions.mockResolvedValue([]);
     const auth = await load();
     await auth.initiateNativeLogin();
@@ -220,6 +220,10 @@ describe('native authentication facade', () => {
     expect(auth.getNativeLoginError()).toBe(
       'No enabled Azure subscriptions were found for this account'
     );
+    expect(api.logoutAzure).toHaveBeenCalledOnce();
+    await expect(
+      auth.nativeCredential.getToken('https://management.azure.com/.default')
+    ).rejects.toThrow('Azure login is required');
   });
 
   test('returns access tokens acquired in the main process', async () => {
@@ -287,6 +291,18 @@ describe('native authentication facade', () => {
     expect(api.logoutAzure).toHaveBeenCalledOnce();
     expect(auth.getNativeAccount()).toBeUndefined();
     expect(auth.isAzureExplicitlySignedOut()).toBe(true);
+  });
+
+  test('keeps the local session when main-process sign-out fails', async () => {
+    const api = capability({
+      logoutAzure: vi.fn().mockResolvedValue({ success: false, error: 'cleanup failed' }),
+    });
+    const { auth } = await establishSession(api);
+
+    await expect(auth.logoutNative()).rejects.toThrow('cleanup failed');
+
+    expect(auth.getNativeAccount()).toBeDefined();
+    expect(auth.hasNativeSession()).toBe(true);
   });
 
   test('allows explicit CLI fallback after native sign-out', async () => {
