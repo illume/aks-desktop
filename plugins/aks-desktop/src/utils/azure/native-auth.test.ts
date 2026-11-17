@@ -518,6 +518,143 @@ describe('native Azure authentication', () => {
     expect(getNativeAccount()?.subscriptionId).toBe('subscription-id');
   });
 
+  test.each(['fetch', 'body'])(
+    'times out a hung refresh %s, retries, and ignores its late response',
+    async stage => {
+      await establishSession();
+      const request = deferred<Response>();
+      const body = deferred<unknown>();
+      const response = jsonResponse({});
+      vi.spyOn(response, 'json').mockReturnValue(body.promise);
+      vi.mocked(fetch).mockReturnValueOnce(
+        stage === 'fetch' ? request.promise : Promise.resolve(response)
+      );
+      const first = nativeCredential.getToken('other-scope');
+      const second = nativeCredential.getToken('other-scope');
+      const failures = Promise.all([
+        expect(first).rejects.toThrow('Azure token refresh timed out'),
+        expect(second).rejects.toThrow('Azure token refresh timed out'),
+      ]);
+      const signal = vi.mocked(fetch).mock.calls[2][1]?.signal;
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await failures;
+      expect(signal?.aborted).toBe(true);
+      expect(hasNativeSession()).toBe(true);
+
+      vi.mocked(fetch).mockResolvedValueOnce(
+        jsonResponse({ access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 })
+      );
+      await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
+        token: 'fresh',
+      });
+      if (stage === 'fetch') {
+        request.resolve(
+          jsonResponse({ access_token: 'late', refresh_token: 'late-refresh', expires_in: 3600 })
+        );
+      } else {
+        body.resolve({ access_token: 'late', refresh_token: 'late-refresh', expires_in: 3600 });
+      }
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
+        token: 'fresh',
+      });
+      vi.mocked(fetch).mockResolvedValueOnce(
+        jsonResponse({ access_token: 'another', expires_in: 3600 })
+      );
+      await nativeCredential.getToken('another-scope');
+      expect(String(vi.mocked(fetch).mock.calls[4][1]?.body)).toContain(
+        'refresh_token=fresh-refresh'
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  test('a late terminal refresh failure after timeout cannot sign out the session', async () => {
+    await establishSession();
+    const request = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(request.promise);
+    const result = expect(nativeCredential.getToken('other-scope')).rejects.toThrow('timed out');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await result;
+    request.resolve(jsonResponse({ error: 'invalid_grant' }, 400));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(hasNativeSession()).toBe(true);
+    expect(isAzureExplicitlySignedOut()).toBe(false);
+  });
+
+  test('caller cancellation does not abort a shared refresh or evict its result', async () => {
+    await establishSession();
+    const controller = new AbortController();
+    const request = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(request.promise);
+    const cancelled = nativeCredential.getToken('other-scope', { abortSignal: controller.signal });
+    const other = nativeCredential.getToken('other-scope');
+    const result = expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    await result;
+    expect(vi.mocked(fetch).mock.calls[2][1]?.signal?.aborted).toBe(false);
+    request.resolve(jsonResponse({ access_token: 'shared', expires_in: 3600 }));
+    await expect(other).resolves.toMatchObject({ token: 'shared' });
+    await expect(nativeCredential.getToken('other-scope')).resolves.toMatchObject({
+      token: 'shared',
+    });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test('an already-aborted token caller neither uses the cache nor starts a refresh', async () => {
+    await establishSession();
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      nativeCredential.getToken('other-scope', { abortSignal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(
+      nativeCredential.getToken('https://management.core.windows.net//.default', {
+        abortSignal: controller.signal,
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('concurrent callers refresh an expired cached token only once', async () => {
+    await establishSession();
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ access_token: 'short-lived', expires_in: 10 })
+    );
+    await nativeCredential.getToken('other-scope');
+    const request = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(request.promise);
+    const first = nativeCredential.getToken('other-scope');
+    const second = nativeCredential.getToken('other-scope');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    request.resolve(jsonResponse({ access_token: 'fresh', expires_in: 3600 }));
+    await expect(first).resolves.toMatchObject({ token: 'fresh' });
+    await expect(second).resolves.toMatchObject({ token: 'fresh' });
+  });
+
+  test('an older successful refresh cannot replace a rotated refresh credential', async () => {
+    await establishSession();
+    const old = deferred<Response>();
+    vi.mocked(fetch)
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'new', refresh_token: 'rotated', expires_in: 3600 })
+      );
+    const pending = nativeCredential.getToken('old-scope');
+    await nativeCredential.getToken('new-scope');
+    old.resolve(jsonResponse({ access_token: 'old', refresh_token: 'stale', expires_in: 3600 }));
+    await pending;
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ access_token: 'another', expires_in: 3600 })
+    );
+    await nativeCredential.getToken('another-scope');
+    expect(String(vi.mocked(fetch).mock.calls[4][1]?.body)).toContain('refresh_token=rotated');
+  });
+
   test.each(['invalid_grant', 'interaction_required', 'login_required'])(
     'retains the home session when a guest tenant returns %s',
     async error => {

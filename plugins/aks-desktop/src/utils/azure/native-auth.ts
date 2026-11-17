@@ -7,6 +7,7 @@ import { getNativeCloudConfiguration, NativeCloudConfiguration } from './azure-c
 
 const AZURE_CLI_CLIENT_ID = '04b07795-8ddb-461a-bbee-02f9e1bf7b46';
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000;
+const TOKEN_REQUEST_TIMEOUT_MS = 30_000;
 
 class AuthenticationError extends Error {
   constructor(message: string, readonly code?: string) {
@@ -61,7 +62,11 @@ function tokenEndpoint(cloud: NativeCloudConfiguration, tenant = 'common') {
   return `${cloud.authority}/${encodeURIComponent(tenant)}/oauth2/v2.0/token`;
 }
 
-async function postForm<T>(url: string, values: Record<string, string>): Promise<T> {
+async function postForm<T>(
+  url: string,
+  values: Record<string, string>,
+  signal?: AbortSignal
+): Promise<T> {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -69,6 +74,7 @@ async function postForm<T>(url: string, values: Record<string, string>): Promise
       'x-ms-useragent': 'AZURECLI/2.0.0',
     },
     body: new URLSearchParams(values),
+    signal,
   });
   const body = await response.json().catch(() => undefined);
   if (!response.ok) {
@@ -88,7 +94,7 @@ function decodeClaims(token?: string): Record<string, unknown> {
   }
 }
 
-function cacheToken(scope: string, response: TokenResponse): AccessToken {
+function cacheToken(scope: string, response: TokenResponse, credential?: string): AccessToken {
   if (
     typeof response?.access_token !== 'string' ||
     !response.access_token ||
@@ -98,7 +104,11 @@ function cacheToken(scope: string, response: TokenResponse): AccessToken {
   ) {
     throw new Error('Invalid Azure authentication response');
   }
-  if (typeof response.refresh_token === 'string' && response.refresh_token) {
+  if (
+    (credential === undefined || credential === refreshToken) &&
+    typeof response.refresh_token === 'string' &&
+    response.refresh_token
+  ) {
     refreshToken = response.refresh_token;
   }
   const token = {
@@ -368,17 +378,34 @@ async function requestToken(scope: string, tenantId?: string): Promise<AccessTok
   if (!refreshToken || !nativeCloud) throw new Error('Azure login is required');
   const generation = loginGeneration;
   const credential = refreshToken;
+  const controller = new AbortController();
+  const deadline = Date.now() + TOKEN_REQUEST_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutError = () => new Error('Azure token refresh timed out');
   let response: TokenResponse;
   try {
-    response = await postForm<TokenResponse>(
-      tokenEndpoint(nativeCloud, tenantId ?? account?.tenantId),
-      {
-        client_id: AZURE_CLI_CLIENT_ID,
-        grant_type: 'refresh_token',
-        refresh_token: credential,
-        scope,
-      }
-    );
+    response = await Promise.race([
+      postForm<TokenResponse>(
+        tokenEndpoint(nativeCloud, tenantId ?? account?.tenantId),
+        {
+          client_id: AZURE_CLI_CLIENT_ID,
+          grant_type: 'refresh_token',
+          refresh_token: credential,
+          scope,
+        },
+        controller.signal
+      ),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(timeoutError());
+          controller.abort();
+        }, TOKEN_REQUEST_TIMEOUT_MS);
+      }),
+    ]);
+    if (Date.now() >= deadline) {
+      controller.abort();
+      throw timeoutError();
+    }
   } catch (error) {
     if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
     const requestedTenant = tenantId ?? account?.tenantId;
@@ -399,9 +426,11 @@ async function requestToken(scope: string, tenantId?: string): Promise<AccessTok
       window.dispatchEvent(new CustomEvent('azure-account-change'));
     }
     throw error;
+  } finally {
+    clearTimeout(timer!);
   }
   if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
-  return cacheToken(`${tenantId ?? ''}|${scope}`, response);
+  return cacheToken(`${tenantId ?? ''}|${scope}`, response, credential);
 }
 
 /** In-memory credential backed by the native public-client session. */
@@ -411,21 +440,39 @@ export const nativeCredential: TokenCredential = {
     if (!scope || (Array.isArray(scopes) && scopes.length !== 1)) {
       throw new Error('Exactly one token scope is required');
     }
-    const key = `${options?.tenantId ?? ''}|${scope}`;
-    const cached =
-      tokens.get(key) ??
-      (!options?.tenantId && scope === nativeCloud?.arm.scope ? tokens.get(scope) : undefined);
-    if (cached) {
+    const signal = options?.abortSignal;
+    const abortError = () =>
+      signal?.reason ?? new DOMException('Token request was aborted', 'AbortError');
+    if (signal?.aborted) throw abortError();
+    const load = async () => {
+      const key = `${options?.tenantId ?? ''}|${scope}`;
       const generation = loginGeneration;
-      const token = await cached;
-      if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
-      if (token.expiresOnTimestamp - TOKEN_REFRESH_MARGIN_MS > Date.now()) return token;
-    }
-    const pending = requestToken(scope, options?.tenantId);
-    tokens.set(key, pending);
-    pending.catch(() => {
-      if (tokens.get(key) === pending) tokens.delete(key);
-    });
-    return pending;
+      while (true) {
+        const cached =
+          tokens.get(key) ??
+          (!options?.tenantId && scope === nativeCloud?.arm.scope ? tokens.get(scope) : undefined);
+        if (cached) {
+          const token = await cached;
+          if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
+          if (signal?.aborted) throw abortError();
+          if (token.expiresOnTimestamp - TOKEN_REFRESH_MARGIN_MS > Date.now()) return token;
+          if (tokens.has(key) && tokens.get(key) !== cached) continue;
+        }
+        const pending = requestToken(scope, options?.tenantId);
+        tokens.set(key, pending);
+        pending.catch(() => {
+          if (tokens.get(key) === pending) tokens.delete(key);
+        });
+        return pending;
+      }
+    };
+    if (!signal) return load();
+    // A caller can stop waiting without cancelling the shared refresh for other callers.
+    let onAbort: () => void;
+    return new Promise<AccessToken>((resolve, reject) => {
+      onAbort = () => reject(abortError());
+      signal.addEventListener('abort', onAbort, { once: true });
+      load().then(resolve, reject);
+    }).finally(() => signal.removeEventListener('abort', onAbort!));
   },
 };

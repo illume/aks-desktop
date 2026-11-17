@@ -118,7 +118,10 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
         return;
       }
       const stderr = result.stderr?.trim() ?? '';
-      if (stderr && isCliNotFoundError(stderr)) {
+      if (
+        stderr &&
+        (isCliNotFoundError(stderr) || stderr === 'pluginRunCommand is not available.')
+      ) {
         setLogoutNotice('Azure CLI was not available. Native Azure sign-out completed.');
       } else if (stderr && !stderr.split('\n').every(line => line.trim().startsWith('WARNING:'))) {
         console.error('Azure CLI logout error:', stderr);
