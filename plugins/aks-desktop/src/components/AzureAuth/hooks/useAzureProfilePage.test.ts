@@ -43,6 +43,7 @@ vi.mock('../../../utils/azure/az-cli-core', async () => {
   return {
     runCommandAsync: mockRunCommandAsync,
     isAzError: (stderr: string) => stderr.includes('ERROR:'),
+    isCliNotFoundError: (stderr: string) => stderr.includes('az: command not found'),
   };
 });
 vi.mock('../../../utils/azure/native-auth', () => nativeAuthMocks);
@@ -211,14 +212,30 @@ describe('useAzureProfilePage', () => {
     expect(mockPush).toHaveBeenCalledWith('/azure/login');
   });
 
-  test('logs out a native session without invoking Azure CLI', async () => {
+  test('logs out both native and CLI sessions', async () => {
     nativeAuthMocks.hasNativeSession.mockReturnValue(true);
+    mockRunCommandAsync.mockResolvedValue({ stderr: '' });
     const { result } = renderHook(() => useAzureProfilePage());
 
     await act(() => result.current.handleLogout());
 
     expect(nativeAuthMocks.logoutNative).toHaveBeenCalledOnce();
-    expect(mockRunCommandAsync).not.toHaveBeenCalled();
+    expect(mockRunCommandAsync).toHaveBeenCalledWith('az', ['logout']);
+    expect(nativeAuthMocks.logoutNative.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRunCommandAsync.mock.invocationCallOrder[0]
+    );
+    expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
+  });
+
+  test('reports an unavailable CLI while completing native-only sign-out', async () => {
+    mockRunCommandAsync.mockResolvedValue({ stderr: 'az: command not found' });
+    const { result } = renderHook(() => useAzureProfilePage());
+
+    await act(() => result.current.handleLogout());
+
+    expect(nativeAuthMocks.logoutNative).toHaveBeenCalledOnce();
+    expect(result.current.logoutNotice).toContain('not available');
+    expect(result.current.logoutError).toBe('');
     expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
   });
 
@@ -249,18 +266,33 @@ describe('useAzureProfilePage', () => {
     act(() => vi.runAllTimers());
     expect(mockPush).not.toHaveBeenCalled();
     expect(result.current.loggingOut).toBe(false);
+    expect(result.current.logoutError).toContain('Azure CLI sign-out failed');
     expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'failed');
     expect(telemetryMocks.trackError).toHaveBeenCalledWith({
       area: 'auth-logout',
       errorClass: 'UnknownError',
       phase: 'failed',
     });
+
     expect(
       JSON.stringify([
         telemetryMocks.trackAksFeature.mock.calls,
         telemetryMocks.trackError.mock.calls,
       ])
     ).not.toContain('sensitive logout result');
+  });
+
+  test('keeps the logout failure visible when native auth becomes signed out', async () => {
+    mockRunCommandAsync.mockResolvedValue({
+      stderr: 'Command execution error: bridge disconnected',
+    });
+    const { result, rerender } = renderHook(() => useAzureProfilePage());
+    await act(() => result.current.handleLogout());
+    mockUseAzureAuth.mockReturnValue(AUTH_LOGGED_OUT);
+    rerender();
+    expect(result.current.logoutError).toContain('Azure CLI sign-out failed');
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(nativeAuthMocks.logoutNative).toHaveBeenCalledOnce();
   });
 
   test('handleLogout sets loggingOut false when an error is thrown', async () => {

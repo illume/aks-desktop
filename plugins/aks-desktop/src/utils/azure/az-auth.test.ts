@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getNativeLoginError: vi.fn(),
   hasNativeSession: vi.fn(),
   initiateNativeLogin: vi.fn(),
+  isAzureExplicitlySignedOut: vi.fn(),
   needsRelogin: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
@@ -35,14 +36,24 @@ vi.mock('./native-auth', () => ({
   getNativeLoginError: mocks.getNativeLoginError,
   hasNativeSession: mocks.hasNativeSession,
   initiateNativeLogin: mocks.initiateNativeLogin,
+  isAzureExplicitlySignedOut: mocks.isAzureExplicitlySignedOut,
 }));
 
-import { getLoginStatus, initiateLogin, login, monitorLoginStatus } from './az-auth';
+import {
+  getCliLoginStatus,
+  getLoginStatus,
+  getNativeLoginStatus,
+  initiateCliLogin,
+  initiateLogin,
+  login,
+  monitorLoginStatus,
+} from './az-auth';
 
 beforeEach(() => {
   mocks.getNativeAccount.mockReturnValue(undefined);
   mocks.getNativeLoginError.mockReturnValue(undefined);
   mocks.hasNativeSession.mockReturnValue(false);
+  mocks.isAzureExplicitlySignedOut.mockReturnValue(false);
   mocks.initiateNativeLogin.mockResolvedValue({
     message: 'Enter code ABCD-EFGH',
     userCode: 'ABCD-EFGH',
@@ -172,7 +183,26 @@ describe('getLoginStatus', () => {
       isLoggedIn: false,
       needsRelogin: false,
     });
+
     expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+  });
+
+  test('does not silently reuse the CLI account after explicit sign-out', async () => {
+    mocks.isAzureExplicitlySignedOut.mockReturnValue(true);
+    await expect(getLoginStatus()).resolves.toEqual({
+      isLoggedIn: false,
+      error: 'Not logged in',
+    });
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+  });
+
+  test('does not publish an in-flight CLI account read after sign-out', async () => {
+    let resolve!: (value: { stdout: string; stderr: string }) => void;
+    mocks.runCommandAsync.mockReturnValue(new Promise(r => (resolve = r)));
+    const pending = getLoginStatus();
+    mocks.isAzureExplicitlySignedOut.mockReturnValue(true);
+    resolve({ stdout: '{"id":"cli","tenantId":"tenant"}', stderr: '' });
+    await expect(pending).resolves.toEqual({ isLoggedIn: false, error: 'Not logged in' });
   });
 
   test.each([
@@ -326,6 +356,10 @@ describe('initiateLogin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.needsRelogin.mockReturnValue(false);
+    mocks.runCommandAsync.mockResolvedValue({
+      stdout: '{"name":"AzureCloud"}',
+      stderr: '',
+    });
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -333,14 +367,145 @@ describe('initiateLogin', () => {
     vi.restoreAllMocks();
   });
 
-  test('starts native authentication without invoking Azure CLI', async () => {
+  test('starts native authentication in the selected CLI cloud', async () => {
+    mocks.runCommandAsync.mockResolvedValue({
+      stdout: '{"name":"AzureUSGovernment"}',
+      stderr: '',
+    });
     await expect(initiateLogin()).resolves.toEqual({
       success: true,
       message: 'Enter code ABCD-EFGH',
       userCode: 'ABCD-EFGH',
     });
-    expect(mocks.initiateNativeLogin).toHaveBeenCalledOnce();
+    expect(mocks.initiateNativeLogin).toHaveBeenCalledWith(undefined, 'AzureUSGovernment');
+    expect(mocks.runCommandAsync).toHaveBeenCalledWith('az', ['cloud', 'show', '--output', 'json']);
+  });
+
+  test('uses public cloud when CLI is unavailable', async () => {
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: 'az: command not found' });
+    expect(await initiateLogin()).toMatchObject({ success: true });
+    expect(mocks.initiateNativeLogin).toHaveBeenCalledWith(undefined, 'AzureCloud');
+  });
+
+  test('uses an explicitly selected native cloud without querying the CLI', async () => {
+    expect(await initiateLogin(undefined, 'AzureChinaCloud')).toMatchObject({ success: true });
     expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+    expect(mocks.initiateNativeLogin).toHaveBeenCalledWith(undefined, 'AzureChinaCloud');
+  });
+
+  test('does not silently select public cloud when CLI cloud cannot be read', async () => {
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: 'ERROR: invalid configuration' });
+    expect(await initiateLogin()).toMatchObject({ success: false });
+    expect(mocks.initiateNativeLogin).not.toHaveBeenCalled();
+  });
+
+  test('does not start native login after cancellation during cloud discovery', async () => {
+    const controller = new AbortController();
+    mocks.runCommandAsync.mockReturnValue(new Promise(() => {}));
+    const attempt = initiateLogin(controller.signal);
+    controller.abort();
+    expect(await attempt).toMatchObject({ success: false });
+    expect(mocks.initiateNativeLogin).not.toHaveBeenCalled();
+  });
+
+  describe('complementary CLI login', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    test('runs browser login in the selected cloud and verifies the CLI account', async () => {
+      mocks.getNativeAccount.mockReturnValue({
+        tenantId: 'tenant',
+        subscriptionId: 'native',
+        username: 'USER@example.com',
+        environmentName: 'AzureUSGovernment',
+      });
+      mocks.runCommandAsync
+        .mockResolvedValueOnce({ stdout: '[{"id":"cli"}]', stderr: '' })
+        .mockResolvedValueOnce({
+          stdout:
+            '{"id":"native","tenantId":"tenant","cloudName":"AzureUSGovernment","user":{"name":"user@example.com"}}',
+          stderr: '',
+        });
+      expect(await initiateCliLogin()).toEqual({
+        success: true,
+        message: 'Azure CLI sign-in successful.',
+      });
+      expect(mocks.runCommandAsync).toHaveBeenNthCalledWith(1, 'az', ['login', '--output', 'json']);
+      expect(mocks.runCommandAsync).toHaveBeenNthCalledWith(2, 'az', [
+        'account',
+        'show',
+        '--subscription',
+        'native',
+        '-o',
+        'json',
+      ]);
+    });
+
+    test.each([
+      { stdout: '', stderr: 'ERROR: authentication failed' },
+      { stdout: '', stderr: 'az: command not found' },
+      { stdout: '[]', stderr: '' },
+      { stdout: '', stderr: '' },
+    ])('reports CLI login failures: %j', async output => {
+      mocks.runCommandAsync.mockResolvedValue(output);
+      expect((await initiateCliLogin()).success).toBe(false);
+      expect(mocks.runCommandAsync).toHaveBeenCalledOnce();
+    });
+
+    test('does not report success when the CLI account lookup fails', async () => {
+      mocks.runCommandAsync
+        .mockResolvedValueOnce({ stdout: '[{"id":"cli"}]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: 'ERROR: Please run az login' });
+      expect(await initiateCliLogin()).toMatchObject({ success: false });
+    });
+
+    test.each([
+      { username: 'other@example.com', tenantId: 'tenant', cloudName: 'AzureCloud' },
+      { username: 'user@example.com', tenantId: 'other', cloudName: 'AzureCloud' },
+      { username: 'user@example.com', tenantId: 'tenant', cloudName: 'AzureChinaCloud' },
+      { username: undefined, tenantId: 'tenant', cloudName: 'AzureCloud' },
+    ])('rejects a mismatched or unverifiable CLI identity: %j', async account => {
+      mocks.getNativeAccount.mockReturnValue({
+        tenantId: 'tenant',
+        subscriptionId: 'native',
+        username: 'user@example.com',
+        environmentName: 'AzureCloud',
+      });
+      mocks.runCommandAsync
+        .mockResolvedValueOnce({ stdout: '[{"id":"cli"}]', stderr: '' })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify({
+            id: 'native',
+            tenantId: account.tenantId,
+            cloudName: account.cloudName,
+            user: { name: account.username },
+          }),
+          stderr: '',
+        });
+      expect(await initiateCliLogin()).toMatchObject({ success: false });
+    });
+
+    test('shares an in-flight CLI login across callers', async () => {
+      let resolve!: (value: { stdout: string; stderr: string }) => void;
+      mocks.runCommandAsync.mockReturnValueOnce(new Promise(r => (resolve = r)));
+      const first = initiateCliLogin();
+      const second = initiateCliLogin();
+      expect(mocks.runCommandAsync).toHaveBeenCalledOnce();
+      resolve({ stdout: '', stderr: 'ERROR: cancelled' });
+      expect(await first).toEqual(await second);
+    });
+
+    test('keeps native status distinct from a CLI account', async () => {
+      mocks.getNativeAccount.mockReturnValue(undefined);
+      mocks.getNativeLoginError.mockReturnValue(undefined);
+      mocks.runCommandAsync.mockResolvedValue({
+        stdout: '{"id":"cli","tenantId":"tenant"}',
+        stderr: '',
+      });
+      expect((await getNativeLoginStatus()).isLoggedIn).toBe(false);
+      expect((await getCliLoginStatus()).isLoggedIn).toBe(true);
+    });
   });
 
   test('reports thrown login errors', async () => {
@@ -475,15 +640,28 @@ describe('login', () => {
     expect(mocks.initiateNativeLogin).not.toHaveBeenCalled();
   });
 
+  test('does not treat an existing CLI account as a native login', async () => {
+    mocks.getNativeAccount.mockReturnValue(undefined);
+    mocks.runCommandAsync.mockResolvedValue({
+      stdout: '{"name":"AzureCloud"}',
+      stderr: '',
+    });
+    mocks.initiateNativeLogin.mockRejectedValue(new Error('login failed'));
+
+    await expect(login()).resolves.toBe(false);
+    expect(mocks.initiateNativeLogin).toHaveBeenCalledOnce();
+    expect(mocks.runCommandAsync).toHaveBeenCalledWith('az', ['cloud', 'show', '--output', 'json']);
+  });
+
   test('returns false when login initiation fails', async () => {
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '{"name":"AzureCloud"}', stderr: '' });
     mocks.initiateNativeLogin.mockRejectedValue(new Error('login failed'));
 
     await expect(login()).resolves.toBe(false);
   });
 
   test('polls until native authentication reports a session', async () => {
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '{"name":"AzureCloud"}', stderr: '' });
     mocks.getNativeAccount
       .mockReturnValueOnce(undefined)
       .mockReturnValueOnce(undefined)
@@ -501,7 +679,7 @@ describe('login', () => {
   });
 
   test('returns false after the login timeout', async () => {
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '{"name":"AzureCloud"}', stderr: '' });
     mocks.hasNativeSession.mockReturnValueOnce(false).mockReturnValue(true);
 
     const result = login(1);

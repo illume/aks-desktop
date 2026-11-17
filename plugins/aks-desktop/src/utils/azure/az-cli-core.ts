@@ -2,6 +2,12 @@
 // Licensed under the Apache 2.0.
 import { runCommandAsync as execCommand } from '../shared/runCommandAsync';
 import { getAzCommand } from './az-cli-path';
+import {
+  getNativeAccount,
+  getNativeAuthGeneration,
+  hasNativeSession,
+  isAzureExplicitlySignedOut,
+} from './native-auth';
 
 // Debug flag - set to true for development/debugging, false for production
 // Can be controlled via:
@@ -33,7 +39,179 @@ export function needsRelogin(error: string): boolean {
   );
 }
 
-export function runCommandAsync(
+const CLI_IDENTITY_ERROR =
+  'ERROR: Azure CLI identity could not be verified. Sign in to Azure CLI with the same account, tenant, and cloud as the application.';
+let cliLoginsPending = 0;
+let cliLoginFailed = false;
+let cliLoginEpoch = 0;
+let cliIdentityChangesPending = 0;
+let nativeSubscriptionTenantLookup: (subscriptionId: string) => string | undefined = () =>
+  undefined;
+
+/** Registers the native discovery lookup without depending on the token module. */
+export function registerNativeSubscriptionTenantLookup(
+  lookup: (subscriptionId: string) => string | undefined
+): void {
+  nativeSubscriptionTenantLookup = lookup;
+}
+
+function isIdentityIndependent(args: string[]): boolean {
+  return (
+    args[0] === 'version' ||
+    args[0] === 'login' ||
+    args[0] === 'logout' ||
+    (args[0] === 'cloud' && args[1] === 'show') ||
+    (args[0] === 'account' && args[1] === 'show')
+  );
+}
+
+function changesCliIdentity(args: string[]): boolean {
+  return (
+    (args[0] === 'account' && ['set', 'clear'].includes(args[1])) ||
+    (args[0] === 'cloud' && ['set', 'register', 'unregister', 'update'].includes(args[1]))
+  );
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return (
+    typeof a === 'string' &&
+    typeof b === 'string' &&
+    !!a.trim() &&
+    !!b.trim() &&
+    a.trim().toLowerCase() === b.trim().toLowerCase()
+  );
+}
+
+async function verifyCliIdentity(
+  az: string,
+  native: NonNullable<ReturnType<typeof getNativeAccount>>,
+  args: string[] = []
+): Promise<boolean> {
+  try {
+    const subscriptions: string[] = [];
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--subscription' || args[i] === '--subscriptions') {
+        const plural = args[i] === '--subscriptions';
+        if (!args[i + 1] || args[i + 1].startsWith('-')) return false;
+        subscriptions.push(args[++i]);
+        while (plural && args[i + 1] && !args[i + 1].startsWith('-')) {
+          subscriptions.push(args[++i]);
+        }
+      } else if (args[i].startsWith('--subscription=')) {
+        const value = args[i].slice('--subscription='.length);
+        if (!value) return false;
+        subscriptions.push(value);
+      } else if (args[i].startsWith('--subscriptions=')) {
+        const value = args[i].slice('--subscriptions='.length);
+        if (!value) return false;
+        subscriptions.push(value);
+      } else if (args[i] === '--tenant') {
+        if (!sameValue(args[++i], native.tenantId)) return false;
+      } else if (args[i].startsWith('--tenant=')) {
+        if (!sameValue(args[i].slice('--tenant='.length), native.tenantId)) return false;
+      }
+    }
+    const [accountResults, cloudResult] = await Promise.all([
+      Promise.all(
+        (subscriptions.length ? subscriptions : [undefined]).map(subscription =>
+          execCommand(az, [
+            'account',
+            'show',
+            ...(subscription ? ['--subscription', subscription] : []),
+            '-o',
+            'json',
+          ])
+        )
+      ),
+      execCommand(az, ['cloud', 'show', '-o', 'json']),
+    ]);
+    if (isCommandError(cloudResult.stderr) || !cloudResult.stdout) {
+      return false;
+    }
+    const cloud = JSON.parse(cloudResult.stdout);
+    if (!sameValue(native.environmentName, cloud?.name)) return false;
+    return accountResults.every((accountResult, index) => {
+      if (isCommandError(accountResult.stderr) || !accountResult.stdout) return false;
+      const cliAccount = JSON.parse(accountResult.stdout);
+      if (typeof cliAccount?.id !== 'string' || !cliAccount.id.trim()) return false;
+      const selector = subscriptions[index];
+      if (selector && isValidGuid(selector) && !sameValue(selector, cliAccount.id)) return false;
+      const tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+      return (
+        sameValue(native.username, cliAccount?.user?.name) &&
+        sameValue(tenant, cliAccount?.tenantId) &&
+        sameValue(native.environmentName, cliAccount?.cloudName ?? cliAccount?.environmentName)
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
+function isCommandError(stderr: string): boolean {
+  const error = stderr.trim();
+  return (
+    !!error &&
+    (isAzError(error) ||
+      needsRelogin(error) ||
+      isCliNotFoundError(error) ||
+      error.split('\n').some(line => !line.trim().startsWith('WARNING:')))
+  );
+}
+
+async function hasCliAccount(az: string): Promise<boolean> {
+  try {
+    const result = await execCommand(az, ['account', 'show', '-o', 'json']);
+    if (isCommandError(result.stderr)) return false;
+    const account = JSON.parse(result.stdout);
+    return (
+      typeof account?.id === 'string' &&
+      !!account.id.trim() &&
+      typeof account?.tenantId === 'string' &&
+      !!account.tenantId.trim()
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function runCliLogin(
+  az: string,
+  args: string[]
+): Promise<{ stdout: string; stderr: string }> {
+  if (cliLoginsPending++ === 0) cliLoginFailed = false;
+  const epoch = ++cliLoginEpoch;
+  try {
+    const result = await execCommand(az, args);
+    let accounts: unknown;
+    try {
+      accounts = JSON.parse(result.stdout);
+    } catch {
+      // An incomplete or malformed login response cannot establish a trusted session.
+    }
+    const native = getNativeAccount();
+    const generation = getNativeAuthGeneration();
+    const valid =
+      !isCommandError(result.stderr) &&
+      Array.isArray(accounts) &&
+      accounts.length > 0 &&
+      (native ? await verifyCliIdentity(az, native) : await hasCliAccount(az)) &&
+      generation === getNativeAuthGeneration() &&
+      epoch === cliLoginEpoch;
+    if (!valid) {
+      cliLoginFailed = true;
+      if (!isCommandError(result.stderr)) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+    }
+    return result;
+  } catch (error) {
+    cliLoginFailed = true;
+    throw error;
+  } finally {
+    cliLoginsPending--;
+  }
+}
+
+export async function runCommandAsync(
   command: string,
   args: string[]
 ): Promise<{ stdout: string; stderr: string }> {
@@ -43,6 +221,53 @@ export function runCommandAsync(
     debugLog('[AZ-CLI] Command resolution:', command, '→', actualCommand);
   }
   debugLog('[AZ-CLI] Executing command:', actualCommand, 'with args:', args);
+  if (command === 'az') {
+    if (args[0] === 'login') return runCliLogin(actualCommand, args);
+    if (args[0] === 'logout') {
+      cliLoginEpoch++;
+      cliLoginFailed = true;
+    }
+    if (!isIdentityIndependent(args)) {
+      if (
+        cliLoginsPending ||
+        cliIdentityChangesPending ||
+        cliLoginFailed ||
+        isAzureExplicitlySignedOut()
+      ) {
+        return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+      }
+      const native = getNativeAccount();
+      if (!native) {
+        if (hasNativeSession()) {
+          return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+        }
+      } else {
+        const generation = getNativeAuthGeneration();
+        const epoch = cliLoginEpoch;
+        const verified = await verifyCliIdentity(actualCommand, native, args);
+        if (
+          !verified ||
+          generation !== getNativeAuthGeneration() ||
+          epoch !== cliLoginEpoch ||
+          cliLoginsPending ||
+          cliIdentityChangesPending ||
+          cliLoginFailed ||
+          isAzureExplicitlySignedOut()
+        ) {
+          return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+        }
+      }
+      if (changesCliIdentity(args)) {
+        cliLoginEpoch++;
+        cliIdentityChangesPending++;
+        try {
+          return await execCommand(actualCommand, args);
+        } finally {
+          cliIdentityChangesPending--;
+        }
+      }
+    }
+  }
   return execCommand(actualCommand, args);
 }
 

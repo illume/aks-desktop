@@ -4,8 +4,20 @@
 /** Azure CLI-backed access tokens for Azure REST calls. */
 
 import type { AccessToken, GetTokenOptions, TokenCredential } from '@azure/identity';
-import { debugLog, isValidGuid, needsRelogin, runCommandAsync } from './az-cli-core';
-import { hasNativeSession, nativeCredential } from './native-auth';
+import {
+  debugLog,
+  isValidGuid,
+  needsRelogin,
+  registerNativeSubscriptionTenantLookup,
+  runCommandAsync,
+} from './az-cli-core';
+import {
+  getNativeAccount,
+  getNativeAuthGeneration,
+  hasNativeSession,
+  isAzureExplicitlySignedOut,
+  nativeCredential,
+} from './native-auth';
 
 /** Default public-cloud ARM scope; configured clouds can supply another audience. */
 export const ARM_SCOPE = 'https://management.azure.com/.default';
@@ -15,6 +27,52 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000; // 5 minutes
 // Tenant ID or domain name, with no leading `-`.
 const TENANT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.-]*$/;
 const SCOPE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^\s]+$/i;
+
+let accountGeneration = 0;
+let nativeMappingGeneration = 0;
+let nativeSubscriptionTenants = new Map<string, string>();
+let observedNativeGeneration: number | undefined;
+
+function synchronizeNativeGeneration(): void {
+  const generation = getNativeAuthGeneration();
+  if (observedNativeGeneration !== undefined && generation !== observedNativeGeneration) {
+    accountGeneration++;
+    nativeMappingGeneration++;
+    nativeSubscriptionTenants.clear();
+  }
+  observedNativeGeneration = generation;
+}
+
+/** Snapshot used to discard subscription discovery completed after an account change. */
+export function getAzureAccountGeneration(): number {
+  synchronizeNativeGeneration();
+  return accountGeneration;
+}
+
+/** Replaces native subscription bindings only if discovery belongs to the current account. */
+export function setNativeSubscriptionTenants(
+  subscriptions: Array<{ id: string; tenant: string }>,
+  generation: number
+): boolean {
+  synchronizeNativeGeneration();
+  if (generation !== accountGeneration || !hasNativeSession()) return false;
+  registerNativeSubscriptionTenantLookup(subscriptionId => {
+    synchronizeNativeGeneration();
+    return nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
+  });
+  const next = new Map<string, string>();
+  for (const { id, tenant } of subscriptions) {
+    if (isValidGuid(id) && isValidGuid(tenant)) next.set(id.toLowerCase(), tenant.toLowerCase());
+  }
+  if (
+    next.size !== nativeSubscriptionTenants.size ||
+    [...next].some(([id, tenant]) => nativeSubscriptionTenants.get(id) !== tenant)
+  ) {
+    nativeSubscriptionTenants = next;
+    nativeMappingGeneration++;
+  }
+  return true;
+}
 
 /** Token acquisition or validation failure without exposing the token response. */
 export class AzTokenError extends Error {
@@ -57,9 +115,10 @@ export interface AzCliCredential extends TokenCredential {
 async function requestCliToken(
   scope: string,
   tenantId?: string,
-  subscriptionId?: string
+  subscriptionId?: string,
+  nativeSession = false
 ): Promise<AccessToken> {
-  if (hasNativeSession()) {
+  if (nativeSession) {
     return nativeCredential.getToken(scope, { tenantId });
   }
   const args = ['account', 'get-access-token', '--scope', scope, '-o', 'json'];
@@ -133,6 +192,7 @@ export function withAbort<T>(
  */
 export function createAzCliCredential(subscriptionId?: string): AzCliCredential {
   const cache = new Map<string, Promise<AccessToken>>();
+  let cacheGeneration = 0;
 
   /**
    * @param key - Tenant/scope cache key for this credential instance.
@@ -140,8 +200,8 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
    * @param tenantId - Optional tenant selector or expected bound-account tenant.
    * @returns The cached acquisition promise, removed from the cache if rejected.
    */
-  const load = (key: string, scope: string, tenantId?: string) => {
-    const promise = requestCliToken(scope, tenantId, subscriptionId);
+  const load = (key: string, scope: string, tenantId: string | undefined, native: boolean) => {
+    const promise = requestCliToken(scope, tenantId, subscriptionId, native);
     cache.set(key, promise);
     promise.catch(() => {
       if (cache.get(key) === promise) cache.delete(key);
@@ -155,14 +215,52 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
    * @returns The existing token, shared acquisition, or a token refreshed near expiry.
    */
   const resolveToken = async (scope: string, tenantId?: string): Promise<AccessToken> => {
-    const key = `${tenantId ?? ''}|${scope}`;
+    synchronizeNativeGeneration();
+    const native = hasNativeSession();
+    if (!native && isAzureExplicitlySignedOut()) {
+      throw new AzTokenError('Azure login is required', true);
+    }
+    const accountVersion = accountGeneration;
+    const mappingVersion = nativeMappingGeneration;
+    const cacheVersion = cacheGeneration;
+    if (native && subscriptionId) {
+      const mappedTenant = nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
+      if (!mappedTenant) {
+        throw new AzTokenError(
+          'No tenant is known for the selected subscription; refresh subscriptions'
+        );
+      }
+      if (tenantId && tenantId.toLowerCase() !== mappedTenant) {
+        throw new AzTokenError(
+          'The selected subscription account does not belong to the requested tenant'
+        );
+      }
+      tenantId = mappedTenant;
+    }
+    const key = `${
+      native ? `native:${accountVersion}:${mappingVersion}` : `cli:${accountVersion}`
+    }|${tenantId ?? ''}|${scope}`;
     const cached = cache.get(key);
-    if (!cached) return load(key, scope, tenantId);
-
-    const token = await cached;
-    if (token.expiresOnTimestamp - REFRESH_MARGIN_MS > Date.now()) return token;
-    const current = cache.get(key);
-    return current && current !== cached ? current : load(key, scope, tenantId);
+    const ensureCurrent = () => {
+      synchronizeNativeGeneration();
+      if (
+        accountVersion !== accountGeneration ||
+        cacheVersion !== cacheGeneration ||
+        native !== hasNativeSession() ||
+        (!native && isAzureExplicitlySignedOut()) ||
+        (native && mappingVersion !== nativeMappingGeneration)
+      ) {
+        throw new AzTokenError('Azure account changed during token acquisition');
+      }
+    };
+    let token = await (cached ?? load(key, scope, tenantId, native));
+    ensureCurrent();
+    if (cached && token.expiresOnTimestamp - REFRESH_MARGIN_MS <= Date.now()) {
+      const current = cache.get(key);
+      token = await (current && current !== cached ? current : load(key, scope, tenantId, native));
+    }
+    ensureCurrent();
+    return token;
   };
 
   return {
@@ -183,6 +281,7 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
       return withAbort(() => resolveToken(scopeList[0], tenantId), options?.abortSignal);
     },
     clearCache() {
+      cacheGeneration++;
       cache.clear();
     },
   };
@@ -215,9 +314,30 @@ export function clearAzureTokenCaches(): void {
 }
 
 // Clears cache when user logs in or logs out inside the app.
+function handleAzureAccountChange(): void {
+  const nativeGeneration = getNativeAuthGeneration();
+  const account = getNativeAccount();
+  // Discovery during native login precedes the account publication event.
+  const preserveNativeBindings =
+    !!account && observedNativeGeneration === nativeGeneration && hasNativeSession();
+  observedNativeGeneration = nativeGeneration;
+  accountGeneration++;
+  clearAzureTokenCaches();
+  if (!preserveNativeBindings) {
+    nativeMappingGeneration++;
+    nativeSubscriptionTenants.clear();
+  }
+  if (account && nativeSubscriptionTenants.size === 0) {
+    setNativeSubscriptionTenants(
+      [{ id: account.subscriptionId, tenant: account.tenantId }],
+      accountGeneration
+    );
+  }
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('azure-auth-update', clearAzureTokenCaches);
-  window.addEventListener('azure-account-change', clearAzureTokenCaches);
+  window.addEventListener('azure-auth-update', handleAzureAccountChange);
+  window.addEventListener('azure-account-change', handleAzureAccountChange);
 }
 
 /**

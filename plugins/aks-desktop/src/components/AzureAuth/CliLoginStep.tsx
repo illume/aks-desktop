@@ -1,0 +1,146 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the Apache 2.0.
+
+import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
+import { Box, Button, CircularProgress, Typography } from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { initiateCliLogin } from '../../utils/azure/az-auth';
+import { isAzCliInstalled } from '../../utils/azure/az-cli-core';
+import { allowAzureCliFallback, logoutNative } from '../../utils/azure/native-auth';
+
+interface CliLoginStepProps {
+  onContinue: () => void;
+  onBack?: () => void;
+  nativeAuthenticated?: boolean;
+}
+
+/** Offers a separate CLI sign-in for workflows that still use Azure CLI. */
+export default function CliLoginStep({
+  onContinue,
+  onBack,
+  nativeAuthenticated = true,
+}: CliLoginStepProps) {
+  const { t } = useTranslation();
+  const [state, setState] = useState<'checking' | 'pending' | 'failed' | 'unavailable'>('checking');
+  const [error, setError] = useState('');
+  const mounted = useRef(false);
+  const pending = useRef(false);
+  const continued = useRef(false);
+  const onContinueRef = useRef(onContinue);
+  onContinueRef.current = onContinue;
+
+  const continueOnce = () => {
+    if (continued.current) return;
+    continued.current = true;
+    onContinueRef.current();
+  };
+
+  const goBack = () => {
+    if (continued.current) return;
+    continued.current = true;
+    onBack?.();
+  };
+
+  const signIn = async () => {
+    if (pending.current) return;
+    pending.current = true;
+    setState('pending');
+    setError('');
+    if (!nativeAuthenticated) logoutNative();
+    const result = await initiateCliLogin();
+    pending.current = false;
+    if (!mounted.current || continued.current) return;
+    if (result.success) {
+      if (!nativeAuthenticated) allowAzureCliFallback();
+      continueOnce();
+    } else {
+      setError(result.message);
+      setState('failed');
+    }
+  };
+
+  useEffect(() => {
+    mounted.current = true;
+    isAzCliInstalled().then(installed => {
+      if (!mounted.current || continued.current) return;
+      if (installed) void signIn();
+      else if (nativeAuthenticated) continueOnce();
+      else setState('unavailable');
+    });
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  if (state === 'checking') {
+    return (
+      <Box>
+        <Typography>{t('Checking Azure CLI availability')}...</Typography>
+        {nativeAuthenticated ? (
+          <Button onClick={continueOnce}>{t('Continue without Azure CLI')}</Button>
+        ) : (
+          <Button onClick={goBack}>{t('Back')}</Button>
+        )}
+      </Box>
+    );
+  }
+
+  if (state === 'unavailable') {
+    return (
+      <Box>
+        <Typography role="alert">{t('Azure CLI is not available.')}</Typography>
+        <Button onClick={goBack}>{t('Back')}</Button>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Typography sx={{ mb: 2 }}>
+        {nativeAuthenticated
+          ? t(
+              'Sign in to Azure CLI with the same account to use CLI-dependent features. Your selected Azure CLI cloud will be used.'
+            )
+          : t('Sign in with Azure CLI using your selected Azure CLI cloud.')}
+      </Typography>
+      {state === 'pending' ? (
+        <Box role="status">
+          <CircularProgress size={24} />
+          <Typography>
+            {t('Complete Azure CLI sign-in in your browser. This may take a few minutes.')}
+          </Typography>
+          <Typography>
+            {t(
+              'Azure CLI sign-in cannot be cancelled and may change the CLI account after you leave this page.'
+            )}
+          </Typography>
+          {nativeAuthenticated ? (
+            <Button onClick={continueOnce}>{t('Continue without waiting for Azure CLI')}</Button>
+          ) : (
+            <Button onClick={goBack}>{t('Back')}</Button>
+          )}
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Button variant="contained" onClick={signIn}>
+            {t('Retry Azure CLI sign-in')}
+          </Button>
+          {nativeAuthenticated ? (
+            <Button variant="outlined" onClick={continueOnce}>
+              {t('Continue without Azure CLI')}
+            </Button>
+          ) : (
+            <Button variant="outlined" onClick={goBack}>
+              {t('Back')}
+            </Button>
+          )}
+        </Box>
+      )}
+      {error && (
+        <Typography role="alert" sx={{ mt: 2, whiteSpace: 'pre-wrap', color: 'error.main' }}>
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+}

@@ -14,6 +14,7 @@ import {
   getNativeLoginError,
   hasNativeSession,
   initiateNativeLogin,
+  isAzureExplicitlySignedOut,
 } from './native-auth';
 
 /** Azure CLI account state used by authentication flows. */
@@ -34,7 +35,7 @@ export interface AzureLoginStatus {
   error?: string;
 }
 
-/** Result returned after invoking the Azure CLI login command. */
+/** Result returned after initiating authentication. */
 export interface AzureLoginResult {
   /** Whether the login command completed without a terminal command error. */
   success: boolean;
@@ -99,9 +100,15 @@ function isCommandFailure(stderr: string): boolean {
  *
  * @returns Validated login status. Command and parsing failures are returned in `error`.
  */
-async function readLoginStatus(): Promise<AzureLoginStatus> {
+async function readLoginStatus(subscriptionId?: string): Promise<AzureLoginStatus> {
   try {
-    const { stdout, stderr } = await runCommandAsync('az', ['account', 'show', '-o', 'json']);
+    const { stdout, stderr } = await runCommandAsync('az', [
+      'account',
+      'show',
+      ...(subscriptionId ? ['--subscription', subscriptionId] : []),
+      '-o',
+      'json',
+    ]);
     const accountOutput = stdout.trim();
     const errorOutput = stderr.trim();
 
@@ -179,13 +186,28 @@ export function getLoginStatus(): Promise<AzureLoginStatus> {
   const nativeLoginError = getNativeLoginError();
   const readStatus = nativeAccount
     ? Promise.resolve({ isLoggedIn: true, ...nativeAccount })
+    : isAzureExplicitlySignedOut()
+    ? Promise.resolve({ isLoggedIn: false, error: 'Not logged in' })
     : hasNativeSession()
     ? Promise.resolve({
         isLoggedIn: false,
         needsRelogin: !nativeLoginError,
         error: nativeLoginError ?? 'Not logged in',
       })
-    : readLoginStatus();
+    : readLoginStatus().then(status => {
+        const account = getNativeAccount();
+        if (account) return { isLoggedIn: true, ...account };
+        if (isAzureExplicitlySignedOut()) return { isLoggedIn: false, error: 'Not logged in' };
+        if (hasNativeSession()) {
+          const error = getNativeLoginError();
+          return {
+            isLoggedIn: false,
+            needsRelogin: !error,
+            error: error ?? 'Not logged in',
+          };
+        }
+        return status;
+      });
   const observation: Promise<AzureLoginStatus> = readStatus.then(status => {
     if (latestAccountObservation && latestAccountObservation !== observation) {
       return latestAccountObservation;
@@ -210,13 +232,20 @@ export function getLoginStatus(): Promise<AzureLoginStatus> {
 }
 
 /**
- * Runs Azure CLI login and classifies command-level failures.
+ * Starts native Azure login.
  *
+ * @param signal - Cancels an in-progress native login.
+ * @param selectedCloud - Explicit native cloud selection; otherwise use the CLI's active cloud.
  * @returns Login initiation result with a user-facing message.
  */
-export async function initiateLogin(): Promise<AzureLoginResult> {
+export async function initiateLogin(
+  signal?: AbortSignal,
+  selectedCloud?: string
+): Promise<AzureLoginResult> {
   try {
-    const prompt = await initiateNativeLogin();
+    const cloudName = selectedCloud ?? (await getActiveLoginCloud(signal));
+    if (signal?.aborted) throw new Error('Azure login was cancelled');
+    const prompt = await initiateNativeLogin(signal, cloudName);
     return {
       success: true,
       message: prompt.message,
@@ -229,6 +258,142 @@ export async function initiateLogin(): Promise<AzureLoginResult> {
       success: false,
       message: `Failed to initiate login: ${errorMessage}`,
     };
+  }
+}
+
+async function getActiveLoginCloud(signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('Azure login was cancelled');
+  let onAbort: (() => void) | undefined;
+  const cancelled = new Promise<never>((_, reject) => {
+    onAbort = () => reject(new Error('Azure login was cancelled'));
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+  try {
+    const { stdout, stderr } = await Promise.race([
+      runCommandAsync('az', ['cloud', 'show', '--output', 'json']),
+      cancelled,
+    ]);
+    if (isCliNotFoundError(stderr) || stderr.trim() === 'pluginRunCommand is not available.') {
+      return 'AzureCloud';
+    }
+    if (isCommandFailure(stderr)) {
+      throw new Error(`Could not determine the selected Azure CLI cloud: ${stderr.trim()}`);
+    }
+    let cloud: unknown;
+    try {
+      cloud = JSON.parse(stdout);
+    } catch {
+      throw new Error('Could not determine the selected Azure CLI cloud.');
+    }
+    if (
+      !cloud ||
+      typeof cloud !== 'object' ||
+      typeof (cloud as { name?: unknown }).name !== 'string' ||
+      !(cloud as { name: string }).name.trim()
+    ) {
+      throw new Error('Could not determine the selected Azure CLI cloud.');
+    }
+    return (cloud as { name: string }).name;
+  } finally {
+    if (signal && onAbort) signal.removeEventListener('abort', onAbort);
+  }
+}
+
+/** Reads native authentication status without falling back to an existing CLI account. */
+export function getNativeLoginStatus(): Promise<AzureLoginStatus> {
+  const account = getNativeAccount();
+  const error = getNativeLoginError();
+  return Promise.resolve(
+    account
+      ? { isLoggedIn: true, ...account }
+      : { isLoggedIn: false, needsRelogin: !error, error: error ?? 'Not logged in' }
+  );
+}
+
+/** Reads the CLI account independently of native authentication. */
+export function getCliLoginStatus(subscriptionId?: string): Promise<AzureLoginStatus> {
+  return readLoginStatus(subscriptionId);
+}
+
+let pendingCliLogin: Promise<AzureLoginResult> | undefined;
+
+/**
+ * Signs into Azure CLI with its browser-based flow and current selected cloud.
+ * The bridge returns only when the command exits, so callers must show pending UI.
+ */
+export function initiateCliLogin(): Promise<AzureLoginResult> {
+  if (!pendingCliLogin) {
+    pendingCliLogin = runCliLogin().finally(() => {
+      pendingCliLogin = undefined;
+    });
+  }
+  return pendingCliLogin;
+}
+
+async function runCliLogin(): Promise<AzureLoginResult> {
+  try {
+    const { stdout, stderr } = await runCommandAsync('az', ['login', '--output', 'json']);
+    if (isCliNotFoundError(stderr)) {
+      return {
+        success: false,
+        message: `Azure CLI could not be started.\n\n${getInstallationInstructions()}`,
+      };
+    }
+    if (isCommandFailure(stderr)) {
+      return { success: false, message: stderr.trim() };
+    }
+    let accounts: unknown;
+    try {
+      accounts = JSON.parse(stdout);
+    } catch {
+      return { success: false, message: stderr.trim() || 'Azure CLI login did not complete.' };
+    }
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      return {
+        success: false,
+        message: stderr.trim() || 'Azure CLI login did not return an account.',
+      };
+    }
+    const native = getNativeAccount();
+    const status = await getCliLoginStatus(native?.subscriptionId);
+    if (!status.isLoggedIn) {
+      return { success: false, message: status.error || 'Azure CLI login did not complete.' };
+    }
+    if (native) {
+      if (native !== getNativeAccount()) {
+        return {
+          success: false,
+          message: 'Azure account changed during CLI sign-in. Please retry.',
+        };
+      }
+      if (
+        !native.username ||
+        !status.username ||
+        !native.environmentName ||
+        !status.environmentName
+      ) {
+        return {
+          success: false,
+          message:
+            'Unable to verify that Azure CLI and native sign-in use the same account and cloud.',
+        };
+      }
+      if (
+        native.username.toLowerCase() !== status.username.toLowerCase() ||
+        native.tenantId.toLowerCase() !== status.tenantId?.toLowerCase() ||
+        native.subscriptionId.toLowerCase() !== status.subscriptionId?.toLowerCase() ||
+        native.environmentName.toLowerCase() !== status.environmentName.toLowerCase()
+      ) {
+        return {
+          success: false,
+          message:
+            'Azure CLI signed in with a different account, tenant, or cloud. Sign in again with the same account and cloud.',
+        };
+      }
+    }
+    return { success: true, message: 'Azure CLI sign-in successful.' };
+  } catch (error) {
+    return { success: false, message: `Azure CLI sign-in failed: ${getErrorMessage(error)}` };
   }
 }
 
@@ -294,29 +459,39 @@ export function monitorLoginStatus(
 }
 
 /**
- * Completes Azure CLI login within one shared deadline.
+ * Completes Azure login within one shared deadline.
  *
  * @param timeoutMs - Maximum duration for status checks, login initiation, and polling.
- * @returns Whether a usable Azure CLI session was established before the deadline.
+ * @returns Whether a usable Azure session was established before the deadline.
  */
 export async function login(timeoutMs = LOGIN_TIMEOUT_MS): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  const initialStatus = await waitUntilDeadline(getLoginStatus(), deadline);
+  const initialStatus = await waitUntilDeadline(getNativeLoginStatus(), deadline);
   if (initialStatus === OPERATION_TIMED_OUT) return false;
   if (initialStatus.isLoggedIn) return true;
 
-  const init = await waitUntilDeadline(initiateLogin(), deadline);
-  if (init === OPERATION_TIMED_OUT || !init.success) return false;
+  const controller = new AbortController();
+  const init = await waitUntilDeadline(initiateLogin(controller.signal), deadline);
+  if (init === OPERATION_TIMED_OUT || !init.success) {
+    controller.abort();
+    return false;
+  }
 
   return new Promise(resolve => {
     /** Checks login status once and schedules another bounded check when needed. */
     const poll = async () => {
-      const status = await waitUntilDeadline(getLoginStatus(), deadline);
-      if (status === OPERATION_TIMED_OUT) return resolve(false);
+      const status = await waitUntilDeadline(getNativeLoginStatus(), deadline);
+      if (status === OPERATION_TIMED_OUT) {
+        controller.abort();
+        return resolve(false);
+      }
       if (status.isLoggedIn) return resolve(true);
 
       const remaining = deadline - Date.now();
-      if (remaining <= 0) return resolve(false);
+      if (remaining <= 0) {
+        controller.abort();
+        return resolve(false);
+      }
       setTimeout(poll, Math.min(LOGIN_POLL_INTERVAL_MS, remaining));
     };
     poll();

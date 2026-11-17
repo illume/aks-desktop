@@ -6,12 +6,19 @@
 import { getErrorMessage, isValidGuid, runCommandAsync } from './az-cli-core';
 import { clearAzureCloudCache, getAzureCloudEndpoints } from './az-cloud';
 import { azListAll, azRequest, azRequestRaw, AzureRequestError } from './az-http';
-import { clearAzureTokenCaches, getSubscriptionCredential } from './az-token';
+import {
+  clearAzureTokenCaches,
+  getAzureAccountGeneration,
+  getSubscriptionCredential,
+  setNativeSubscriptionTenants,
+} from './az-token';
 import { isValidAzResourceName } from './az-validation';
-import { hasNativeSession } from './native-auth';
+import { hasNativeSession, isAzureExplicitlySignedOut } from './native-auth';
 
 const SUBSCRIPTIONS_API_VERSION = '2022-12-01';
 const RESOURCE_GROUPS_API_VERSION = '2021-04-01';
+let nativeDiscoverySequence = 0;
+let nativePublishedDiscoverySequence = 0;
 /** Used when `createResourceGroup` is called without `tags`. */
 const DEFAULT_RESOURCE_GROUP_TAGS = ['createdBy=AKS Desktop'];
 
@@ -42,12 +49,21 @@ interface ResourceGroupOptions {
  * Tenants that fail (e.g. MFA required) are skipped. Disabled entries remain included.
  *
  * @param refresh - Clears cached tokens and cloud metadata, and refreshes the CLI profile.
+ * @param options.strict - Reject partial discovery if no enabled subscription was found.
  * @returns `{ id, name, tenant, tenantName, status, environmentName }` for each subscription.
  * @throws When cloud configuration or tenants cannot be read, or every tenant fails.
  */
-export async function getSubscriptions(refresh = false): Promise<any[]> {
+export async function getSubscriptions(
+  refresh = false,
+  options?: { strict?: boolean }
+): Promise<any[]> {
   let profile: Map<string, string> | undefined;
   const nativeSession = hasNativeSession();
+  if (!nativeSession && isAzureExplicitlySignedOut()) {
+    throw new Error('Azure login is required');
+  }
+  const accountGeneration = getAzureAccountGeneration();
+  const discoverySequence = nativeSession ? ++nativeDiscoverySequence : 0;
   if (refresh) {
     clearAzureTokenCaches();
     clearAzureCloudCache();
@@ -107,7 +123,13 @@ export async function getSubscriptions(refresh = false): Promise<any[]> {
     }
   }
 
-  if (errors.length > 0 && errors.length === tenants.length) throw errors[0];
+  if (
+    errors.length > 0 &&
+    (errors.length === tenants.length ||
+      (options?.strict && ![...subscriptions.values()].some(sub => sub.status === 'Enabled')))
+  ) {
+    throw errors[0];
+  }
   // TODO: Remove this block and the tenant preference below with listCliProfileSubscriptions.
   if (!nativeSession && !profile && subscriptions.size > 0) {
     profile = await listCliProfileSubscriptions(false);
@@ -121,7 +143,23 @@ export async function getSubscriptions(refresh = false): Promise<any[]> {
     const match = listedTenants.get(id)!.find(t => t.tenant.toLowerCase() === profileTenant);
     if (match) Object.assign(sub, match);
   }
-  return [...subscriptions.values()];
+  const discovered = [...subscriptions.values()];
+  if (!nativeSession && isAzureExplicitlySignedOut()) {
+    throw new Error('Azure login is required');
+  }
+  if (nativeSession) {
+    if (accountGeneration !== getAzureAccountGeneration() || !hasNativeSession()) {
+      throw new Error('Azure account changed during subscription discovery');
+    }
+    if (
+      discoverySequence > nativePublishedDiscoverySequence &&
+      !setNativeSubscriptionTenants(discovered, accountGeneration)
+    ) {
+      throw new Error('Azure account changed during subscription discovery');
+    }
+    nativePublishedDiscoverySequence = Math.max(nativePublishedDiscoverySequence, discoverySequence);
+  }
+  return discovered;
 }
 
 /**
@@ -131,6 +169,7 @@ export async function getSubscriptions(refresh = false): Promise<any[]> {
  * optionally refreshed first.
  */
 async function listCliProfileSubscriptions(refresh: boolean): Promise<Map<string, string>> {
+  if (isAzureExplicitlySignedOut()) throw new Error('Azure login is required');
   const { stdout, stderr } = await runCommandAsync('az', [
     'account',
     'list',

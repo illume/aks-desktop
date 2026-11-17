@@ -31,12 +31,16 @@ export interface UseAzureProfilePageResult {
   subscriptionId: string | undefined;
   /** `true` while the logout command is in flight. */
   loggingOut: boolean;
+  /** Error requiring user action after a partial sign-out. */
+  logoutError: string;
+  /** Information about a native-only sign-out. */
+  logoutNotice: string;
   /** Navigates back to the home page. */
   handleBack: () => void;
   /** Navigates to the Add Cluster from Azure page. */
   handleAddCluster: () => void;
   /**
-   * Initiates the Azure CLI logout flow. On success, dispatches an
+   * Signs out of native and Azure CLI sessions. On success, dispatches an
    * `azure-auth-update` event and redirects to the login page after
    * {@link PROFILE_REDIRECT_DELAY_MS}.
    */
@@ -56,9 +60,12 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
   const history = useHistory();
   const authStatus = useAzureAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const [logoutNotice, setLogoutNotice] = useState('');
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const logoutAttemptGenerationRef = useRef(0);
+  const logoutInFlightRef = useRef(false);
 
   const isCurrentLogoutAttempt = (attemptGeneration: number) =>
     mountedRef.current && logoutAttemptGenerationRef.current === attemptGeneration;
@@ -78,10 +85,10 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
   // Redirect to login page when the user is not (or no longer) logged in,
   // except while an explicit logout flow is already handling the redirect.
   useEffect(() => {
-    if (!loggingOut && !authStatus.isChecking && !authStatus.isLoggedIn) {
+    if (!loggingOut && !logoutError && !authStatus.isChecking && !authStatus.isLoggedIn) {
       history.push('/azure/login');
     }
-  }, [authStatus.isChecking, authStatus.isLoggedIn, history, loggingOut]);
+  }, [authStatus.isChecking, authStatus.isLoggedIn, history, loggingOut, logoutError]);
 
   const handleBack = () => {
     history.push('/');
@@ -92,27 +99,35 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
   };
 
   const handleLogout = async () => {
+    if (logoutInFlightRef.current) return;
+    logoutInFlightRef.current = true;
     const attemptGeneration = ++logoutAttemptGenerationRef.current;
     trackAksFeature('aksd.auth-logout', 'started');
     setLoggingOut(true);
+    setLogoutError('');
+    setLogoutNotice('');
     try {
-      const { hasNativeSession, logoutNative } = await import('../../../utils/azure/native-auth');
-      if (hasNativeSession()) {
-        logoutNative();
-      } else {
-        // Dynamic import avoids circular dependencies at module load time.
-        const { runCommandAsync, isAzError } = await import('../../../utils/azure/az-cli-core');
-        const result = await runCommandAsync('az', ['logout']);
-        if (!isCurrentLogoutAttempt(attemptGeneration)) {
-          return;
-        }
-
-        if (result.stderr && isAzError(result.stderr)) {
-          console.error('Azure CLI logout error:', result.stderr);
-          trackLogoutFailure();
-          setLoggingOut(false);
-          return;
-        }
+      const { logoutNative } = await import('../../../utils/azure/native-auth');
+      logoutNative();
+      // Dynamic import avoids circular dependencies at module load time.
+      const { runCommandAsync, isCliNotFoundError } = await import(
+        '../../../utils/azure/az-cli-core'
+      );
+      const result = await runCommandAsync('az', ['logout']);
+      if (!isCurrentLogoutAttempt(attemptGeneration)) {
+        return;
+      }
+      const stderr = result.stderr?.trim() ?? '';
+      if (stderr && isCliNotFoundError(stderr)) {
+        setLogoutNotice('Azure CLI was not available. Native Azure sign-out completed.');
+      } else if (stderr && !stderr.split('\n').every(line => line.trim().startsWith('WARNING:'))) {
+        console.error('Azure CLI logout error:', stderr);
+        trackLogoutFailure();
+        setLogoutError(
+          'Native Azure sign-out completed, but Azure CLI sign-out failed. Retry or run az logout manually.'
+        );
+        setLoggingOut(false);
+        return;
       }
 
       trackAksFeature('aksd.auth-logout', 'succeeded');
@@ -132,7 +147,10 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
       }
       console.error('Error logging out:', error);
       trackLogoutFailure();
+      setLogoutError('Azure sign-out could not be completed. Retry or run az logout manually.');
       setLoggingOut(false);
+    } finally {
+      logoutInFlightRef.current = false;
     }
   };
 
@@ -143,6 +161,8 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
     tenantId: authStatus.tenantId,
     subscriptionId: authStatus.subscriptionId,
     loggingOut,
+    logoutError,
+    logoutNotice,
     handleBack,
     handleAddCluster,
     handleLogout,
