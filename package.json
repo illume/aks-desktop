@@ -230,9 +230,26 @@
     },
     "targets": {
       "linux": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64", "arm64"] },
-        { "target": "tar.gz", "arch": ["x64", "arm64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "checkForUpdates": false,
@@ -1209,7 +1226,7 @@
   },
   "headlampPatch": {
     "path": "patches/headlamp-source@0.0.0-main.7ce01fce.patch",
-    "integrity": "sha512-Sn8p31d8BC+Rd5hsfF4uxobPwHwAuBR/KSAlm9HR6NrQxJuLP1L+boT+rrS59YBAAWfuLSLJuz0dDwlrOTmEuw=="
+    "integrity": "sha512-CA122BWt5mzJmfrdUrwF79G1q71AqUDL7XY25uSuAfuChmmn/Ao8U1rNfB5m6MzCo8B3i1pi8tsSsx91OQKZmA=="
   },
   "lint-staged": {
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx}": [
