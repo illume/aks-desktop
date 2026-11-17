@@ -374,40 +374,35 @@ describe('runAzCommand', () => {
     });
 
     test('requires explicit CLI sign-in after a real native device login fails', async () => {
+      vi.stubGlobal('pluginAzureOAuth', {
+        startAzureLogin: vi.fn().mockResolvedValue({
+          success: true,
+          prompt: {
+            userCode: 'code',
+            verificationUri: 'https://microsoft.com/devicelogin',
+            message: 'Enter code',
+          },
+        }),
+        getAzureLoginStatus: vi.fn().mockResolvedValue({
+          success: false,
+          error: 'Denied',
+        }),
+        getAzureToken: vi.fn(),
+        cancelAzureLogin: vi.fn().mockResolvedValue({ success: true }),
+        logoutAzure: vi.fn().mockResolvedValue({ success: true }),
+      });
       const nativeAuth = await vi.importActual<typeof import('./native-auth')>('./native-auth');
       mocks.native.mockImplementation(nativeAuth.getNativeAccount);
       mocks.generation.mockImplementation(nativeAuth.getNativeAuthGeneration);
       mocks.nativeSession.mockImplementation(nativeAuth.hasNativeSession);
       mocks.signedOut.mockImplementation(nativeAuth.isAzureExplicitlySignedOut);
       mocks.execCommand.mockResolvedValue(commandResult);
-      vi.useFakeTimers();
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            new Response(
-              JSON.stringify({
-                device_code: 'device',
-                user_code: 'code',
-                verification_uri: 'https://microsoft.com/devicelogin',
-                expires_in: 30,
-                interval: 1,
-              })
-            )
-          )
-          .mockResolvedValueOnce(
-            new Response(JSON.stringify({ error: 'access_denied', error_description: 'Denied' }), {
-              status: 400,
-            })
-          )
-      );
       const open = vi.spyOn(window, 'open').mockImplementation(() => null);
       try {
         nativeAuth.allowAzureCliFallback();
         await nativeAuth.initiateNativeLogin();
         await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
-        await vi.advanceTimersByTimeAsync(1000);
+        await nativeAuth.synchronizeNativeLogin();
         expect(nativeAuth.getNativeLoginError()).toBe('Denied');
         expect(nativeAuth.hasNativeSession()).toBe(false);
         await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
@@ -427,9 +422,8 @@ describe('runAzCommand', () => {
         allowCliOperations();
         await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
       } finally {
-        nativeAuth.logoutNative();
+        await nativeAuth.logoutNative();
         open.mockRestore();
-        vi.useRealTimers();
         vi.unstubAllGlobals();
       }
     });

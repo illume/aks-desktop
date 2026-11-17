@@ -2,7 +2,13 @@
 // Licensed under the Apache 2.0.
 // Azure Container Registry CLI functions.
 
-import { debugLog, isValidGuid, needsRelogin, runAzCommand, runCommandAsync } from './az-cli-core';
+import {
+  debugLog,
+  isValidGuid,
+  needsRelogin,
+  runAzCommand,
+  withVerifiedCliBatch,
+} from './az-cli-core';
 import { isValidAzResourceName } from './az-validation';
 
 /** Azure Container Registry name: 5-50 lowercase alphanumeric characters. */
@@ -153,8 +159,18 @@ export async function getContainerImages(
 }
 
 async function getImagesFromRegistry(subscriptionId: string, registryName: string): Promise<any[]> {
+  return withVerifiedCliBatch(subscriptionId, run =>
+    getImagesFromVerifiedRegistry(subscriptionId, registryName, run)
+  );
+}
+
+async function getImagesFromVerifiedRegistry(
+  subscriptionId: string,
+  registryName: string,
+  run: (args: string[]) => Promise<{ stdout: string; stderr: string }>
+): Promise<any[]> {
   // First get list of repositories
-  const { stdout: repoStdout, stderr: repoStderr } = await runCommandAsync('az', [
+  const { stdout: repoStdout, stderr: repoStderr } = await run([
     'acr',
     'repository',
     'list',
@@ -199,7 +215,7 @@ async function getImagesFromRegistry(subscriptionId: string, registryName: strin
         break;
       }
 
-      const { stdout: tagStdout, stderr: tagStderr } = await runCommandAsync('az', [
+      const { stdout: tagStdout, stderr: tagStderr } = await run([
         'acr',
         'repository',
         'show-tags',

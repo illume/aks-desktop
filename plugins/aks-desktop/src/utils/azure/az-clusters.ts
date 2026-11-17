@@ -7,6 +7,7 @@ import { azListAll } from './az-http';
 import { getClusterResourceGroupViaGraph, getClustersViaGraph } from './az-resource-graph';
 import { getSubscriptions } from './az-subscriptions';
 import { getSubscriptionCredential } from './az-token';
+import { getNativeAccount } from './native-auth';
 
 export async function getClusters(subscriptionId?: string, query?: string): Promise<any[]> {
   const clusters: any[] = [];
@@ -413,13 +414,19 @@ export async function getClusterInfo(clusterName?: string): Promise<{
   } = {};
 
   try {
-    // First get the current subscription
-    const { stdout: accountStdout, stderr: accountStderr } = await runCommandAsync('az', [
-      'account',
-      'show',
-      '--output',
-      'json',
-    ]);
+    const nativeAccount = getNativeAccount();
+    let accountStdout = '';
+    let accountStderr = '';
+    if (nativeAccount) {
+      result.subscriptionId = nativeAccount.subscriptionId;
+    } else {
+      ({ stdout: accountStdout, stderr: accountStderr } = await runCommandAsync('az', [
+        'account',
+        'show',
+        '--output',
+        'json',
+      ]));
+    }
 
     if (accountStderr && !accountStdout) {
       const isInteractionRequired =
@@ -439,7 +446,7 @@ export async function getClusterInfo(clusterName?: string): Promise<{
       }
     }
 
-    if (accountStdout) {
+    if (!nativeAccount && accountStdout) {
       try {
         const account = JSON.parse(accountStdout);
         result.subscriptionId = account.id;

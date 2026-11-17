@@ -15,6 +15,7 @@ import {
   hasNativeSession,
   initiateNativeLogin,
   isAzureExplicitlySignedOut,
+  synchronizeNativeLogin,
 } from './native-auth';
 
 /** Azure CLI account state used by authentication flows. */
@@ -181,7 +182,8 @@ let latestAccountObservation: Promise<AzureLoginStatus> | undefined;
  * Overlapping reads follow the newest observation instead of publishing stale results.
  * @returns Validated account status; lookup failures invalidate the previous context.
  */
-export function getLoginStatus(): Promise<AzureLoginStatus> {
+export async function getLoginStatus(): Promise<AzureLoginStatus> {
+  if (hasNativeSession() && !getNativeAccount()) await synchronizeNativeLogin();
   const nativeAccount = getNativeAccount();
   const nativeLoginError = getNativeLoginError();
   const readStatus = nativeAccount
@@ -300,7 +302,8 @@ async function getActiveLoginCloud(signal?: AbortSignal): Promise<string> {
 }
 
 /** Reads native authentication status without falling back to an existing CLI account. */
-export function getNativeLoginStatus(): Promise<AzureLoginStatus> {
+export async function getNativeLoginStatus(): Promise<AzureLoginStatus> {
+  await synchronizeNativeLogin();
   const account = getNativeAccount();
   const error = getNativeLoginError();
   return Promise.resolve(

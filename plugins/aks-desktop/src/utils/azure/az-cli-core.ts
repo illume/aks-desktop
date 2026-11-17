@@ -260,7 +260,6 @@ async function runCliLogin(
     const native = getNativeAccount();
     const generation = getNativeAuthGeneration();
     const valid =
-      !isCommandError(result.stderr) &&
       Array.isArray(accounts) &&
       accounts.length > 0 &&
       (native
@@ -270,11 +269,11 @@ async function runCliLogin(
       epoch === cliLoginEpoch;
     if (!valid) {
       cliLoginFailed = true;
-      if (!isCommandError(result.stderr)) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+      return isCommandError(result.stderr) ? result : { stdout: '', stderr: CLI_IDENTITY_ERROR };
     } else {
       cliLoginFailed = false;
     }
-    return result;
+    return { stdout: result.stdout, stderr: '' };
   } catch (error) {
     cliLoginFailed = true;
     throw error;
@@ -330,6 +329,7 @@ export async function runCommandAsync(
     actualCommand = getAzCommand();
     debugLog('[AZ-CLI] Command resolution:', command, '→', actualCommand);
   }
+
   debugLog('[AZ-CLI] Executing command:', actualCommand, 'with args:', args);
   if (command === 'az') {
     if (args[0] === 'login') {
@@ -357,6 +357,78 @@ export async function runCommandAsync(
     }
   }
   return execCommand(actualCommand, args);
+}
+
+/** Verifies the active CLI identity before invoking an app-owned CLI capability. */
+export async function verifyCliCapabilityAccess(subscriptionId: string): Promise<boolean> {
+  if (!isValidGuid(subscriptionId)) return false;
+  if (cliIdentityChangesPending) return false;
+  cliReaders++;
+  try {
+    const { stdout, stderr } = await runVerifiedCliCommand(
+      getAzCommand(),
+      ['account', 'show', '--subscription', subscriptionId, '--output', 'json'],
+      false
+    );
+    return !!stdout.trim() && !isCommandError(stderr);
+  } finally {
+    releaseCliReader();
+  }
+}
+
+/** Holds a verified CLI identity stable while a bounded operation runs several commands. */
+export async function withVerifiedCliBatch<T>(
+  subscriptionId: string,
+  operation: (run: (args: string[]) => Promise<{ stdout: string; stderr: string }>) => Promise<T>
+): Promise<T> {
+  if (!isValidGuid(subscriptionId) || cliIdentityChangesPending) {
+    throw new Error(CLI_IDENTITY_ERROR);
+  }
+  cliReaders++;
+  try {
+    const native = getNativeAccount();
+    const generation = getNativeAuthGeneration();
+    const epoch = cliLoginEpoch;
+    if (
+      !cliOperationsAllowed ||
+      cliLoginsPending ||
+      cliLoginFailed ||
+      isAzureExplicitlySignedOut() ||
+      (native &&
+        (generation !== approvedNativeGeneration ||
+          !(await verifyCliIdentity(getAzCommand(), native, [
+            '--subscription',
+            subscriptionId,
+          ])))) ||
+      (!native && hasNativeSession())
+    ) {
+      throw new Error(CLI_IDENTITY_ERROR);
+    }
+    const run = (args: string[]) => {
+      const selectsSubscription = args.some(
+        (arg, index) =>
+          (arg === '--subscription' && sameValue(args[index + 1], subscriptionId)) ||
+          (arg.startsWith('--subscription=') &&
+            sameValue(arg.slice('--subscription='.length), subscriptionId))
+      );
+      if (
+        !selectsSubscription ||
+        changesCliIdentity(args) ||
+        !cliOperationsAllowed ||
+        generation !== getNativeAuthGeneration() ||
+        epoch !== cliLoginEpoch ||
+        cliLoginsPending ||
+        cliLoginFailed ||
+        isAzureExplicitlySignedOut()
+      ) {
+        return Promise.resolve({ stdout: '', stderr: CLI_IDENTITY_ERROR });
+      }
+      return execCommand(getAzCommand(), args);
+    };
+    return await operation(run);
+  } finally {
+    releaseCliReader();
+  }
 }
 
 export async function isAzCliInstalled(): Promise<boolean> {

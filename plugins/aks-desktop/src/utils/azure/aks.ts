@@ -1,4 +1,5 @@
 import { getClusterSettings, setClusterSettings } from '../shared/clusterSettings';
+import { verifyCliCapabilityAccess } from './az-cli-core';
 import { type ConnectedClusterSummary, getClusters, getConnectedClusters } from './az-clusters';
 import { getSubscriptions as getAzSubscriptions } from './az-subscriptions';
 import { getClusterRegistrationCapability } from './clusterRegistrationCapability';
@@ -343,6 +344,13 @@ export async function registerAKSCluster(
       return {
         success: false,
         message: 'Desktop API not available. This feature is only available in desktop mode.',
+      };
+    }
+    if (!(await verifyCliCapabilityAccess(subscriptionId))) {
+      return {
+        success: false,
+        message:
+          'Azure CLI must be signed in with the same account, tenant, cloud, and subscription before registering a cluster.',
       };
     }
 

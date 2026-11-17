@@ -227,30 +227,31 @@ describe('useAzureProfilePage', () => {
     expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
   });
 
-  test.each(['az: command not found', '  pluginRunCommand is not available.\n'])(
-    'reports an unavailable CLI while completing native-only sign-out: %s',
-    async stderr => {
-      mockRunCommandAsync.mockResolvedValue({ stderr });
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-      const { result } = renderHook(() => useAzureProfilePage());
+  test.each([
+    'az: command not found',
+    '  pluginRunCommand is not available.\n',
+    'ERROR: There are no active accounts.',
+  ])('reports an unavailable CLI while completing native-only sign-out: %s', async stderr => {
+    mockRunCommandAsync.mockResolvedValue({ stderr });
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    const { result } = renderHook(() => useAzureProfilePage());
 
-      await act(() => result.current.handleLogout());
+    await act(() => result.current.handleLogout());
 
-      expect(nativeAuthMocks.logoutNative).toHaveBeenCalledOnce();
-      expect(mockRunCommandAsync).toHaveBeenCalledWith('az', ['logout']);
-      expect(result.current.logoutNotice).toContain('not available');
-      expect(result.current.logoutError).toBe('');
-      expect(result.current.loggingOut).toBe(true);
-      expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
-      expect(telemetryMocks.trackError).not.toHaveBeenCalled();
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'azure-auth-update' })
-      );
-      expect(mockPush).not.toHaveBeenCalled();
-      act(() => vi.runAllTimers());
-      expect(mockPush).toHaveBeenCalledWith('/azure/login');
-    }
-  );
+    expect(nativeAuthMocks.logoutNative).toHaveBeenCalledOnce();
+    expect(mockRunCommandAsync).toHaveBeenCalledWith('az', ['logout']);
+    expect(result.current.logoutNotice).toContain('not available');
+    expect(result.current.logoutError).toBe('');
+    expect(result.current.loggingOut).toBe(true);
+    expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
+    expect(telemetryMocks.trackError).not.toHaveBeenCalled();
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'azure-auth-update' })
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+    act(() => vi.runAllTimers());
+    expect(mockPush).toHaveBeenCalledWith('/azure/login');
+  });
 
   test.each([
     'Command execution error: bridge disconnected',

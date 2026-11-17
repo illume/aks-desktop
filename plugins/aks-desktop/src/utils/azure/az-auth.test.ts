@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   isAzureExplicitlySignedOut: vi.fn(),
   needsRelogin: vi.fn(),
   runCommandAsync: vi.fn(),
+  synchronizeNativeLogin: vi.fn(),
 }));
 
 vi.mock('./az-cli-core', () => ({
@@ -37,6 +38,7 @@ vi.mock('./native-auth', () => ({
   hasNativeSession: mocks.hasNativeSession,
   initiateNativeLogin: mocks.initiateNativeLogin,
   isAzureExplicitlySignedOut: mocks.isAzureExplicitlySignedOut,
+  synchronizeNativeLogin: mocks.synchronizeNativeLogin,
 }));
 
 import {
@@ -54,6 +56,7 @@ beforeEach(() => {
   mocks.getNativeLoginError.mockReturnValue(undefined);
   mocks.hasNativeSession.mockReturnValue(false);
   mocks.isAzureExplicitlySignedOut.mockReturnValue(false);
+  mocks.synchronizeNativeLogin.mockResolvedValue(undefined);
   mocks.initiateNativeLogin.mockResolvedValue({
     message: 'Enter code ABCD-EFGH',
     userCode: 'ABCD-EFGH',

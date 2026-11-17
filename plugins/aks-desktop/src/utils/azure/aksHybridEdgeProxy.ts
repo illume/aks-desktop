@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { ApiProxy } from '@kinvolk/headlamp-plugin/lib';
-import { getErrorMessage } from './az-cli-core';
+import { getErrorMessage, verifyCliCapabilityAccess } from './az-cli-core';
 import { azRequest, AzureRequestError } from './az-http';
 import { getStartClusterProxyCapability } from './clusterProxyCapability';
 
@@ -65,6 +65,13 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
     return { success: false, error: 'Desktop proxy capability is not available.' };
   }
   try {
+    if (!(await verifyCliCapabilityAccess(target.subscriptionId))) {
+      return {
+        success: false,
+        error:
+          'Azure CLI must be signed in with the same account, tenant, cloud, and subscription before starting the proxy.',
+      };
+    }
     return await startProxyCapability({
       cluster: target.clusterName,
       subscriptionId: target.subscriptionId,

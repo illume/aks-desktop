@@ -61,7 +61,7 @@ export default function CliLoginStep({
     pending.current = true;
     setState('pending');
     setError('');
-    if (!nativeAuthenticated) logoutNative();
+    if (!nativeAuthenticated) await logoutNative();
     const generation = getNativeAuthGeneration();
     const result = await initiateCliLogin();
     pending.current = false;
