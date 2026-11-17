@@ -7,6 +7,7 @@ import { LOGIN_POLL_INTERVAL_MS } from '../constants/timing';
 const mocks = vi.hoisted(() => ({
   isAzCliLoggedIn: vi.fn(),
   getNativeAccount: vi.fn(),
+  getNativeLoginError: vi.fn(),
   hasNativeSession: vi.fn(),
   initiateNativeLogin: vi.fn(),
   needsRelogin: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('./az-cli-path', () => ({
 
 vi.mock('./native-auth', () => ({
   getNativeAccount: mocks.getNativeAccount,
+  getNativeLoginError: mocks.getNativeLoginError,
   hasNativeSession: mocks.hasNativeSession,
   initiateNativeLogin: mocks.initiateNativeLogin,
 }));
@@ -39,6 +41,7 @@ import { getLoginStatus, initiateLogin, login, monitorLoginStatus } from './az-a
 
 beforeEach(() => {
   mocks.getNativeAccount.mockReturnValue(undefined);
+  mocks.getNativeLoginError.mockReturnValue(undefined);
   mocks.hasNativeSession.mockReturnValue(false);
   mocks.initiateNativeLogin.mockResolvedValue({
     message: 'Enter code ABCD-EFGH',
@@ -158,6 +161,18 @@ describe('getLoginStatus', () => {
       error: 'Azure CLI could not be started.\n\nInstall Azure CLI.',
       isLoggedIn: false,
     });
+  });
+
+  test('reports a native authentication failure without invoking Azure CLI', async () => {
+    mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeLoginError.mockReturnValue('Device authorization was declined');
+
+    await expect(getLoginStatus()).resolves.toEqual({
+      error: 'Device authorization was declined',
+      isLoggedIn: false,
+      needsRelogin: false,
+    });
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
   });
 
   test.each([

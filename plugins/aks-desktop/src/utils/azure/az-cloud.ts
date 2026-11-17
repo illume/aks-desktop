@@ -2,8 +2,8 @@
 // Licensed under the Apache 2.0.
 
 import { runAzCommand } from './az-cli-core';
-import { hasNativeSession } from './native-auth';
 import { withAbort } from './az-token';
+import { hasNativeSession } from './native-auth';
 
 /** Name, request destination and token scope from one CLI cloud configuration. */
 interface AzureCloudEndpoints {

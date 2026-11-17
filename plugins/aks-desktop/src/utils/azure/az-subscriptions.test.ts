@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   clearAzureTokenCaches: vi.fn(),
   getAzureCloudEndpoints: vi.fn(),
   getSubscriptionCredential: vi.fn(),
+  hasNativeSession: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
 vi.mock('./az-cli-core', () => ({
@@ -34,6 +35,9 @@ vi.mock('./az-token', () => ({
   clearAzureTokenCaches: mocks.clearAzureTokenCaches,
   getSubscriptionCredential: mocks.getSubscriptionCredential,
   withAbort: vi.fn(),
+}));
+vi.mock('./native-auth', () => ({
+  hasNativeSession: mocks.hasNativeSession,
 }));
 
 import { AzureRequestError } from './az-http';
@@ -92,6 +96,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getAzureCloudEndpoints.mockResolvedValue(CLOUD);
   mocks.getSubscriptionCredential.mockReturnValue(SUB_CREDENTIAL);
+  mocks.hasNativeSession.mockReturnValue(false);
   mocks.runCommandAsync.mockResolvedValue({ stdout: '[]', stderr: '' });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -272,6 +277,20 @@ describe('getSubscriptions', () => {
       '--output',
       'json',
     ]);
+  });
+
+  it('never reads or refreshes the CLI profile for a native session', async () => {
+    mocks.hasNativeSession.mockReturnValue(true);
+    mockArm([{ tenantId: TENANT_A }], {
+      [TENANT_A]: [armSub('native-sub', TENANT_A)],
+    });
+
+    await expect(getSubscriptions(true)).resolves.toEqual([
+      expect.objectContaining({ id: 'native-sub', tenant: TENANT_A }),
+    ]);
+    expect(mocks.clearAzureTokenCaches).toHaveBeenCalledOnce();
+    expect(mocks.clearAzureCloudCache).toHaveBeenCalledOnce();
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
   });
 });
 

@@ -47,10 +47,11 @@ interface ResourceGroupOptions {
  */
 export async function getSubscriptions(refresh = false): Promise<any[]> {
   let profile: Map<string, string> | undefined;
+  const nativeSession = hasNativeSession();
   if (refresh) {
     clearAzureTokenCaches();
     clearAzureCloudCache();
-    profile = await listCliProfileSubscriptions(true);
+    if (!nativeSession) profile = await listCliProfileSubscriptions(true);
   }
   const cloud = await getAzureCloudEndpoints();
   const cloudOptions = { endpoint: cloud.endpoint, scope: cloud.scope };
@@ -108,7 +109,7 @@ export async function getSubscriptions(refresh = false): Promise<any[]> {
 
   if (errors.length > 0 && errors.length === tenants.length) throw errors[0];
   // TODO: Remove this block and the tenant preference below with listCliProfileSubscriptions.
-  if (!hasNativeSession() && !profile && subscriptions.size > 0) {
+  if (!nativeSession && !profile && subscriptions.size > 0) {
     profile = await listCliProfileSubscriptions(false);
     if ([...subscriptions.keys()].some(id => !profile!.has(id.toLowerCase()))) {
       profile = await listCliProfileSubscriptions(true);

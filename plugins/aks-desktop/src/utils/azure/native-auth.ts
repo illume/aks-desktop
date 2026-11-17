@@ -33,6 +33,7 @@ export interface NativeLoginPrompt {
 let account: NativeAccount | undefined;
 let refreshToken: string | undefined;
 let loginPending = false;
+let loginError: string | undefined;
 let loginGeneration = 0;
 const tokens = new Map<string, Promise<AccessToken>>();
 
@@ -118,6 +119,7 @@ async function completeLogin(
     }
 
     const tokenResponse = body as TokenResponse;
+    if (generation !== loginGeneration) return;
     const token = cacheToken(ARM_SCOPE, tokenResponse);
     const claims = decodeClaims(tokenResponse.id_token ?? tokenResponse.access_token);
     const subscriptions = await fetch(
@@ -170,6 +172,7 @@ export async function initiateNativeLogin(): Promise<NativeLoginPrompt> {
   });
   const generation = loginGeneration;
   loginPending = true;
+  loginError = undefined;
   void completeLogin(
     response.device_code,
     response.interval ?? 5,
@@ -177,6 +180,10 @@ export async function initiateNativeLogin(): Promise<NativeLoginPrompt> {
     generation
   ).catch(error => {
     loginPending = false;
+    account = undefined;
+    refreshToken = undefined;
+    tokens.clear();
+    loginError = error instanceof Error ? error.message : 'Azure authentication failed';
     console.error('Azure authentication failed:', error);
   });
   openExternalUrl(response.verification_uri || DEVICE_LOGIN_URL);
@@ -194,9 +201,16 @@ export function getNativeAccount(): NativeAccount | undefined {
   return account;
 }
 
+/** Returns the latest terminal native-login error, if any. */
+export function getNativeLoginError(): string | undefined {
+  return loginError;
+}
+
 /** Returns whether native login has established or is establishing a session. */
 export function hasNativeSession(): boolean {
-  return loginPending || account !== undefined || refreshToken !== undefined;
+  return (
+    loginPending || account !== undefined || refreshToken !== undefined || loginError !== undefined
+  );
 }
 
 /** Clears native tokens and cancels an outstanding device login. */
@@ -205,17 +219,20 @@ export function logoutNative(): void {
   account = undefined;
   refreshToken = undefined;
   loginPending = false;
+  loginError = undefined;
   tokens.clear();
 }
 
 async function requestToken(scope: string, tenantId?: string): Promise<AccessToken> {
   if (!refreshToken) throw new Error('Azure login is required');
+  const generation = loginGeneration;
   const response = await postForm<TokenResponse>(tokenEndpoint(tenantId ?? account?.tenantId), {
     client_id: AZURE_CLI_CLIENT_ID,
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     scope,
   });
+  if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
   return cacheToken(`${tenantId ?? ''}|${scope}`, response);
 }
 

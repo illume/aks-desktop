@@ -9,7 +9,12 @@ import {
   runCommandAsync,
 } from './az-cli-core';
 import { getInstallationInstructions } from './az-cli-path';
-import { getNativeAccount, hasNativeSession, initiateNativeLogin } from './native-auth';
+import {
+  getNativeAccount,
+  getNativeLoginError,
+  hasNativeSession,
+  initiateNativeLogin,
+} from './native-auth';
 
 /** Azure CLI account state used by authentication flows. */
 export interface AzureLoginStatus {
@@ -171,13 +176,14 @@ let latestAccountObservation: Promise<AzureLoginStatus> | undefined;
  */
 export function getLoginStatus(): Promise<AzureLoginStatus> {
   const nativeAccount = getNativeAccount();
+  const nativeLoginError = getNativeLoginError();
   const readStatus = nativeAccount
     ? Promise.resolve({ isLoggedIn: true, ...nativeAccount })
     : hasNativeSession()
     ? Promise.resolve({
         isLoggedIn: false,
-        needsRelogin: true,
-        error: 'Not logged in',
+        needsRelogin: !nativeLoginError,
+        error: nativeLoginError ?? 'Not logged in',
       })
     : readLoginStatus();
   const observation: Promise<AzureLoginStatus> = readStatus.then(status => {

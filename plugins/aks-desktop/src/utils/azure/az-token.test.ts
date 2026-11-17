@@ -4,10 +4,18 @@
 import type { TokenCredential } from '@azure/identity';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ execCommand: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  execCommand: vi.fn(),
+  hasNativeSession: vi.fn(),
+  nativeGetToken: vi.fn(),
+}));
 
 vi.mock('../shared/runCommandAsync', () => ({ runCommandAsync: mocks.execCommand }));
 vi.mock('./az-cli-path', () => ({ getAzCommand: () => 'az' }));
+vi.mock('./native-auth', () => ({
+  hasNativeSession: mocks.hasNativeSession,
+  nativeCredential: { getToken: mocks.nativeGetToken },
+}));
 
 import {
   ARM_SCOPE,
@@ -34,6 +42,8 @@ function cliToken(token: string, expiresInSeconds = 3600, tenant = 't') {
 
 beforeEach(() => {
   mocks.execCommand.mockReset();
+  mocks.hasNativeSession.mockReturnValue(false);
+  mocks.nativeGetToken.mockReset();
   azCliCredential.clearCache();
 });
 
@@ -148,6 +158,22 @@ describe('subscription credentials', () => {
 });
 
 describe('createAzCliCredential', () => {
+  test('uses native tokens without invoking Azure CLI when a native session exists', async () => {
+    mocks.hasNativeSession.mockReturnValue(true);
+    mocks.nativeGetToken.mockResolvedValue({
+      token: 'native-token',
+      expiresOnTimestamp: Date.now() + 3_600_000,
+    });
+
+    await expect(
+      createAzCliCredential().getToken(ARM_SCOPE, { tenantId: 'native-tenant' })
+    ).resolves.toMatchObject({ token: 'native-token' });
+    expect(mocks.nativeGetToken).toHaveBeenCalledWith(ARM_SCOPE, {
+      tenantId: 'native-tenant',
+    });
+    expect(mocks.execCommand).not.toHaveBeenCalled();
+  });
+
   test('satisfies the Azure SDK TokenCredential contract', () => {
     const credential: TokenCredential = createAzCliCredential();
     expect(typeof credential.getToken).toBe('function');

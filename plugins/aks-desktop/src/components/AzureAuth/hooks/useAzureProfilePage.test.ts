@@ -9,6 +9,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 const mockPush = vi.hoisted(() => vi.fn());
 const mockUseAzureAuth = vi.hoisted(() => vi.fn());
 const mockRunCommandAsync = vi.hoisted(() => vi.fn());
+const nativeAuthMocks = vi.hoisted(() => ({
+  hasNativeSession: vi.fn(),
+  logoutNative: vi.fn(),
+}));
 const azureCliImportControl = vi.hoisted(() => {
   let resolveImport!: () => void;
   const importPromise = new Promise<void>(resolve => {
@@ -41,6 +45,7 @@ vi.mock('../../../utils/azure/az-cli-core', async () => {
     isAzError: (stderr: string) => stderr.includes('ERROR:'),
   };
 });
+vi.mock('../../../utils/azure/native-auth', () => nativeAuthMocks);
 
 vi.mock('../../../telemetry/aksFeature', () => ({
   trackAksFeature: telemetryMocks.trackAksFeature,
@@ -95,6 +100,7 @@ describe('useAzureProfilePage', () => {
     vi.useFakeTimers();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockUseAzureAuth.mockReturnValue(AUTH_LOGGED_IN);
+    nativeAuthMocks.hasNativeSession.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -203,6 +209,17 @@ describe('useAzureProfilePage', () => {
 
     act(() => vi.runAllTimers());
     expect(mockPush).toHaveBeenCalledWith('/azure/login');
+  });
+
+  test('logs out a native session without invoking Azure CLI', async () => {
+    nativeAuthMocks.hasNativeSession.mockReturnValue(true);
+    const { result } = renderHook(() => useAzureProfilePage());
+
+    await act(() => result.current.handleLogout());
+
+    expect(nativeAuthMocks.logoutNative).toHaveBeenCalledOnce();
+    expect(mockRunCommandAsync).not.toHaveBeenCalled();
+    expect(telemetryMocks.trackAksFeature).toHaveBeenCalledWith('aksd.auth-logout', 'succeeded');
   });
 
   test('redirect guard defers to timeout during active logout flow', async () => {
