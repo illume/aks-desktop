@@ -125,7 +125,11 @@ async function completeNativeLogin(generation: number): Promise<void> {
   dispatchAccountChange();
 }
 
-/** Starts capability-scoped desktop device authentication without requiring Azure CLI. */
+/**
+ * Starts capability-scoped desktop device authentication without requiring Azure CLI.
+ *
+ * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code
+ */
 export async function initiateNativeLogin(
   signal?: AbortSignal,
   cloudName = 'AzureCloud'
@@ -152,7 +156,10 @@ export async function initiateNativeLogin(
     removeAbortListener = () => signal.removeEventListener('abort', onAbort);
   }
   const result = await bridge().startAzureLogin(cloud.name, cloud.arm.scope);
-  if (generation !== loginGeneration || signal?.aborted) {
+  if (generation !== loginGeneration) {
+    throw new Error('Azure login was cancelled');
+  }
+  if (signal?.aborted) {
     await bridge().cancelAzureLogin();
     throw new Error('Azure login was cancelled');
   }
@@ -244,7 +251,7 @@ export const nativeCredential: TokenCredential = {
     if (signal?.aborted) throw abortError();
     const load = async () => {
       const generation = loginGeneration;
-      const result = await bridge().getAzureToken(scope, options?.tenantId);
+      const result = await bridge().getAzureToken(normalizeNativeScope(scope), options?.tenantId);
       if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
       if (signal?.aborted) throw abortError();
       if (
@@ -271,3 +278,20 @@ export const nativeCredential: TokenCredential = {
     }).finally(() => signal.removeEventListener('abort', onAbort!));
   },
 };
+
+/**
+ * Maps ARM endpoint scopes used by Azure SDK callers to the configured resource identifier.
+ *
+ * Azure resource identifiers can retain a trailing slash, producing a double slash before
+ * `.default`; see https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc#trailing-slash-and-default
+ */
+function normalizeNativeScope(scope: string): string {
+  if (!nativeCloud) return scope;
+  for (const service of [nativeCloud.arm, nativeCloud.graph]) {
+    const endpoint = service.endpoint.replace(/\/+$/, '');
+    if (scope === `${endpoint}/.default` || scope === `${endpoint}//.default`) {
+      return service.scope;
+    }
+  }
+  return scope;
+}

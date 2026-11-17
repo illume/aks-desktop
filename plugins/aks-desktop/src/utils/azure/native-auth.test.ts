@@ -45,6 +45,14 @@ function capability(overrides: Record<string, unknown> = {}) {
   return api;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 async function load() {
   return import('./native-auth');
 }
@@ -119,6 +127,46 @@ describe('native authentication facade', () => {
     expect(auth.hasNativeSession()).toBe(false);
   });
 
+  test('does not let a superseded attempt cancel a newer main-process session', async () => {
+    const firstStart = deferred<{
+      success: true;
+      pending: true;
+      prompt: { userCode: string; verificationUri: string; message: string };
+    }>();
+    const api = capability({
+      startAzureLogin: vi
+        .fn()
+        .mockReturnValueOnce(firstStart.promise)
+        .mockResolvedValueOnce({
+          success: true,
+          pending: true,
+          prompt: {
+            userCode: 'NEW',
+            verificationUri: 'https://microsoft.com/devicelogin',
+            message: 'Enter NEW',
+          },
+        }),
+    });
+    const auth = await load();
+    const first = auth.initiateNativeLogin();
+    const second = auth.initiateNativeLogin();
+
+    firstStart.resolve({
+      success: true,
+      pending: true,
+      prompt: {
+        userCode: 'OLD',
+        verificationUri: 'https://microsoft.com/devicelogin',
+        message: 'Enter OLD',
+      },
+    });
+
+    await expect(first).rejects.toThrow('cancelled');
+    await expect(second).resolves.toMatchObject({ userCode: 'NEW' });
+    expect(api.cancelAzureLogin).not.toHaveBeenCalled();
+    expect(auth.hasNativeSession()).toBe(true);
+  });
+
   test('keeps pending status without repeating subscription discovery', async () => {
     const api = capability({
       getAzureLoginStatus: vi.fn().mockResolvedValue({ success: true, pending: true }),
@@ -185,6 +233,17 @@ describe('native authentication facade', () => {
     expect(api.getAzureToken).toHaveBeenCalledWith(
       'https://graph.microsoft.com/.default',
       'guest-tenant'
+    );
+  });
+
+  test('maps the default ARM endpoint scope to the configured native resource scope', async () => {
+    const { api, auth } = await establishSession();
+
+    await auth.nativeCredential.getToken('https://management.azure.com/.default');
+
+    expect(api.getAzureToken).toHaveBeenCalledWith(
+      'https://management.core.windows.net//.default',
+      undefined
     );
   });
 

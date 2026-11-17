@@ -7,7 +7,7 @@ const mockClusterRequest = vi.hoisted(() => vi.fn());
 const mockRequest = vi.hoisted(() => vi.fn());
 const mockStartClusterProxy = vi.hoisted(() => vi.fn());
 const mockRunCommandAsync = vi.hoisted(() => vi.fn());
-const mockVerifyCliCapabilityAccess = vi.hoisted(() => vi.fn());
+const mockWithVerifiedCliCapabilityAccess = vi.hoisted(() => vi.fn());
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   ApiProxy: {
@@ -22,7 +22,7 @@ vi.mock('../shared/runCommandAsync', () => ({
 }));
 vi.mock('./az-cli-core', async importOriginal => ({
   ...(await importOriginal<typeof import('./az-cli-core')>()),
-  verifyCliCapabilityAccess: mockVerifyCliCapabilityAccess,
+  withVerifiedCliCapabilityAccess: mockWithVerifiedCliCapabilityAccess,
 }));
 
 import {
@@ -64,7 +64,12 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStartClusterProxy.mockResolvedValue({ success: true });
-    mockVerifyCliCapabilityAccess.mockResolvedValue(true);
+    mockWithVerifiedCliCapabilityAccess.mockImplementation(
+      async (_subscriptionId: string, operation: () => Promise<unknown>) => ({
+        verified: true,
+        value: await operation(),
+      })
+    );
     vi.stubGlobal('startClusterProxy', mockStartClusterProxy);
   });
 
@@ -100,7 +105,7 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
   });
 
   test('does not invoke the proxy capability when the CLI identity cannot be verified', async () => {
-    mockVerifyCliCapabilityAccess.mockResolvedValue(false);
+    mockWithVerifiedCliCapabilityAccess.mockResolvedValue({ verified: false });
 
     await expect(startProxy(targetA)).resolves.toEqual({
       success: false,

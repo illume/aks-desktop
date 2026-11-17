@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   getConnectedClusters: vi.fn(),
   getSubscriptions: vi.fn(),
   setClusterSettings: vi.fn(),
-  verifyCliCapabilityAccess: vi.fn(),
+  withVerifiedCliCapabilityAccess: vi.fn(),
 }));
 
 vi.mock('./az-clusters', () => ({
@@ -18,7 +18,7 @@ vi.mock('./az-clusters', () => ({
 }));
 vi.mock('./az-subscriptions', () => ({ getSubscriptions: mocks.getSubscriptions }));
 vi.mock('./az-cli-core', () => ({
-  verifyCliCapabilityAccess: mocks.verifyCliCapabilityAccess,
+  withVerifiedCliCapabilityAccess: mocks.withVerifiedCliCapabilityAccess,
 }));
 vi.mock('../shared/clusterSettings', () => ({
   getClusterSettings: mocks.getClusterSettings,
@@ -65,7 +65,12 @@ describe('Azure AKS utilities', () => {
     vi.clearAllMocks();
     mocks.getClusterSettings.mockReturnValue({ allowedNamespaces: ['existing'] });
     mocks.getConnectedClusters.mockResolvedValue({ clusters: [] });
-    mocks.verifyCliCapabilityAccess.mockResolvedValue(true);
+    mocks.withVerifiedCliCapabilityAccess.mockImplementation(
+      async (_subscriptionId: string, operation: () => Promise<unknown>) => ({
+        verified: true,
+        value: await operation(),
+      })
+    );
     vi.stubGlobal('registerCluster', registerClusterCapability);
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -304,7 +309,7 @@ describe('Azure AKS utilities', () => {
   });
 
   test('does not invoke native registration when the CLI identity cannot be verified', async () => {
-    mocks.verifyCliCapabilityAccess.mockResolvedValue(false);
+    mocks.withVerifiedCliCapabilityAccess.mockResolvedValue({ verified: false });
 
     await expect(registerAKSCluster('sub-1', 'rg-1', 'cluster-1')).resolves.toEqual({
       success: false,

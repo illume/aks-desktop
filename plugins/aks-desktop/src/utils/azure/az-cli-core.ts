@@ -359,10 +359,17 @@ export async function runCommandAsync(
   return execCommand(actualCommand, args);
 }
 
-/** Verifies the active CLI identity before invoking an app-owned CLI capability. */
-export async function verifyCliCapabilityAccess(subscriptionId: string): Promise<boolean> {
-  if (!isValidGuid(subscriptionId)) return false;
-  if (cliIdentityChangesPending) return false;
+/**
+ * Runs an app-owned CLI capability while the verified Azure CLI identity is held stable.
+ *
+ * The reader reservation prevents a queued login, logout, cloud switch, or account switch
+ * from starting between verification and the capability's completion.
+ */
+export async function withVerifiedCliCapabilityAccess<T>(
+  subscriptionId: string,
+  operation: () => Promise<T>
+): Promise<{ verified: false } | { verified: true; value: T }> {
+  if (!isValidGuid(subscriptionId) || cliIdentityChangesPending) return { verified: false };
   cliReaders++;
   try {
     const { stdout, stderr } = await runVerifiedCliCommand(
@@ -370,7 +377,8 @@ export async function verifyCliCapabilityAccess(subscriptionId: string): Promise
       ['account', 'show', '--subscription', subscriptionId, '--output', 'json'],
       false
     );
-    return !!stdout.trim() && !isCommandError(stderr);
+    if (!stdout.trim() || isCommandError(stderr)) return { verified: false };
+    return { verified: true, value: await operation() };
   } finally {
     releaseCliReader();
   }

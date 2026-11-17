@@ -46,6 +46,7 @@ import {
   registerNativeSubscriptionTenantLookup,
   runAzCommand,
   runCommandAsync,
+  withVerifiedCliCapabilityAccess,
 } from './az-cli-core';
 
 beforeEach(() => {
@@ -238,6 +239,29 @@ describe('runAzCommand', () => {
         '-o',
         'json',
       ]);
+    });
+
+    test('holds the reader lease until a verified capability completes', async () => {
+      const subscriptionId = '11111111-2222-3333-4444-555555555555';
+      mocks.native.mockReturnValue({ ...native, subscriptionId });
+      registerNativeSubscriptionTenantLookup(id => (id === subscriptionId ? 'tenant' : undefined));
+      allowCliOperations();
+      mockCli({ ...account, id: subscriptionId });
+      const operationStarted = deferred<void>();
+      const operationResult = deferred<string>();
+      const capability = withVerifiedCliCapabilityAccess(subscriptionId, async () => {
+        operationStarted.resolve();
+        return operationResult.promise;
+      });
+      await operationStarted.promise;
+
+      const logout = runCommandAsync('az', ['logout']);
+      await Promise.resolve();
+      expect(mocks.execCommand).not.toHaveBeenCalledWith('/bundled/az', ['logout']);
+
+      operationResult.resolve('started');
+      await expect(capability).resolves.toEqual({ verified: true, value: 'started' });
+      await expect(logout).resolves.toEqual(commandResult);
     });
 
     test('uses the discovered tenant for a guest subscription', async () => {
