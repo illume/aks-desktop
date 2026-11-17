@@ -938,7 +938,7 @@ index 874134a8384a772eacc5046065f939179160d83d..bb30d0b401236ac30a8bf69166524e3d
 +});
 diff --git a/source/app/electron/azureOAuth.test.ts b/source/app/electron/azureOAuth.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df07e0f38d
+index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7b7be43b5
 --- /dev/null
 +++ b/source/app/electron/azureOAuth.test.ts
 @@ -0,0 +1,470 @@
@@ -1079,7 +1079,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +        sessionId: SESSION_ID,
 +        cloud: 'AzureCloud',
 +        scope: ARM_SCOPE,
-+      }),
++      })
 +    ).resolves.toEqual({ success: false, error: 'Unauthorized request' });
 +    expect(fetchMock).not.toHaveBeenCalled();
 +  });
@@ -1096,7 +1096,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          message: 'Enter CODE',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response({
@@ -1104,7 +1104,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          refresh_token: 'refresh-token',
 +          id_token: jwt({ tid: 'home-tenant', name: 'José Müller' }),
 +          expires_in: 3600,
-+        }),
++        })
 +      );
 +
 +    await expect(
@@ -1113,7 +1113,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +        sessionId: SESSION_ID,
 +        cloud: 'AzureCloud',
 +        scope: ARM_SCOPE,
-+      }),
++      })
 +    ).resolves.toMatchObject({
 +      success: true,
 +      pending: true,
@@ -1126,7 +1126,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +      invoke(AZURE_OAUTH_STATUS, event(window), {
 +        capability: CAPABILITY,
 +        sessionId: SESSION_ID,
-+      }),
++      })
 +    ).toEqual({
 +      success: true,
 +      pending: false,
@@ -1144,7 +1144,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +        verification_uri: 'https://microsoft.com/devicelogin',
 +        expires_in: 900,
 +        interval: 1,
-+      }),
++      })
 +    );
 +
 +    await invoke(AZURE_OAUTH_START, event(window), {
@@ -1155,10 +1155,10 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +    });
 +
 +    expect(fetchMock.mock.calls[0][0]).toBe(
-+      'https://login.chinacloudapi.cn/common/oauth2/v2.0/devicecode',
++      'https://login.chinacloudapi.cn/common/oauth2/v2.0/devicecode'
 +    );
 +    expect(String(fetchMock.mock.calls[0][1].body)).toContain(
-+      `scope=${encodeURIComponent(CHINA_ARM_SCOPE)}`,
++      `scope=${encodeURIComponent(CHINA_ARM_SCOPE)}`
 +    );
 +  });
 +
@@ -1173,7 +1173,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          verification_uri: 'https://microsoft.com/devicelogin',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response({
@@ -1181,14 +1181,14 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          refresh_token: 'refresh-token',
 +          id_token: jwt({ tid: 'home-tenant' }),
 +          expires_in: 3600,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response({
 +          access_token: 'graph-token',
 +          refresh_token: 'rotated-refresh-token',
 +          expires_in: 3600,
-+        }),
++        })
 +      );
 +    await invoke(AZURE_OAUTH_START, event(window), {
 +      capability: CAPABILITY,
@@ -1213,7 +1213,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +    expect(second).toEqual(first);
 +    expect(fetchMock).toHaveBeenCalledTimes(3);
 +    expect(fetchMock.mock.calls[2][0]).toBe(
-+      'https://login.microsoftonline.com/guest-tenant/oauth2/v2.0/token',
++      'https://login.microsoftonline.com/guest-tenant/oauth2/v2.0/token'
 +    );
 +    expect(String(fetchMock.mock.calls[2][1].body)).toContain('refresh_token=refresh-token');
 +  });
@@ -1229,7 +1229,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          verification_uri: 'https://microsoft.com/devicelogin',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response({
@@ -1237,7 +1237,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          refresh_token: 'refresh-token',
 +          id_token: jwt({ tid: 'home-tenant' }),
 +          expires_in: 3600,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response(
@@ -1245,8 +1245,8 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +            error: 'interaction_required',
 +            error_description: 'Guest tenant requires interaction',
 +          },
-+          400,
-+        ),
++          400
++        )
 +      );
 +    await invoke(AZURE_OAUTH_START, event(window), {
 +      capability: CAPABILITY,
@@ -1268,7 +1268,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +      invoke(AZURE_OAUTH_STATUS, event(window), {
 +        capability: CAPABILITY,
 +        sessionId: SESSION_ID,
-+      }),
++      })
 +    ).toMatchObject({
 +      success: true,
 +      pending: false,
@@ -1286,7 +1286,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          verification_uri: 'https://microsoft.com/devicelogin',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response({
@@ -1294,7 +1294,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          refresh_token: 'refresh-token',
 +          id_token: jwt({ tid: 'home-tenant' }),
 +          expires_in: 3600,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response(
@@ -1302,8 +1302,8 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +            error: 'invalid_grant',
 +            error_description: 'AADSTS700082: The refresh token has expired.',
 +          },
-+          400,
-+        ),
++          400
++        )
 +      );
 +    await invoke(AZURE_OAUTH_START, event(window), {
 +      capability: CAPABILITY,
@@ -1319,7 +1319,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +        sessionId: SESSION_ID,
 +        scope: GRAPH_SCOPE,
 +        tenantId: 'guest-tenant',
-+      }),
++      })
 +    ).resolves.toMatchObject({ success: false, sessionExpired: true });
 +  });
 +
@@ -1335,7 +1335,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          verification_uri: 'https://microsoft.com/devicelogin',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      );
 +      await invoke(AZURE_OAUTH_START, event(window), {
 +        capability: CAPABILITY,
@@ -1348,18 +1348,18 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +        invoke(channel, event(window), {
 +          capability: CAPABILITY,
 +          sessionId: SESSION_ID,
-+        }),
++        })
 +      ).toEqual({ success: true });
 +      expect(
 +        invoke(AZURE_OAUTH_STATUS, event(window), {
 +          capability: CAPABILITY,
 +          sessionId: SESSION_ID,
-+        }),
++        })
 +      ).toEqual({
 +        success: false,
 +        error: 'Azure login is required',
 +      });
-+    },
++    }
 +  );
 +
 +  it('does not let stale cleanup clear a newer session', async () => {
@@ -1373,7 +1373,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          verification_uri: 'https://microsoft.com/devicelogin',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      )
 +      .mockResolvedValueOnce(
 +        response({
@@ -1382,7 +1382,7 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +          verification_uri: 'https://microsoft.com/devicelogin',
 +          expires_in: 900,
 +          interval: 1,
-+        }),
++        })
 +      );
 +    const newerSessionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 +    await invoke(AZURE_OAUTH_START, event(window), {
@@ -1402,22 +1402,22 @@ index 0000000000000000000000000000000000000000..592334f7a44c417f3a285c0c1b7a89df
 +      invoke(AZURE_OAUTH_CANCEL, event(window), {
 +        capability: CAPABILITY,
 +        sessionId: SESSION_ID,
-+      }),
++      })
 +    ).toEqual({ success: false, error: 'Azure login is required' });
 +    expect(
 +      invoke(AZURE_OAUTH_STATUS, event(window), {
 +        capability: CAPABILITY,
 +        sessionId: newerSessionId,
-+      }),
++      })
 +    ).toEqual({ success: true, pending: true });
 +  });
 +});
 diff --git a/source/app/electron/azureOAuth.ts b/source/app/electron/azureOAuth.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd587ff90b
+index 0000000000000000000000000000000000000000..a218be0ce3473f1a941acb2c5d9b4c132f4cb863
 --- /dev/null
 +++ b/source/app/electron/azureOAuth.ts
-@@ -0,0 +1,602 @@
+@@ -0,0 +1,597 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -1448,8 +1448,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +const REQUEST_TIMEOUT_MS = 30_000;
 +const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 +const TENANT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.-]{0,255}$/;
-+const SESSION_ID_PATTERN =
-+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
++const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 +const UNAUTHORIZED = 'Unauthorized request';
 +const NOT_AVAILABLE = 'Azure authentication is not available in this build.';
 +const CANCELLED = 'Azure sign-in was cancelled';
@@ -1506,11 +1505,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +let activeCleanup: (() => void) | null = null;
 +
 +class OAuthFailure extends Error {
-+  constructor(
-+    message: string,
-+    readonly code?: string,
-+    readonly sessionExpired = false,
-+  ) {
++  constructor(message: string, readonly code?: string, readonly sessionExpired = false) {
 +    super(message);
 +  }
 +}
@@ -1537,7 +1532,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +    typeof details?.error_description === 'string'
 +      ? details.error_description
 +      : 'Azure authentication failed',
-+    typeof details?.error === 'string' ? details.error : undefined,
++    typeof details?.error === 'string' ? details.error : undefined
 +  );
 +}
 +
@@ -1555,14 +1550,14 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +  url: string,
 +  values: Record<string, string>,
 +  signal: AbortSignal,
-+  timeout = REQUEST_TIMEOUT_MS,
++  timeout = REQUEST_TIMEOUT_MS
 +): Promise<{ response: Response; body: unknown }> {
 +  const controller = new AbortController();
 +  const abort = () => controller.abort(signal.reason);
 +  signal.addEventListener('abort', abort, { once: true });
 +  const timer = setTimeout(
 +    () => controller.abort(new OAuthFailure('Azure request timed out')),
-+    timeout,
++    timeout
 +  );
 +  try {
 +    const response = await fetch(url, {
@@ -1670,7 +1665,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +    deviceCode: string,
 +    intervalSeconds: number,
 +    expiresInSeconds: number,
-+    scope: string,
++    scope: string
 +  ) => {
 +    const deadline = Date.now() + expiresInSeconds * 1000;
 +    let interval = intervalSeconds;
@@ -1690,7 +1685,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +            device_code: deviceCode,
 +          },
 +          session.controller.signal,
-+          Math.min(REQUEST_TIMEOUT_MS, Math.max(1, deadline - Date.now())),
++          Math.min(REQUEST_TIMEOUT_MS, Math.max(1, deadline - Date.now()))
 +        ));
 +      } catch (error) {
 +        if (!current(capability, session.generation)) return;
@@ -1720,8 +1715,8 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +        typeof claims.preferred_username === 'string'
 +          ? claims.preferred_username
 +          : typeof claims.name === 'string'
-+            ? claims.name
-+            : undefined;
++          ? claims.name
++          : undefined;
 +      session.tokens.set(`|${scope}`, Promise.resolve(token));
 +      session.pending = false;
 +      return;
@@ -1774,7 +1769,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +          client_id: config.clientId,
 +          scope: `${request.scope} openid profile offline_access`,
 +        },
-+        session.controller.signal,
++        session.controller.signal
 +      );
 +      if (!response.ok) throw parseOAuthFailure(body);
 +      const device = (body ?? {}) as {
@@ -1808,7 +1803,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +        device.device_code,
 +        interval,
 +        expiresIn,
-+        request.scope,
++        request.scope
 +      ).catch(error => {
 +        if (!current(request.capability as string, generation)) return;
 +        session.pending = false;
@@ -1816,7 +1811,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +          error instanceof OAuthFailure
 +            ? error
 +            : new OAuthFailure(
-+                error instanceof Error ? error.message : 'Azure authentication failed',
++                error instanceof Error ? error.message : 'Azure authentication failed'
 +              );
 +      });
 +      return {
@@ -1909,7 +1904,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +              refresh_token: credential,
 +              scope: request.scope as string,
 +            },
-+            session.controller.signal,
++            session.controller.signal
 +          );
 +          if (!response.ok) {
 +            const error = parseOAuthFailure(body);
@@ -1987,7 +1982,7 @@ index 0000000000000000000000000000000000000000..93b0bdd315670eaa61550b900b25f2cd
 +    _event: unknown,
 +    _url: string,
 +    isInPlace: boolean,
-+    isMainFrame: boolean,
++    isMainFrame: boolean
 +  ) => {
 +    if (isMainFrame && !isInPlace) {
 +      for (const capability of sessions.keys()) clearSession(capability);
@@ -4088,7 +4083,7 @@ index 663f90b32f4c1fc6b262d2de704532f039140c38..509765943583971b1ae384e2d75b7536
        }
  
 diff --git a/source/app/electron/preload.test.ts b/source/app/electron/preload.test.ts
-index e3c761993aec9186435edb281e934ddb565645d3..80d533964c6c1848ec3058462147db724924779c 100644
+index e3c761993aec9186435edb281e934ddb565645d3..c3de3eee1eee1e75560d0b8469985e9a684baf53 100644
 --- a/source/app/electron/preload.test.ts
 +++ b/source/app/electron/preload.test.ts
 @@ -86,6 +86,23 @@ describe('desktop preload API', () => {
@@ -4115,7 +4110,7 @@ index e3c761993aec9186435edb281e934ddb565645d3..80d533964c6c1848ec3058462147db72
    it('exposes Electron development mode to a built renderer', () => {
      expect(desktopApi.isDevelopment).toBe(true);
    });
-@@ -121,6 +138,60 @@ describe('desktop preload API', () => {
+@@ -121,6 +138,50 @@ describe('desktop preload API', () => {
      expect(electronMocks.removeListener).toHaveBeenCalledWith('locale', wrappedListener);
    });
  
@@ -4142,19 +4137,9 @@ index e3c761993aec9186435edb281e934ddb565645d3..80d533964c6c1848ec3058462147db72
 +    const capability = 'a'.repeat(64);
 +    const sessionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 +
-+    await desktopApi.azureOAuth.start(
-+      capability,
-+      sessionId,
-+      'AzureCloud',
-+      'https://arm/.default'
-+    );
++    await desktopApi.azureOAuth.start(capability, sessionId, 'AzureCloud', 'https://arm/.default');
 +    await desktopApi.azureOAuth.status(capability, sessionId);
-+    await desktopApi.azureOAuth.getToken(
-+      capability,
-+      sessionId,
-+      'https://graph/.default',
-+      'tenant'
-+    );
++    await desktopApi.azureOAuth.getToken(capability, sessionId, 'https://graph/.default', 'tenant');
 +    await desktopApi.azureOAuth.cancel(capability, sessionId);
 +    await desktopApi.azureOAuth.logout(capability, sessionId);
 +
@@ -10956,7 +10941,7 @@ index 13483d9e8dff20ba2f1a143b0b9d381de81ba701..b57c69fcb20487f39c1210741ed3230f
    "registerDetailsViewHeaderAction": [Function],
 diff --git a/source/frontend/src/plugin/azureOAuth.test.ts b/source/frontend/src/plugin/azureOAuth.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..70e1e0a4ddff745d1e56af89b0be1e062edc344f
+index 0000000000000000000000000000000000000000..ca81bf3c3d2393425d475367aabca38a1eec55e3
 --- /dev/null
 +++ b/source/frontend/src/plugin/azureOAuth.test.ts
 @@ -0,0 +1,100 @@
@@ -11043,8 +11028,8 @@ index 0000000000000000000000000000000000000000..70e1e0a4ddff745d1e56af89b0be1e06
 +      getPluginAzureOAuthArgValues(
 +        capabilities as PluginCommandCapability[],
 +        candidate as PluginInfo,
-+        bridge(),
-+      ),
++        bridge()
++      )
 +    ).toEqual([[], []]);
 +  });
 +
@@ -11062,7 +11047,7 @@ index 0000000000000000000000000000000000000000..70e1e0a4ddff745d1e56af89b0be1e06
 +});
 diff --git a/source/frontend/src/plugin/azureOAuth.ts b/source/frontend/src/plugin/azureOAuth.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..be5f69d1c412cc63211c82e197f0100745430876
+index 0000000000000000000000000000000000000000..de9446a35303820097cea8b879531d11ba1b8abc
 --- /dev/null
 +++ b/source/frontend/src/plugin/azureOAuth.ts
 @@ -0,0 +1,150 @@
@@ -11102,14 +11087,14 @@ index 0000000000000000000000000000000000000000..be5f69d1c412cc63211c82e197f01007
 +    capability: string,
 +    sessionId: string,
 +    cloud: string,
-+    scope: string,
++    scope: string
 +  ): Promise<AzureOAuthResult>;
 +  status(capability: string, sessionId: string): Promise<AzureOAuthResult>;
 +  getToken(
 +    capability: string,
 +    sessionId: string,
 +    scope: string,
-+    tenantId?: string,
++    tenantId?: string
 +  ): Promise<AzureOAuthResult>;
 +  cancel(capability: string, sessionId: string): Promise<AzureOAuthResult>;
 +  logout(capability: string, sessionId: string): Promise<AzureOAuthResult>;
@@ -11124,7 +11109,7 @@ index 0000000000000000000000000000000000000000..be5f69d1c412cc63211c82e197f01007
 +}
 +
 +export function captureAzureOAuthBridge(
-+  bridge: Partial<AzureOAuthBridge> | undefined,
++  bridge: Partial<AzureOAuthBridge> | undefined
 +): AzureOAuthBridge | undefined {
 +  const start = bridge?.start;
 +  const status = bridge?.status;
@@ -11208,7 +11193,7 @@ index 0000000000000000000000000000000000000000..be5f69d1c412cc63211c82e197f01007
 +export function getPluginAzureOAuthArgValues(
 +  capabilities: PluginCommandCapability[],
 +  plugin: PluginInfo,
-+  bridge: AzureOAuthBridge | undefined,
++  bridge: AzureOAuthBridge | undefined
 +): [string[], unknown[]] {
 +  const capability = findPluginCapability(capabilities, plugin);
 +  if (!bridge || capability?.azureOAuth !== true || !/^[0-9a-f]{64}$/.test(capability.capability)) {
