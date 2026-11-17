@@ -55,6 +55,7 @@ import { registerUpgradeInsights } from './components/UpgradeInsights/navigation
 import { setConsentPredicate, setTelemetryEnabled } from './telemetry';
 import { registerReduxCallback } from './telemetry/setup';
 import type { ProjectDefinition } from './types/project';
+import { invalidateProxySession } from './utils/azure/aksHybridEdgeProxy';
 import { getLoginStatus } from './utils/azure/az-auth';
 import { AZURE_ACCOUNT_POLL_INTERVAL_MS } from './utils/constants/timing';
 import {
@@ -180,8 +181,34 @@ if (Headlamp.isRunningAsApp()) {
   // Check initially
   updateAzureAccountLabel();
 
+  let proxyAuthIdentity: string | undefined;
+  const invalidateProxyOnAccountChange = (event: Event) => {
+    const status = (event as CustomEvent<Awaited<ReturnType<typeof getLoginStatus>>>).detail;
+    const identity = JSON.stringify([
+      status?.isLoggedIn,
+      status?.username,
+      status?.tenantId,
+      status?.subscriptionId,
+      status?.environmentName,
+    ]);
+    if (proxyAuthIdentity === undefined) {
+      proxyAuthIdentity = identity;
+    } else if (identity !== proxyAuthIdentity) {
+      proxyAuthIdentity = identity;
+      void invalidateProxySession().catch(error =>
+        console.error('[AKS] Could not invalidate cluster proxies:', error)
+      );
+    }
+  };
+
   // Listen for custom events from login/logout operations
   window.addEventListener('azure-auth-update', updateAzureAccountLabel);
+  window.addEventListener('azure-auth-update', () => {
+    void invalidateProxySession().catch(error =>
+      console.error('[AKS] Could not invalidate cluster proxies:', error)
+    );
+  });
+  window.addEventListener('azure-account-change', invalidateProxyOnAccountChange);
 
   // Check when window regains focus (user might have logged in/out externally)
   let isWindowFocused = document.hasFocus();

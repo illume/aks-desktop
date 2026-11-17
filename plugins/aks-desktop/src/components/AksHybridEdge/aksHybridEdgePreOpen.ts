@@ -6,6 +6,7 @@ import {
   checkClusterReachable,
   startProxy,
   verifyAksHybridEdgeCluster,
+  waitForProxySessionInvalidation,
 } from '../../utils/azure/aksHybridEdgeProxy';
 import {
   getClusterSettings,
@@ -79,6 +80,7 @@ export async function aksHybridEdgePreOpenHook({
     return;
   }
 
+  await waitForProxySessionInvalidation();
   const settings = getClusterSettings(cluster);
   if (settings.clusterType !== 'aksarc') {
     // Not registered as AKS Hybrid & Edge. It may still be an Arc-proxied cluster
@@ -111,7 +113,7 @@ export async function aksHybridEdgePreOpenHook({
     return;
   }
 
-  const { subscriptionId, resourceGroup } = settings;
+  const { subscriptionId, resourceGroup, tenantId } = settings;
   if (!subscriptionId || !resourceGroup) {
     throw new Error(
       'Missing Azure metadata for this AKS Hybrid & Edge cluster. Re-register it to reconnect.'
@@ -120,7 +122,12 @@ export async function aksHybridEdgePreOpenHook({
 
   reportProgress?.('Starting AKS Hybrid & Edge proxy…');
   signal?.throwIfAborted();
-  const start = await startProxy({ subscriptionId, resourceGroup, clusterName: cluster });
+  const start = await startProxy({
+    subscriptionId,
+    resourceGroup,
+    clusterName: cluster,
+    tenantId,
+  });
   if (!start.success) {
     throw new Error(start.error || 'Failed to start the AKS Hybrid & Edge proxy.');
   }

@@ -14,9 +14,10 @@ export interface ClusterProxyCapabilityResult {
 
 /** Private capability injected by Headlamp while executing AKS Desktop. */
 export type StartClusterProxyCapability = (target: {
-  cluster: string;
-  subscriptionId: string;
-  resourceGroup: string;
+  cluster?: string;
+  subscriptionId?: string;
+  resourceGroup?: string;
+  invalidate?: true;
 }) => Promise<ClusterProxyCapabilityResult>;
 
 declare const startClusterProxy: StartClusterProxyCapability | undefined;

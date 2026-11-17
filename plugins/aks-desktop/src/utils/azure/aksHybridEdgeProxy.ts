@@ -2,6 +2,8 @@
 // Licensed under the Apache 2.0.
 
 import { ApiProxy } from '@kinvolk/headlamp-plugin/lib';
+import { ensureProxyAuthentication } from './aksHybridEdgeProxyAuth';
+import { getLoginStatus } from './az-auth';
 import { getErrorMessage } from './az-cli-core';
 import { azRequest, AzureRequestError } from './az-http';
 import { getStartClusterProxyCapability } from './clusterProxyCapability';
@@ -19,6 +21,8 @@ export interface ProxyTarget {
   resourceGroup: string;
   /** Arc-connected cluster name (also the kubeconfig context name). */
   clusterName: string;
+  /** Tenant containing the selected subscription. */
+  tenantId?: string;
 }
 
 /** Result of a {@link startProxy} call. */
@@ -30,6 +34,7 @@ export interface StartProxyResult {
 
 /** How long a single reachability probe may take. */
 const REACHABILITY_TIMEOUT_MS = 5_000;
+let proxySessionInvalidation: Promise<void> = Promise.resolve();
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
@@ -65,6 +70,19 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
     return { success: false, error: 'Desktop proxy capability is not available.' };
   }
   try {
+    await waitForProxySessionInvalidation();
+    const appIdentity = await getLoginStatus();
+    await waitForProxySessionInvalidation();
+    if (!appIdentity.isLoggedIn || !appIdentity.username) {
+      return { success: false, error: 'Sign in to Azure before connecting this cluster.' };
+    }
+    const authentication = await ensureProxyAuthentication({
+      ...target,
+      accountName: appIdentity.username,
+    });
+    if (!authentication.success) {
+      return authentication;
+    }
     return await startProxyCapability({
       cluster: target.clusterName,
       subscriptionId: target.subscriptionId,
@@ -73,6 +91,27 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
   } catch (error) {
     return { success: false, error: getErrorMessage(error) };
   }
+}
+
+/** Stops every app-owned proxy so a previous Azure identity cannot be reused. */
+export function invalidateProxySession(): Promise<void> {
+  const invalidate = async () => {
+    const startProxyCapability = getStartClusterProxyCapability();
+    if (!startProxyCapability) {
+      return;
+    }
+    const result = await startProxyCapability({ invalidate: true });
+    if (!result.success) {
+      throw new Error(result.error || 'Could not invalidate cluster proxies.');
+    }
+  };
+  proxySessionInvalidation = proxySessionInvalidation.then(invalidate, invalidate);
+  return proxySessionInvalidation;
+}
+
+/** Waits until auth-change cleanup succeeds before a proxy is opened or reused. */
+export function waitForProxySessionInvalidation(): Promise<void> {
+  return proxySessionInvalidation;
 }
 
 /**

@@ -183,7 +183,7 @@ export function getLoginStatus(): Promise<AzureLoginStatus> {
     if (identity !== observedAccount) {
       observedAccount = identity;
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('azure-account-change'));
+        window.dispatchEvent(new CustomEvent('azure-account-change', { detail: status }));
       }
     }
     return status;
