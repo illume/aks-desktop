@@ -45,8 +45,22 @@ let cliLoginsPending = 0;
 let cliLoginFailed = false;
 let cliLoginEpoch = 0;
 let cliIdentityChangesPending = 0;
+let cliOperationsAllowed = true;
+let approvedNativeGeneration: number | undefined;
 let nativeSubscriptionTenantLookup: (subscriptionId: string) => string | undefined = () =>
   undefined;
+
+/** Blocks CLI-dependent operations until the user completes the CLI sign-in step. */
+export function blockCliOperations(): void {
+  cliOperationsAllowed = false;
+  cliLoginEpoch++;
+}
+
+/** Allows verified CLI operations after the current sign-in step succeeds. */
+export function allowCliOperations(): void {
+  approvedNativeGeneration = getNativeAccount() ? getNativeAuthGeneration() : undefined;
+  cliOperationsAllowed = true;
+}
 
 /** Registers the native discovery lookup without depending on the token module. */
 export function registerNativeSubscriptionTenantLookup(
@@ -229,6 +243,7 @@ export async function runCommandAsync(
     }
     if (!isIdentityIndependent(args)) {
       if (
+        !cliOperationsAllowed ||
         cliLoginsPending ||
         cliIdentityChangesPending ||
         cliLoginFailed ||
@@ -243,10 +258,14 @@ export async function runCommandAsync(
         }
       } else {
         const generation = getNativeAuthGeneration();
+        if (generation !== approvedNativeGeneration) {
+          return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+        }
         const epoch = cliLoginEpoch;
         const verified = await verifyCliIdentity(actualCommand, native, args);
         if (
           !verified ||
+          !cliOperationsAllowed ||
           generation !== getNativeAuthGeneration() ||
           epoch !== cliLoginEpoch ||
           cliLoginsPending ||

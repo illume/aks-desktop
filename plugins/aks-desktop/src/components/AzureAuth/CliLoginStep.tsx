@@ -5,7 +5,11 @@ import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
 import { initiateCliLogin } from '../../utils/azure/az-auth';
-import { isAzCliInstalled } from '../../utils/azure/az-cli-core';
+import {
+  allowCliOperations,
+  blockCliOperations,
+  isAzCliInstalled,
+} from '../../utils/azure/az-cli-core';
 import { allowAzureCliFallback, logoutNative } from '../../utils/azure/native-auth';
 
 interface CliLoginStepProps {
@@ -38,6 +42,7 @@ export default function CliLoginStep({
   const goBack = () => {
     if (continued.current) return;
     continued.current = true;
+    blockCliOperations();
     onBack?.();
   };
 
@@ -52,6 +57,7 @@ export default function CliLoginStep({
     if (!mounted.current || continued.current) return;
     if (result.success) {
       if (!nativeAuthenticated) allowAzureCliFallback();
+      allowCliOperations();
       continueOnce();
     } else {
       setError(result.message);
@@ -61,6 +67,7 @@ export default function CliLoginStep({
 
   useEffect(() => {
     mounted.current = true;
+    blockCliOperations();
     isAzCliInstalled().then(installed => {
       if (!mounted.current || continued.current) return;
       if (installed) void signIn();

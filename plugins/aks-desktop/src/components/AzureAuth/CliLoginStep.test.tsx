@@ -11,11 +11,17 @@ const mocks = vi.hoisted(() => ({
   initiateCliLogin: vi.fn(),
   allowAzureCliFallback: vi.fn(),
   logoutNative: vi.fn(),
+  allowCliOperations: vi.fn(),
+  blockCliOperations: vi.fn(),
 }));
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   useTranslation: () => ({ t: (s: string) => s }),
 }));
-vi.mock('../../utils/azure/az-cli-core', () => ({ isAzCliInstalled: mocks.isAzCliInstalled }));
+vi.mock('../../utils/azure/az-cli-core', () => ({
+  isAzCliInstalled: mocks.isAzCliInstalled,
+  allowCliOperations: mocks.allowCliOperations,
+  blockCliOperations: mocks.blockCliOperations,
+}));
 vi.mock('../../utils/azure/az-auth', () => ({ initiateCliLogin: mocks.initiateCliLogin }));
 vi.mock('../../utils/azure/native-auth', () => ({
   allowAzureCliFallback: mocks.allowAzureCliFallback,
@@ -37,6 +43,8 @@ describe('CliLoginStep', () => {
     render(<CliLoginStep onContinue={onContinue} />);
     await waitFor(() => expect(onContinue).toHaveBeenCalledOnce());
     expect(mocks.initiateCliLogin).not.toHaveBeenCalled();
+    expect(mocks.blockCliOperations).toHaveBeenCalled();
+    expect(mocks.allowCliOperations).not.toHaveBeenCalled();
   });
 
   test('starts CLI login automatically once and waits for it before continuing', async () => {
@@ -54,6 +62,7 @@ describe('CliLoginStep', () => {
     expect(onContinue).not.toHaveBeenCalled();
     await act(async () => resolve({ success: true, message: 'done' }));
     expect(onContinue).toHaveBeenCalledOnce();
+    expect(mocks.allowCliOperations).toHaveBeenCalledOnce();
   });
 
   test('shows failure, permits retry and offers native-only continuation', async () => {
@@ -61,6 +70,7 @@ describe('CliLoginStep', () => {
     const onContinue = vi.fn();
     render(<CliLoginStep onContinue={onContinue} />);
     expect((await screen.findByRole('alert')).textContent).toContain('Failed');
+    expect(screen.getByText(/will not change your Azure CLI cloud/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Retry Azure CLI sign-in' }));
     await waitFor(() => expect(mocks.initiateCliLogin).toHaveBeenCalledTimes(2));
     await screen.findByRole('alert');
@@ -89,6 +99,7 @@ describe('CliLoginStep', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue without waiting for Azure CLI' }));
     await act(async () => resolve({ success: true, message: 'done' }));
     expect(onContinue).toHaveBeenCalledOnce();
+    expect(mocks.allowCliOperations).not.toHaveBeenCalled();
   });
 
   test('CLI-only mode requires successful sign-in before enabling fallback', async () => {
@@ -126,5 +137,6 @@ describe('CliLoginStep', () => {
     expect(onContinue).not.toHaveBeenCalled();
     expect(mocks.logoutNative).toHaveBeenCalledOnce();
     expect(mocks.allowAzureCliFallback).not.toHaveBeenCalled();
+    expect(mocks.allowCliOperations).not.toHaveBeenCalled();
   });
 });

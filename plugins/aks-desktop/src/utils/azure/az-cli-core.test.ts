@@ -34,6 +34,8 @@ vi.mock('./native-auth', () => ({
 }));
 
 import {
+  allowCliOperations,
+  blockCliOperations,
   getErrorMessage,
   isAzCliInstalled,
   isAzCliLoggedIn,
@@ -52,6 +54,7 @@ beforeEach(() => {
   mocks.generation.mockReturnValue(0);
   mocks.nativeSession.mockReturnValue(false);
   mocks.signedOut.mockReturnValue(false);
+  allowCliOperations();
   registerNativeSubscriptionTenantLookup(id => (id.toLowerCase() === 'sub' ? 'tenant' : undefined));
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -364,6 +367,47 @@ describe('runAzCommand', () => {
         await expect(runCommandAsync('az', args)).resolves.toEqual(commandResult);
       }
       await expect(runCommandAsync('kubectl', ['get', 'pods'])).resolves.toEqual(commandResult);
+    });
+
+    test('keeps CLI operations blocked after skipping while metadata remains available', async () => {
+      mocks.execCommand.mockResolvedValue(commandResult);
+      blockCliOperations();
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+      await expect(runCommandAsync('az', ['version'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['account', 'show'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['cloud', 'show'])).resolves.toEqual(commandResult);
+      await expect(runCommandAsync('az', ['logout'])).resolves.toEqual(commandResult);
+    });
+
+    test('a successful late CLI login cannot undo a skipped step', async () => {
+      let finishLogin!: (value: { stdout: string; stderr: string }) => void;
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') return new Promise(resolve => (finishLogin = resolve));
+        if (args[0] === 'account') {
+          return Promise.resolve({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+      const login = runCommandAsync('az', ['login']);
+      blockCliOperations();
+      finishLogin({ stdout: '[{}]', stderr: '' });
+      await login;
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+    });
+
+    test('a new successful CLI sign-in and explicit permission restores access', async () => {
+      blockCliOperations();
+      mocks.execCommand
+        .mockResolvedValueOnce({ stdout: '[{}]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '{"id":"sub","tenantId":"tenant"}', stderr: '' })
+        .mockResolvedValue(commandResult);
+      await expect(runCommandAsync('az', ['login'])).resolves.toEqual({
+        stdout: '[{}]',
+        stderr: '',
+      });
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(denied);
+      allowCliOperations();
+      await expect(runCommandAsync('az', ['group', 'list'])).resolves.toEqual(commandResult);
     });
 
     test('blocks during login and after failure until a successful retry', async () => {
