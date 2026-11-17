@@ -36,7 +36,9 @@ describe.runIf(azureLiveEnabled)(
 
     beforeAll(async () => {
       const selectedSubscription = process.env.AZ_LIVE_SUBSCRIPTION || DEFAULT_LIVE_SUBSCRIPTION;
-      const args = ['account', 'show', '--subscription', selectedSubscription, '--output', 'json'];
+      const subscriptionArgument =
+        process.platform === 'win32' ? `"${selectedSubscription}"` : selectedSubscription;
+      const args = ['account', 'show', '--subscription', subscriptionArgument, '--output', 'json'];
       account = JSON.parse(await az(args));
 
       (globalThis as any).pluginRunCommand = (command: string, commandArgs: string[]) => {

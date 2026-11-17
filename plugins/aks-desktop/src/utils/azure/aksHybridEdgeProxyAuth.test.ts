@@ -38,7 +38,7 @@ describe('ensureProxyAuthentication', () => {
   test('reuses matching app-owned CLI state without prompting', async () => {
     mockRunCommandAsync
       .mockResolvedValueOnce(account())
-      .mockResolvedValueOnce({ stdout: '1799999999', stderr: '' });
+      .mockResolvedValueOnce({ stdout: '4102444800', stderr: '' });
 
     await expect(ensureProxyAuthentication(target)).resolves.toEqual({ success: true });
     expect(mockRunCommandAsync).toHaveBeenCalledTimes(2);
@@ -49,7 +49,7 @@ describe('ensureProxyAuthentication', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: 'ERROR: Please run az login' })
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce(account())
-      .mockResolvedValueOnce({ stdout: '1799999999', stderr: '' });
+      .mockResolvedValueOnce({ stdout: '4102444800', stderr: '' });
 
     await expect(ensureProxyAuthentication(target)).resolves.toEqual({ success: true });
     expect(mockRunCommandAsync).toHaveBeenNthCalledWith(2, 'az', [
@@ -94,7 +94,7 @@ describe('ensureProxyAuthentication', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: 'ERROR: token refresh failed' })
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce(account())
-      .mockResolvedValueOnce({ stdout: '1799999999', stderr: '' });
+      .mockResolvedValueOnce({ stdout: '4102444800', stderr: '' });
 
     await expect(ensureProxyAuthentication(target)).resolves.toEqual({ success: true });
     expect(mockRunCommandAsync).toHaveBeenNthCalledWith(

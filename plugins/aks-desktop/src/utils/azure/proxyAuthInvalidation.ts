@@ -19,26 +19,32 @@ export function createProxyAuthInvalidator(
   onError: (error: unknown) => void
 ): (status: AzureLoginStatus | undefined) => void {
   let previousIdentity: string | undefined;
-  let pendingIdentity: string | undefined;
+  let latestIdentity: string | undefined;
+  let pending: Promise<void> | undefined;
+
+  const schedule = (identity: string) => {
+    pending = invalidate()
+      .then(() => {
+        previousIdentity = identity;
+      })
+      .catch(error => {
+        previousIdentity = undefined;
+        onError(error);
+      })
+      .then(() => {
+        pending = undefined;
+        if (latestIdentity !== identity) {
+          schedule(latestIdentity!);
+        }
+      });
+  };
+
   return status => {
     const identity = identityKey(status);
-    if (identity === previousIdentity || identity === pendingIdentity) {
+    latestIdentity = identity;
+    if (pending || identity === previousIdentity) {
       return;
     }
-    pendingIdentity = identity;
-    void invalidate().then(
-      () => {
-        previousIdentity = identity;
-        if (pendingIdentity === identity) {
-          pendingIdentity = undefined;
-        }
-      },
-      error => {
-        if (pendingIdentity === identity) {
-          pendingIdentity = undefined;
-        }
-        onError(error);
-      }
-    );
+    schedule(identity);
   };
 }

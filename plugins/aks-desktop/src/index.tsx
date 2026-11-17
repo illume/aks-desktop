@@ -179,23 +179,25 @@ if (Headlamp.isRunningAsApp()) {
     }
   };
 
-  // Check initially
-  updateAzureAccountLabel();
-
-  const invalidateForObservedIdentity = createProxyAuthInvalidator(invalidateProxySession, error =>
-    console.error('[AKS] Could not invalidate cluster proxies:', error)
+  const reportProxyInvalidationError = (error: unknown) =>
+    console.error('[AKS] Could not invalidate cluster proxies:', error);
+  void invalidateProxySession().catch(reportProxyInvalidationError);
+  const invalidateForObservedIdentity = createProxyAuthInvalidator(
+    invalidateProxySession,
+    reportProxyInvalidationError
   );
   const invalidateProxyOnAccountChange = (event: Event) => {
     const status = (event as CustomEvent<Awaited<ReturnType<typeof getLoginStatus>>>).detail;
     invalidateForObservedIdentity(status);
   };
 
+  // Check initially
+  updateAzureAccountLabel();
+
   // Listen for custom events from login/logout operations
   window.addEventListener('azure-auth-update', updateAzureAccountLabel);
   window.addEventListener('azure-auth-update', () => {
-    void invalidateProxySession().catch(error =>
-      console.error('[AKS] Could not invalidate cluster proxies:', error)
-    );
+    void invalidateProxySession().catch(reportProxyInvalidationError);
   });
   window.addEventListener('azure-account-change', invalidateProxyOnAccountChange);
 

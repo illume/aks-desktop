@@ -92,11 +92,16 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
     if (generation !== proxySessionGeneration) {
       return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
     }
-    return await startProxyCapability({
+    const result = await startProxyCapability({
       cluster: target.clusterName,
       subscriptionId: target.subscriptionId,
       resourceGroup: target.resourceGroup,
     });
+    await waitForProxySessionInvalidation();
+    if (generation !== proxySessionGeneration) {
+      return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
+    }
+    return result;
   } catch (error) {
     return { success: false, error: getErrorMessage(error) };
   }

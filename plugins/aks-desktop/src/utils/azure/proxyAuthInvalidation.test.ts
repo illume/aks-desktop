@@ -22,7 +22,7 @@ describe('createProxyAuthInvalidator', () => {
     expect(invalidate).toHaveBeenCalledOnce();
   });
 
-  test('ignores duplicate observations but invalidates an account change', () => {
+  test('ignores duplicate observations but invalidates an account change', async () => {
     const invalidate = vi.fn().mockResolvedValue(undefined);
     const handleIdentity = createProxyAuthInvalidator(invalidate, vi.fn());
 
@@ -30,7 +30,7 @@ describe('createProxyAuthInvalidator', () => {
     handleIdentity({ ...identity });
     handleIdentity({ ...identity, username: 'another@example.com' });
 
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
   });
 
   test('reports an invalidation failure and permits retrying the same identity', async () => {
@@ -43,5 +43,29 @@ describe('createProxyAuthInvalidator', () => {
     await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(error));
     handleIdentity(identity);
     await vi.waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
+  });
+
+  test('retries the latest identity after a different identity fails cleanup', async () => {
+    let rejectChangedIdentity: ((error: Error) => void) | undefined;
+    const invalidate = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectChangedIdentity = reject;
+          })
+      )
+      .mockResolvedValueOnce(undefined);
+    const handleIdentity = createProxyAuthInvalidator(invalidate, vi.fn());
+
+    handleIdentity(identity);
+    await vi.waitFor(() => expect(invalidate).toHaveBeenCalledOnce());
+    handleIdentity({ ...identity, username: 'another@example.com' });
+    await vi.waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
+    handleIdentity(identity);
+    rejectChangedIdentity?.(new Error('cleanup failed'));
+
+    await vi.waitFor(() => expect(invalidate).toHaveBeenCalledTimes(3));
   });
 });

@@ -183,6 +183,31 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
       expect.objectContaining({ cluster: targetA.clusterName })
     );
   });
+
+  test('does not report success when authentication changes during main-process startup', async () => {
+    let finishStart: ((result: { success: true }) => void) | undefined;
+    mockStartClusterProxy.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishStart = resolve;
+        })
+    );
+
+    const started = startProxy(targetA);
+    await vi.waitFor(() =>
+      expect(mockStartClusterProxy).toHaveBeenCalledWith(
+        expect.objectContaining({ cluster: targetA.clusterName })
+      )
+    );
+    const invalidated = invalidateProxySession();
+    finishStart?.({ success: true });
+
+    await expect(started).resolves.toEqual({
+      success: false,
+      error: 'Azure sign-in changed while starting the cluster proxy.',
+    });
+    await expect(invalidated).resolves.toBeUndefined();
+  });
 });
 
 describe('aksHybridEdgeProxy — reachability & verification', () => {
