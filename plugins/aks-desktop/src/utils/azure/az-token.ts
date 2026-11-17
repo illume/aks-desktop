@@ -5,6 +5,7 @@
 
 import type { AccessToken, GetTokenOptions, TokenCredential } from '@azure/identity';
 import { debugLog, isValidGuid, needsRelogin, runCommandAsync } from './az-cli-core';
+import { hasNativeSession, nativeCredential } from './native-auth';
 
 /** Default public-cloud ARM scope; configured clouds can supply another audience. */
 export const ARM_SCOPE = 'https://management.azure.com/.default';
@@ -58,6 +59,9 @@ async function requestCliToken(
   tenantId?: string,
   subscriptionId?: string
 ): Promise<AccessToken> {
+  if (hasNativeSession()) {
+    return nativeCredential.getToken(scope, { tenantId });
+  }
   const args = ['account', 'get-access-token', '--scope', scope, '-o', 'json'];
   // Keep the selected account: Azure CLI rejects combining these selectors.
   if (subscriptionId) args.push('--subscription', subscriptionId);

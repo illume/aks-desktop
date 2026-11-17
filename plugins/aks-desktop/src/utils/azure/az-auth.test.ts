@@ -6,6 +6,9 @@ import { LOGIN_POLL_INTERVAL_MS } from '../constants/timing';
 
 const mocks = vi.hoisted(() => ({
   isAzCliLoggedIn: vi.fn(),
+  getNativeAccount: vi.fn(),
+  hasNativeSession: vi.fn(),
+  initiateNativeLogin: vi.fn(),
   needsRelogin: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
@@ -26,7 +29,23 @@ vi.mock('./az-cli-path', () => ({
   getInstallationInstructions: () => 'Install Azure CLI.',
 }));
 
+vi.mock('./native-auth', () => ({
+  getNativeAccount: mocks.getNativeAccount,
+  hasNativeSession: mocks.hasNativeSession,
+  initiateNativeLogin: mocks.initiateNativeLogin,
+}));
+
 import { getLoginStatus, initiateLogin, login, monitorLoginStatus } from './az-auth';
+
+beforeEach(() => {
+  mocks.getNativeAccount.mockReturnValue(undefined);
+  mocks.hasNativeSession.mockReturnValue(false);
+  mocks.initiateNativeLogin.mockResolvedValue({
+    message: 'Enter code ABCD-EFGH',
+    userCode: 'ABCD-EFGH',
+    verificationUri: 'https://microsoft.com/devicelogin',
+  });
+});
 
 describe('getLoginStatus', () => {
   beforeEach(() => {
@@ -299,96 +318,22 @@ describe('initiateLogin', () => {
     vi.restoreAllMocks();
   });
 
-  test('accepts successful login output with warnings', async () => {
-    mocks.runCommandAsync.mockResolvedValue({
-      stdout: '[{"isDefault":true}]',
-      stderr: 'WARNING: The login output has changed.',
-    });
-
+  test('starts native authentication without invoking Azure CLI', async () => {
     await expect(initiateLogin()).resolves.toEqual({
       success: true,
-      message: 'Login process initiated. Please complete authentication in your browser.',
+      message: 'Enter code ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
     });
-  });
-
-  test('accepts usable login output with a tenant-specific error', async () => {
-    mocks.runCommandAsync.mockResolvedValue({
-      stdout: '[{"isDefault":true}]',
-      stderr: "ERROR: Failed to authenticate tenant 'unavailable-tenant'.",
-    });
-
-    await expect(initiateLogin()).resolves.toMatchObject({ success: true });
-  });
-
-  test.each([
-    'ERROR: The user canceled the authentication',
-    'Command exited with code 1',
-    'Command exited with code null',
-    'Command execution error: bridge disconnected',
-    'Failed to execute command: bridge not ready',
-    'pluginRunCommand is not available.',
-  ])('reports a command failure immediately: %s', async stderr => {
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr });
-
-    await expect(initiateLogin()).resolves.toEqual({
-      success: false,
-      message: `Failed to initiate login: ${stderr}`,
-    });
-  });
-
-  test('trims command failure output before displaying it', async () => {
-    mocks.runCommandAsync.mockResolvedValue({
-      stdout: '',
-      stderr: '  Command execution error: bridge disconnected\n',
-    });
-
-    await expect(initiateLogin()).resolves.toEqual({
-      success: false,
-      message: 'Failed to initiate login: Command execution error: bridge disconnected',
-    });
-  });
-
-  test('does not treat whitespace stdout as a successful command', async () => {
-    mocks.runCommandAsync.mockResolvedValue({
-      stdout: ' \n',
-      stderr: 'Command exited with code 1',
-    });
-
-    await expect(initiateLogin()).resolves.toEqual({
-      success: false,
-      message: 'Failed to initiate login: Command exited with code 1',
-    });
-  });
-
-  test('preserves Azure CLI installation guidance for ENOENT', async () => {
-    mocks.runCommandAsync.mockResolvedValue({
-      stdout: '',
-      stderr: 'Command execution error: spawn az ENOENT',
-    });
-
-    const result = await initiateLogin();
-
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('Azure CLI could not be started.');
-    expect(result.message).toContain('Install Azure CLI.');
-  });
-
-  test('preserves Azure CLI installation guidance for a thrown ENOENT error', async () => {
-    mocks.runCommandAsync.mockRejectedValue(new Error('spawn az ENOENT'));
-
-    const result = await initiateLogin();
-
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('Azure CLI could not be started.');
-    expect(result.message).toContain('Install Azure CLI.');
+    expect(mocks.initiateNativeLogin).toHaveBeenCalledOnce();
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
   });
 
   test('reports thrown login errors', async () => {
-    mocks.runCommandAsync.mockRejectedValue(new Error('bridge failed'));
+    mocks.initiateNativeLogin.mockRejectedValue(new Error('identity service failed'));
 
     await expect(initiateLogin()).resolves.toEqual({
       success: false,
-      message: 'Failed to initiate login: bridge failed',
+      message: 'Failed to initiate login: identity service failed',
     });
   });
 });
@@ -504,29 +449,35 @@ describe('login', () => {
     vi.useRealTimers();
   });
 
-  test('returns immediately for an existing Azure CLI session', async () => {
-    mocks.isAzCliLoggedIn.mockResolvedValue(true);
+  test('returns immediately for an existing session', async () => {
+    mocks.getNativeAccount.mockReturnValue({
+      tenantId: 'tenant-id',
+      subscriptionId: 'subscription-id',
+      environmentName: 'AzureCloud',
+    });
 
     await expect(login()).resolves.toBe(true);
-    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+    expect(mocks.initiateNativeLogin).not.toHaveBeenCalled();
   });
 
   test('returns false when login initiation fails', async () => {
-    mocks.isAzCliLoggedIn.mockResolvedValue(false);
-    mocks.runCommandAsync.mockResolvedValue({
-      stdout: '',
-      stderr: 'Command exited with code 1',
-    });
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.initiateNativeLogin.mockRejectedValue(new Error('login failed'));
 
     await expect(login()).resolves.toBe(false);
   });
 
-  test('polls until Azure CLI reports a session', async () => {
-    mocks.isAzCliLoggedIn
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '[{"isDefault":true}]', stderr: '' });
+  test('polls until native authentication reports a session', async () => {
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.getNativeAccount
+      .mockReturnValueOnce(undefined)
+      .mockReturnValueOnce(undefined)
+      .mockReturnValue({
+        tenantId: 'tenant-id',
+        subscriptionId: 'subscription-id',
+        environmentName: 'AzureCloud',
+      });
+    mocks.hasNativeSession.mockReturnValueOnce(false).mockReturnValue(true);
 
     const result = login();
     await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
@@ -535,41 +486,12 @@ describe('login', () => {
   });
 
   test('returns false after the login timeout', async () => {
-    mocks.isAzCliLoggedIn.mockResolvedValue(false);
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '[{"isDefault":true}]', stderr: '' });
+    mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.hasNativeSession.mockReturnValueOnce(false).mockReturnValue(true);
 
     const result = login(1);
-    await vi.advanceTimersByTimeAsync(LOGIN_POLL_INTERVAL_MS);
+    await vi.advanceTimersByTimeAsync(1);
 
     await expect(result).resolves.toBe(false);
-  });
-
-  test('returns false when an Azure CLI status check hangs past the timeout', async () => {
-    mocks.isAzCliLoggedIn.mockReturnValue(new Promise(() => {}));
-
-    const result = login(1_000);
-    await vi.advanceTimersByTimeAsync(1_000);
-
-    await expect(Promise.race([result, Promise.resolve('pending')])).resolves.toBe(false);
-  });
-
-  test('returns false when Azure CLI login initiation hangs past the timeout', async () => {
-    mocks.isAzCliLoggedIn.mockResolvedValue(false);
-    mocks.runCommandAsync.mockReturnValue(new Promise(() => {}));
-
-    const result = login(1_000);
-    await vi.advanceTimersByTimeAsync(1_000);
-
-    await expect(Promise.race([result, Promise.resolve('pending')])).resolves.toBe(false);
-  });
-
-  test('returns false when the post-login status check hangs past the timeout', async () => {
-    mocks.isAzCliLoggedIn.mockResolvedValueOnce(false).mockReturnValueOnce(new Promise(() => {}));
-    mocks.runCommandAsync.mockResolvedValue({ stdout: '[{"isDefault":true}]', stderr: '' });
-
-    const result = login(1_000);
-    await vi.advanceTimersByTimeAsync(1_000);
-
-    await expect(Promise.race([result, Promise.resolve('pending')])).resolves.toBe(false);
   });
 });

@@ -96,18 +96,23 @@ export function useAzureProfilePage(): UseAzureProfilePageResult {
     trackAksFeature('aksd.auth-logout', 'started');
     setLoggingOut(true);
     try {
-      // Dynamic import avoids circular dependencies at module load time.
-      const { runCommandAsync, isAzError } = await import('../../../utils/azure/az-cli-core');
-      const result = await runCommandAsync('az', ['logout']);
-      if (!isCurrentLogoutAttempt(attemptGeneration)) {
-        return;
-      }
+      const { hasNativeSession, logoutNative } = await import('../../../utils/azure/native-auth');
+      if (hasNativeSession()) {
+        logoutNative();
+      } else {
+        // Dynamic import avoids circular dependencies at module load time.
+        const { runCommandAsync, isAzError } = await import('../../../utils/azure/az-cli-core');
+        const result = await runCommandAsync('az', ['logout']);
+        if (!isCurrentLogoutAttempt(attemptGeneration)) {
+          return;
+        }
 
-      if (result.stderr && isAzError(result.stderr)) {
-        console.error('Azure CLI logout error:', result.stderr);
-        trackLogoutFailure();
-        setLoggingOut(false);
-        return;
+        if (result.stderr && isAzError(result.stderr)) {
+          console.error('Azure CLI logout error:', result.stderr);
+          trackLogoutFailure();
+          setLoggingOut(false);
+          return;
+        }
       }
 
       trackAksFeature('aksd.auth-logout', 'succeeded');

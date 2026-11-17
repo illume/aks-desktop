@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0.
 
 import { runAzCommand } from './az-cli-core';
+import { hasNativeSession } from './native-auth';
 import { withAbort } from './az-token';
 
 /** Name, request destination and token scope from one CLI cloud configuration. */
@@ -46,6 +47,13 @@ export function getAzureCloudEndpoints(
   cloudName?: string,
   signal?: AbortSignal
 ): Promise<AzureCloudEndpoints> {
+  if (hasNativeSession()) {
+    return Promise.resolve({
+      name: 'AzureCloud',
+      endpoint: 'https://management.azure.com',
+      scope: 'https://management.azure.com/.default',
+    });
+  }
   return getCloudEndpoints('arm', cloudName, signal);
 }
 
@@ -60,6 +68,13 @@ export function getAzureGraphEndpoints(
   cloudName?: string,
   signal?: AbortSignal
 ): Promise<AzureCloudEndpoints> {
+  if (hasNativeSession()) {
+    return Promise.resolve({
+      name: 'AzureCloud',
+      endpoint: 'https://graph.microsoft.com',
+      scope: 'https://graph.microsoft.com/.default',
+    });
+  }
   return getCloudEndpoints('graph', cloudName, signal);
 }
 

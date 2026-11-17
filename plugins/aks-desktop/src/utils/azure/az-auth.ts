@@ -2,15 +2,14 @@
 // Licensed under the Apache 2.0.
 import { LOGIN_POLL_INTERVAL_MS, LOGIN_TIMEOUT_MS } from '../constants/timing';
 import {
-  debugLog,
   getErrorMessage,
-  isAzCliLoggedIn,
   isAzError,
   isCliNotFoundError,
   needsRelogin,
   runCommandAsync,
 } from './az-cli-core';
-import { getAzCommand, getInstallationInstructions } from './az-cli-path';
+import { getInstallationInstructions } from './az-cli-path';
+import { getNativeAccount, hasNativeSession, initiateNativeLogin } from './native-auth';
 
 /** Azure CLI account state used by authentication flows. */
 export interface AzureLoginStatus {
@@ -36,6 +35,8 @@ export interface AzureLoginResult {
   success: boolean;
   /** User-facing description of the result. */
   message: string;
+  /** Device code to display while native authentication is pending. */
+  userCode?: string;
 }
 
 /** Account-status update emitted by {@link monitorLoginStatus}. */
@@ -169,7 +170,17 @@ let latestAccountObservation: Promise<AzureLoginStatus> | undefined;
  * @returns Validated account status; lookup failures invalidate the previous context.
  */
 export function getLoginStatus(): Promise<AzureLoginStatus> {
-  const observation: Promise<AzureLoginStatus> = readLoginStatus().then(status => {
+  const nativeAccount = getNativeAccount();
+  const readStatus = nativeAccount
+    ? Promise.resolve({ isLoggedIn: true, ...nativeAccount })
+    : hasNativeSession()
+    ? Promise.resolve({
+        isLoggedIn: false,
+        needsRelogin: true,
+        error: 'Not logged in',
+      })
+    : readLoginStatus();
+  const observation: Promise<AzureLoginStatus> = readStatus.then(status => {
     if (latestAccountObservation && latestAccountObservation !== observation) {
       return latestAccountObservation;
     }
@@ -199,55 +210,15 @@ export function getLoginStatus(): Promise<AzureLoginStatus> {
  */
 export async function initiateLogin(): Promise<AzureLoginResult> {
   try {
-    debugLog('[AZ-CLI] ===== INITIATING LOGIN =====');
-    debugLog('[AZ-CLI] Resolved command:', getAzCommand());
-    debugLog(
-      '[AZ-CLI] Is Electron?:',
-      typeof window !== 'undefined' && (window as any).desktopApi !== undefined
-    );
-    debugLog('[AZ-CLI] Platform:', typeof process !== 'undefined' ? process.platform : 'unknown');
-
-    const { stdout, stderr } = await runCommandAsync('az', ['login']);
-
-    debugLog('[AZ-CLI] Login stdout:', stdout);
-    debugLog('[AZ-CLI] Login stderr:', stderr);
-
-    if (stderr && (isCliNotFoundError(stderr) || stderr.includes('ENOENT'))) {
-      console.error('[AZ-CLI] Azure CLI not found error detected in stderr');
-      const instructions = getInstallationInstructions();
-      return {
-        success: false,
-        message: `Azure CLI could not be started.\n\n${instructions}`,
-      };
-    }
-
-    if (!stdout.trim() && stderr && isCommandFailure(stderr)) {
-      return {
-        success: false,
-        message: `Failed to initiate login: ${stderr.trim()}`,
-      };
-    }
-
-    // If we get here, login was initiated successfully
-    debugLog('[AZ-CLI] Login initiated successfully');
+    const prompt = await initiateNativeLogin();
     return {
       success: true,
-      message: 'Login process initiated. Please complete authentication in your browser.',
+      message: prompt.message,
+      userCode: prompt.userCode,
     };
   } catch (error) {
-    console.error('[AZ-CLI] Error initiating Azure login:', error);
+    console.error('Error initiating Azure login:', error);
     const errorMessage = getErrorMessage(error);
-
-    // Check if it's an ENOENT error
-    if (errorMessage.includes('ENOENT') || errorMessage.includes('spawn az ENOENT')) {
-      console.error('[AZ-CLI] ENOENT error - Azure CLI command not found');
-      const instructions = getInstallationInstructions();
-      return {
-        success: false,
-        message: `Azure CLI could not be started.\n\n${instructions}`,
-      };
-    }
-
     return {
       success: false,
       message: `Failed to initiate login: ${errorMessage}`,
@@ -324,9 +295,9 @@ export function monitorLoginStatus(
  */
 export async function login(timeoutMs = LOGIN_TIMEOUT_MS): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  const initialStatus = await waitUntilDeadline(isAzCliLoggedIn(), deadline);
+  const initialStatus = await waitUntilDeadline(getLoginStatus(), deadline);
   if (initialStatus === OPERATION_TIMED_OUT) return false;
-  if (initialStatus) return true;
+  if (initialStatus.isLoggedIn) return true;
 
   const init = await waitUntilDeadline(initiateLogin(), deadline);
   if (init === OPERATION_TIMED_OUT || !init.success) return false;
@@ -334,9 +305,9 @@ export async function login(timeoutMs = LOGIN_TIMEOUT_MS): Promise<boolean> {
   return new Promise(resolve => {
     /** Checks login status once and schedules another bounded check when needed. */
     const poll = async () => {
-      const status = await waitUntilDeadline(isAzCliLoggedIn(), deadline);
+      const status = await waitUntilDeadline(getLoginStatus(), deadline);
       if (status === OPERATION_TIMED_OUT) return resolve(false);
-      if (status) return resolve(true);
+      if (status.isLoggedIn) return resolve(true);
 
       const remaining = deadline - Date.now();
       if (remaining <= 0) return resolve(false);

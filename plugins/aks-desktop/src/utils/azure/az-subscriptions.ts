@@ -8,6 +8,7 @@ import { clearAzureCloudCache, getAzureCloudEndpoints } from './az-cloud';
 import { azListAll, azRequest, azRequestRaw, AzureRequestError } from './az-http';
 import { clearAzureTokenCaches, getSubscriptionCredential } from './az-token';
 import { isValidAzResourceName } from './az-validation';
+import { hasNativeSession } from './native-auth';
 
 const SUBSCRIPTIONS_API_VERSION = '2022-12-01';
 const RESOURCE_GROUPS_API_VERSION = '2021-04-01';
@@ -107,7 +108,7 @@ export async function getSubscriptions(refresh = false): Promise<any[]> {
 
   if (errors.length > 0 && errors.length === tenants.length) throw errors[0];
   // TODO: Remove this block and the tenant preference below with listCliProfileSubscriptions.
-  if (!profile && subscriptions.size > 0) {
+  if (!hasNativeSession() && !profile && subscriptions.size > 0) {
     profile = await listCliProfileSubscriptions(false);
     if ([...subscriptions.keys()].some(id => !profile!.has(id.toLowerCase()))) {
       profile = await listCliProfileSubscriptions(true);

@@ -59,6 +59,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
+  const [loginPrompt, setLoginPrompt] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showRetry, setShowRetry] = useState(false);
   const [loginCommandPending, setLoginCommandPending] = useState(false);
@@ -250,6 +251,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
     setLoading(true);
     setShowRetry(false);
     setErrorMessage('');
+    setLoginPrompt('');
     setStatusMessage(`${t('Initiating Azure login')}...`);
     startLoginTimeout(attemptGeneration);
 
@@ -281,6 +283,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
       }
 
       startLoginRetryTimeout(attemptGeneration);
+      setLoginPrompt(result.message);
       setStatusMessage(t('Checking authentication status'));
 
       // Check immediately, then poll for login completion
@@ -328,6 +331,7 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
             loginAttemptOutcomeRef.current = 'failed';
             trackLoginFailure('UnknownError');
             setStatusMessage('');
+            setLoginPrompt('');
             setErrorMessage(status.error);
             setLoading(false);
             setShowRetry(false);
@@ -534,6 +538,12 @@ export default function AzureLoginPage({ redirectTo }: AzureLoginPageProps) {
             {statusMessage && (
               <Typography variant="body2" sx={{ mt: 2, color: 'info.main' }}>
                 {statusMessage}
+              </Typography>
+            )}
+
+            {loginPrompt && (
+              <Typography variant="body2" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>
+                {loginPrompt}
               </Typography>
             )}
 
