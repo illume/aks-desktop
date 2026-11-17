@@ -157,7 +157,10 @@ export async function getSubscriptions(
     ) {
       throw new Error('Azure account changed during subscription discovery');
     }
-    nativePublishedDiscoverySequence = Math.max(nativePublishedDiscoverySequence, discoverySequence);
+    nativePublishedDiscoverySequence = Math.max(
+      nativePublishedDiscoverySequence,
+      discoverySequence
+    );
   }
   return discovered;
 }
