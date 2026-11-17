@@ -29,8 +29,8 @@ import {
   ARM_SCOPE,
   AzTokenError,
   createAzCliCredential,
-  getAzureAccountGeneration,
   getAzToken,
+  getAzureAccountGeneration,
   getSubscriptionCredential,
   setNativeSubscriptionTenants,
 } from './az-token';

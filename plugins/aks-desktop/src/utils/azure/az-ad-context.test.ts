@@ -330,7 +330,7 @@ describe('Graph account and cloud context', () => {
     expect(requests).toHaveLength(2);
   });
 
-  test('late token acquisition from A stays isolated from B, including a switch back to A', async () => {
+  test('rejects a late token from A without affecting B, including a switch back to A', async () => {
     const dispatch = mocks.command.getMockImplementation()!;
     let release!: (value: ReturnType<typeof output>) => void;
     let started!: () => void;
@@ -349,7 +349,7 @@ describe('Graph account and cloud context', () => {
     const pendingA = searchAzureADUsers('Alice');
     await waiting;
     account.user.name = 'operator-b@contoso.com';
-    await resolveAzureADUser(user.id);
+    expect((await resolveAzureADUser(user.id)).success).toBe(true);
     release(
       output({
         accessToken: 'offline-late-a',
@@ -357,15 +357,20 @@ describe('Graph account and cloud context', () => {
         tenant: tenantId,
       })
     );
-    await pendingA;
-    await searchAzureADUsers('Alice');
-    expect(requests[0].authorization).toBe(requests[2].authorization);
-    expect(requests[1].authorization).not.toBe(requests[2].authorization);
+    expect(await pendingA).toMatchObject({
+      success: false,
+      error: expect.stringContaining('account changed'),
+    });
+    expect(requests).toHaveLength(1);
+    expect((await searchAzureADUsers('Alice')).success).toBe(true);
+    expect(requests).toHaveLength(2);
+    expect(requests[0].authorization).toBe(requests[1].authorization);
     expect(calls('account get-access-token')).toHaveLength(2);
     account.user.name = 'operator-a@contoso.com';
     mocks.command.mockImplementation(dispatch);
-    await resolveAzureADUser(user.id);
+    expect((await resolveAzureADUser(user.id)).success).toBe(true);
     expect(calls('account get-access-token')).toHaveLength(3);
-    expect(requests[3].authorization).not.toBe(requests[1].authorization);
+    expect(requests).toHaveLength(3);
+    expect(requests[2].authorization).not.toBe(requests[0].authorization);
   });
 });

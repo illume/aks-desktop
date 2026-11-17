@@ -217,6 +217,7 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
   const resolveToken = async (scope: string, tenantId?: string): Promise<AccessToken> => {
     synchronizeNativeGeneration();
     const native = hasNativeSession();
+    let resolvedTenantId = tenantId;
     if (!native && isAzureExplicitlySignedOut()) {
       throw new AzTokenError('Azure login is required', true);
     }
@@ -235,11 +236,11 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
           'The selected subscription account does not belong to the requested tenant'
         );
       }
-      tenantId = mappedTenant;
+      resolvedTenantId = mappedTenant;
     }
     const key = `${
       native ? `native:${accountVersion}:${mappingVersion}` : `cli:${accountVersion}`
-    }|${tenantId ?? ''}|${scope}`;
+    }|${resolvedTenantId ?? ''}|${scope}`;
     const cached = cache.get(key);
     const ensureCurrent = () => {
       synchronizeNativeGeneration();
@@ -253,11 +254,13 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
         throw new AzTokenError('Azure account changed during token acquisition');
       }
     };
-    let token = await (cached ?? load(key, scope, tenantId, native));
+    let token = await (cached ?? load(key, scope, resolvedTenantId, native));
     ensureCurrent();
     if (cached && token.expiresOnTimestamp - REFRESH_MARGIN_MS <= Date.now()) {
       const current = cache.get(key);
-      token = await (current && current !== cached ? current : load(key, scope, tenantId, native));
+      token = await (current && current !== cached
+        ? current
+        : load(key, scope, resolvedTenantId, native));
     }
     ensureCurrent();
     return token;
