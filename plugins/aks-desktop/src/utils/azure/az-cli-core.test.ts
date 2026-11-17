@@ -846,6 +846,22 @@ describe('runAzCommand', () => {
       ]);
     });
 
+    test('returns verified partial login results without stale tenant errors', async () => {
+      acceptNative();
+      mockCli();
+      mocks.execCommand.mockImplementationOnce(() =>
+        Promise.resolve({
+          stdout: '[{"id":"sub","tenantId":"tenant"}]',
+          stderr: 'ERROR: authentication failed for an unrelated tenant',
+        })
+      );
+
+      await expect(runCommandAsync('az', ['login'])).resolves.toEqual({
+        stdout: '[{"id":"sub","tenantId":"tenant"}]',
+        stderr: '',
+      });
+    });
+
     test('keeps operations blocked when login succeeds but account verification fails', async () => {
       acceptNative();
       mockCli({ ...account, user: { name: 'other@example.com' } });

@@ -7,6 +7,7 @@ const mockClusterRequest = vi.hoisted(() => vi.fn());
 const mockRequest = vi.hoisted(() => vi.fn());
 const mockStartClusterProxy = vi.hoisted(() => vi.fn());
 const mockRunCommandAsync = vi.hoisted(() => vi.fn());
+const mockVerifyCliCapabilityAccess = vi.hoisted(() => vi.fn());
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   ApiProxy: {
@@ -18,6 +19,10 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
 // Retain the command boundary to prove health requests no longer execute az rest.
 vi.mock('../shared/runCommandAsync', () => ({
   runCommandAsync: mockRunCommandAsync,
+}));
+vi.mock('./az-cli-core', async importOriginal => ({
+  ...(await importOriginal<typeof import('./az-cli-core')>()),
+  verifyCliCapabilityAccess: mockVerifyCliCapabilityAccess,
 }));
 
 import {
@@ -59,6 +64,7 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStartClusterProxy.mockResolvedValue({ success: true });
+    mockVerifyCliCapabilityAccess.mockResolvedValue(true);
     vi.stubGlobal('startClusterProxy', mockStartClusterProxy);
   });
 
@@ -91,6 +97,17 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
       success: false,
       error: 'spawn az ENOENT',
     });
+  });
+
+  test('does not invoke the proxy capability when the CLI identity cannot be verified', async () => {
+    mockVerifyCliCapabilityAccess.mockResolvedValue(false);
+
+    await expect(startProxy(targetA)).resolves.toEqual({
+      success: false,
+      error:
+        'Azure CLI must be signed in with the same account, tenant, cloud, and subscription before starting the proxy.',
+    });
+    expect(mockStartClusterProxy).not.toHaveBeenCalled();
   });
 });
 

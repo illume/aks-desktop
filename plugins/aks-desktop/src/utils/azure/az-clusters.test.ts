@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   getAzureCloudEndpoints: vi.fn(),
+  getClusterResourceGroupViaGraph: vi.fn(),
   getClustersViaGraph: vi.fn(),
+  getNativeAccount: vi.fn(),
   getSubscriptionCredential: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
@@ -29,13 +31,14 @@ vi.mock('./az-token', async importOriginal => ({
 }));
 
 vi.mock('./az-resource-graph', () => ({
-  getClusterResourceGroupViaGraph: vi.fn(),
+  getClusterResourceGroupViaGraph: mocks.getClusterResourceGroupViaGraph,
   getClustersViaGraph: mocks.getClustersViaGraph,
 }));
 
 vi.mock('./az-subscriptions', () => ({ getSubscriptions: vi.fn() }));
+vi.mock('./native-auth', () => ({ getNativeAccount: mocks.getNativeAccount }));
 
-import { getClusters, getConnectedClusters } from './az-clusters';
+import { getClusterInfo, getClusters, getConnectedClusters } from './az-clusters';
 
 describe('getClusters', () => {
   beforeEach(() => {
@@ -64,6 +67,29 @@ describe('getClusters', () => {
     await expect(getClusters('sub-1')).resolves.toEqual([
       expect.objectContaining({ aadProfile: { enableAzureRbac: true } }),
     ]);
+  });
+});
+
+describe('getClusterInfo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getNativeAccount.mockReturnValue({
+      subscriptionId: '00000000-0000-0000-0000-000000000001',
+    });
+    mocks.getClusterResourceGroupViaGraph.mockResolvedValue('native-rg');
+  });
+
+  test('uses the native subscription as application context without reading CLI defaults', async () => {
+    await expect(getClusterInfo('native-cluster')).resolves.toEqual({
+      clusterName: 'native-cluster',
+      resourceGroup: 'native-rg',
+      subscriptionId: '00000000-0000-0000-0000-000000000001',
+    });
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+    expect(mocks.getClusterResourceGroupViaGraph).toHaveBeenCalledWith(
+      'native-cluster',
+      '00000000-0000-0000-0000-000000000001'
+    );
   });
 });
 
