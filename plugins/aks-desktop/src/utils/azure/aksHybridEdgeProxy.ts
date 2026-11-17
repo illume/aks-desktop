@@ -2,6 +2,8 @@
 // Licensed under the Apache 2.0.
 
 import { ApiProxy } from '@kinvolk/headlamp-plugin/lib';
+import { ensureProxyAuthentication } from './aksHybridEdgeProxyAuth';
+import { getLoginStatus } from './az-auth';
 import { getErrorMessage } from './az-cli-core';
 import { azRequest, AzureRequestError } from './az-http';
 import { getStartClusterProxyCapability } from './clusterProxyCapability';
@@ -19,6 +21,8 @@ export interface ProxyTarget {
   resourceGroup: string;
   /** Arc-connected cluster name (also the kubeconfig context name). */
   clusterName: string;
+  /** Tenant containing the selected subscription. */
+  tenantId?: string;
 }
 
 /** Result of a {@link startProxy} call. */
@@ -30,6 +34,8 @@ export interface StartProxyResult {
 
 /** How long a single reachability probe may take. */
 const REACHABILITY_TIMEOUT_MS = 5_000;
+let proxySessionInvalidation: Promise<void> = Promise.resolve();
+let proxySessionGeneration = 0;
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
@@ -65,14 +71,62 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
     return { success: false, error: 'Desktop proxy capability is not available.' };
   }
   try {
-    return await startProxyCapability({
+    await waitForProxySessionInvalidation();
+    const generation = proxySessionGeneration;
+    const appIdentity = await getLoginStatus();
+    await waitForProxySessionInvalidation();
+    if (generation !== proxySessionGeneration) {
+      return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
+    }
+    if (!appIdentity.isLoggedIn || !appIdentity.username) {
+      return { success: false, error: 'Sign in to Azure before connecting this cluster.' };
+    }
+    const authentication = await ensureProxyAuthentication({
+      ...target,
+      accountName: appIdentity.username,
+    });
+    if (!authentication.success) {
+      return authentication;
+    }
+    await waitForProxySessionInvalidation();
+    if (generation !== proxySessionGeneration) {
+      return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
+    }
+    const result = await startProxyCapability({
       cluster: target.clusterName,
       subscriptionId: target.subscriptionId,
       resourceGroup: target.resourceGroup,
     });
+    await waitForProxySessionInvalidation();
+    if (generation !== proxySessionGeneration) {
+      return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
+    }
+    return result;
   } catch (error) {
     return { success: false, error: getErrorMessage(error) };
   }
+}
+
+/** Stops every app-owned proxy so a previous Azure identity cannot be reused. */
+export function invalidateProxySession(): Promise<void> {
+  proxySessionGeneration += 1;
+  const invalidate = async () => {
+    const startProxyCapability = getStartClusterProxyCapability();
+    if (!startProxyCapability) {
+      return;
+    }
+    const result = await startProxyCapability({ invalidate: true });
+    if (!result.success) {
+      throw new Error(result.error || 'Could not invalidate cluster proxies.');
+    }
+  };
+  proxySessionInvalidation = proxySessionInvalidation.then(invalidate, invalidate);
+  return proxySessionInvalidation;
+}
+
+/** Waits until auth-change cleanup succeeds before a proxy is opened or reused. */
+export function waitForProxySessionInvalidation(): Promise<void> {
+  return proxySessionInvalidation;
 }
 
 /**

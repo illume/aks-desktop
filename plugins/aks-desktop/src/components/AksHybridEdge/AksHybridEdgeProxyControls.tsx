@@ -168,6 +168,7 @@ export function AksHybridEdgeProxyStartDialog({
   const clusterName: string = cluster?.name;
   const subscriptionId = settings.subscriptionId;
   const resourceGroup = settings.resourceGroup;
+  const tenantId = settings.tenantId;
 
   const run = React.useCallback(async () => {
     if (!subscriptionId || !resourceGroup || !clusterName) {
@@ -175,7 +176,7 @@ export function AksHybridEdgeProxyStartDialog({
       setPhase('error');
       return;
     }
-    const target = { subscriptionId, resourceGroup, clusterName };
+    const target = { subscriptionId, resourceGroup, clusterName, tenantId };
     setPhase('starting');
     setErrorMsg('');
     setShowPortalLink(false);
@@ -211,7 +212,7 @@ export function AksHybridEdgeProxyStartDialog({
       setErrorMsg(err instanceof Error ? err.message : t('Unknown error'));
       setPhase('error');
     }
-  }, [subscriptionId, resourceGroup, clusterName, t]);
+  }, [subscriptionId, resourceGroup, tenantId, clusterName, t]);
 
   // Kick off the start flow once when the dialog opens; reset when it closes.
   React.useEffect(() => {

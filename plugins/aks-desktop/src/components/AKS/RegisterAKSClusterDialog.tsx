@@ -544,6 +544,7 @@ export default function RegisterAKSClusterDialog({
       subscriptionId: selectedSubscription.id,
       resourceGroup: selectedCluster.resourceGroup,
       clusterName: selectedCluster.name,
+      tenantId: selectedSubscription.tenantId,
     };
 
     try {
@@ -607,6 +608,7 @@ export default function RegisterAKSClusterDialog({
         clusterType: 'aksarc',
         subscriptionId: selectedSubscription.id,
         resourceGroup: selectedCluster.resourceGroup,
+        tenantId: selectedSubscription.tenantId,
       });
       // Give the cluster a distinct name badge (server icon + Azure-blue accent)
       // on the Home table, so AKS Hybrid & Edge clusters stand out next to their name.

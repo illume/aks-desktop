@@ -114,7 +114,8 @@ describe('getLoginStatus', () => {
         { cloudName: 'AzureChinaCloud' },
       ]) {
         account = { ...account, ...update };
-        await getLoginStatus();
+        const status = await getLoginStatus();
+        expect((changed.mock.calls.at(-1)?.[0] as CustomEvent).detail).toEqual(status);
       }
       expect(changed).toHaveBeenCalledTimes(4);
       mocks.runCommandAsync.mockResolvedValue({ stdout: '', stderr: '' });

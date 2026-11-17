@@ -43,6 +43,13 @@ function withAksToolPaths(environment, manifest, resourcesDirectory, platform = 
   for (const key of pathKeys) delete result[key];
   const inherited = pathKeys.map(key => environment[key]).filter(Boolean);
   result[pathKey] = [...directories, ...inherited].join(platform === 'win32' ? ';' : ':');
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  const home = platform === 'win32' ? environment.USERPROFILE : environment.HOME;
+  if (typeof home !== 'string' || !pathApi.isAbsolute(home)) {
+    throw new Error('AKS Desktop requires an absolute home directory for Azure CLI state');
+  }
+  result.AZURE_CONFIG_DIR = pathApi.join(home, '.aks-desktop', 'azure');
+  result.AKS_DESKTOP_AZURE_CONFIG_OWNED = '1';
   return result;
 }
 

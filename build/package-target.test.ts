@@ -24,9 +24,17 @@ for (const platform of ['darwin', 'linux', 'win32']) {
     const entry = { path: `external-tools/${name}`, sha256: createHash('sha256').update('bundled CLI').digest('hex') };
     const manifest = { 'external-tools': [{ id: 'az', platforms: { [platform]: entry } }] };
     const key = platform === 'win32' ? 'Path' : 'PATH';
-    const environment = { [key]: '/shell/bin', HOME: '/home' };
+    const homeKey = platform === 'win32' ? 'USERPROFILE' : 'HOME';
+    const home = platform === 'win32' ? 'C:\\Users\\tester' : '/home';
+    const environment = { [key]: '/shell/bin', [homeKey]: home };
     assert.deepEqual(runtime.withAksToolPaths(environment, manifest, directory, platform), {
-      [key]: `${path.join(directory, 'external-tools')}${platform === 'win32' ? ';' : ':'}/shell/bin`, HOME: '/home',
+      [key]: `${path.join(directory, 'external-tools')}${platform === 'win32' ? ';' : ':'}/shell/bin`,
+      [homeKey]: home,
+      AZURE_CONFIG_DIR:
+        platform === 'win32'
+          ? 'C:\\Users\\tester\\.aks-desktop\\azure'
+          : '/home/.aks-desktop/azure',
+      AKS_DESKTOP_AZURE_CONFIG_OWNED: '1',
     });
     assert.equal(environment[key], '/shell/bin');
     fs.writeFileSync(path.join(directory, 'external-tools', name), 'changed');
@@ -47,7 +55,10 @@ test('AKS runtime accepts confined wrapper links but rejects escaped tools', { s
   fs.symlinkSync('wrapper', path.join(resources, 'az'));
   const entry = { path: 'az', sha256: createHash('sha256').update('wrapper').digest('hex') };
   const manifest = { 'external-tools': [{ id: 'az', platforms: { [process.platform]: entry } }] };
-  assert.equal(withAksToolPaths({ PATH: '/shell' }, manifest, resources).PATH, `${resources}${path.delimiter}/shell`);
+  assert.equal(
+    withAksToolPaths({ PATH: '/shell', HOME: '/home' }, manifest, resources).PATH,
+    `${resources}${path.delimiter}/shell`
+  );
   fs.writeFileSync(path.join(directory, 'outside'), 'wrapper');
   fs.unlinkSync(path.join(resources, 'az'));
   fs.symlinkSync('../outside', path.join(resources, 'az'));

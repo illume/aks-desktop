@@ -23,6 +23,8 @@ export interface ClusterSettings {
   subscriptionId?: string;
   /** Azure resource group containing the cluster (needed for AKS Hybrid & Edge proxy actions). */
   resourceGroup?: string;
+  /** Azure tenant containing the AKS Hybrid & Edge cluster subscription. */
+  tenantId?: string;
   /**
    * Per-cluster badge appearance. Shared verbatim with Headlamp core, which
    * reads `appearance.icon` / `appearance.accentColor` from this same

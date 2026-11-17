@@ -7,6 +7,8 @@ const mockClusterRequest = vi.hoisted(() => vi.fn());
 const mockRequest = vi.hoisted(() => vi.fn());
 const mockStartClusterProxy = vi.hoisted(() => vi.fn());
 const mockRunCommandAsync = vi.hoisted(() => vi.fn());
+const mockEnsureProxyAuthentication = vi.hoisted(() => vi.fn());
+const mockGetLoginStatus = vi.hoisted(() => vi.fn());
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   ApiProxy: {
@@ -20,18 +22,32 @@ vi.mock('../shared/runCommandAsync', () => ({
   runCommandAsync: mockRunCommandAsync,
 }));
 
+vi.mock('./aksHybridEdgeProxyAuth', () => ({
+  ensureProxyAuthentication: mockEnsureProxyAuthentication,
+}));
+
+vi.mock('./az-auth', () => ({
+  getLoginStatus: mockGetLoginStatus,
+}));
+
 import {
   azurePortalClusterUrl,
   checkClusterAccessible,
   checkClusterReachable,
   getClusterCurrentState,
+  invalidateProxySession,
   isClusterInKubeconfig,
   startProxy,
   verifyAksHybridEdgeCluster,
 } from './aksHybridEdgeProxy';
 import { azCliCredential, AzTokenError } from './az-token';
 
-const targetA = { subscriptionId: 'sub-a', resourceGroup: 'rg-a', clusterName: 'cluster-a' };
+const targetA = {
+  subscriptionId: 'sub-a',
+  resourceGroup: 'rg-a',
+  clusterName: 'cluster-a',
+  tenantId: 'tenant-a',
+};
 const mockFetch = vi.fn<typeof fetch>();
 
 function healthResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -47,6 +63,13 @@ beforeEach(() => {
     expiresOnTimestamp: Date.now() + 3_600_000,
   });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
+  mockEnsureProxyAuthentication.mockResolvedValue({ success: true });
+  mockGetLoginStatus.mockResolvedValue({
+    isLoggedIn: true,
+    username: 'operator@example.com',
+    tenantId: 'tenant-a',
+    subscriptionId: 'sub-a',
+  });
 });
 
 afterEach(() => {
@@ -74,6 +97,10 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
       subscriptionId: 'sub-a',
       resourceGroup: 'rg-a',
     });
+    expect(mockEnsureProxyAuthentication).toHaveBeenCalledWith({
+      ...targetA,
+      accountName: 'operator@example.com',
+    });
   });
 
   test('startProxy fails cleanly when the desktop bridge is unavailable', async () => {
@@ -91,6 +118,95 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
       success: false,
       error: 'spawn az ENOENT',
     });
+  });
+
+  test('does not start a proxy when the CLI identity does not match the app', async () => {
+    mockEnsureProxyAuthentication.mockResolvedValue({
+      success: false,
+      error: 'Azure CLI identity mismatch.',
+    });
+
+    await expect(startProxy(targetA)).resolves.toEqual({
+      success: false,
+      error: 'Azure CLI identity mismatch.',
+    });
+    expect(mockStartClusterProxy).not.toHaveBeenCalled();
+  });
+
+  test('does not inspect or start the proxy CLI without a live app identity', async () => {
+    mockGetLoginStatus.mockResolvedValue({ isLoggedIn: false });
+
+    await expect(startProxy(targetA)).resolves.toEqual({
+      success: false,
+      error: 'Sign in to Azure before connecting this cluster.',
+    });
+    expect(mockEnsureProxyAuthentication).not.toHaveBeenCalled();
+    expect(mockStartClusterProxy).not.toHaveBeenCalled();
+  });
+
+  test('invalidates every app-owned proxy on an auth lifecycle change', async () => {
+    await invalidateProxySession();
+
+    expect(mockStartClusterProxy).toHaveBeenCalledWith({ invalidate: true });
+  });
+
+  test('blocks proxy reuse after invalidation fails until cleanup succeeds', async () => {
+    mockStartClusterProxy.mockResolvedValueOnce({
+      success: false,
+      error: 'An old cluster proxy could not be terminated.',
+    });
+
+    await expect(invalidateProxySession()).rejects.toThrow(
+      'An old cluster proxy could not be terminated.'
+    );
+    await expect(startProxy(targetA)).resolves.toEqual({
+      success: false,
+      error: 'An old cluster proxy could not be terminated.',
+    });
+
+    mockStartClusterProxy.mockResolvedValue({ success: true });
+    await expect(invalidateProxySession()).resolves.toBeUndefined();
+  });
+
+  test('does not start a proxy when authentication changes during CLI validation', async () => {
+    mockEnsureProxyAuthentication.mockImplementationOnce(async () => {
+      await invalidateProxySession();
+      return { success: true };
+    });
+
+    await expect(startProxy(targetA)).resolves.toEqual({
+      success: false,
+      error: 'Azure sign-in changed while starting the cluster proxy.',
+    });
+    expect(mockStartClusterProxy).toHaveBeenCalledWith({ invalidate: true });
+    expect(mockStartClusterProxy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cluster: targetA.clusterName })
+    );
+  });
+
+  test('does not report success when authentication changes during main-process startup', async () => {
+    let finishStart: ((result: { success: true }) => void) | undefined;
+    mockStartClusterProxy.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishStart = resolve;
+        })
+    );
+
+    const started = startProxy(targetA);
+    await vi.waitFor(() =>
+      expect(mockStartClusterProxy).toHaveBeenCalledWith(
+        expect.objectContaining({ cluster: targetA.clusterName })
+      )
+    );
+    const invalidated = invalidateProxySession();
+    finishStart?.({ success: true });
+
+    await expect(started).resolves.toEqual({
+      success: false,
+      error: 'Azure sign-in changed while starting the cluster proxy.',
+    });
+    await expect(invalidated).resolves.toBeUndefined();
   });
 });
 

@@ -2399,10 +2399,10 @@ index 42ceafafc8e8e57bc9d92afe1c04e09f31d00176..908c104b69583e30e15b37c7e3d7dc98
  
 diff --git a/app/electron/proxies.ts b/app/electron/proxies.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..0b2b9047f2b06069685cebe4728b01b5e4007a49
+index 0000000000000000000000000000000000000000..329f6e17298cb078c76fb63e2c5558b6241d2a14
 --- /dev/null
 +++ b/app/electron/proxies.ts
-@@ -0,0 +1,877 @@
+@@ -0,0 +1,895 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -3123,7 +3123,15 @@ index 0000000000000000000000000000000000000000..0b2b9047f2b06069685cebe4728b01b5
 + */
 +export async function killAllProxies(): Promise<void> {
 +  isShuttingDown = true;
-+  await Promise.all([...proxyChildren].map(entry => terminateChildEntry(entry, true)));
++  await stopAllProxies(true);
++}
++
++/** Stops every tracked proxy without entering application shutdown. */
++export async function stopAllProxies(releaseOnTerminationFailure = false): Promise<boolean> {
++  const results = await Promise.all(
++    [...proxyChildren].map(entry => terminateChildEntry(entry, releaseOnTerminationFailure))
++  );
++  return results.every(Boolean);
 +}
 +
 +/**
@@ -3155,11 +3163,21 @@ index 0000000000000000000000000000000000000000..0b2b9047f2b06069685cebe4728b01b5
 +    if (!authorizeEvent(event)) {
 +      return { success: false, error: 'Cluster proxy caller is invalid.' };
 +    }
-+    const data = (request ?? {}) as { capabilitySecret?: unknown };
++    const data = (request ?? {}) as { capabilitySecret?: unknown; invalidate?: unknown };
 +    const currentCapabilitySecret =
 +      typeof capabilitySecret === 'function' ? capabilitySecret() : capabilitySecret;
 +    if (data.capabilitySecret !== currentCapabilitySecret) {
 +      return { success: false, error: 'Cluster proxy capability is invalid.' };
++    }
++    if (data.invalidate === true) {
++      const invalidation = proxyStartQueue.then(async () => {
++        const stopped = await stopAllProxies();
++        return stopped
++          ? { success: true }
++          : { success: false, error: 'An old cluster proxy could not be terminated.' };
++      });
++      proxyStartQueue = invalidation.then(() => undefined).catch(() => undefined);
++      return invalidation;
 +    }
 +    const validation = provider.validateRequest(request);
 +    if (!validation.target) {
@@ -7635,3 +7653,283 @@ index a9f9ce75021825b683f7a7e7dc9751b7af322c2e..33f73657373aeab8e6165868ac76a497
  ### Route
  
  Show a component in the main area at a given URL with
+diff --git a/app/electron/proxies.test.ts b/app/electron/proxies.test.ts
+index 82f1e819ef12886a55809c13d8d2e1e916d1b0a3..27b80a88706b977f219723615d2a66f054e8db03 100644
+--- a/app/electron/proxies.test.ts
++++ b/app/electron/proxies.test.ts
+@@ -991,6 +991,34 @@ describe('cluster proxy handler', () => {
+     });
+   });
+ 
++  it('stops active proxies on auth invalidation and remains reusable', async () => {
++    await withPlatform('linux', async () => {
++      const firstChild = proxyChild(1111);
++      const secondChild = proxyChild(2222);
++      spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
++      const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
++      const start = startHandler();
++
++      const first = start({} as Electron.IpcMainInvokeEvent, proxyRequest('cluster-a'));
++      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
++      firstChild.stdout.emit('data', "Start sending kubectl requests on 'cluster-a' context\n");
++      await expect(first).resolves.toEqual({ success: true });
++
++      const invalidation = start({} as Electron.IpcMainInvokeEvent, {
++        capabilitySecret: PROXY_CAPABILITY,
++        invalidate: true,
++      });
++      await vi.waitFor(() => expect(kill).toHaveBeenCalledWith(-1111, 'SIGKILL'));
++      firstChild.emit('exit', null, 'SIGKILL');
++      await expect(invalidation).resolves.toEqual({ success: true });
++
++      const second = start({} as Electron.IpcMainInvokeEvent, proxyRequest('cluster-b'));
++      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
++      secondChild.stdout.emit('data', "Start sending kubectl requests on 'cluster-b' context\n");
++      await expect(second).resolves.toEqual({ success: true });
++    });
++  });
++
+   it('does not spawn a queued proxy after shutdown begins', async () => {
+     await withPlatform('linux', async () => {
+       const firstChild = proxyChild(1111);
+diff --git a/app/electron/proxies.test.ts b/app/electron/proxies.test.ts
+index 27b80a88706b977f219723615d2a66f054e8db03..b9a28e4c0420e3d12b63075d1a1f0a777caf777b 100644
+--- a/app/electron/proxies.test.ts
++++ b/app/electron/proxies.test.ts
+@@ -1019,6 +1019,73 @@ describe('cluster proxy handler', () => {
+     });
+   });
+ 
++  it('does not reuse a proxy when auth invalidation cannot terminate it', async () => {
++    await withPlatform('linux', async () => {
++      const child = proxyChild(1111);
++      spawnMock.mockReturnValue(child);
++      const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
++        throw new Error('not permitted');
++      });
++      const start = startHandler();
++
++      const first = start({} as Electron.IpcMainInvokeEvent, proxyRequest('cluster-a'));
++      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
++      child.stdout.emit('data', "Start sending kubectl requests on 'cluster-a' context\n");
++      await expect(first).resolves.toEqual({ success: true });
++
++      await expect(
++        start({} as Electron.IpcMainInvokeEvent, {
++          capabilitySecret: PROXY_CAPABILITY,
++          invalidate: true,
++        })
++      ).resolves.toEqual({
++        success: false,
++        error: 'An old cluster proxy could not be terminated.',
++      });
++      await expect(
++        start({} as Electron.IpcMainInvokeEvent, proxyRequest('cluster-b'))
++      ).resolves.toEqual({
++        success: false,
++        error: 'A proxy from the previous Azure identity is still running.',
++      });
++      expect(spawnMock).toHaveBeenCalledTimes(1);
++
++      kill.mockImplementation(() => true);
++      const cleanup = start({} as Electron.IpcMainInvokeEvent, {
++        capabilitySecret: PROXY_CAPABILITY,
++        invalidate: true,
++      });
++      child.emit('exit', null, 'SIGKILL');
++      await expect(cleanup).resolves.toEqual({ success: true });
++    });
++  });
++
++  it('does not deduplicate a new-identity start with a start queued before invalidation', async () => {
++    await withPlatform('linux', async () => {
++      const firstChild = proxyChild(1111);
++      const secondChild = proxyChild(2222);
++      spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
++      vi.spyOn(process, 'kill').mockReturnValue(true);
++      const start = startHandler();
++
++      const first = start({} as Electron.IpcMainInvokeEvent, proxyRequest('cluster-a'));
++      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(1));
++      const invalidation = start({} as Electron.IpcMainInvokeEvent, {
++        capabilitySecret: PROXY_CAPABILITY,
++        invalidate: true,
++      });
++      const second = start({} as Electron.IpcMainInvokeEvent, proxyRequest('cluster-a'));
++
++      firstChild.stdout.emit('data', "Start sending kubectl requests on 'cluster-a' context\n");
++      await expect(first).resolves.toEqual({ success: true });
++      firstChild.emit('exit', null, 'SIGKILL');
++      await expect(invalidation).resolves.toEqual({ success: true });
++      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalledTimes(2));
++      secondChild.stdout.emit('data', "Start sending kubectl requests on 'cluster-a' context\n");
++      await expect(second).resolves.toEqual({ success: true });
++    });
++  });
++
+   it('does not spawn a queued proxy after shutdown begins', async () => {
+     await withPlatform('linux', async () => {
+       const firstChild = proxyChild(1111);
+diff --git a/app/electron/proxies.ts b/app/electron/proxies.ts
+index 329f6e17298cb078c76fb63e2c5558b6241d2a14..bed6e5f80518b4ad9b865db4fe90dc5c486edc73 100644
+--- a/app/electron/proxies.ts
++++ b/app/electron/proxies.ts
+@@ -103,6 +103,7 @@ export interface ManagedProxyProvider<TTarget extends ManagedProxyTarget> {
+ 
+ interface ProxyChildEntry {
+   child: ChildProcessWithoutNullStreams;
++  generation: number;
+   group: boolean;
+   providerId: string;
+   targetKey: string;
+@@ -131,10 +132,16 @@ interface ProxyStart {
+   entry?: ProxyChildEntry;
+ }
+ 
++interface StartingProxy {
++  generation: number;
++  promise: Promise<StartProxyResult>;
++}
++
+ const proxyChildren = new Set<ProxyChildEntry>();
+-const startingProxies = new Map<string, Promise<StartProxyResult>>();
++const startingProxies = new Map<string, StartingProxy>();
+ let proxyStartQueue: Promise<unknown> = Promise.resolve();
+ let isShuttingDown = false;
++let proxyGeneration = 0;
+ 
+ const READY_MATCH_TAIL_CHARS = 256;
+ const STDERR_TAIL_CHARS = 2_048;
+@@ -260,7 +267,11 @@ function liveChildForTarget<TTarget extends ManagedProxyTarget>(
+ ): ProxyChildEntry | undefined {
+   const key = proxyTargetKey(provider, target);
+   for (const entry of proxyChildren) {
+-    if (entry.providerId === provider.id && entry.targetKey === key) {
++    if (
++      entry.generation === proxyGeneration &&
++      entry.providerId === provider.id &&
++      entry.targetKey === key
++    ) {
+       return entry;
+     }
+   }
+@@ -647,20 +658,31 @@ async function startProxy<TTarget extends ManagedProxyTarget>(
+   provider: ManagedProxyProvider<TTarget>,
+   target: TTarget,
+   port: number,
++  generation: number,
+   getEnvironment: () => Promise<NodeJS.ProcessEnv>
+ ): Promise<ProxyStart> {
+   const spec = provider.buildSpawnSpec(target, port);
+   let child: ChildProcessWithoutNullStreams;
+   try {
+-    if (isShuttingDown) {
+-      return { result: { success: false, error: 'The app is shutting down.' } };
++    if (isShuttingDown || generation !== proxyGeneration) {
++      return {
++        result: {
++          success: false,
++          error: isShuttingDown ? 'The app is shutting down.' : 'Azure authentication changed.',
++        },
++      };
+     }
+     const env = sanitizeProxyEnvironment({
+       ...(await getEnvironment()),
+       PYTHONUNBUFFERED: '1',
+     });
+-    if (isShuttingDown) {
+-      return { result: { success: false, error: 'The app is shutting down.' } };
++    if (isShuttingDown || generation !== proxyGeneration) {
++      return {
++        result: {
++          success: false,
++          error: isShuttingDown ? 'The app is shutting down.' : 'Azure authentication changed.',
++        },
++      };
+     }
+     child = spawn(spec.command, spec.args, {
+       ...spec.options,
+@@ -677,6 +699,7 @@ async function startProxy<TTarget extends ManagedProxyTarget>(
+ 
+   const entry = {
+     child,
++    generation,
+     group: !!spec.options.detached,
+     providerId: provider.id,
+     targetKey: proxyTargetKey(provider, target),
+@@ -685,9 +708,14 @@ async function startProxy<TTarget extends ManagedProxyTarget>(
+     stderrTail: '',
+   };
+   proxyChildren.add(entry);
+-  if (isShuttingDown) {
++  if (isShuttingDown || generation !== proxyGeneration) {
+     await terminateChildEntry(entry, true);
+-    return { result: { success: false, error: 'The app is shutting down.' } };
++    return {
++      result: {
++        success: false,
++        error: isShuttingDown ? 'The app is shutting down.' : 'Azure authentication changed.',
++      },
++    };
+   }
+   child.stderr.on('data', data => {
+     entry.stderrTail = (entry.stderrTail + data.toString()).slice(-STDERR_TAIL_CHARS);
+@@ -765,6 +793,7 @@ export function setupManagedProxyHandler<TTarget extends ManagedProxyTarget>(
+       return { success: false, error: 'Cluster proxy capability is invalid.' };
+     }
+     if (data.invalidate === true) {
++      proxyGeneration++;
+       const invalidation = proxyStartQueue.then(async () => {
+         const stopped = await stopAllProxies();
+         return stopped
+@@ -784,11 +813,21 @@ export function setupManagedProxyHandler<TTarget extends ManagedProxyTarget>(
+ 
+     const target = validation.target;
+     const targetKey = proxyTargetKey(provider, target);
++    const generation = proxyGeneration;
+     const existingStart = startingProxies.get(targetKey);
+-    if (existingStart) {
+-      return existingStart;
++    if (existingStart?.generation === generation) {
++      return existingStart.promise;
+     }
+     const started = proxyStartQueue.then(async () => {
++      if (
++        generation !== proxyGeneration ||
++        [...proxyChildren].some(entry => entry.generation !== proxyGeneration)
++      ) {
++        return {
++          success: false,
++          error: 'A proxy from the previous Azure identity is still running.',
++        };
++      }
+       const sameClusterEntries = liveChildrenForCluster(target.cluster);
+       const exactTarget = liveChildForTarget(provider, target);
+       const reusableTarget =
+@@ -814,7 +853,7 @@ export function setupManagedProxyHandler<TTarget extends ManagedProxyTarget>(
+       if (!port) {
+         return { success: false, error: 'No local port pair is available for the cluster proxy.' };
+       }
+-      const proxyStart = await startProxy(provider, target, port, getEnvironment);
++      const proxyStart = await startProxy(provider, target, port, generation, getEnvironment);
+       if (!proxyStart.result.success || !proxyStart.entry) {
+         return proxyStart.result;
+       }
+@@ -856,13 +895,15 @@ export function setupManagedProxyHandler<TTarget extends ManagedProxyTarget>(
+       }
+       return result;
+     });
+-    startingProxies.set(targetKey, started);
++    startingProxies.set(targetKey, { generation, promise: started });
+     proxyStartQueue = started.then(() => undefined).catch(() => undefined);
+ 
+     try {
+       return await started;
+     } finally {
+-      startingProxies.delete(targetKey);
++      if (startingProxies.get(targetKey)?.promise === started) {
++        startingProxies.delete(targetKey);
++      }
+     }
+   });
+ }
