@@ -103,6 +103,13 @@ export default function CliLoginStep({
             )
           : t('Sign in with Azure CLI using your selected Azure CLI cloud.')}
       </Typography>
+      {nativeAuthenticated && (
+        <Typography sx={{ mb: 2 }}>
+          {t(
+            'If Azure CLI uses a different cloud, select the same cloud in Azure CLI before retrying. AKS Desktop will not change your Azure CLI cloud.'
+          )}
+        </Typography>
+      )}
       {state === 'pending' ? (
         <Box role="status">
           <CircularProgress size={24} />
