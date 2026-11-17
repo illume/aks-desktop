@@ -35,6 +35,7 @@ export interface StartProxyResult {
 /** How long a single reachability probe may take. */
 const REACHABILITY_TIMEOUT_MS = 5_000;
 let proxySessionInvalidation: Promise<void> = Promise.resolve();
+let proxySessionGeneration = 0;
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
@@ -71,8 +72,12 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
   }
   try {
     await waitForProxySessionInvalidation();
+    const generation = proxySessionGeneration;
     const appIdentity = await getLoginStatus();
     await waitForProxySessionInvalidation();
+    if (generation !== proxySessionGeneration) {
+      return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
+    }
     if (!appIdentity.isLoggedIn || !appIdentity.username) {
       return { success: false, error: 'Sign in to Azure before connecting this cluster.' };
     }
@@ -82,6 +87,10 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
     });
     if (!authentication.success) {
       return authentication;
+    }
+    await waitForProxySessionInvalidation();
+    if (generation !== proxySessionGeneration) {
+      return { success: false, error: 'Azure sign-in changed while starting the cluster proxy.' };
     }
     return await startProxyCapability({
       cluster: target.clusterName,
@@ -95,6 +104,7 @@ export async function startProxy(target: ProxyTarget): Promise<StartProxyResult>
 
 /** Stops every app-owned proxy so a previous Azure identity cannot be reused. */
 export function invalidateProxySession(): Promise<void> {
+  proxySessionGeneration += 1;
   const invalidate = async () => {
     const startProxyCapability = getStartClusterProxyCapability();
     if (!startProxyCapability) {

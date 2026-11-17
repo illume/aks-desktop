@@ -167,6 +167,22 @@ describe('aksHybridEdgeProxy — injected app capability', () => {
     mockStartClusterProxy.mockResolvedValue({ success: true });
     await expect(invalidateProxySession()).resolves.toBeUndefined();
   });
+
+  test('does not start a proxy when authentication changes during CLI validation', async () => {
+    mockEnsureProxyAuthentication.mockImplementationOnce(async () => {
+      await invalidateProxySession();
+      return { success: true };
+    });
+
+    await expect(startProxy(targetA)).resolves.toEqual({
+      success: false,
+      error: 'Azure sign-in changed while starting the cluster proxy.',
+    });
+    expect(mockStartClusterProxy).toHaveBeenCalledWith({ invalidate: true });
+    expect(mockStartClusterProxy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cluster: targetA.clusterName })
+    );
+  });
 });
 
 describe('aksHybridEdgeProxy — reachability & verification', () => {

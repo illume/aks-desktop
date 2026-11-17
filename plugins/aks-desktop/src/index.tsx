@@ -57,6 +57,7 @@ import { registerReduxCallback } from './telemetry/setup';
 import type { ProjectDefinition } from './types/project';
 import { invalidateProxySession } from './utils/azure/aksHybridEdgeProxy';
 import { getLoginStatus } from './utils/azure/az-auth';
+import { createProxyAuthInvalidator } from './utils/azure/proxyAuthInvalidation';
 import { AZURE_ACCOUNT_POLL_INTERVAL_MS } from './utils/constants/timing';
 import {
   isAksProject,
@@ -181,24 +182,12 @@ if (Headlamp.isRunningAsApp()) {
   // Check initially
   updateAzureAccountLabel();
 
-  let proxyAuthIdentity: string | undefined;
+  const invalidateForObservedIdentity = createProxyAuthInvalidator(invalidateProxySession, error =>
+    console.error('[AKS] Could not invalidate cluster proxies:', error)
+  );
   const invalidateProxyOnAccountChange = (event: Event) => {
     const status = (event as CustomEvent<Awaited<ReturnType<typeof getLoginStatus>>>).detail;
-    const identity = JSON.stringify([
-      status?.isLoggedIn,
-      status?.username,
-      status?.tenantId,
-      status?.subscriptionId,
-      status?.environmentName,
-    ]);
-    if (proxyAuthIdentity === undefined) {
-      proxyAuthIdentity = identity;
-    } else if (identity !== proxyAuthIdentity) {
-      proxyAuthIdentity = identity;
-      void invalidateProxySession().catch(error =>
-        console.error('[AKS] Could not invalidate cluster proxies:', error)
-      );
-    }
+    invalidateForObservedIdentity(status);
   };
 
   // Listen for custom events from login/logout operations
