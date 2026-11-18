@@ -350,34 +350,35 @@ describe('getSubscriptions', () => {
       [TENANT_B]: new Error('MFA required'),
     });
 
-    it('returns the effective preserved tenant after partial native discovery', async () => {
-      mocks.hasNativeSession.mockReturnValue(true);
-      mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_B);
-      mockArm(
-        [
-          { tenantId: TENANT_A, displayName: 'Contoso' },
-          { tenantId: TENANT_B, displayName: 'Fabrikam' },
-        ],
-        {
-          [TENANT_A]: [armSub(SUB_ID, TENANT_A)],
-          [TENANT_B]: new Error('MFA required'),
-        }
-      );
-
-      await expect(getSubscriptions()).resolves.toEqual([
-        expect.objectContaining({
-          id: SUB_ID,
-          tenant: TENANT_B,
-          tenantName: undefined,
-        }),
-      ]);
-      expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
-        [expect.objectContaining({ id: SUB_ID, tenant: TENANT_A })],
-        7,
-        [TENANT_B]
-      );
-    });
     await getSubscriptions();
+    expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: SUB_ID, tenant: TENANT_A })],
+      7,
+      [TENANT_B]
+    );
+  });
+
+  it('returns the effective preserved tenant after partial native discovery', async () => {
+    mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_B);
+    mockArm(
+      [
+        { tenantId: TENANT_A, displayName: 'Contoso' },
+        { tenantId: TENANT_B, displayName: 'Fabrikam' },
+      ],
+      {
+        [TENANT_A]: [armSub(SUB_ID, TENANT_A)],
+        [TENANT_B]: new Error('MFA required'),
+      }
+    );
+
+    await expect(getSubscriptions()).resolves.toEqual([
+      expect.objectContaining({
+        id: SUB_ID,
+        tenant: TENANT_B,
+        tenantName: undefined,
+      }),
+    ]);
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
       [expect.objectContaining({ id: SUB_ID, tenant: TENANT_A })],
       7,

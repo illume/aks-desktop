@@ -147,7 +147,7 @@ export async function getSubscriptions(
     if (match) Object.assign(sub, match);
     sub.tenants = listedTenants.get(id)!.map(value => value.tenant);
   }
-  const discovered = [...subscriptions.values()];
+  let discovered = [...subscriptions.values()];
   if (!nativeSession && isAzureExplicitlySignedOut()) {
     throw new Error('Azure login is required');
   }
@@ -168,15 +168,14 @@ export async function getSubscriptions(
       nativePublishedDiscoverySequence,
       discoverySequence
     );
-    for (const subscription of discovered) {
+    discovered = discovered.map(subscription => {
       const tenant = getNativeSubscriptionTenant(subscription.id);
-      if (!tenant) continue;
+      if (!tenant) return subscription;
       const tenantMetadata = listedTenants
         .get(subscription.id)
         ?.find(value => value.tenant.toLowerCase() === tenant.toLowerCase());
-      subscription.tenant = tenant;
-      subscription.tenantName = tenantMetadata?.tenantName;
-    }
+      return { ...subscription, tenant, tenantName: tenantMetadata?.tenantName };
+    });
   }
   return discovered;
 }

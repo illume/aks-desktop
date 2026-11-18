@@ -52,8 +52,10 @@ let cliWriterActive = false;
 const cliWriters: Array<() => void> = [];
 let nativeSubscriptionTenantLookup: (subscriptionId: string) => string | undefined = () =>
   undefined;
-let nativeSubscriptionTenantCanReconcile: (subscriptionId: string, tenantId: string) => boolean =
-  () => false;
+let nativeSubscriptionTenantCanReconcile: (
+  subscriptionId: string,
+  tenantId: string
+) => boolean = () => false;
 let nativeSubscriptionTenantReconcile: (subscriptionId: string, tenantId: string) => boolean = () =>
   false;
 

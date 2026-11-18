@@ -65,10 +65,14 @@ export function setNativeSubscriptionTenants(
 ): boolean {
   synchronizeNativeGeneration();
   if (generation !== accountGeneration || !hasNativeSession()) return false;
-  registerNativeSubscriptionTenantLookup(subscriptionId => {
-    synchronizeNativeGeneration();
-    return nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
-  }, canReconcileNativeSubscriptionTenant, reconcileNativeSubscriptionTenant);
+  registerNativeSubscriptionTenantLookup(
+    subscriptionId => {
+      synchronizeNativeGeneration();
+      return nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
+    },
+    canReconcileNativeSubscriptionTenant,
+    reconcileNativeSubscriptionTenant
+  );
   const preserved = new Set(
     preserveTenantIds.filter(isValidGuid).map(tenantId => tenantId.toLowerCase())
   );

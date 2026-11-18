@@ -166,11 +166,7 @@ describe('Graph account and cloud context', () => {
     const command = mocks.command.getMockImplementation()!;
     let releaseArm!: (value: ReturnType<typeof output>) => void;
     mocks.command.mockImplementation((executable: string, args: string[]) => {
-      if (
-        args[0] === 'account' &&
-        args[1] === 'get-access-token' &&
-        args[3] === ARM_SCOPE
-      ) {
+      if (args[0] === 'account' && args[1] === 'get-access-token' && args[3] === ARM_SCOPE) {
         return new Promise(resolve => {
           releaseArm = resolve;
         });
