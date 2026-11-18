@@ -144,7 +144,14 @@ function reconcileNativeSubscriptionTenant(subscriptionId: string, tenantId: str
   if (!canReconcileNativeSubscriptionTenant(subscriptionId, tenantId)) return false;
   const binding = nativeSubscriptionTenants.get(subscriptionId.toLowerCase())!;
   const tenant = tenantId.toLowerCase();
-  if (!updateNativeAccountTenant(subscriptionId, tenant)) return false;
+  const account = getNativeAccount();
+  if (!account) return false;
+  if (
+    account.subscriptionId.toLowerCase() === subscriptionId.toLowerCase() &&
+    !updateNativeAccountTenant(subscriptionId, tenant)
+  ) {
+    return false;
+  }
   if (binding.tenant !== tenant) {
     binding.tenant = tenant;
     nativeMappingGeneration++;

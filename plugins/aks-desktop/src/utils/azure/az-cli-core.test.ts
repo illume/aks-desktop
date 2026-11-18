@@ -501,6 +501,71 @@ describe('runAzCommand', () => {
       expect(mocks.updateNativeAccountTenant).toHaveBeenCalledWith(subscriptionId, tenantB);
     });
 
+    test('reconciles a verified non-default subscription without changing native account metadata', async () => {
+      const {
+        getAzureAccountGeneration,
+        getNativeSubscriptionTenant,
+        setNativeSubscriptionTenants,
+      } = await import('./az-token');
+      const defaultSubscription = '11111111-2222-3333-4444-555555555555';
+      const targetSubscription = '22222222-3333-4444-5555-666666666666';
+      const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+      const tenantB = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+      mocks.native.mockReturnValue({
+        ...native,
+        subscriptionId: defaultSubscription,
+        tenantId: tenantA,
+      });
+      mocks.nativeSession.mockReturnValue(true);
+      allowCliOperations();
+      expect(
+        setNativeSubscriptionTenants(
+          [
+            { id: defaultSubscription, tenant: tenantA },
+            {
+              id: targetSubscription,
+              tenant: tenantA,
+              tenants: [tenantA, tenantB],
+            },
+          ],
+          getAzureAccountGeneration()
+        )
+      ).toBe(true);
+      mocks.updateNativeAccountTenant.mockClear();
+      let targetTenant = tenantB;
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'account') {
+          return Promise.resolve({
+            stdout: JSON.stringify({
+              ...account,
+              id: targetSubscription,
+              tenantId: targetTenant,
+            }),
+            stderr: '',
+          });
+        }
+        if (args[0] === 'cloud') {
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+
+      await expect(
+        runCommandAsync('az', ['group', 'list', '--subscription', targetSubscription])
+      ).resolves.toEqual(commandResult);
+      expect(getNativeSubscriptionTenant(targetSubscription)).toBe(tenantB);
+      expect(mocks.updateNativeAccountTenant).not.toHaveBeenCalled();
+
+      targetTenant = tenantA;
+      await expect(
+        withVerifiedCliBatch(targetSubscription, run =>
+          run(['group', 'list', '--subscription', targetSubscription])
+        )
+      ).resolves.toEqual(commandResult);
+      expect(getNativeSubscriptionTenant(targetSubscription)).toBe(tenantA);
+      expect(mocks.updateNativeAccountTenant).not.toHaveBeenCalled();
+    });
+
     test('uses real token discovery bindings and rejects removed or stale mappings', async () => {
       const { getAzureAccountGeneration, setNativeSubscriptionTenants } = await import(
         './az-token'

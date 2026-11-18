@@ -59,6 +59,14 @@ let nativeSubscriptionTenantCanReconcile: (
 let nativeSubscriptionTenantReconcile: (subscriptionId: string, tenantId: string) => boolean = () =>
   false;
 
+function commitTenantReconciliations(
+  reconciliations: Array<{ subscriptionId: string; tenantId: string }>
+): boolean {
+  return reconciliations.every(({ subscriptionId, tenantId }) =>
+    nativeSubscriptionTenantReconcile(subscriptionId, tenantId)
+  );
+}
+
 function drainCliWriters(): void {
   if (cliWriterActive || cliReaders || !cliWriters.length) return;
   cliWriterActive = true;
@@ -300,13 +308,7 @@ async function runCliLogin(
         : await hasCliAccount(az)) &&
       generation === getNativeAuthGeneration() &&
       epoch === cliLoginEpoch;
-    if (
-      valid &&
-      native &&
-      !tenantReconciliations.every(({ subscriptionId, tenantId }) =>
-        nativeSubscriptionTenantReconcile(subscriptionId, tenantId)
-      )
-    ) {
+    if (valid && native && !commitTenantReconciliations(tenantReconciliations)) {
       valid = false;
     }
     if (!valid) {
@@ -345,7 +347,8 @@ async function runVerifiedCliCommand(
     const generation = getNativeAuthGeneration();
     if (generation !== approvedNativeGeneration) return { stdout: '', stderr: CLI_IDENTITY_ERROR };
     const epoch = cliLoginEpoch;
-    const verified = await verifyCliIdentity(az, native, args);
+    const tenantReconciliations: Array<{ subscriptionId: string; tenantId: string }> = [];
+    const verified = await verifyCliIdentity(az, native, args, true, tenantReconciliations);
     if (
       !verified ||
       !cliOperationsAllowed ||
@@ -356,6 +359,9 @@ async function runVerifiedCliCommand(
       cliLoginFailed ||
       isAzureExplicitlySignedOut()
     ) {
+      return { stdout: '', stderr: CLI_IDENTITY_ERROR };
+    }
+    if (!commitTenantReconciliations(tenantReconciliations)) {
       return { stdout: '', stderr: CLI_IDENTITY_ERROR };
     }
   }
@@ -444,15 +450,32 @@ export async function withVerifiedCliBatch<T>(
       cliLoginsPending ||
       cliLoginFailed ||
       isAzureExplicitlySignedOut() ||
-      (native &&
-        (generation !== approvedNativeGeneration ||
-          !(await verifyCliIdentity(getAzCommand(), native, [
-            '--subscription',
-            subscriptionId,
-          ])))) ||
+      (native && generation !== approvedNativeGeneration) ||
       (!native && hasNativeSession())
     ) {
       throw new Error(CLI_IDENTITY_ERROR);
+    }
+    if (native) {
+      const tenantReconciliations: Array<{ subscriptionId: string; tenantId: string }> = [];
+      const verified = await verifyCliIdentity(
+        getAzCommand(),
+        native,
+        ['--subscription', subscriptionId],
+        true,
+        tenantReconciliations
+      );
+      if (
+        !verified ||
+        !cliOperationsAllowed ||
+        generation !== getNativeAuthGeneration() ||
+        epoch !== cliLoginEpoch ||
+        cliLoginsPending ||
+        cliLoginFailed ||
+        isAzureExplicitlySignedOut() ||
+        !commitTenantReconciliations(tenantReconciliations)
+      ) {
+        throw new Error(CLI_IDENTITY_ERROR);
+      }
     }
     const run = (args: string[]) => {
       const selectsSubscription = args.some(
