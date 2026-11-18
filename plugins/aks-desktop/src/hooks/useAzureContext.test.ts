@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAzureContext } from './useAzureContext';
 
@@ -21,6 +21,7 @@ vi.mock('@kinvolk/headlamp-plugin/lib', () => {
 });
 
 import { getClusterInfo } from '../utils/azure/az-clusters';
+import { AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT } from '../utils/azure/az-token';
 import type { AzureAuthStatus } from './useAzureAuth';
 import { useAzureAuth } from './useAzureAuth';
 
@@ -42,6 +43,7 @@ describe('useAzureContext', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
   });
 
@@ -96,6 +98,37 @@ describe('useAzureContext', () => {
     });
     expect(result.current.error).toBeNull();
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it('re-resolves context when an effective subscription tenant changes', async () => {
+    mockAuth();
+    mockGetClusterInfo
+      .mockResolvedValueOnce({
+        clusterName: 'my-cluster',
+        subscriptionId: 'sub-1',
+        resourceGroup: 'rg-1',
+        tenantId: 'tenant-a',
+      })
+      .mockResolvedValue({
+        clusterName: 'my-cluster',
+        subscriptionId: 'sub-1',
+        resourceGroup: 'rg-1',
+        tenantId: 'tenant-b',
+      });
+    const { result } = renderHook(() => useAzureContext('my-cluster'));
+    await waitFor(() => expect(result.current.azureContext?.tenantId).toBe('tenant-a'));
+    const callsBeforeChange = mockGetClusterInfo.mock.calls.length;
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT, {
+          detail: { subscriptionIds: ['sub-1'] },
+        })
+      );
+    });
+
+    await waitFor(() => expect(result.current.azureContext?.tenantId).toBe('tenant-b'));
+    expect(mockGetClusterInfo).toHaveBeenCalledTimes(callsBeforeChange + 1);
   });
 
   it('sets error when getClusterInfo fails', async () => {

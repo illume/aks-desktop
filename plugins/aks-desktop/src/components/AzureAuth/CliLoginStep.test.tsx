@@ -36,6 +36,7 @@ describe('CliLoginStep', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.isAzCliInstalled.mockResolvedValue(true);
+    mocks.logoutNative.mockResolvedValue(true);
   });
   afterEach(cleanup);
 
@@ -120,6 +121,19 @@ describe('CliLoginStep', () => {
     render(<CliLoginStep nativeAuthenticated={false} onContinue={onContinue} />);
 
     expect((await screen.findByRole('alert')).textContent).toContain('cleanup failed');
+    expect(mocks.initiateCliLogin).not.toHaveBeenCalled();
+    expect(onContinue).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Retry Azure CLI sign-in' })).toBeTruthy();
+  });
+
+  test('CLI-only mode stops when the sign-out policy cannot be saved', async () => {
+    mocks.logoutNative.mockResolvedValue(false);
+    const onContinue = vi.fn();
+    render(<CliLoginStep nativeAuthenticated={false} onContinue={onContinue} />);
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'sign-out policy could not be saved'
+    );
     expect(mocks.initiateCliLogin).not.toHaveBeenCalled();
     expect(onContinue).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Retry Azure CLI sign-in' })).toBeTruthy();

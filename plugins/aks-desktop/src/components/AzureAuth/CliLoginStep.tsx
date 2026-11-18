@@ -63,8 +63,13 @@ export default function CliLoginStep({
     setError('');
     try {
       if (!nativeAuthenticated) {
-        await logoutNative();
+        const persisted = await logoutNative();
         if (!mounted.current || continued.current) return;
+        if (!persisted) {
+          throw new Error(
+            'Azure sign-out policy could not be saved. Enable application storage and retry.'
+          );
+        }
       }
       const generation = getNativeAuthGeneration();
       const result = await initiateCliLogin();

@@ -198,7 +198,8 @@
           "authority": "https://login.chinacloudapi.cn",
           "scopes": [
             "https://management.core.chinacloudapi.cn//.default",
-            "https://microsoftgraph.chinacloudapi.cn/.default"
+            "https://microsoftgraph.chinacloudapi.cn/.default",
+            "https://prometheus.monitor.azure.cn/.default"
           ]
         }
       ]

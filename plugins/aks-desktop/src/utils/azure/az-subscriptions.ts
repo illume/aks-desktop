@@ -20,6 +20,9 @@ const SUBSCRIPTIONS_API_VERSION = '2022-12-01';
 const RESOURCE_GROUPS_API_VERSION = '2021-04-01';
 let nativeDiscoverySequence = 0;
 let nativePublishedDiscoverySequence = 0;
+let nativePublishedDiscovery:
+  | { accountGeneration: number; subscriptions: Array<Record<string, any>> }
+  | undefined;
 /** Used when `createResourceGroup` is called without `tags`. */
 const DEFAULT_RESOURCE_GROUP_TAGS = ['createdBy=AKS Desktop'];
 
@@ -156,7 +159,13 @@ export async function getSubscriptions(
       throw new Error('Azure account changed during subscription discovery');
     }
     if (discoverySequence < nativePublishedDiscoverySequence) {
-      throw new Error('Azure subscription discovery was superseded by a newer result');
+      if (nativePublishedDiscovery?.accountGeneration !== accountGeneration) {
+        throw new Error('Azure subscription discovery was superseded by a newer result');
+      }
+      return nativePublishedDiscovery.subscriptions.map(subscription => ({
+        ...subscription,
+        tenants: [...subscription.tenants],
+      }));
     }
     if (
       discoverySequence > nativePublishedDiscoverySequence &&
@@ -168,14 +177,21 @@ export async function getSubscriptions(
       nativePublishedDiscoverySequence,
       discoverySequence
     );
-    discovered = discovered.map(subscription => {
+    discovered = discovered.flatMap(subscription => {
       const tenant = getNativeSubscriptionTenant(subscription.id);
-      if (!tenant) return subscription;
+      if (!tenant) return [];
       const tenantMetadata = listedTenants
         .get(subscription.id)
         ?.find(value => value.tenant.toLowerCase() === tenant.toLowerCase());
-      return { ...subscription, tenant, tenantName: tenantMetadata?.tenantName };
+      return [{ ...subscription, tenant, tenantName: tenantMetadata?.tenantName }];
     });
+    nativePublishedDiscovery = {
+      accountGeneration,
+      subscriptions: discovered.map(subscription => ({
+        ...subscription,
+        tenants: [...subscription.tenants],
+      })),
+    };
   }
   return discovered;
 }

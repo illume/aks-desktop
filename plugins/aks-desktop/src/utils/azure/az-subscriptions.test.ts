@@ -247,6 +247,7 @@ describe('getSubscriptions', () => {
 
   it('allows strict discovery when an enabled subscription was found despite a tenant failure', async () => {
     mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_A);
     mockArm([{ tenantId: TENANT_A }, { tenantId: TENANT_B }], {
       [TENANT_A]: [armSub(SUB_ID, TENANT_A)],
       [TENANT_B]: new Error('MFA required'),
@@ -326,6 +327,7 @@ describe('getSubscriptions', () => {
 
   it('never reads or refreshes the CLI profile for a native session', async () => {
     mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_A);
     mockArm([{ tenantId: TENANT_A }], {
       [TENANT_A]: [armSub('native-sub', TENANT_A)],
     });
@@ -396,7 +398,7 @@ describe('getSubscriptions', () => {
     await expect(getSubscriptions()).rejects.toThrow('account changed');
   });
 
-  it('rejects an older native discovery after newer bindings are published', async () => {
+  it('returns the newer published snapshot to an older overlapping discovery', async () => {
     mocks.hasNativeSession.mockReturnValue(true);
     let release!: (value: any[]) => void;
     mocks.azListAll
@@ -404,14 +406,35 @@ describe('getSubscriptions', () => {
       .mockResolvedValueOnce([]);
     const older = getSubscriptions();
     await vi.waitFor(() => expect(mocks.azListAll).toHaveBeenCalledTimes(1));
-    await getSubscriptions();
+    await expect(getSubscriptions()).resolves.toEqual([]);
     release([]);
-    await expect(older).rejects.toThrow('superseded');
+    await expect(older).resolves.toEqual([]);
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not return stale entries from an older overlapping discovery', async () => {
+    mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_B);
+    let releaseOlder!: (value: any[]) => void;
+    mocks.azListAll
+      .mockReturnValueOnce(new Promise(resolve => (releaseOlder = resolve)))
+      .mockResolvedValueOnce([{ tenantId: TENANT_B }])
+      .mockResolvedValueOnce([armSub(SUB_ID, TENANT_B)])
+      .mockResolvedValueOnce([armSub('stale-sub', TENANT_A)]);
+    const older = getSubscriptions();
+    await vi.waitFor(() => expect(mocks.azListAll).toHaveBeenCalledTimes(1));
+
+    const newer = await getSubscriptions();
+    releaseOlder([{ tenantId: TENANT_A }]);
+
+    const olderResult = await older;
+    expect(olderResult).toEqual(newer);
+    expect(olderResult.map(subscription => subscription.id)).not.toContain('stale-sub');
   });
 
   it('publishes an older successful discovery while a newer one is still pending', async () => {
     mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_A);
     let releaseOlder!: (value: any[]) => void;
     let failNewer!: (error: Error) => void;
     mocks.azListAll

@@ -30,7 +30,6 @@ const TENANT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.-]*$/;
 const SCOPE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^\s]+$/i;
 
 let accountGeneration = 0;
-let nativeMappingGeneration = 0;
 interface NativeSubscriptionTenantBinding {
   tenant: string;
   tenants: Set<string>;
@@ -42,10 +41,21 @@ function synchronizeNativeGeneration(): void {
   const generation = getNativeAuthGeneration();
   if (observedNativeGeneration !== undefined && generation !== observedNativeGeneration) {
     accountGeneration++;
-    nativeMappingGeneration++;
     nativeSubscriptionTenants.clear();
   }
   observedNativeGeneration = generation;
+}
+
+export const AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT = 'azure-subscription-tenant-change';
+
+function dispatchNativeSubscriptionTenantChange(subscriptionIds: string[]): void {
+  if (subscriptionIds.length > 0 && typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent(AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT, {
+        detail: { subscriptionIds },
+      })
+    );
+  }
 }
 
 /** Snapshot used to discard subscription discovery completed after an account change. */
@@ -114,8 +124,11 @@ export function setNativeSubscriptionTenants(
       );
     })
   ) {
+    const changed = [...nativeSubscriptionTenants]
+      .filter(([id, binding]) => next.get(id)?.tenant !== binding.tenant)
+      .map(([id]) => id);
     nativeSubscriptionTenants = next;
-    nativeMappingGeneration++;
+    dispatchNativeSubscriptionTenantChange(changed);
   }
   const account = getNativeAccount();
   const accountTenant = account
@@ -154,8 +167,7 @@ function reconcileNativeSubscriptionTenant(subscriptionId: string, tenantId: str
   }
   if (binding.tenant !== tenant) {
     binding.tenant = tenant;
-    nativeMappingGeneration++;
-    clearAzureTokenCaches();
+    dispatchNativeSubscriptionTenantChange([subscriptionId.toLowerCase()]);
   }
   return true;
 }
@@ -308,7 +320,6 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
       throw new AzTokenError('Azure login is required', true);
     }
     const accountVersion = accountGeneration;
-    const mappingVersion = nativeMappingGeneration;
     const cacheVersion = cacheGeneration;
     if (native && subscriptionId) {
       const mappedTenant = nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
@@ -323,10 +334,12 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
         );
       }
       resolvedTenantId = mappedTenant;
+    } else if (native && !tenantId) {
+      resolvedTenantId = getNativeAccount()?.tenantId;
     }
-    const key = `${
-      native ? `native:${accountVersion}:${mappingVersion}` : `cli:${accountVersion}`
-    }|${resolvedTenantId ?? ''}|${scope}`;
+    const key = `${native ? `native:${accountVersion}` : `cli:${accountVersion}`}|${
+      resolvedTenantId ?? ''
+    }|${scope}`;
     const cached = cache.get(key);
     const ensureCurrent = () => {
       synchronizeNativeGeneration();
@@ -335,7 +348,14 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
         cacheVersion !== cacheGeneration ||
         native !== hasNativeSession() ||
         (!native && isAzureExplicitlySignedOut()) ||
-        (native && mappingVersion !== nativeMappingGeneration)
+        (native &&
+          subscriptionId !== undefined &&
+          nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant !==
+            resolvedTenantId) ||
+        (native &&
+          subscriptionId === undefined &&
+          tenantId === undefined &&
+          getNativeAccount()?.tenantId.toLowerCase() !== resolvedTenantId?.toLowerCase())
       ) {
         throw new AzTokenError('Azure account changed during token acquisition');
       }
@@ -413,7 +433,6 @@ function handleAzureAccountChange(): void {
   accountGeneration++;
   clearAzureTokenCaches();
   if (!preserveNativeBindings) {
-    nativeMappingGeneration++;
     nativeSubscriptionTenants.clear();
   }
   if (account && nativeSubscriptionTenants.size === 0) {

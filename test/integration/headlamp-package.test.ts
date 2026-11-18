@@ -252,8 +252,11 @@ test('AKS supplies its Azure OAuth scopes through the generated product manifest
   );
   const configuration = rootManifest.headlamp.azureOAuth;
   const publicCloud = configuration.clouds.find(cloud => cloud.name === 'AzureCloud');
+  const chinaCloud = configuration.clouds.find(cloud => cloud.name === 'AzureChinaCloud');
   assert.ok(publicCloud);
+  assert.ok(chinaCloud);
   assert.ok(publicCloud.scopes.includes('https://prometheus.monitor.azure.com/.default'));
+  assert.ok(chinaCloud.scopes.includes('https://prometheus.monitor.azure.cn/.default'));
   for (const platform of ['linux', 'darwin', 'win32']) {
     const manifest = validateBuildManifest(createProductTemplate(rootManifest, platform));
     assert.deepEqual(manifest.azureOAuth, configuration);

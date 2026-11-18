@@ -30,6 +30,7 @@ vi.mock('./native-auth', () => ({
 import {
   ARM_SCOPE,
   AzTokenError,
+  AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT,
   createAzCliCredential,
   getAzToken,
   getAzureAccountGeneration,
@@ -143,6 +144,26 @@ describe('subscription credentials', () => {
       false
     );
     await expect(credential.getToken(ARM_SCOPE)).rejects.toThrow('No tenant is known');
+  });
+
+  test('notifies consumers when an effective subscription tenant changes', () => {
+    const subscription = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+    const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const tenantB = '11111111-1111-1111-1111-111111111111';
+    mocks.hasNativeSession.mockReturnValue(true);
+    const listener = vi.fn();
+    window.addEventListener(AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT, listener);
+    const generation = getAzureAccountGeneration();
+
+    setNativeSubscriptionTenants([{ id: subscription, tenant: tenantA }], generation);
+    expect(listener).not.toHaveBeenCalled();
+    setNativeSubscriptionTenants([{ id: subscription, tenant: tenantB }], generation);
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      subscriptionIds: [subscription],
+    });
+    window.removeEventListener(AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT, listener);
   });
 
   test('seeds the selected native account on account events', async () => {
@@ -282,6 +303,42 @@ describe('subscription credentials', () => {
     window.dispatchEvent(new CustomEvent('azure-account-change'));
     release({ token: 'stale', expiresOnTimestamp: Date.now() + 3_600_000 });
     await expect(pending).rejects.toThrow('account changed');
+  });
+
+  test('keeps in-flight tokens valid when an unrelated subscription binding changes', async () => {
+    const subscriptionA = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+    const subscriptionB = 'cccccccc-dddd-eeee-ffff-000000000001';
+    const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const tenantB = '11111111-1111-1111-1111-111111111111';
+    const tenantC = '22222222-2222-2222-2222-222222222222';
+    mocks.hasNativeSession.mockReturnValue(true);
+    const releases: Array<(token: { token: string; expiresOnTimestamp: number }) => void> = [];
+    mocks.nativeGetToken.mockImplementation(() => new Promise(resolve => releases.push(resolve)));
+    const generation = getAzureAccountGeneration();
+    setNativeSubscriptionTenants(
+      [
+        { id: subscriptionA, tenant: tenantA },
+        { id: subscriptionB, tenant: tenantB },
+      ],
+      generation
+    );
+    const bound = getSubscriptionCredential(subscriptionA).getToken(ARM_SCOPE);
+    const explicitlyScoped = createAzCliCredential().getToken(ARM_SCOPE, {
+      tenantId: tenantA,
+    });
+
+    setNativeSubscriptionTenants(
+      [
+        { id: subscriptionA, tenant: tenantA },
+        { id: subscriptionB, tenant: tenantC },
+      ],
+      generation
+    );
+    releases[0]({ token: 'bound', expiresOnTimestamp: Date.now() + 3_600_000 });
+    releases[1]({ token: 'explicit', expiresOnTimestamp: Date.now() + 3_600_000 });
+
+    await expect(bound).resolves.toMatchObject({ token: 'bound' });
+    await expect(explicitlyScoped).resolves.toMatchObject({ token: 'explicit' });
   });
 
   test('never reuses a CLI token after switching to native authentication', async () => {
