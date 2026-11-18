@@ -3,7 +3,9 @@
 
 import { ApiProxy } from '@kinvolk/headlamp-plugin/lib';
 import { getErrorMessage, withVerifiedCliCapabilityAccess } from './az-cli-core';
+import { getAzureCloudEndpoints } from './az-cloud';
 import { azRequest, AzureRequestError } from './az-http';
+import { getSubscriptionCredential } from './az-token';
 import { getStartClusterProxyCapability } from './clusterProxyCapability';
 
 // Proxy lifecycle is owned by the app (main) layer. There is no stop intent:
@@ -264,9 +266,13 @@ export async function getClusterCurrentState(
     '/providers/Microsoft.HybridContainerService/provisionedClusterInstances/default';
 
   try {
+    const { endpoint, scope } = await getAzureCloudEndpoints();
     const response = await azRequest<ProvisionedClusterInstance>({
       url,
       apiVersion: PROVISIONED_CLUSTER_API_VERSION,
+      endpoint,
+      scope,
+      credential: getSubscriptionCredential(target.subscriptionId),
     });
     const status = response?.properties?.status;
     for (const value of [response, response?.properties, status]) {

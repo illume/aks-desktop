@@ -22,22 +22,24 @@ export async function queryPrometheus(
   step = 60,
   subscription: string
 ): Promise<any[]> {
-  try {
-    // Acquire access token for Prometheus
-    const { stdout: tokenStdout } = await runCommandWithOutput('az', [
-      'account',
-      'get-access-token',
-      '--resource',
-      'https://prometheus.monitor.azure.com/',
-      '--query',
-      'accessToken',
-      '-o',
-      'tsv',
-      '--subscription',
-      subscription,
-    ]);
+  const { stdout: tokenStdout, stderr: tokenStderr } = await runCommandWithOutput('az', [
+    'account',
+    'get-access-token',
+    '--resource',
+    'https://prometheus.monitor.azure.com/',
+    '--query',
+    'accessToken',
+    '-o',
+    'tsv',
+    '--subscription',
+    subscription,
+  ]);
+  const token = tokenStdout.trim();
+  if (!token) {
+    throw new Error(tokenStderr.trim() || 'Azure CLI returned no Prometheus access token');
+  }
 
-    const token = tokenStdout.trim();
+  try {
     const rangeUrl = `${endpoint}/api/v1/query_range`;
 
     const formData = new URLSearchParams();

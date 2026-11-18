@@ -145,6 +145,7 @@ export async function initiateNativeLogin(
   cloudName = 'AzureCloud'
 ): Promise<NativeLoginPrompt> {
   if (signal?.aborted) throw new Error('Azure login was cancelled');
+  const oauth = bridge();
   const cloud = getNativeCloudConfiguration(cloudName);
   if (!blockImplicitAzureCli()) {
     throw new Error(
@@ -158,19 +159,19 @@ export async function initiateNativeLogin(
   if (signal) {
     const onAbort = () => {
       if (generation !== loginGeneration || !loginPending) return;
-      void bridge().cancelAzureLogin();
+      void oauth.cancelAzureLogin();
       resetNativeSession();
       dispatchAccountChange();
     };
     signal.addEventListener('abort', onAbort, { once: true });
     removeAbortListener = () => signal.removeEventListener('abort', onAbort);
   }
-  const result = await bridge().startAzureLogin(cloud.name, cloud.arm.scope);
+  const result = await oauth.startAzureLogin(cloud.name, cloud.arm.scope);
   if (generation !== loginGeneration) {
     throw new Error('Azure login was cancelled');
   }
   if (signal?.aborted) {
-    await bridge().cancelAzureLogin();
+    await oauth.cancelAzureLogin();
     throw new Error('Azure login was cancelled');
   }
   if (!result.success || !result.prompt) {
@@ -237,7 +238,11 @@ export function allowAzureCliFallback(): void {
 /** Signs out and prevents automatic reuse of an Azure CLI account. */
 export async function logoutNative(): Promise<boolean> {
   const persisted = blockImplicitAzureCli();
+  const generation = loginGeneration;
   const result = await bridge().logoutAzure();
+  if (generation !== loginGeneration) {
+    throw new Error('Azure account changed during sign-out');
+  }
   if (!result.success) {
     throw new Error(result.error ?? 'Azure native sign-out failed');
   }
@@ -262,7 +267,8 @@ export const nativeCredential: TokenCredential = {
     if (signal?.aborted) throw abortError();
     const load = async () => {
       const generation = loginGeneration;
-      const result = await bridge().getAzureToken(normalizeNativeScope(scope), options?.tenantId);
+      const tenantId = options?.tenantId ?? account?.tenantId;
+      const result = await bridge().getAzureToken(normalizeNativeScope(scope), tenantId);
       if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
       if (signal?.aborted) throw abortError();
       if (

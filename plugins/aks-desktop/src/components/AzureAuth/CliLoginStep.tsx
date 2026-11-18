@@ -61,23 +61,33 @@ export default function CliLoginStep({
     pending.current = true;
     setState('pending');
     setError('');
-    if (!nativeAuthenticated) await logoutNative();
-    const generation = getNativeAuthGeneration();
-    const result = await initiateCliLogin();
-    pending.current = false;
-    if (!mounted.current || continued.current) return;
-    if (generation !== getNativeAuthGeneration()) {
-      setError('Azure account changed during CLI sign-in. Please retry.');
+    try {
+      if (!nativeAuthenticated) {
+        await logoutNative();
+        if (!mounted.current || continued.current) return;
+      }
+      const generation = getNativeAuthGeneration();
+      const result = await initiateCliLogin();
+      if (!mounted.current || continued.current) return;
+      if (generation !== getNativeAuthGeneration()) {
+        setError('Azure account changed during CLI sign-in. Please retry.');
+        setState('failed');
+        return;
+      }
+      if (result.success) {
+        if (!nativeAuthenticated) allowAzureCliFallback();
+        allowCliOperations();
+        continueOnce();
+      } else {
+        setError(result.message);
+        setState('failed');
+      }
+    } catch (error) {
+      if (!mounted.current || continued.current) return;
+      setError(error instanceof Error ? error.message : 'Azure CLI sign-in failed.');
       setState('failed');
-      return;
-    }
-    if (result.success) {
-      if (!nativeAuthenticated) allowAzureCliFallback();
-      allowCliOperations();
-      continueOnce();
-    } else {
-      setError(result.message);
-      setState('failed');
+    } finally {
+      pending.current = false;
     }
   };
 

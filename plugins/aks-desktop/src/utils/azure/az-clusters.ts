@@ -1,12 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
+import { getClusterSettings } from '../shared/clusterSettings';
 import { debugLog, getErrorMessage, isAzError, needsRelogin, runCommandAsync } from './az-cli-core';
 import { getAzureCloudEndpoints } from './az-cloud';
 import { azListAll } from './az-http';
 import { getClusterResourceGroupViaGraph, getClustersViaGraph } from './az-resource-graph';
 import { getSubscriptions } from './az-subscriptions';
-import { getSubscriptionCredential } from './az-token';
+import { getNativeSubscriptionTenant, getSubscriptionCredential } from './az-token';
 import { getNativeAccount } from './native-auth';
 
 export async function getClusters(subscriptionId?: string, query?: string): Promise<any[]> {
@@ -406,19 +407,49 @@ export async function getClusterInfo(clusterName?: string): Promise<{
   clusterName?: string;
   resourceGroup?: string;
   subscriptionId?: string;
+  tenantId?: string;
 }> {
   const result: {
     clusterName?: string;
     resourceGroup?: string;
     subscriptionId?: string;
+    tenantId?: string;
   } = {};
 
   try {
+    if (clusterName) {
+      const registration = getClusterSettings(clusterName).azureRegistration;
+      if (
+        typeof registration?.subscriptionId === 'string' &&
+        registration.subscriptionId &&
+        typeof registration.resourceGroup === 'string' &&
+        registration.resourceGroup
+      ) {
+        let tenantId = getNativeSubscriptionTenant(registration.subscriptionId);
+        if (!tenantId) {
+          const subscriptions = await getSubscriptions();
+          const subscription = subscriptions.find(
+            value =>
+              typeof value.id === 'string' &&
+              value.id.toLowerCase() === registration.subscriptionId.toLowerCase()
+          );
+          tenantId = typeof subscription?.tenant === 'string' ? subscription.tenant : undefined;
+        }
+        return {
+          clusterName,
+          subscriptionId: registration.subscriptionId,
+          resourceGroup: registration.resourceGroup,
+          tenantId,
+        };
+      }
+    }
+
     const nativeAccount = getNativeAccount();
     let accountStdout = '';
     let accountStderr = '';
     if (nativeAccount) {
       result.subscriptionId = nativeAccount.subscriptionId;
+      result.tenantId = nativeAccount.tenantId;
     } else {
       ({ stdout: accountStdout, stderr: accountStderr } = await runCommandAsync('az', [
         'account',
@@ -450,6 +481,7 @@ export async function getClusterInfo(clusterName?: string): Promise<{
       try {
         const account = JSON.parse(accountStdout);
         result.subscriptionId = account.id;
+        result.tenantId = account.tenantId;
       } catch (parseError) {
         console.warn('Could not parse Azure account info:', parseError);
       }

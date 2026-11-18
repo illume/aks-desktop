@@ -92,10 +92,12 @@ export async function getSubscriptions(
   const subscriptions = new Map<string, any>();
   const listedTenants = new Map<string, { tenant: string; tenantName?: string }[]>();
   const errors: unknown[] = [];
+  const failedTenantIds: string[] = [];
 
   for (const [index, result] of results.entries()) {
     if (result.status === 'rejected') {
       errors.push(result.reason);
+      failedTenantIds.push(tenants[index].tenantId);
       console.warn(
         `Skipping subscriptions for tenant ${tenants[index].tenantId}:`,
         getErrorMessage(result.reason)
@@ -153,7 +155,7 @@ export async function getSubscriptions(
     }
     if (
       discoverySequence > nativePublishedDiscoverySequence &&
-      !setNativeSubscriptionTenants(discovered, accountGeneration)
+      !setNativeSubscriptionTenants(discovered, accountGeneration, failedTenantIds)
     ) {
       throw new Error('Azure account changed during subscription discovery');
     }

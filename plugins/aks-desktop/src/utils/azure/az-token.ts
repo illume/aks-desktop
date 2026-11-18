@@ -49,10 +49,14 @@ export function getAzureAccountGeneration(): number {
   return accountGeneration;
 }
 
-/** Replaces native subscription bindings only if discovery belongs to the current account. */
+/**
+ * Publishes native subscription bindings only if discovery belongs to the current account.
+ * Bindings from tenants whose queries failed are preserved until a later successful query.
+ */
 export function setNativeSubscriptionTenants(
   subscriptions: Array<{ id: string; tenant: string }>,
-  generation: number
+  generation: number,
+  preserveTenantIds: string[] = []
 ): boolean {
   synchronizeNativeGeneration();
   if (generation !== accountGeneration || !hasNativeSession()) return false;
@@ -60,7 +64,12 @@ export function setNativeSubscriptionTenants(
     synchronizeNativeGeneration();
     return nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
   });
-  const next = new Map<string, string>();
+  const preserved = new Set(
+    preserveTenantIds.filter(isValidGuid).map(tenantId => tenantId.toLowerCase())
+  );
+  const next = new Map(
+    [...nativeSubscriptionTenants].filter(([, tenantId]) => preserved.has(tenantId))
+  );
   for (const { id, tenant } of subscriptions) {
     if (isValidGuid(id) && isValidGuid(tenant)) next.set(id.toLowerCase(), tenant.toLowerCase());
   }
@@ -72,6 +81,12 @@ export function setNativeSubscriptionTenants(
     nativeMappingGeneration++;
   }
   return true;
+}
+
+/** Returns the tenant discovered for a native subscription in the current account generation. */
+export function getNativeSubscriptionTenant(subscriptionId: string): string | undefined {
+  synchronizeNativeGeneration();
+  return nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
 }
 
 /** Token acquisition or validation failure without exposing the token response. */

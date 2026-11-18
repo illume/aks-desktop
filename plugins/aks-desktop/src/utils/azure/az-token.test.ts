@@ -31,6 +31,7 @@ import {
   createAzCliCredential,
   getAzToken,
   getAzureAccountGeneration,
+  getNativeSubscriptionTenant,
   getSubscriptionCredential,
   setNativeSubscriptionTenants,
 } from './az-token';
@@ -111,6 +112,7 @@ describe('subscription credentials', () => {
       setNativeSubscriptionTenants([{ id: subscription, tenant }], getAzureAccountGeneration())
     ).toBe(true);
     await expect(bound.getToken(ARM_SCOPE)).resolves.toMatchObject({ token: 'native' });
+    expect(getNativeSubscriptionTenant(subscription.toUpperCase())).toBe(tenant);
     expect(mocks.nativeGetToken).toHaveBeenCalledWith(ARM_SCOPE, { tenantId: tenant });
     await expect(
       bound.getToken(ARM_SCOPE, { tenantId: '11111111-1111-1111-1111-111111111111' })
@@ -180,6 +182,29 @@ describe('subscription credentials', () => {
     await expect(getSubscriptionCredential(other).getToken(ARM_SCOPE)).rejects.toThrow(
       'No tenant is known'
     );
+  });
+
+  test('preserves only bindings owned by tenants whose discovery failed', () => {
+    const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const tenantB = '11111111-1111-1111-1111-111111111111';
+    const staleA = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+    const currentA = 'cccccccc-dddd-eeee-ffff-000000000001';
+    const preservedB = 'dddddddd-eeee-ffff-0000-000000000002';
+    mocks.hasNativeSession.mockReturnValue(true);
+    const generation = getAzureAccountGeneration();
+    setNativeSubscriptionTenants(
+      [
+        { id: staleA, tenant: tenantA },
+        { id: preservedB, tenant: tenantB },
+      ],
+      generation
+    );
+
+    setNativeSubscriptionTenants([{ id: currentA, tenant: tenantA }], generation, [tenantB]);
+
+    expect(getNativeSubscriptionTenant(staleA)).toBeUndefined();
+    expect(getNativeSubscriptionTenant(currentA)).toBe(tenantA);
+    expect(getNativeSubscriptionTenant(preservedB)).toBe(tenantB);
   });
 
   test('does not return an in-flight token after a native mapping or account change', async () => {

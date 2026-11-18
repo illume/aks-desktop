@@ -102,6 +102,8 @@ describe('native authentication facade', () => {
     await expect(auth.initiateNativeLogin()).rejects.toThrow(
       'Desktop Azure authentication is not available'
     );
+    expect(auth.hasNativeSession()).toBe(false);
+    expect(auth.isAzureExplicitlySignedOut()).toBe(false);
   });
 
   test('uses the selected sovereign cloud configuration', async () => {
@@ -247,7 +249,7 @@ describe('native authentication facade', () => {
 
     expect(api.getAzureToken).toHaveBeenCalledWith(
       'https://management.core.windows.net//.default',
-      undefined
+      'guest-tenant'
     );
   });
 
@@ -303,6 +305,21 @@ describe('native authentication facade', () => {
 
     expect(auth.getNativeAccount()).toBeDefined();
     expect(auth.hasNativeSession()).toBe(true);
+  });
+
+  test('ignores a sign-out response superseded by a newer login', async () => {
+    const cleanup = deferred<{ success: true }>();
+    const api = capability();
+    const { auth } = await establishSession(api);
+    api.logoutAzure.mockReturnValueOnce(cleanup.promise);
+    const logout = auth.logoutNative();
+
+    await auth.initiateNativeLogin();
+    cleanup.resolve({ success: true });
+
+    await expect(logout).rejects.toThrow('account changed');
+    expect(auth.hasNativeSession()).toBe(true);
+    expect(auth.isAzureExplicitlySignedOut()).toBe(false);
   });
 
   test('allows explicit CLI fallback after native sign-out', async () => {

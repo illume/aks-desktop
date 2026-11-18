@@ -56,7 +56,7 @@ export const useAzureContext = (
         if (!cancelled) {
           const subscriptionId = clusterInfo.subscriptionId;
           const resourceGroup = clusterInfo.resourceGroup;
-          const tenantId = azureAuth.tenantId;
+          const tenantId = clusterInfo.tenantId ?? azureAuth.tenantId;
 
           if (!subscriptionId || !resourceGroup || !tenantId) {
             console.error('Missing required Azure context fields:', {

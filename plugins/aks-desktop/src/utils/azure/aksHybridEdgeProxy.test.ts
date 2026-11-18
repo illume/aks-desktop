@@ -8,6 +8,8 @@ const mockRequest = vi.hoisted(() => vi.fn());
 const mockStartClusterProxy = vi.hoisted(() => vi.fn());
 const mockRunCommandAsync = vi.hoisted(() => vi.fn());
 const mockWithVerifiedCliCapabilityAccess = vi.hoisted(() => vi.fn());
+const mockGetAzureCloudEndpoints = vi.hoisted(() => vi.fn());
+const mockGetSubscriptionCredential = vi.hoisted(() => vi.fn());
 
 vi.mock('@kinvolk/headlamp-plugin/lib', () => ({
   ApiProxy: {
@@ -23,6 +25,13 @@ vi.mock('../shared/runCommandAsync', () => ({
 vi.mock('./az-cli-core', async importOriginal => ({
   ...(await importOriginal<typeof import('./az-cli-core')>()),
   withVerifiedCliCapabilityAccess: mockWithVerifiedCliCapabilityAccess,
+}));
+vi.mock('./az-cloud', () => ({
+  getAzureCloudEndpoints: mockGetAzureCloudEndpoints,
+}));
+vi.mock('./az-token', async importOriginal => ({
+  ...(await importOriginal<typeof import('./az-token')>()),
+  getSubscriptionCredential: mockGetSubscriptionCredential,
 }));
 
 import {
@@ -51,6 +60,11 @@ beforeEach(() => {
     token: 'test-arm-token',
     expiresOnTimestamp: Date.now() + 3_600_000,
   });
+  mockGetAzureCloudEndpoints.mockResolvedValue({
+    endpoint: 'https://management.azure.com',
+    scope: 'https://management.azure.com/.default',
+  });
+  mockGetSubscriptionCredential.mockReturnValue(azCliCredential);
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -342,7 +356,11 @@ describe('aksHybridEdgeProxy — reachability & verification', () => {
       expect(health.errorMessage).toBe('not reachable');
     });
 
-    test('uses authenticated HTTP with encoded path segments and the pinned API version', async () => {
+    test('uses the active cloud and subscription credential with encoded path segments', async () => {
+      mockGetAzureCloudEndpoints.mockResolvedValueOnce({
+        endpoint: 'https://management.usgovcloudapi.net',
+        scope: 'https://management.core.usgovcloudapi.net//.default',
+      });
       mockFetch.mockResolvedValue(
         healthResponse({
           properties: { provisioningState: 'Failed', status: { currentState: 'Succeeded' } },
@@ -358,14 +376,15 @@ describe('aksHybridEdgeProxy — reachability & verification', () => {
       expect(mockFetch).toHaveBeenCalledOnce();
       const [url, init] = mockFetch.mock.calls[0];
       expect(String(url)).toBe(
-        'https://management.azure.com/subscriptions/sub-a/resourceGroups/%C3%A9quipe%20(%231)' +
+        'https://management.usgovcloudapi.net/subscriptions/sub-a/resourceGroups/%C3%A9quipe%20(%231)' +
           '/providers/Microsoft.Kubernetes/connectedClusters/cluster%20%2F%3F%23' +
           '/providers/Microsoft.HybridContainerService/provisionedClusterInstances/default?api-version=2024-01-01'
       );
       expect(init?.method).toBe('GET');
+      expect(mockGetSubscriptionCredential).toHaveBeenCalledWith('sub-a');
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer test-arm-token');
       expect(azCliCredential.getToken).toHaveBeenCalledWith(
-        'https://management.azure.com/.default',
+        'https://management.core.usgovcloudapi.net//.default',
         expect.objectContaining({ abortSignal: expect.any(AbortSignal) })
       );
     });

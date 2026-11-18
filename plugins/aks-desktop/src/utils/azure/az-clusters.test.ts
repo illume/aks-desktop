@@ -8,8 +8,11 @@ const mocks = vi.hoisted(() => ({
   getAzureCloudEndpoints: vi.fn(),
   getClusterResourceGroupViaGraph: vi.fn(),
   getClustersViaGraph: vi.fn(),
+  getClusterSettings: vi.fn(),
   getNativeAccount: vi.fn(),
+  getNativeSubscriptionTenant: vi.fn(),
   getSubscriptionCredential: vi.fn(),
+  getSubscriptions: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
 
@@ -27,6 +30,7 @@ vi.mock('./az-cloud', () => ({
 
 vi.mock('./az-token', async importOriginal => ({
   ...(await importOriginal<typeof import('./az-token')>()),
+  getNativeSubscriptionTenant: mocks.getNativeSubscriptionTenant,
   getSubscriptionCredential: mocks.getSubscriptionCredential,
 }));
 
@@ -35,8 +39,9 @@ vi.mock('./az-resource-graph', () => ({
   getClustersViaGraph: mocks.getClustersViaGraph,
 }));
 
-vi.mock('./az-subscriptions', () => ({ getSubscriptions: vi.fn() }));
+vi.mock('./az-subscriptions', () => ({ getSubscriptions: mocks.getSubscriptions }));
 vi.mock('./native-auth', () => ({ getNativeAccount: mocks.getNativeAccount }));
+vi.mock('../shared/clusterSettings', () => ({ getClusterSettings: mocks.getClusterSettings }));
 
 import { getClusterInfo, getClusters, getConnectedClusters } from './az-clusters';
 
@@ -75,7 +80,10 @@ describe('getClusterInfo', () => {
     vi.clearAllMocks();
     mocks.getNativeAccount.mockReturnValue({
       subscriptionId: '00000000-0000-0000-0000-000000000001',
+      tenantId: '00000000-0000-0000-0000-000000000002',
     });
+    mocks.getClusterSettings.mockReturnValue({});
+    mocks.getNativeSubscriptionTenant.mockReturnValue(undefined);
     mocks.getClusterResourceGroupViaGraph.mockResolvedValue('native-rg');
   });
 
@@ -84,12 +92,52 @@ describe('getClusterInfo', () => {
       clusterName: 'native-cluster',
       resourceGroup: 'native-rg',
       subscriptionId: '00000000-0000-0000-0000-000000000001',
+      tenantId: '00000000-0000-0000-0000-000000000002',
     });
     expect(mocks.runCommandAsync).not.toHaveBeenCalled();
     expect(mocks.getClusterResourceGroupViaGraph).toHaveBeenCalledWith(
       'native-cluster',
       '00000000-0000-0000-0000-000000000001'
     );
+  });
+
+  test('uses the persisted cluster registration and its bound tenant', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000003',
+        resourceGroup: 'persisted-rg',
+      },
+    });
+    mocks.getNativeSubscriptionTenant.mockReturnValue('00000000-0000-0000-0000-000000000004');
+
+    await expect(getClusterInfo('persisted-cluster')).resolves.toEqual({
+      clusterName: 'persisted-cluster',
+      resourceGroup: 'persisted-rg',
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000004',
+    });
+    expect(mocks.getClusterResourceGroupViaGraph).not.toHaveBeenCalled();
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+  });
+
+  test('discovers the persisted subscription tenant when no binding exists', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000003',
+        resourceGroup: 'persisted-rg',
+      },
+    });
+    mocks.getSubscriptions.mockResolvedValue([
+      {
+        id: '00000000-0000-0000-0000-000000000003',
+        tenant: '00000000-0000-0000-0000-000000000005',
+      },
+    ]);
+
+    await expect(getClusterInfo('persisted-cluster')).resolves.toMatchObject({
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000005',
+    });
   });
 });
 

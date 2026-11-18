@@ -331,7 +331,8 @@ describe('getSubscriptions', () => {
     expect(mocks.runCommandAsync).not.toHaveBeenCalled();
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
       [expect.objectContaining({ id: 'native-sub', tenant: TENANT_A })],
-      7
+      7,
+      []
     );
   });
 
@@ -344,7 +345,8 @@ describe('getSubscriptions', () => {
     await getSubscriptions();
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
       [expect.objectContaining({ id: SUB_ID, tenant: TENANT_A })],
-      7
+      7,
+      [TENANT_B]
     );
   });
 
@@ -390,7 +392,8 @@ describe('getSubscriptions', () => {
     ]);
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
       [expect.objectContaining({ id: SUB_ID, tenant: TENANT_A })],
-      7
+      7,
+      []
     );
     failNewer(new Error('discovery failed'));
     await expect(newer).rejects.toThrow('discovery failed');

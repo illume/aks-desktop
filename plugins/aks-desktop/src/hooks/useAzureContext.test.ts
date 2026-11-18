@@ -82,6 +82,7 @@ describe('useAzureContext', () => {
       clusterName: 'my-cluster',
       subscriptionId: 'sub-1',
       resourceGroup: 'rg-1',
+      tenantId: 'cluster-tenant',
     });
 
     const { result } = renderHook(() => useAzureContext('my-cluster'));
@@ -90,7 +91,7 @@ describe('useAzureContext', () => {
       expect(result.current.azureContext).toEqual({
         subscriptionId: 'sub-1',
         resourceGroup: 'rg-1',
-        tenantId: 'tenant-1',
+        tenantId: 'cluster-tenant',
       });
     });
     expect(result.current.error).toBeNull();

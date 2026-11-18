@@ -114,6 +114,31 @@ describe('CliLoginStep', () => {
     expect(mocks.allowAzureCliFallback).toHaveBeenCalledOnce();
   });
 
+  test('CLI-only mode reports native cleanup failures without starting the CLI', async () => {
+    mocks.logoutNative.mockRejectedValue(new Error('cleanup failed'));
+    const onContinue = vi.fn();
+    render(<CliLoginStep nativeAuthenticated={false} onContinue={onContinue} />);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('cleanup failed');
+    expect(mocks.initiateCliLogin).not.toHaveBeenCalled();
+    expect(onContinue).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Retry Azure CLI sign-in' })).toBeTruthy();
+  });
+
+  test('does not start an uncancellable CLI login after leaving during native cleanup', async () => {
+    let resolveCleanup!: () => void;
+    mocks.logoutNative.mockReturnValue(new Promise<void>(resolve => (resolveCleanup = resolve)));
+    const onBack = vi.fn();
+    render(<CliLoginStep nativeAuthenticated={false} onContinue={vi.fn()} onBack={onBack} />);
+    await screen.findByRole('status');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await act(async () => resolveCleanup());
+
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(mocks.initiateCliLogin).not.toHaveBeenCalled();
+  });
+
   test('CLI-only mode does not continue without the CLI', async () => {
     mocks.isAzCliInstalled.mockResolvedValue(false);
     const onContinue = vi.fn();
