@@ -209,10 +209,10 @@ export function waitForAzureRetry(
  * Creates a signal that aborts when the caller's `signal` aborts or after `timeoutMs`.
  * `dispose` stops the timer and removes the listener.
  * @param signal - Optional caller signal, including already-aborted signals.
- * @param timeoutMs - Total request/acquisition/retry budget in milliseconds.
+ * @param timeoutMs - Total request/acquisition/retry budget in milliseconds; defaults to one minute.
  * @returns The linked signal and a disposer that must run on every completion path.
  */
-function linkSignal(signal: AbortSignal | undefined, timeoutMs: number) {
+export function createAzureRequestSignal(signal?: AbortSignal, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController();
   const onAbort = () => controller.abort(signal?.reason);
   if (signal?.aborted) onAbort();
@@ -245,7 +245,7 @@ export async function azRequestRaw<T>(options: AzRequestOptions): Promise<AzResp
   const credential = options.credential ?? azCliCredential;
   const maxRetries =
     options.maxRetries ?? (RETRYABLE_METHODS.has(method) ? DEFAULT_MAX_RETRIES : 0);
-  const linked = linkSignal(options.signal, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const linked = createAzureRequestSignal(options.signal, options.timeoutMs);
 
   try {
     for (let attempt = 0; ; attempt++) {
@@ -326,11 +326,12 @@ export async function azRequest<T>(options: AzRequestOptions): Promise<T | undef
  * @typeParam T - Item shape inside each page's value array.
  * @param options - GET request/authentication options reused per page; timeoutMs is
  * per request, while a caller signal can impose one budget across the entire list.
+ * Set requireValueArray to reject pages without a value array.
  * @returns All items in service order, without partial success on a failed later page.
  * @throws For invalid value arrays, untrusted nextLink origins or propagated request failures.
  */
 export async function azListAll<T>(
-  options: Omit<AzRequestOptions, 'method' | 'body'>
+  options: Omit<AzRequestOptions, 'method' | 'body'> & { requireValueArray?: boolean }
 ): Promise<T[]> {
   const origin = resolveUrl(options).origin;
   const items: T[] = [];
@@ -338,7 +339,7 @@ export async function azListAll<T>(
 
   while (next) {
     const page: { value?: T[]; nextLink?: string } | undefined = await azRequest(next);
-    if (page?.value !== undefined && !Array.isArray(page.value)) {
+    if ((options.requireValueArray || page?.value !== undefined) && !Array.isArray(page?.value)) {
       throw new AzureRequestError('Malformed list response: `value` is not an array');
     }
     items.push(...(page?.value ?? []));
