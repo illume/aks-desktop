@@ -4,6 +4,7 @@
 import { useTranslation } from '@kinvolk/headlamp-plugin/lib';
 import { useEffect, useState } from 'react';
 import { getClusterInfo } from '../utils/azure/az-clusters';
+import { AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT } from '../utils/azure/az-token';
 import { useAzureAuth } from './useAzureAuth';
 
 export interface AzureContext {
@@ -22,10 +23,19 @@ export const useAzureContext = (
   const azureAuth = useAzureAuth();
   const [azureContext, setAzureContext] = useState<AzureContext | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tenantRevision, setTenantRevision] = useState(0);
   // Match what the effect sets, so the first render doesn't show a stale state.
   const [isLoading, setIsLoading] = useState(
     () => Boolean(cluster) && (azureAuth.isChecking || azureAuth.isLoggedIn)
   );
+
+  useEffect(() => {
+    const refreshTenant = () => setTenantRevision(value => value + 1);
+    window.addEventListener(AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT, refreshTenant);
+    return () => {
+      window.removeEventListener(AZURE_SUBSCRIPTION_TENANT_CHANGE_EVENT, refreshTenant);
+    };
+  }, []);
 
   useEffect(() => {
     if (!cluster) {
@@ -56,7 +66,7 @@ export const useAzureContext = (
         if (!cancelled) {
           const subscriptionId = clusterInfo.subscriptionId;
           const resourceGroup = clusterInfo.resourceGroup;
-          const tenantId = azureAuth.tenantId;
+          const tenantId = clusterInfo.tenantId ?? azureAuth.tenantId;
 
           if (!subscriptionId || !resourceGroup || !tenantId) {
             console.error('Missing required Azure context fields:', {
@@ -93,7 +103,7 @@ export const useAzureContext = (
     return () => {
       cancelled = true;
     };
-  }, [cluster, azureAuth.isChecking, azureAuth.isLoggedIn, azureAuth.tenantId]);
+  }, [cluster, azureAuth.isChecking, azureAuth.isLoggedIn, azureAuth.tenantId, tenantRevision]);
 
   return { azureContext, error, isLoading };
 };

@@ -6,8 +6,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   getAzureCloudEndpoints: vi.fn(),
+  getClusterResourceGroupViaGraph: vi.fn(),
   getClustersViaGraph: vi.fn(),
+  getClusterSettings: vi.fn(),
+  getNativeAccount: vi.fn(),
+  getNativeSubscriptionTenant: vi.fn(),
+  getSubscriptionLoginStatus: vi.fn(),
   getSubscriptionCredential: vi.fn(),
+  getSubscriptions: vi.fn(),
+  hasNativeSession: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
 
@@ -25,17 +32,26 @@ vi.mock('./az-cloud', () => ({
 
 vi.mock('./az-token', async importOriginal => ({
   ...(await importOriginal<typeof import('./az-token')>()),
+  getNativeSubscriptionTenant: mocks.getNativeSubscriptionTenant,
   getSubscriptionCredential: mocks.getSubscriptionCredential,
 }));
 
 vi.mock('./az-resource-graph', () => ({
-  getClusterResourceGroupViaGraph: vi.fn(),
+  getClusterResourceGroupViaGraph: mocks.getClusterResourceGroupViaGraph,
   getClustersViaGraph: mocks.getClustersViaGraph,
 }));
 
-vi.mock('./az-subscriptions', () => ({ getSubscriptions: vi.fn() }));
+vi.mock('./az-subscriptions', () => ({ getSubscriptions: mocks.getSubscriptions }));
+vi.mock('./az-auth', () => ({
+  getSubscriptionLoginStatus: mocks.getSubscriptionLoginStatus,
+}));
+vi.mock('./native-auth', () => ({
+  getNativeAccount: mocks.getNativeAccount,
+  hasNativeSession: mocks.hasNativeSession,
+}));
+vi.mock('../shared/clusterSettings', () => ({ getClusterSettings: mocks.getClusterSettings }));
 
-import { getClusters, getConnectedClusters } from './az-clusters';
+import { getClusterInfo, getClusters, getConnectedClusters } from './az-clusters';
 
 describe('getClusters', () => {
   beforeEach(() => {
@@ -64,6 +80,118 @@ describe('getClusters', () => {
     await expect(getClusters('sub-1')).resolves.toEqual([
       expect.objectContaining({ aadProfile: { enableAzureRbac: true } }),
     ]);
+  });
+});
+
+describe('getClusterInfo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getNativeAccount.mockReturnValue({
+      subscriptionId: '00000000-0000-0000-0000-000000000001',
+      tenantId: '00000000-0000-0000-0000-000000000002',
+    });
+    mocks.getClusterSettings.mockReturnValue({});
+    mocks.getNativeSubscriptionTenant.mockReturnValue(undefined);
+    mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getClusterResourceGroupViaGraph.mockResolvedValue('native-rg');
+  });
+
+  test('uses the native subscription as application context without reading CLI defaults', async () => {
+    await expect(getClusterInfo('native-cluster')).resolves.toEqual({
+      clusterName: 'native-cluster',
+      resourceGroup: 'native-rg',
+      subscriptionId: '00000000-0000-0000-0000-000000000001',
+      tenantId: '00000000-0000-0000-0000-000000000002',
+    });
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+    expect(mocks.getClusterResourceGroupViaGraph).toHaveBeenCalledWith(
+      'native-cluster',
+      '00000000-0000-0000-0000-000000000001'
+    );
+  });
+
+  test('uses the persisted cluster registration and its bound tenant', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000003',
+        resourceGroup: 'persisted-rg',
+      },
+    });
+    mocks.getNativeSubscriptionTenant.mockReturnValue('00000000-0000-0000-0000-000000000004');
+
+    await expect(getClusterInfo('persisted-cluster')).resolves.toEqual({
+      clusterName: 'persisted-cluster',
+      resourceGroup: 'persisted-rg',
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000004',
+    });
+    expect(mocks.getClusterResourceGroupViaGraph).not.toHaveBeenCalled();
+    expect(mocks.runCommandAsync).not.toHaveBeenCalled();
+  });
+
+  test('discovers the persisted subscription tenant when no binding exists', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000003',
+        resourceGroup: 'persisted-rg',
+      },
+    });
+    mocks.getSubscriptions.mockResolvedValue([
+      {
+        id: '00000000-0000-0000-0000-000000000003',
+        tenant: '00000000-0000-0000-0000-000000000005',
+      },
+    ]);
+
+    await expect(getClusterInfo('persisted-cluster')).resolves.toMatchObject({
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000005',
+    });
+  });
+
+  test('does not fall back to the active tenant when the registered tenant is unknown', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000003',
+        resourceGroup: 'persisted-rg',
+      },
+    });
+    mocks.getSubscriptions.mockResolvedValue([]);
+
+    await expect(getClusterInfo('persisted-cluster')).rejects.toThrow(
+      'No tenant is known for the registered Azure subscription'
+    );
+    expect(mocks.getClusterResourceGroupViaGraph).not.toHaveBeenCalled();
+  });
+
+  test('uses the persisted top-level Arc scope and a subscription-specific CLI tenant', async () => {
+    mocks.getNativeAccount.mockReturnValue(undefined);
+    mocks.hasNativeSession.mockReturnValue(false);
+    mocks.getClusterSettings.mockReturnValue({
+      clusterType: 'aksarc',
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      resourceGroup: 'arc-rg',
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000004',
+        resourceGroup: 'stale-managed-rg',
+      },
+    });
+    mocks.getSubscriptionLoginStatus.mockResolvedValue({
+      isLoggedIn: true,
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000006',
+    });
+
+    await expect(getClusterInfo('arc-cluster')).resolves.toEqual({
+      clusterName: 'arc-cluster',
+      resourceGroup: 'arc-rg',
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000006',
+    });
+    expect(mocks.getSubscriptionLoginStatus).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000003'
+    );
+    expect(mocks.getSubscriptions).not.toHaveBeenCalled();
   });
 });
 

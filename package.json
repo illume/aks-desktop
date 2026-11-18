@@ -173,6 +173,37 @@
   },
   "headlamp": {
     "commandEnvironment": "external-tools/aks-tool-environment.cjs",
+    "azureOAuth": {
+      "clientId": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+      "clouds": [
+        {
+          "name": "AzureCloud",
+          "authority": "https://login.microsoftonline.com",
+          "scopes": [
+            "https://management.core.windows.net//.default",
+            "https://graph.microsoft.com/.default",
+            "https://prometheus.monitor.azure.com/.default"
+          ]
+        },
+        {
+          "name": "AzureUSGovernment",
+          "authority": "https://login.microsoftonline.us",
+          "scopes": [
+            "https://management.core.usgovcloudapi.net//.default",
+            "https://graph.microsoft.us/.default"
+          ]
+        },
+        {
+          "name": "AzureChinaCloud",
+          "authority": "https://login.chinacloudapi.cn",
+          "scopes": [
+            "https://management.core.chinacloudapi.cn//.default",
+            "https://microsoftgraph.chinacloudapi.cn/.default",
+            "https://prometheus.monitor.azure.cn/.default"
+          ]
+        }
+      ]
+    },
     "githubOAuth": {
       "clientId": "Iv23liWWbvrfIrA6WWj5",
       "clientSecret": "5a066cc6ca8d2c6f201c45f24f2f4e62905b5d95"
@@ -201,9 +232,26 @@
     },
     "targets": {
       "linux": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64", "arm64"] },
-        { "target": "tar.gz", "arch": ["x64", "arm64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "checkForUpdates": false,
@@ -334,6 +382,7 @@
       {
         "environment": "development",
         "pluginLocation": "development",
+        "azureOAuth": true,
         "githubOAuth": true,
         "approvedCommands": [
           {
@@ -733,6 +782,7 @@
       {
         "environment": "production",
         "pluginLocation": "shipped",
+        "azureOAuth": true,
         "githubOAuth": true,
         "approvedCommands": [
           {
@@ -1178,7 +1228,7 @@
   },
   "headlampPatch": {
     "path": "patches/headlamp-source@0.0.0-main.7ce01fce.patch",
-    "integrity": "sha512-Sn8p31d8BC+Rd5hsfF4uxobPwHwAuBR/KSAlm9HR6NrQxJuLP1L+boT+rrS59YBAAWfuLSLJuz0dDwlrOTmEuw=="
+    "integrity": "sha512-I0kKbf2jJifuX+DlxPClo+vvByM4N8R0kMANNGYXLWvPWEauKuecW9wd338Tpj44WHIxwPQa1TglE8FNJDlgaA=="
   },
   "lint-staged": {
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx}": [

@@ -8,6 +8,7 @@ vi.mock('../shared/runCommandAsync', () => ({ runCommandAsync: mocks.command }))
 vi.mock('./az-cli-path', () => ({ getAzCommand: () => 'az' }));
 
 import { resolveAzureADUser, searchAzureADUsers } from './az-ad';
+import { ARM_SCOPE, getSubscriptionCredential } from './az-token';
 
 const subscriptionId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const tenantId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -28,6 +29,7 @@ let resources: Record<string, unknown>;
 let loggedIn: boolean;
 let tokenCount: number;
 let requests: { url: string; authorization: string }[];
+let subscriptionTenants: Record<string, string>;
 
 function output(data: unknown) {
   return { stdout: JSON.stringify(data), stderr: '' };
@@ -53,11 +55,25 @@ beforeEach(() => {
   loggedIn = true;
   tokenCount = 0;
   requests = [];
+  subscriptionTenants = {};
   mocks.command.mockReset().mockImplementation(async (command: string, args: string[]) => {
     expect(command).toBe('az');
     if (args[0] === 'account' && args[1] === 'show') {
-      expect(args).toEqual(['account', 'show', '-o', 'json']);
-      return loggedIn ? output(account) : { stdout: '', stderr: 'ERROR: Please run az login' };
+      const requestedSubscription = args[2] === '--subscription' ? args[3] : undefined;
+      expect(args).toEqual(
+        requestedSubscription
+          ? ['account', 'show', '--subscription', requestedSubscription, '-o', 'json']
+          : ['account', 'show', '-o', 'json']
+      );
+      return loggedIn
+        ? output({
+            ...account,
+            id: requestedSubscription ?? account.id,
+            tenantId: requestedSubscription
+              ? subscriptionTenants[requestedSubscription] ?? account.tenantId
+              : account.tenantId,
+          })
+        : { stdout: '', stderr: 'ERROR: Please run az login' };
     }
     if (args[0] === 'cloud' && args[1] === 'show') {
       expect(args).toEqual([
@@ -76,7 +92,7 @@ beforeEach(() => {
       });
     }
     if (args[0] === 'account' && args[1] === 'get-access-token') {
-      expect(args).toEqual([
+      expect(args.slice(0, 7)).toEqual([
         'account',
         'get-access-token',
         '--scope',
@@ -84,13 +100,14 @@ beforeEach(() => {
         '-o',
         'json',
         '--subscription',
-        account.id,
       ]);
+      expect(args[7] === account.id || args[7] in subscriptionTenants).toBe(true);
       tokenCount++;
+      const requestedSubscription = args[7];
       return output({
         accessToken: `offline-${account.user.name}-${tokenCount}`,
         expires_on: Math.floor(Date.now() / 1000) + 3600,
-        tenant: account.tenantId,
+        tenant: subscriptionTenants[requestedSubscription] ?? account.tenantId,
       });
     }
     throw new Error(`Unexpected CLI command: ${args.join(' ')}`);
@@ -119,6 +136,56 @@ describe('Graph account and cloud context', () => {
     expect(calls('cloud show')).toHaveLength(1);
     expect(calls('account get-access-token')).toHaveLength(1);
     expect(new Set(requests.map(request => request.authorization)).size).toBe(1);
+  });
+
+  test('targets the selected subscription instead of the login-default tenant', async () => {
+    const selectedSubscription = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const selectedTenant = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    subscriptionTenants[selectedSubscription] = selectedTenant;
+
+    const search = await searchAzureADUsers('Alice', selectedSubscription);
+    const resolve = await resolveAzureADUser(user.id, selectedSubscription);
+    expect(search, 'error' in search ? search.error : undefined).toMatchObject({ success: true });
+    expect(resolve, 'error' in resolve ? resolve.error : undefined).toMatchObject({
+      success: true,
+    });
+    expect(calls('account show').map(([, args]) => args)).toEqual([
+      ['account', 'show', '--subscription', selectedSubscription, '-o', 'json'],
+      ['account', 'show', '--subscription', selectedSubscription, '-o', 'json'],
+    ]);
+    expect(calls('account get-access-token')[0][1]).toContain(selectedSubscription);
+  });
+
+  test('does not invalidate shared ARM tokens when the Graph subscription changes', async () => {
+    const otherSubscription = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const otherTenant = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    subscriptionTenants[subscriptionId] = tenantId;
+    subscriptionTenants[otherSubscription] = otherTenant;
+    await searchAzureADUsers('Alice', subscriptionId);
+
+    const command = mocks.command.getMockImplementation()!;
+    let releaseArm!: (value: ReturnType<typeof output>) => void;
+    mocks.command.mockImplementation((executable: string, args: string[]) => {
+      if (args[0] === 'account' && args[1] === 'get-access-token' && args[3] === ARM_SCOPE) {
+        return new Promise(resolve => {
+          releaseArm = resolve;
+        });
+      }
+      return command(executable, args);
+    });
+    const armToken = getSubscriptionCredential(subscriptionId).getToken(ARM_SCOPE);
+    await vi.waitFor(() => expect(releaseArm).toBeTypeOf('function'));
+
+    await searchAzureADUsers('Alice', otherSubscription);
+    releaseArm(
+      output({
+        accessToken: 'arm-token',
+        expires_on: Math.floor(Date.now() / 1000) + 3600,
+        tenant: tenantId,
+      })
+    );
+
+    await expect(armToken).resolves.toMatchObject({ token: 'arm-token' });
   });
 
   test('immediately replaces credentials on external user changes in the same subscription and tenant', async () => {
@@ -330,7 +397,7 @@ describe('Graph account and cloud context', () => {
     expect(requests).toHaveLength(2);
   });
 
-  test('late token acquisition from A stays isolated from B, including a switch back to A', async () => {
+  test('rejects a late token from A without affecting B, including a switch back to A', async () => {
     const dispatch = mocks.command.getMockImplementation()!;
     let release!: (value: ReturnType<typeof output>) => void;
     let started!: () => void;
@@ -349,7 +416,7 @@ describe('Graph account and cloud context', () => {
     const pendingA = searchAzureADUsers('Alice');
     await waiting;
     account.user.name = 'operator-b@contoso.com';
-    await resolveAzureADUser(user.id);
+    expect((await resolveAzureADUser(user.id)).success).toBe(true);
     release(
       output({
         accessToken: 'offline-late-a',
@@ -357,15 +424,20 @@ describe('Graph account and cloud context', () => {
         tenant: tenantId,
       })
     );
-    await pendingA;
-    await searchAzureADUsers('Alice');
-    expect(requests[0].authorization).toBe(requests[2].authorization);
-    expect(requests[1].authorization).not.toBe(requests[2].authorization);
+    expect(await pendingA).toMatchObject({
+      success: false,
+      error: expect.stringContaining('account changed'),
+    });
+    expect(requests).toHaveLength(1);
+    expect((await searchAzureADUsers('Alice')).success).toBe(true);
+    expect(requests).toHaveLength(2);
+    expect(requests[0].authorization).toBe(requests[1].authorization);
     expect(calls('account get-access-token')).toHaveLength(2);
     account.user.name = 'operator-a@contoso.com';
     mocks.command.mockImplementation(dispatch);
-    await resolveAzureADUser(user.id);
+    expect((await resolveAzureADUser(user.id)).success).toBe(true);
     expect(calls('account get-access-token')).toHaveLength(3);
-    expect(requests[3].authorization).not.toBe(requests[1].authorization);
+    expect(requests).toHaveLength(3);
+    expect(requests[2].authorization).not.toBe(requests[0].authorization);
   });
 });

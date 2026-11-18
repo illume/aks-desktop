@@ -48,6 +48,9 @@ export async function getPrometheusEndpoint(
     console.debug('[getPrometheusEndpoint]   stdout length:', allGroupsStdout.length);
     console.debug('[getPrometheusEndpoint]   stderr:', allGroupsStderr);
 
+    if (!allGroupsStdout.trim() && allGroupsStderr.trim()) {
+      throw new Error(allGroupsStderr.trim());
+    }
     if (!allGroupsStdout.trim()) {
       throw new Error(
         'Azure Monitor Metrics (Managed Prometheus) does not appear to be configured for this cluster. ' +
@@ -99,7 +102,7 @@ export async function getPrometheusEndpoint(
 
     console.debug('[getPrometheusEndpoint] Found workspace scope:', workspaceScope);
 
-    const { stdout: endpointStdout } = await runCommandWithOutput('az', [
+    const { stdout: endpointStdout, stderr: endpointStderr } = await runCommandWithOutput('az', [
       'monitor',
       'account',
       'show',
@@ -112,6 +115,9 @@ export async function getPrometheusEndpoint(
       '--subscription',
       subscription,
     ]);
+    if (!endpointStdout.trim() && endpointStderr.trim()) {
+      throw new Error(endpointStderr.trim());
+    }
 
     console.debug('[getPrometheusEndpoint] Prometheus endpoint:', endpointStdout.trim());
 

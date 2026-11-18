@@ -84,6 +84,17 @@ describe('getPrometheusEndpoint', () => {
     );
   });
 
+  test('propagates Azure CLI authentication errors instead of reporting missing configuration', async () => {
+    mockRunCommandWithOutput.mockResolvedValue({
+      stdout: '',
+      stderr: 'Azure login is required for subscription test-sub',
+    });
+
+    await expect(getPrometheusEndpoint('test-rg', 'test-cluster', 'test-sub')).rejects.toThrow(
+      'Azure login is required for subscription test-sub'
+    );
+  });
+
   test('no matching cluster error message references "docs/cluster-requirements.md"', async () => {
     const ruleGroups = [
       {
