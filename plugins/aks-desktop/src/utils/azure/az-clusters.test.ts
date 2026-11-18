@@ -11,8 +11,10 @@ const mocks = vi.hoisted(() => ({
   getClusterSettings: vi.fn(),
   getNativeAccount: vi.fn(),
   getNativeSubscriptionTenant: vi.fn(),
+  getSubscriptionLoginStatus: vi.fn(),
   getSubscriptionCredential: vi.fn(),
   getSubscriptions: vi.fn(),
+  hasNativeSession: vi.fn(),
   runCommandAsync: vi.fn(),
 }));
 
@@ -40,7 +42,13 @@ vi.mock('./az-resource-graph', () => ({
 }));
 
 vi.mock('./az-subscriptions', () => ({ getSubscriptions: mocks.getSubscriptions }));
-vi.mock('./native-auth', () => ({ getNativeAccount: mocks.getNativeAccount }));
+vi.mock('./az-auth', () => ({
+  getSubscriptionLoginStatus: mocks.getSubscriptionLoginStatus,
+}));
+vi.mock('./native-auth', () => ({
+  getNativeAccount: mocks.getNativeAccount,
+  hasNativeSession: mocks.hasNativeSession,
+}));
 vi.mock('../shared/clusterSettings', () => ({ getClusterSettings: mocks.getClusterSettings }));
 
 import { getClusterInfo, getClusters, getConnectedClusters } from './az-clusters';
@@ -84,6 +92,7 @@ describe('getClusterInfo', () => {
     });
     mocks.getClusterSettings.mockReturnValue({});
     mocks.getNativeSubscriptionTenant.mockReturnValue(undefined);
+    mocks.hasNativeSession.mockReturnValue(true);
     mocks.getClusterResourceGroupViaGraph.mockResolvedValue('native-rg');
   });
 
@@ -153,6 +162,36 @@ describe('getClusterInfo', () => {
       'No tenant is known for the registered Azure subscription'
     );
     expect(mocks.getClusterResourceGroupViaGraph).not.toHaveBeenCalled();
+  });
+
+  test('uses the persisted top-level Arc scope and a subscription-specific CLI tenant', async () => {
+    mocks.getNativeAccount.mockReturnValue(undefined);
+    mocks.hasNativeSession.mockReturnValue(false);
+    mocks.getClusterSettings.mockReturnValue({
+      clusterType: 'aksarc',
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      resourceGroup: 'arc-rg',
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000004',
+        resourceGroup: 'stale-managed-rg',
+      },
+    });
+    mocks.getSubscriptionLoginStatus.mockResolvedValue({
+      isLoggedIn: true,
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000006',
+    });
+
+    await expect(getClusterInfo('arc-cluster')).resolves.toEqual({
+      clusterName: 'arc-cluster',
+      resourceGroup: 'arc-rg',
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000006',
+    });
+    expect(mocks.getSubscriptionLoginStatus).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000003'
+    );
+    expect(mocks.getSubscriptions).not.toHaveBeenCalled();
   });
 });
 

@@ -45,6 +45,7 @@ import {
   getCliLoginStatus,
   getLoginStatus,
   getNativeLoginStatus,
+  getSubscriptionLoginStatus,
   initiateCliLogin,
   initiateLogin,
   login,
@@ -206,6 +207,34 @@ describe('getLoginStatus', () => {
     mocks.isAzureExplicitlySignedOut.mockReturnValue(true);
     resolve({ stdout: '{"id":"cli","tenantId":"tenant"}', stderr: '' });
     await expect(pending).resolves.toEqual({ isLoggedIn: false, error: 'Not logged in' });
+  });
+
+  test('reads a requested CLI subscription without changing the active account', async () => {
+    mocks.runCommandAsync.mockResolvedValue({
+      stdout: JSON.stringify({
+        id: '00000000-0000-0000-0000-000000000003',
+        tenantId: '00000000-0000-0000-0000-000000000006',
+        user: { name: 'user@example.com' },
+      }),
+      stderr: '',
+    });
+
+    await expect(
+      getSubscriptionLoginStatus('00000000-0000-0000-0000-000000000003')
+    ).resolves.toEqual({
+      isLoggedIn: true,
+      subscriptionId: '00000000-0000-0000-0000-000000000003',
+      tenantId: '00000000-0000-0000-0000-000000000006',
+      username: 'user@example.com',
+    });
+    expect(mocks.runCommandAsync).toHaveBeenCalledWith('az', [
+      'account',
+      'show',
+      '--subscription',
+      '00000000-0000-0000-0000-000000000003',
+      '-o',
+      'json',
+    ]);
   });
 
   test.each([

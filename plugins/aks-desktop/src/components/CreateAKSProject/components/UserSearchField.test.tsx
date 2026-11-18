@@ -52,11 +52,20 @@ describe('UserSearchField — clearing the field', () => {
     );
     const onChange = vi.fn();
 
-    render(<UserSearchField value="" onChange={onChange} label="Assignee" />);
+    render(
+      <UserSearchField
+        subscriptionId="subscription-id"
+        value=""
+        onChange={onChange}
+        label="Assignee"
+      />
+    );
     const input = screen.getByRole('combobox');
 
     fireEvent.change(input, { target: { value: 'someone@contoso.com' } });
-    await waitFor(() => expect(mockResolve).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockResolve).toHaveBeenCalledWith('someone@contoso.com', 'subscription-id')
+    );
 
     fireEvent.change(input, { target: { value: '' } });
     onChange.mockClear();
@@ -147,7 +156,14 @@ describe('UserSearchField — clearing the field', () => {
   it('surfaces a directory lookup failure instead of presenting an empty result', async () => {
     mockSearch.mockResolvedValue({ success: false, users: [], error: 'ERROR: lookup failed' });
 
-    render(<UserSearchField value="" onChange={vi.fn()} label="Assignee" />);
+    render(
+      <UserSearchField
+        subscriptionId="subscription-id"
+        value=""
+        onChange={vi.fn()}
+        label="Assignee"
+      />
+    );
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'alice' } });
 
     expect(
@@ -155,6 +171,7 @@ describe('UserSearchField — clearing the field', () => {
         'Try searching again. If the problem continues, check your Azure sign-in.'
       )
     ).toBeVisible();
+    expect(mockSearch).toHaveBeenCalledWith('alice', 'subscription-id');
     expect(screen.queryByText('No users found')).not.toBeInTheDocument();
   });
 
@@ -224,7 +241,7 @@ describe('UserSearchField — clearing the field', () => {
     expect(screen.queryByText(/User search failed\. Check/)).not.toBeInTheDocument();
 
     fireEvent.change(input, { target: { value: 'alice@contoso.com' } });
-    await waitFor(() => expect(mockResolve).toHaveBeenCalledWith('alice@contoso.com'));
+    await waitFor(() => expect(mockResolve).toHaveBeenCalledWith('alice@contoso.com', undefined));
     expect(onChange).toHaveBeenLastCalledWith({
       objectId: '',
       upn: 'alice@contoso.com',
@@ -234,7 +251,7 @@ describe('UserSearchField — clearing the field', () => {
 
     const objectId = '00000000-1111-2222-3333-444444444444';
     fireEvent.change(input, { target: { value: objectId } });
-    await waitFor(() => expect(mockResolve).toHaveBeenLastCalledWith(objectId));
+    await waitFor(() => expect(mockResolve).toHaveBeenLastCalledWith(objectId, undefined));
     expect(onChange).toHaveBeenLastCalledWith({ objectId, preserveExistingUpn: true });
     expect(input).toHaveValue(objectId);
     expect(mockSearch).toHaveBeenCalledTimes(1);
@@ -284,7 +301,7 @@ describe('UserSearchField — clearing the field', () => {
         displayName: user.displayName,
       })
     );
-    expect(mockResolve).toHaveBeenCalledWith(identifier);
+    expect(mockResolve).toHaveBeenCalledWith(identifier, undefined);
     expect(mockSearch).not.toHaveBeenCalled();
   });
 

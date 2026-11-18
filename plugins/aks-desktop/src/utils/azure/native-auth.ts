@@ -237,9 +237,20 @@ export function allowAzureCliFallback(): void {
 
 /** Signs out and prevents automatic reuse of an Azure CLI account. */
 export async function logoutNative(): Promise<boolean> {
+  let oauth: PluginAzureOAuth;
+  try {
+    oauth = bridge();
+  } catch (error) {
+    if (hasNativeSession()) throw error;
+    const persisted = blockImplicitAzureCli();
+    resetNativeSession();
+    explicitlySignedOut = true;
+    dispatchAccountChange();
+    return persisted;
+  }
   const persisted = blockImplicitAzureCli();
   const generation = loginGeneration;
-  const result = await bridge().logoutAzure();
+  const result = await oauth.logoutAzure();
   if (generation !== loginGeneration) {
     throw new Error('Azure account changed during sign-out');
   }
@@ -270,15 +281,16 @@ export const nativeCredential: TokenCredential = {
       const tenantId = options?.tenantId ?? account?.tenantId;
       const result = await bridge().getAzureToken(normalizeNativeScope(scope), tenantId);
       if (generation !== loginGeneration) throw new Error('Azure login was cancelled');
+      if (result.sessionExpired) {
+        await failSession(result.error ?? 'Azure login expired', true);
+        throw new Error(result.error ?? 'Azure token request failed');
+      }
       if (signal?.aborted) throw abortError();
       if (
         !result.success ||
         typeof result.accessToken !== 'string' ||
         typeof result.expiresOnTimestamp !== 'number'
       ) {
-        if (result.sessionExpired) {
-          await failSession(result.error ?? 'Azure login expired', true);
-        }
         throw new Error(result.error ?? 'Azure token request failed');
       }
       return {

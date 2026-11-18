@@ -2,11 +2,16 @@
 // Licensed under the Apache 2.0.
 
 import { isEntraObjectId, isUserPrincipalName } from '../shared/entraIdentifiers';
-import { getLoginStatus } from './az-auth';
+import { getLoginStatus, getSubscriptionLoginStatus } from './az-auth';
 import { getErrorMessage } from './az-cli-core';
 import { getAzureGraphEndpoints } from './az-cloud';
 import { azRequest, AzureRequestError } from './az-http';
-import { type AzCliCredential, createAzCliCredential } from './az-token';
+import {
+  type AzCliCredential,
+  getNativeSubscriptionTenant,
+  getSubscriptionCredential,
+} from './az-token';
+import { getNativeAccount } from './native-auth';
 
 // Preserve the existing search input contract; identifiers resolved below are not restricted.
 const ODATA_SAFE_QUERY_PATTERN = /^[a-zA-Z0-9@._ -]+$/;
@@ -32,8 +37,19 @@ if (typeof window !== 'undefined') {
  * @returns Named-cloud Graph routing and a credential isolated to the full account identity.
  * @throws For unavailable/incomplete accounts, invalid clouds or a concurrent account change.
  */
-async function getAzureGraphContext() {
-  const account = await getLoginStatus();
+async function getAzureGraphContext(subscriptionId?: string) {
+  const nativeAccount = getNativeAccount();
+  const account =
+    subscriptionId && nativeAccount
+      ? {
+          isLoggedIn: true,
+          ...nativeAccount,
+          subscriptionId,
+          tenantId: getNativeSubscriptionTenant(subscriptionId),
+        }
+      : subscriptionId
+      ? await getSubscriptionLoginStatus(subscriptionId)
+      : await getLoginStatus();
   if (!account.isLoggedIn) {
     clearContext();
     throw new Error(account.error ?? 'Not logged in to Azure CLI');
@@ -64,7 +80,7 @@ async function getAzureGraphContext() {
   ]);
   if (current?.identity !== identity) {
     current?.credential.clearCache();
-    current = { identity, credential: createAzCliCredential(account.subscriptionId) };
+    current = { identity, credential: getSubscriptionCredential(account.subscriptionId) };
   }
   return { endpoint, scope, tenantId: account.tenantId, credential: current.credential };
 }
@@ -128,7 +144,8 @@ function parseUser(value: unknown): AzureADUser {
  * @returns Selected users, or an explicit failure for authentication, HTTP or payload errors.
  */
 export async function searchAzureADUsers(
-  query: string
+  query: string,
+  subscriptionId?: string
 ): Promise<{ success: boolean; users: AzureADUser[]; error?: string }> {
   if (!query || query.trim().length < 2) {
     return { success: true, users: [] };
@@ -142,7 +159,7 @@ export async function searchAzureADUsers(
 
   const escaped = trimmed.replace(/'/g, "''");
   try {
-    const context = await getAzureGraphContext();
+    const context = await getAzureGraphContext(subscriptionId);
     const url = new URL(`${context.endpoint}/v1.0/users`);
     url.searchParams.set(
       '$filter',
@@ -181,7 +198,8 @@ export async function searchAzureADUsers(
  * @returns A complete selected user, or an explicit validation/authentication/HTTP failure.
  */
 export async function resolveAzureADUser(
-  idOrUpn: string
+  idOrUpn: string,
+  subscriptionId?: string
 ): Promise<{ success: boolean; user?: AzureADUser; error?: string }> {
   const trimmed = idOrUpn.trim();
 
@@ -193,7 +211,7 @@ export async function resolveAzureADUser(
   const identifier = trimmed.startsWith('$') ? trimmed.replace(/'/g, "''") : trimmed;
   const encoded = encodeURIComponent(identifier).replace(/'/g, '%27');
   try {
-    const context = await getAzureGraphContext();
+    const context = await getAzureGraphContext(subscriptionId);
     const usersUrl = `${context.endpoint}/v1.0/users`;
     const url = new URL(
       trimmed.startsWith('$') ? `${usersUrl}('${encoded}')` : `${usersUrl}/${encoded}`

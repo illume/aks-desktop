@@ -28,6 +28,7 @@ let resources: Record<string, unknown>;
 let loggedIn: boolean;
 let tokenCount: number;
 let requests: { url: string; authorization: string }[];
+let subscriptionTenants: Record<string, string>;
 
 function output(data: unknown) {
   return { stdout: JSON.stringify(data), stderr: '' };
@@ -53,11 +54,25 @@ beforeEach(() => {
   loggedIn = true;
   tokenCount = 0;
   requests = [];
+  subscriptionTenants = {};
   mocks.command.mockReset().mockImplementation(async (command: string, args: string[]) => {
     expect(command).toBe('az');
     if (args[0] === 'account' && args[1] === 'show') {
-      expect(args).toEqual(['account', 'show', '-o', 'json']);
-      return loggedIn ? output(account) : { stdout: '', stderr: 'ERROR: Please run az login' };
+      const requestedSubscription = args[2] === '--subscription' ? args[3] : undefined;
+      expect(args).toEqual(
+        requestedSubscription
+          ? ['account', 'show', '--subscription', requestedSubscription, '-o', 'json']
+          : ['account', 'show', '-o', 'json']
+      );
+      return loggedIn
+        ? output({
+            ...account,
+            id: requestedSubscription ?? account.id,
+            tenantId: requestedSubscription
+              ? subscriptionTenants[requestedSubscription] ?? account.tenantId
+              : account.tenantId,
+          })
+        : { stdout: '', stderr: 'ERROR: Please run az login' };
     }
     if (args[0] === 'cloud' && args[1] === 'show') {
       expect(args).toEqual([
@@ -76,7 +91,7 @@ beforeEach(() => {
       });
     }
     if (args[0] === 'account' && args[1] === 'get-access-token') {
-      expect(args).toEqual([
+      expect(args.slice(0, 7)).toEqual([
         'account',
         'get-access-token',
         '--scope',
@@ -84,13 +99,14 @@ beforeEach(() => {
         '-o',
         'json',
         '--subscription',
-        account.id,
       ]);
+      expect(args[7] === account.id || args[7] in subscriptionTenants).toBe(true);
       tokenCount++;
+      const requestedSubscription = args[7];
       return output({
         accessToken: `offline-${account.user.name}-${tokenCount}`,
         expires_on: Math.floor(Date.now() / 1000) + 3600,
-        tenant: account.tenantId,
+        tenant: subscriptionTenants[requestedSubscription] ?? account.tenantId,
       });
     }
     throw new Error(`Unexpected CLI command: ${args.join(' ')}`);
@@ -119,6 +135,24 @@ describe('Graph account and cloud context', () => {
     expect(calls('cloud show')).toHaveLength(1);
     expect(calls('account get-access-token')).toHaveLength(1);
     expect(new Set(requests.map(request => request.authorization)).size).toBe(1);
+  });
+
+  test('targets the selected subscription instead of the login-default tenant', async () => {
+    const selectedSubscription = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const selectedTenant = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    subscriptionTenants[selectedSubscription] = selectedTenant;
+
+    const search = await searchAzureADUsers('Alice', selectedSubscription);
+    const resolve = await resolveAzureADUser(user.id, selectedSubscription);
+    expect(search, 'error' in search ? search.error : undefined).toMatchObject({ success: true });
+    expect(resolve, 'error' in resolve ? resolve.error : undefined).toMatchObject({
+      success: true,
+    });
+    expect(calls('account show').map(([, args]) => args)).toEqual([
+      ['account', 'show', '--subscription', selectedSubscription, '-o', 'json'],
+      ['account', 'show', '--subscription', selectedSubscription, '-o', 'json'],
+    ]);
+    expect(calls('account get-access-token')[0][1]).toContain(selectedSubscription);
   });
 
   test('immediately replaces credentials on external user changes in the same subscription and tenant', async () => {

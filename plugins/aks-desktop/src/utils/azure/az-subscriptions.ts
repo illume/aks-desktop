@@ -144,6 +144,7 @@ export async function getSubscriptions(
     const profileTenant = profile?.get(id.toLowerCase());
     const match = listedTenants.get(id)!.find(t => t.tenant.toLowerCase() === profileTenant);
     if (match) Object.assign(sub, match);
+    sub.tenants = listedTenants.get(id)!.map(value => value.tenant);
   }
   const discovered = [...subscriptions.values()];
   if (!nativeSession && isAzureExplicitlySignedOut()) {
@@ -152,6 +153,9 @@ export async function getSubscriptions(
   if (nativeSession) {
     if (accountGeneration !== getAzureAccountGeneration() || !hasNativeSession()) {
       throw new Error('Azure account changed during subscription discovery');
+    }
+    if (discoverySequence < nativePublishedDiscoverySequence) {
+      throw new Error('Azure subscription discovery was superseded by a newer result');
     }
     if (
       discoverySequence > nativePublishedDiscoverySequence &&

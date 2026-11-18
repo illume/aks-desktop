@@ -135,6 +135,7 @@ describe('getSubscriptions', () => {
         id: 'sub-a',
         name: 'Sub sub-a',
         tenant: TENANT_A,
+        tenants: [TENANT_A],
         tenantName: 'Contoso',
         status: 'Enabled',
         environmentName: CLOUD.name,
@@ -143,6 +144,7 @@ describe('getSubscriptions', () => {
         id: 'sub-b',
         name: 'Sub sub-b',
         tenant: TENANT_B,
+        tenants: [TENANT_B],
         tenantName: 'Fabrikam',
         status: 'Disabled',
         environmentName: CLOUD.name,
@@ -174,7 +176,9 @@ describe('getSubscriptions', () => {
       [TENANT_B]: [armSub('shared', TENANT_A)],
     });
 
-    expect(await getSubscriptions()).toHaveLength(1);
+    expect(await getSubscriptions()).toEqual([
+      expect.objectContaining({ id: 'shared', tenant: TENANT_A, tenants: [TENANT_A, TENANT_B] }),
+    ]);
   });
 
   it('reports the tenant a subscription was listed through, not its home tenant', async () => {
@@ -360,7 +364,7 @@ describe('getSubscriptions', () => {
     await expect(getSubscriptions()).rejects.toThrow('account changed');
   });
 
-  it('returns an older native discovery without overwriting newer bindings', async () => {
+  it('rejects an older native discovery after newer bindings are published', async () => {
     mocks.hasNativeSession.mockReturnValue(true);
     let release!: (value: any[]) => void;
     mocks.azListAll
@@ -370,7 +374,7 @@ describe('getSubscriptions', () => {
     await vi.waitFor(() => expect(mocks.azListAll).toHaveBeenCalledTimes(1));
     await getSubscriptions();
     release([]);
-    await expect(older).resolves.toEqual([]);
+    await expect(older).rejects.toThrow('superseded');
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledTimes(1);
   });
 

@@ -285,6 +285,31 @@ describe('native authentication facade', () => {
     expect(api.cancelAzureLogin).not.toHaveBeenCalled();
   });
 
+  test('applies a terminal host expiry even after the caller stops waiting', async () => {
+    const tokenResponse = deferred<{
+      success: false;
+      error: string;
+      sessionExpired: true;
+    }>();
+    const api = capability({ getAzureToken: vi.fn().mockReturnValue(tokenResponse.promise) });
+    const { auth } = await establishSession(api);
+    const controller = new AbortController();
+    const token = auth.nativeCredential.getToken('https://graph.microsoft.com/.default', {
+      abortSignal: controller.signal,
+    });
+
+    controller.abort(new Error('caller stopped'));
+    await expect(token).rejects.toThrow('caller stopped');
+    tokenResponse.resolve({
+      success: false,
+      error: 'AADSTS700082: refresh token expired',
+      sessionExpired: true,
+    });
+
+    await vi.waitFor(() => expect(auth.hasNativeSession()).toBe(false));
+    expect(auth.isAzureExplicitlySignedOut()).toBe(true);
+  });
+
   test('logs out both renderer and main-process native state', async () => {
     const { api, auth } = await establishSession();
 
@@ -293,6 +318,25 @@ describe('native authentication facade', () => {
     expect(api.logoutAzure).toHaveBeenCalledOnce();
     expect(auth.getNativeAccount()).toBeUndefined();
     expect(auth.isAzureExplicitlySignedOut()).toBe(true);
+  });
+
+  test('cleans up a bridge-less renderer when no native session exists', async () => {
+    const auth = await load();
+
+    await expect(auth.logoutNative()).resolves.toBe(true);
+
+    expect(auth.hasNativeSession()).toBe(false);
+    expect(auth.isAzureExplicitlySignedOut()).toBe(true);
+  });
+
+  test('fails closed when the bridge disappears during an existing native session', async () => {
+    const { auth } = await establishSession();
+    vi.stubGlobal('pluginAzureOAuth', undefined);
+
+    await expect(auth.logoutNative()).rejects.toThrow(
+      'Desktop Azure authentication is not available'
+    );
+    expect(auth.hasNativeSession()).toBe(true);
   });
 
   test('keeps the local session when main-process sign-out fails', async () => {

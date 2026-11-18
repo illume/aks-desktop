@@ -1,7 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 
-import { runCommandWithOutput } from '../kubernetes/cli-runner';
+import { getSubscriptionCredential } from '../azure/az-token';
+
+const PROMETHEUS_SCOPE = 'https://prometheus.monitor.azure.com/.default';
 
 /**
  * Executes PromQL query against the given Prometheus endpoint.
@@ -22,22 +24,7 @@ export async function queryPrometheus(
   step = 60,
   subscription: string
 ): Promise<any[]> {
-  const { stdout: tokenStdout, stderr: tokenStderr } = await runCommandWithOutput('az', [
-    'account',
-    'get-access-token',
-    '--resource',
-    'https://prometheus.monitor.azure.com/',
-    '--query',
-    'accessToken',
-    '-o',
-    'tsv',
-    '--subscription',
-    subscription,
-  ]);
-  const token = tokenStdout.trim();
-  if (!token) {
-    throw new Error(tokenStderr.trim() || 'Azure CLI returned no Prometheus access token');
-  }
+  const { token } = await getSubscriptionCredential(subscription).getToken(PROMETHEUS_SCOPE);
 
   try {
     const rangeUrl = `${endpoint}/api/v1/query_range`;

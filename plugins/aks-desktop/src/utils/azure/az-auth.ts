@@ -208,6 +208,7 @@ export async function getLoginStatus(): Promise<AzureLoginStatus> {
             error: error ?? 'Not logged in',
           };
         }
+
         return status;
       });
   const observation: Promise<AzureLoginStatus> = readStatus.then(status => {
@@ -231,6 +232,26 @@ export async function getLoginStatus(): Promise<AzureLoginStatus> {
   });
   latestAccountObservation = observation;
   return observation;
+}
+
+/**
+ * Reads the CLI account selected by a subscription without changing the active account.
+ * This path is used only when no native session exists and remains subject to explicit sign-out.
+ */
+export async function getSubscriptionLoginStatus(
+  subscriptionId: string
+): Promise<AzureLoginStatus> {
+  if (hasNativeSession()) {
+    return { isLoggedIn: false, error: 'Native Azure authentication is active' };
+  }
+  if (isAzureExplicitlySignedOut()) {
+    return { isLoggedIn: false, error: 'Not logged in' };
+  }
+  const status = await readLoginStatus(subscriptionId);
+  if (isAzureExplicitlySignedOut()) {
+    return { isLoggedIn: false, error: 'Not logged in' };
+  }
+  return status;
 }
 
 /**

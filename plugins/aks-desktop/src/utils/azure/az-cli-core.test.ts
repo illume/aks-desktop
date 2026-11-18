@@ -46,6 +46,7 @@ import {
   registerNativeSubscriptionTenantLookup,
   runAzCommand,
   runCommandAsync,
+  withVerifiedCliBatch,
   withVerifiedCliCapabilityAccess,
 } from './az-cli-core';
 
@@ -70,6 +71,64 @@ afterEach(async () => {
     })
   );
   await runCommandAsync('az', ['login', '--output', 'json']);
+});
+
+describe('withVerifiedCliBatch', () => {
+  const subscriptionId = '11111111-2222-3333-4444-555555555555';
+  const identityError = expect.stringContaining('identity could not be verified');
+
+  test('rejects invalid subscription identifiers before invoking the callback', async () => {
+    const operation = vi.fn();
+
+    await expect(withVerifiedCliBatch('not-a-guid', operation)).rejects.toThrow(
+      'identity could not be verified'
+    );
+    expect(operation).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['missing', ['group', 'list', '--output', 'json']],
+    ['mismatched', ['group', 'list', '--subscription', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']],
+    ['identity-changing', ['account', 'set', '--subscription', subscriptionId]],
+  ])('blocks %s command selectors inside a verified batch', async (_label, args) => {
+    mocks.execCommand.mockResolvedValue({ stdout: 'should-not-run', stderr: '' });
+
+    const result = await withVerifiedCliBatch(subscriptionId, run => run(args));
+
+    expect(result).toEqual({ stdout: '', stderr: identityError });
+    expect(mocks.execCommand).not.toHaveBeenCalled();
+  });
+
+  test('blocks commands after the native generation changes', async () => {
+    mocks.execCommand.mockResolvedValue({ stdout: 'should-not-run', stderr: '' });
+
+    const result = await withVerifiedCliBatch(subscriptionId, run => {
+      mocks.generation.mockReturnValue(1);
+      return run(['group', 'list', '--subscription', subscriptionId]);
+    });
+
+    expect(result).toEqual({ stdout: '', stderr: identityError });
+    expect(mocks.execCommand).not.toHaveBeenCalled();
+  });
+
+  test('releases its reader lease when the callback rejects', async () => {
+    await expect(
+      withVerifiedCliBatch(subscriptionId, async () => {
+        throw new Error('operation failed');
+      })
+    ).rejects.toThrow('operation failed');
+    mocks.execCommand.mockResolvedValue({ stdout: '', stderr: '' });
+
+    await expect(
+      runCommandAsync('az', ['account', 'set', '--subscription', subscriptionId])
+    ).resolves.toEqual({ stdout: '', stderr: '' });
+    expect(mocks.execCommand).toHaveBeenCalledWith('/bundled/az', [
+      'account',
+      'set',
+      '--subscription',
+      subscriptionId,
+    ]);
+  });
 });
 
 describe('needsRelogin', () => {
@@ -277,6 +336,62 @@ describe('runAzCommand', () => {
       await expect(
         runCommandAsync('az', ['group', 'list', '--subscription', 'guest'])
       ).resolves.toEqual(denied);
+    });
+
+    test('reconciles a verified login to another discovered tenant only', async () => {
+      let selectedTenant = 'tenant-a';
+      const discoveredTenants = new Set(['tenant-a', 'tenant-b']);
+      const reconcile = vi.fn((_subscriptionId: string, tenantId: string) => {
+        if (!discoveredTenants.has(tenantId)) return false;
+        selectedTenant = tenantId;
+        return true;
+      });
+      acceptNative();
+      registerNativeSubscriptionTenantLookup(() => selectedTenant, reconcile);
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+        if (args[0] === 'account') {
+          return Promise.resolve({
+            stdout: JSON.stringify({ ...account, tenantId: 'tenant-b' }),
+            stderr: '',
+          });
+        }
+        if (args[0] === 'cloud') {
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+
+      await expect(runCommandAsync('az', ['login'])).resolves.toEqual({
+        stdout: '[{}]',
+        stderr: '',
+      });
+      expect(reconcile).toHaveBeenCalledWith('sub', 'tenant-b');
+      expect(selectedTenant).toBe('tenant-b');
+    });
+
+    test('rejects a verified login tenant absent from discovery', async () => {
+      const selectedTenant = 'tenant-a';
+      const reconcile = vi.fn(() => false);
+      acceptNative();
+      registerNativeSubscriptionTenantLookup(() => selectedTenant, reconcile);
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+        if (args[0] === 'account') {
+          return Promise.resolve({
+            stdout: JSON.stringify({ ...account, tenantId: 'unknown-tenant' }),
+            stderr: '',
+          });
+        }
+        if (args[0] === 'cloud') {
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+
+      await expect(runCommandAsync('az', ['login'])).resolves.toEqual(denied);
+      expect(reconcile).toHaveBeenCalledWith('sub', 'unknown-tenant');
+      expect(selectedTenant).toBe('tenant-a');
     });
 
     test('uses real token discovery bindings and rejects removed or stale mappings', async () => {

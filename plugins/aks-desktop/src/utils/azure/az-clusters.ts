@@ -2,13 +2,14 @@
 // Licensed under the Apache 2.0.
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
 import { getClusterSettings } from '../shared/clusterSettings';
+import { getSubscriptionLoginStatus } from './az-auth';
 import { debugLog, getErrorMessage, isAzError, needsRelogin, runCommandAsync } from './az-cli-core';
 import { getAzureCloudEndpoints } from './az-cloud';
 import { azListAll } from './az-http';
 import { getClusterResourceGroupViaGraph, getClustersViaGraph } from './az-resource-graph';
 import { getSubscriptions } from './az-subscriptions';
 import { getNativeSubscriptionTenant, getSubscriptionCredential } from './az-token';
-import { getNativeAccount } from './native-auth';
+import { getNativeAccount, hasNativeSession } from './native-auth';
 
 export async function getClusters(subscriptionId?: string, query?: string): Promise<any[]> {
   const clusters: any[] = [];
@@ -418,7 +419,18 @@ export async function getClusterInfo(clusterName?: string): Promise<{
 
   try {
     if (clusterName) {
-      const registration = getClusterSettings(clusterName).azureRegistration;
+      const settings = getClusterSettings(clusterName);
+      const arcRegistration =
+        typeof settings.subscriptionId === 'string' && typeof settings.resourceGroup === 'string'
+          ? {
+              subscriptionId: settings.subscriptionId,
+              resourceGroup: settings.resourceGroup,
+            }
+          : undefined;
+      const registration =
+        settings.clusterType === 'aksarc'
+          ? arcRegistration
+          : settings.azureRegistration ?? arcRegistration;
       if (
         typeof registration?.subscriptionId === 'string' &&
         registration.subscriptionId &&
@@ -427,13 +439,22 @@ export async function getClusterInfo(clusterName?: string): Promise<{
       ) {
         let tenantId = getNativeSubscriptionTenant(registration.subscriptionId);
         if (!tenantId) {
-          const subscriptions = await getSubscriptions();
-          const subscription = subscriptions.find(
-            value =>
-              typeof value.id === 'string' &&
-              value.id.toLowerCase() === registration.subscriptionId.toLowerCase()
-          );
-          tenantId = typeof subscription?.tenant === 'string' ? subscription.tenant : undefined;
+          if (hasNativeSession()) {
+            const subscriptions = await getSubscriptions();
+            const subscription = subscriptions.find(
+              value =>
+                typeof value.id === 'string' &&
+                value.id.toLowerCase() === registration.subscriptionId.toLowerCase()
+            );
+            tenantId = typeof subscription?.tenant === 'string' ? subscription.tenant : undefined;
+          } else {
+            const status = await getSubscriptionLoginStatus(registration.subscriptionId);
+            tenantId =
+              status.isLoggedIn &&
+              status.subscriptionId?.toLowerCase() === registration.subscriptionId.toLowerCase()
+                ? status.tenantId
+                : undefined;
+          }
         }
         if (!tenantId) {
           throw new Error(

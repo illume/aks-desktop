@@ -187,10 +187,10 @@ describe('subscription credentials', () => {
   test('preserves only bindings owned by tenants whose discovery failed', () => {
     const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
     const tenantB = '11111111-1111-1111-1111-111111111111';
+    mocks.hasNativeSession.mockReturnValue(true);
     const staleA = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
     const currentA = 'cccccccc-dddd-eeee-ffff-000000000001';
     const preservedB = 'dddddddd-eeee-ffff-0000-000000000002';
-    mocks.hasNativeSession.mockReturnValue(true);
     const generation = getAzureAccountGeneration();
     setNativeSubscriptionTenants(
       [
@@ -205,6 +205,47 @@ describe('subscription credentials', () => {
     expect(getNativeSubscriptionTenant(staleA)).toBeUndefined();
     expect(getNativeSubscriptionTenant(currentA)).toBe(tenantA);
     expect(getNativeSubscriptionTenant(preservedB)).toBe(tenantB);
+  });
+
+  test('retains duplicate subscription tenants during partial discovery', () => {
+    const subscription = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+    const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const tenantB = '11111111-1111-1111-1111-111111111111';
+    mocks.hasNativeSession.mockReturnValue(true);
+    const generation = getAzureAccountGeneration();
+    setNativeSubscriptionTenants(
+      [
+        { id: subscription, tenant: tenantA },
+        { id: subscription, tenant: tenantB },
+      ],
+      generation
+    );
+
+    expect(getNativeSubscriptionTenant(subscription)).toBe(tenantA);
+    setNativeSubscriptionTenants([{ id: subscription, tenant: tenantB }], generation, [tenantA]);
+    expect(getNativeSubscriptionTenant(subscription)).toBe(tenantA);
+    setNativeSubscriptionTenants([{ id: subscription, tenant: tenantB }], generation);
+    expect(getNativeSubscriptionTenant(subscription)).toBe(tenantB);
+  });
+
+  test('preserves failed duplicate tenant alternatives during partial discovery', () => {
+    const subscription = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+    const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const tenantB = '11111111-1111-1111-1111-111111111111';
+    mocks.hasNativeSession.mockReturnValue(true);
+    const generation = getAzureAccountGeneration();
+    setNativeSubscriptionTenants(
+      [
+        { id: subscription, tenant: tenantA },
+        { id: subscription, tenant: tenantB },
+      ],
+      generation
+    );
+
+    setNativeSubscriptionTenants([{ id: subscription, tenant: tenantA }], generation, [tenantB]);
+
+    setNativeSubscriptionTenants([{ id: subscription, tenant: tenantB }], generation, [tenantA]);
+    expect(getNativeSubscriptionTenant(subscription)).toBe(tenantA);
   });
 
   test('does not return an in-flight token after a native mapping or account change', async () => {

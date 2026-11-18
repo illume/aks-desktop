@@ -30,7 +30,11 @@ const SCOPE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^\s]+$/i;
 
 let accountGeneration = 0;
 let nativeMappingGeneration = 0;
-let nativeSubscriptionTenants = new Map<string, string>();
+interface NativeSubscriptionTenantBinding {
+  tenant: string;
+  tenants: Set<string>;
+}
+let nativeSubscriptionTenants = new Map<string, NativeSubscriptionTenantBinding>();
 let observedNativeGeneration: number | undefined;
 
 function synchronizeNativeGeneration(): void {
@@ -54,7 +58,7 @@ export function getAzureAccountGeneration(): number {
  * Bindings from tenants whose queries failed are preserved until a later successful query.
  */
 export function setNativeSubscriptionTenants(
-  subscriptions: Array<{ id: string; tenant: string }>,
+  subscriptions: Array<{ id: string; tenant: string; tenants?: string[] }>,
   generation: number,
   preserveTenantIds: string[] = []
 ): boolean {
@@ -62,20 +66,48 @@ export function setNativeSubscriptionTenants(
   if (generation !== accountGeneration || !hasNativeSession()) return false;
   registerNativeSubscriptionTenantLookup(subscriptionId => {
     synchronizeNativeGeneration();
-    return nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
-  });
+    return nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
+  }, reconcileNativeSubscriptionTenant);
   const preserved = new Set(
     preserveTenantIds.filter(isValidGuid).map(tenantId => tenantId.toLowerCase())
   );
-  const next = new Map(
-    [...nativeSubscriptionTenants].filter(([, tenantId]) => preserved.has(tenantId))
-  );
-  for (const { id, tenant } of subscriptions) {
-    if (isValidGuid(id) && isValidGuid(tenant)) next.set(id.toLowerCase(), tenant.toLowerCase());
+  const next = new Map<string, NativeSubscriptionTenantBinding>();
+  for (const [id, binding] of nativeSubscriptionTenants) {
+    const tenants = new Set([...binding.tenants].filter(tenant => preserved.has(tenant)));
+    if (tenants.size > 0) {
+      next.set(id, {
+        tenant: tenants.has(binding.tenant) ? binding.tenant : [...tenants][0],
+        tenants,
+      });
+    }
+  }
+  for (const { id, tenant, tenants = [] } of subscriptions) {
+    if (!isValidGuid(id) || !isValidGuid(tenant)) continue;
+    const key = id.toLowerCase();
+    const existing = next.get(key);
+    const previousTenant = nativeSubscriptionTenants.get(key)?.tenant;
+    const alternatives = new Set(
+      [tenant, ...tenants].filter(isValidGuid).map(value => value.toLowerCase())
+    );
+    for (const alternative of existing?.tenants ?? []) alternatives.add(alternative);
+    const selected =
+      previousTenant && alternatives.has(previousTenant)
+        ? previousTenant
+        : existing && alternatives.has(existing.tenant)
+        ? existing.tenant
+        : tenant.toLowerCase();
+    next.set(key, { tenant: selected, tenants: alternatives });
   }
   if (
     next.size !== nativeSubscriptionTenants.size ||
-    [...next].some(([id, tenant]) => nativeSubscriptionTenants.get(id) !== tenant)
+    [...next].some(([id, binding]) => {
+      const current = nativeSubscriptionTenants.get(id);
+      return (
+        current?.tenant !== binding.tenant ||
+        current.tenants.size !== binding.tenants.size ||
+        [...binding.tenants].some(tenant => !current.tenants.has(tenant))
+      );
+    })
   ) {
     nativeSubscriptionTenants = next;
     nativeMappingGeneration++;
@@ -86,7 +118,20 @@ export function setNativeSubscriptionTenants(
 /** Returns the tenant discovered for a native subscription in the current account generation. */
 export function getNativeSubscriptionTenant(subscriptionId: string): string | undefined {
   synchronizeNativeGeneration();
-  return nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
+  return nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
+}
+
+function reconcileNativeSubscriptionTenant(subscriptionId: string, tenantId: string): boolean {
+  synchronizeNativeGeneration();
+  const binding = nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
+  const tenant = tenantId.toLowerCase();
+  if (!binding?.tenants.has(tenant)) return false;
+  if (binding.tenant !== tenant) {
+    binding.tenant = tenant;
+    nativeMappingGeneration++;
+    clearAzureTokenCaches();
+  }
+  return true;
 }
 
 /** Token acquisition or validation failure without exposing the token response. */
@@ -240,7 +285,7 @@ export function createAzCliCredential(subscriptionId?: string): AzCliCredential 
     const mappingVersion = nativeMappingGeneration;
     const cacheVersion = cacheGeneration;
     if (native && subscriptionId) {
-      const mappedTenant = nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
+      const mappedTenant = nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
       if (!mappedTenant) {
         throw new AzTokenError(
           'No tenant is known for the selected subscription; refresh subscriptions'

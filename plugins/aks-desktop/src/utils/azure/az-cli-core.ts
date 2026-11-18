@@ -52,6 +52,8 @@ let cliWriterActive = false;
 const cliWriters: Array<() => void> = [];
 let nativeSubscriptionTenantLookup: (subscriptionId: string) => string | undefined = () =>
   undefined;
+let nativeSubscriptionTenantReconcile: (subscriptionId: string, tenantId: string) => boolean = () =>
+  false;
 
 function drainCliWriters(): void {
   if (cliWriterActive || cliReaders || !cliWriters.length) return;
@@ -100,9 +102,11 @@ export function allowCliOperations(): void {
 
 /** Registers the native discovery lookup without depending on the token module. */
 export function registerNativeSubscriptionTenantLookup(
-  lookup: (subscriptionId: string) => string | undefined
+  lookup: (subscriptionId: string) => string | undefined,
+  reconcile: (subscriptionId: string, tenantId: string) => boolean = () => false
 ): void {
   nativeSubscriptionTenantLookup = lookup;
+  nativeSubscriptionTenantReconcile = reconcile;
 }
 
 function isIdentityIndependent(args: string[]): boolean {
@@ -138,7 +142,8 @@ function sameValue(a: unknown, b: unknown): boolean {
 async function verifyCliIdentity(
   az: string,
   native: NonNullable<ReturnType<typeof getNativeAccount>>,
-  args: string[] = []
+  args: string[] = [],
+  reconcileTenant = false
 ): Promise<boolean> {
   try {
     const subscriptions: string[] = [];
@@ -205,7 +210,15 @@ async function verifyCliIdentity(
       if (typeof cliAccount?.id !== 'string' || !cliAccount.id.trim()) return false;
       const selector = subscriptions[index];
       if (selector && isValidGuid(selector) && !sameValue(selector, cliAccount.id)) return false;
-      const tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+      let tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+      if (
+        reconcileTenant &&
+        typeof cliAccount?.tenantId === 'string' &&
+        !sameValue(tenant, cliAccount.tenantId) &&
+        nativeSubscriptionTenantReconcile(cliAccount.id, cliAccount.tenantId)
+      ) {
+        tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+      }
       return (
         sameValue(native.username, cliAccount?.user?.name) &&
         sameValue(tenant, cliAccount?.tenantId) &&
@@ -263,7 +276,7 @@ async function runCliLogin(
       Array.isArray(accounts) &&
       accounts.length > 0 &&
       (native
-        ? await verifyCliIdentity(az, native, ['--subscription', native.subscriptionId])
+        ? await verifyCliIdentity(az, native, ['--subscription', native.subscriptionId], true)
         : await hasCliAccount(az)) &&
       generation === getNativeAuthGeneration() &&
       epoch === cliLoginEpoch;
