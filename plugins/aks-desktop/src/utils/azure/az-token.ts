@@ -124,9 +124,9 @@ export function setNativeSubscriptionTenants(
       );
     })
   ) {
-    const changed = [...nativeSubscriptionTenants]
-      .filter(([id, binding]) => next.get(id)?.tenant !== binding.tenant)
-      .map(([id]) => id);
+    const changed = [...new Set([...nativeSubscriptionTenants.keys(), ...next.keys()])].filter(
+      id => nativeSubscriptionTenants.get(id)?.tenant !== next.get(id)?.tenant
+    );
     nativeSubscriptionTenants = next;
     dispatchNativeSubscriptionTenantChange(changed);
   }

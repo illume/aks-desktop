@@ -146,7 +146,7 @@ describe('subscription credentials', () => {
     await expect(credential.getToken(ARM_SCOPE)).rejects.toThrow('No tenant is known');
   });
 
-  test('notifies consumers when an effective subscription tenant changes', () => {
+  test('notifies consumers when an effective subscription tenant is added or changes', () => {
     const subscription = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
     const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
     const tenantB = '11111111-1111-1111-1111-111111111111';
@@ -156,7 +156,11 @@ describe('subscription credentials', () => {
     const generation = getAzureAccountGeneration();
 
     setNativeSubscriptionTenants([{ id: subscription, tenant: tenantA }], generation);
-    expect(listener).not.toHaveBeenCalled();
+    expect(listener).toHaveBeenCalledOnce();
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      subscriptionIds: [subscription],
+    });
+    listener.mockClear();
     setNativeSubscriptionTenants([{ id: subscription, tenant: tenantB }], generation);
 
     expect(listener).toHaveBeenCalledOnce();
