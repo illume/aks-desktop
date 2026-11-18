@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getNativeLoginError: vi.fn(),
   isAzureExplicitlySignedOut: vi.fn(),
   nativeGetToken: vi.fn(),
+  updateNativeAccountTenant: vi.fn(),
 }));
 
 vi.mock('../shared/runCommandAsync', () => ({ runCommandAsync: mocks.execCommand }));
@@ -23,6 +24,7 @@ vi.mock('./native-auth', () => ({
   getNativeLoginError: mocks.getNativeLoginError,
   isAzureExplicitlySignedOut: mocks.isAzureExplicitlySignedOut,
   nativeCredential: { getToken: mocks.nativeGetToken },
+  updateNativeAccountTenant: mocks.updateNativeAccountTenant,
 }));
 
 import {
@@ -58,6 +60,7 @@ beforeEach(() => {
   mocks.getNativeLoginError.mockReturnValue(undefined);
   mocks.isAzureExplicitlySignedOut.mockReturnValue(false);
   mocks.nativeGetToken.mockReset();
+  mocks.updateNativeAccountTenant.mockReset().mockReturnValue(true);
   window.dispatchEvent(new CustomEvent('azure-account-change'));
 });
 
@@ -226,6 +229,26 @@ describe('subscription credentials', () => {
     expect(getNativeSubscriptionTenant(subscription)).toBe(tenantA);
     setNativeSubscriptionTenants([{ id: subscription, tenant: tenantB }], generation);
     expect(getNativeSubscriptionTenant(subscription)).toBe(tenantB);
+  });
+
+  test('keeps the selected native account tenant aligned with the effective binding', () => {
+    const subscription = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+    const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const tenantB = '11111111-1111-1111-1111-111111111111';
+    mocks.hasNativeSession.mockReturnValue(true);
+    mocks.getNativeAccount.mockReturnValue({
+      subscriptionId: subscription,
+      tenantId: tenantA,
+    });
+
+    expect(
+      setNativeSubscriptionTenants(
+        [{ id: subscription, tenant: tenantA, tenants: [tenantA, tenantB] }],
+        getAzureAccountGeneration()
+      )
+    ).toBe(true);
+
+    expect(mocks.updateNativeAccountTenant).toHaveBeenCalledWith(subscription, tenantA);
   });
 
   test('preserves failed duplicate tenant alternatives during partial discovery', () => {

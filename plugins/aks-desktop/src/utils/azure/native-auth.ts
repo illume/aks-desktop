@@ -204,6 +204,17 @@ export function getNativeAccount(): NativeAccount | undefined {
   return account;
 }
 
+/** Updates the selected subscription tenant after a verified CLI login. */
+export function updateNativeAccountTenant(subscriptionId: string, tenantId: string): boolean {
+  if (!account || account.subscriptionId.toLowerCase() !== subscriptionId.toLowerCase()) {
+    return false;
+  }
+  if (account.tenantId.toLowerCase() !== tenantId.toLowerCase()) {
+    account = { ...account, tenantId };
+  }
+  return true;
+}
+
 /** Returns the latest terminal native-login error, if any. */
 export function getNativeLoginError(): string | undefined {
   return loginError;

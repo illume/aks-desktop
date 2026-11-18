@@ -83,6 +83,114 @@ describe('UserSearchField — clearing the field', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('ignores a directory lookup from the previous subscription', async () => {
+    let settleLookup!: (v: unknown) => void;
+    mockResolve.mockReturnValue(
+      new Promise(resolve => {
+        settleLookup = resolve;
+      })
+    );
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <UserSearchField
+        subscriptionId="subscription-a"
+        value=""
+        onChange={onChange}
+        label="Assignee"
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'someone@contoso.com' },
+    });
+    await waitFor(() =>
+      expect(mockResolve).toHaveBeenCalledWith('someone@contoso.com', 'subscription-a')
+    );
+    rerender(
+      <UserSearchField
+        subscriptionId="subscription-b"
+        value=""
+        onChange={onChange}
+        label="Assignee"
+      />
+    );
+    onChange.mockClear();
+
+    settleLookup({
+      success: true,
+      user: {
+        id: '38927c93-a0fd-4b06-b21a-69b8ed1e208c',
+        userPrincipalName: 'someone@contoso.com',
+        displayName: 'Someone',
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores a directory lookup that lands after unmount', async () => {
+    let settleLookup!: (v: unknown) => void;
+    mockResolve.mockReturnValue(
+      new Promise(resolve => {
+        settleLookup = resolve;
+      })
+    );
+    const onChange = vi.fn();
+    const { unmount } = render(
+      <UserSearchField
+        subscriptionId="subscription-id"
+        value=""
+        onChange={onChange}
+        label="Assignee"
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'someone@contoso.com' },
+    });
+    await waitFor(() => expect(mockResolve).toHaveBeenCalled());
+    unmount();
+    onChange.mockClear();
+
+    settleLookup({
+      success: true,
+      user: {
+        id: '38927c93-a0fd-4b06-b21a-69b8ed1e208c',
+        userPrincipalName: 'someone@contoso.com',
+        displayName: 'Someone',
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('cancels a queued search when the subscription changes', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <UserSearchField
+        subscriptionId="subscription-a"
+        value=""
+        onChange={onChange}
+        label="Assignee"
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'alice' } });
+    rerender(
+      <UserSearchField
+        subscriptionId="subscription-b"
+        value=""
+        onChange={onChange}
+        label="Assignee"
+      />
+    );
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    expect(mockSearch).not.toHaveBeenCalled();
+  });
+
   it('ignores a directory lookup after a complete identifier becomes partial', async () => {
     let settleLookup!: (v: unknown) => void;
     mockResolve.mockReturnValue(

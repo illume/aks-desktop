@@ -298,14 +298,26 @@ export const UserSearchField: React.FC<UserSearchFieldProps> = ({
     [applyTypedValue, onChange]
   );
 
-  // Clean up debounce timer
+  // Directory state and pending work belong to the selected subscription.
   useEffect(() => {
+    requestIdRef.current += 1;
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+    setLoading(false);
+    setOptions([]);
+    setSearchAvailable(null);
+    setSearchFailed(false);
+    setNoUsersFound(false);
     return () => {
+      requestIdRef.current += 1;
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
       }
     };
-  }, []);
+  }, [subscriptionId]);
 
   const showFallbackMessage = searchAvailable === false;
   const hasSearchQuery =

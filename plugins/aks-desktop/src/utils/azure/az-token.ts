@@ -17,6 +17,7 @@ import {
   hasNativeSession,
   isAzureExplicitlySignedOut,
   nativeCredential,
+  updateNativeAccountTenant,
 } from './native-auth';
 
 /** Default public-cloud ARM scope; configured clouds can supply another audience. */
@@ -67,7 +68,7 @@ export function setNativeSubscriptionTenants(
   registerNativeSubscriptionTenantLookup(subscriptionId => {
     synchronizeNativeGeneration();
     return nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
-  }, reconcileNativeSubscriptionTenant);
+  }, canReconcileNativeSubscriptionTenant, reconcileNativeSubscriptionTenant);
   const preserved = new Set(
     preserveTenantIds.filter(isValidGuid).map(tenantId => tenantId.toLowerCase())
   );
@@ -112,6 +113,13 @@ export function setNativeSubscriptionTenants(
     nativeSubscriptionTenants = next;
     nativeMappingGeneration++;
   }
+  const account = getNativeAccount();
+  const accountTenant = account
+    ? nativeSubscriptionTenants.get(account.subscriptionId.toLowerCase())?.tenant
+    : undefined;
+  if (account && accountTenant) {
+    updateNativeAccountTenant(account.subscriptionId, accountTenant);
+  }
   return true;
 }
 
@@ -121,11 +129,18 @@ export function getNativeSubscriptionTenant(subscriptionId: string): string | un
   return nativeSubscriptionTenants.get(subscriptionId.toLowerCase())?.tenant;
 }
 
-function reconcileNativeSubscriptionTenant(subscriptionId: string, tenantId: string): boolean {
+function canReconcileNativeSubscriptionTenant(subscriptionId: string, tenantId: string): boolean {
   synchronizeNativeGeneration();
   const binding = nativeSubscriptionTenants.get(subscriptionId.toLowerCase());
   const tenant = tenantId.toLowerCase();
-  if (!binding?.tenants.has(tenant)) return false;
+  return binding?.tenants.has(tenant) === true;
+}
+
+function reconcileNativeSubscriptionTenant(subscriptionId: string, tenantId: string): boolean {
+  if (!canReconcileNativeSubscriptionTenant(subscriptionId, tenantId)) return false;
+  const binding = nativeSubscriptionTenants.get(subscriptionId.toLowerCase())!;
+  const tenant = tenantId.toLowerCase();
+  if (!updateNativeAccountTenant(subscriptionId, tenant)) return false;
   if (binding.tenant !== tenant) {
     binding.tenant = tenant;
     nativeMappingGeneration++;

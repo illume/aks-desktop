@@ -8,8 +8,8 @@ import { getAzureGraphEndpoints } from './az-cloud';
 import { azRequest, AzureRequestError } from './az-http';
 import {
   type AzCliCredential,
+  createAzCliCredential,
   getNativeSubscriptionTenant,
-  getSubscriptionCredential,
 } from './az-token';
 import { getNativeAccount } from './native-auth';
 
@@ -80,7 +80,7 @@ async function getAzureGraphContext(subscriptionId?: string) {
   ]);
   if (current?.identity !== identity) {
     current?.credential.clearCache();
-    current = { identity, credential: getSubscriptionCredential(account.subscriptionId) };
+    current = { identity, credential: createAzCliCredential(account.subscriptionId) };
   }
   return { endpoint, scope, tenantId: account.tenantId, credential: current.credential };
 }

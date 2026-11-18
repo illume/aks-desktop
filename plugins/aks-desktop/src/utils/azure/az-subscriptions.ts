@@ -9,6 +9,7 @@ import { azListAll, azRequest, azRequestRaw, AzureRequestError } from './az-http
 import {
   clearAzureTokenCaches,
   getAzureAccountGeneration,
+  getNativeSubscriptionTenant,
   getSubscriptionCredential,
   setNativeSubscriptionTenants,
 } from './az-token';
@@ -167,6 +168,15 @@ export async function getSubscriptions(
       nativePublishedDiscoverySequence,
       discoverySequence
     );
+    for (const subscription of discovered) {
+      const tenant = getNativeSubscriptionTenant(subscription.id);
+      if (!tenant) continue;
+      const tenantMetadata = listedTenants
+        .get(subscription.id)
+        ?.find(value => value.tenant.toLowerCase() === tenant.toLowerCase());
+      subscription.tenant = tenant;
+      subscription.tenantName = tenantMetadata?.tenantName;
+    }
   }
   return discovered;
 }

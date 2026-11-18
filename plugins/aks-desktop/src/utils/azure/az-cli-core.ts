@@ -52,6 +52,8 @@ let cliWriterActive = false;
 const cliWriters: Array<() => void> = [];
 let nativeSubscriptionTenantLookup: (subscriptionId: string) => string | undefined = () =>
   undefined;
+let nativeSubscriptionTenantCanReconcile: (subscriptionId: string, tenantId: string) => boolean =
+  () => false;
 let nativeSubscriptionTenantReconcile: (subscriptionId: string, tenantId: string) => boolean = () =>
   false;
 
@@ -103,9 +105,11 @@ export function allowCliOperations(): void {
 /** Registers the native discovery lookup without depending on the token module. */
 export function registerNativeSubscriptionTenantLookup(
   lookup: (subscriptionId: string) => string | undefined,
+  canReconcile: (subscriptionId: string, tenantId: string) => boolean = () => false,
   reconcile: (subscriptionId: string, tenantId: string) => boolean = () => false
 ): void {
   nativeSubscriptionTenantLookup = lookup;
+  nativeSubscriptionTenantCanReconcile = canReconcile;
   nativeSubscriptionTenantReconcile = reconcile;
 }
 
@@ -143,7 +147,8 @@ async function verifyCliIdentity(
   az: string,
   native: NonNullable<ReturnType<typeof getNativeAccount>>,
   args: string[] = [],
-  reconcileTenant = false
+  reconcileTenant = false,
+  tenantReconciliations: Array<{ subscriptionId: string; tenantId: string }> = []
 ): Promise<boolean> {
   try {
     const subscriptions: string[] = [];
@@ -210,20 +215,26 @@ async function verifyCliIdentity(
       if (typeof cliAccount?.id !== 'string' || !cliAccount.id.trim()) return false;
       const selector = subscriptions[index];
       if (selector && isValidGuid(selector) && !sameValue(selector, cliAccount.id)) return false;
-      let tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+      if (
+        !sameValue(native.username, cliAccount?.user?.name) ||
+        !sameValue(native.environmentName, cliAccount?.cloudName ?? cliAccount?.environmentName)
+      ) {
+        return false;
+      }
+      const tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+      if (sameValue(tenant, cliAccount?.tenantId)) return true;
       if (
         reconcileTenant &&
         typeof cliAccount?.tenantId === 'string' &&
-        !sameValue(tenant, cliAccount.tenantId) &&
-        nativeSubscriptionTenantReconcile(cliAccount.id, cliAccount.tenantId)
+        nativeSubscriptionTenantCanReconcile(cliAccount.id, cliAccount.tenantId)
       ) {
-        tenant = nativeSubscriptionTenantLookup(cliAccount.id);
+        tenantReconciliations.push({
+          subscriptionId: cliAccount.id,
+          tenantId: cliAccount.tenantId,
+        });
+        return true;
       }
-      return (
-        sameValue(native.username, cliAccount?.user?.name) &&
-        sameValue(tenant, cliAccount?.tenantId) &&
-        sameValue(native.environmentName, cliAccount?.cloudName ?? cliAccount?.environmentName)
-      );
+      return false;
     });
   } catch {
     return false;
@@ -272,14 +283,30 @@ async function runCliLogin(
     }
     const native = getNativeAccount();
     const generation = getNativeAuthGeneration();
-    const valid =
+    const tenantReconciliations: Array<{ subscriptionId: string; tenantId: string }> = [];
+    let valid =
       Array.isArray(accounts) &&
       accounts.length > 0 &&
       (native
-        ? await verifyCliIdentity(az, native, ['--subscription', native.subscriptionId], true)
+        ? await verifyCliIdentity(
+            az,
+            native,
+            ['--subscription', native.subscriptionId],
+            true,
+            tenantReconciliations
+          )
         : await hasCliAccount(az)) &&
       generation === getNativeAuthGeneration() &&
       epoch === cliLoginEpoch;
+    if (
+      valid &&
+      native &&
+      !tenantReconciliations.every(({ subscriptionId, tenantId }) =>
+        nativeSubscriptionTenantReconcile(subscriptionId, tenantId)
+      )
+    ) {
+      valid = false;
+    }
     if (!valid) {
       cliLoginFailed = true;
       return isCommandError(result.stderr) ? result : { stdout: '', stderr: CLI_IDENTITY_ERROR };

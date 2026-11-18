@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   clearAzureTokenCaches: vi.fn(),
   getAzureCloudEndpoints: vi.fn(),
   getAzureAccountGeneration: vi.fn(),
+  getNativeSubscriptionTenant: vi.fn(),
   getSubscriptionCredential: vi.fn(),
   setNativeSubscriptionTenants: vi.fn(),
   hasNativeSession: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock('./az-http', async importOriginal => ({
 vi.mock('./az-token', () => ({
   clearAzureTokenCaches: mocks.clearAzureTokenCaches,
   getAzureAccountGeneration: mocks.getAzureAccountGeneration,
+  getNativeSubscriptionTenant: mocks.getNativeSubscriptionTenant,
   getSubscriptionCredential: mocks.getSubscriptionCredential,
   setNativeSubscriptionTenants: mocks.setNativeSubscriptionTenants,
   withAbort: vi.fn(),
@@ -105,6 +107,7 @@ beforeEach(() => {
   mocks.hasNativeSession.mockReturnValue(false);
   mocks.isAzureExplicitlySignedOut.mockReturnValue(false);
   mocks.getAzureAccountGeneration.mockReturnValue(7);
+  mocks.getNativeSubscriptionTenant.mockReturnValue(undefined);
   mocks.setNativeSubscriptionTenants.mockReturnValue(true);
   mocks.runCommandAsync.mockResolvedValue({ stdout: '[]', stderr: '' });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -345,6 +348,34 @@ describe('getSubscriptions', () => {
     mockArm([{ tenantId: TENANT_A }, { tenantId: TENANT_B }], {
       [TENANT_A]: [armSub(SUB_ID, TENANT_B)],
       [TENANT_B]: new Error('MFA required'),
+    });
+
+    it('returns the effective preserved tenant after partial native discovery', async () => {
+      mocks.hasNativeSession.mockReturnValue(true);
+      mocks.getNativeSubscriptionTenant.mockReturnValue(TENANT_B);
+      mockArm(
+        [
+          { tenantId: TENANT_A, displayName: 'Contoso' },
+          { tenantId: TENANT_B, displayName: 'Fabrikam' },
+        ],
+        {
+          [TENANT_A]: [armSub(SUB_ID, TENANT_A)],
+          [TENANT_B]: new Error('MFA required'),
+        }
+      );
+
+      await expect(getSubscriptions()).resolves.toEqual([
+        expect.objectContaining({
+          id: SUB_ID,
+          tenant: TENANT_B,
+          tenantName: undefined,
+        }),
+      ]);
+      expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: SUB_ID, tenant: TENANT_A })],
+        7,
+        [TENANT_B]
+      );
     });
     await getSubscriptions();
     expect(mocks.setNativeSubscriptionTenants).toHaveBeenCalledWith(

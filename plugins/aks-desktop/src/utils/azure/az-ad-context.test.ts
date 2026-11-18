@@ -8,6 +8,7 @@ vi.mock('../shared/runCommandAsync', () => ({ runCommandAsync: mocks.command }))
 vi.mock('./az-cli-path', () => ({ getAzCommand: () => 'az' }));
 
 import { resolveAzureADUser, searchAzureADUsers } from './az-ad';
+import { ARM_SCOPE, getSubscriptionCredential } from './az-token';
 
 const subscriptionId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const tenantId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -153,6 +154,42 @@ describe('Graph account and cloud context', () => {
       ['account', 'show', '--subscription', selectedSubscription, '-o', 'json'],
     ]);
     expect(calls('account get-access-token')[0][1]).toContain(selectedSubscription);
+  });
+
+  test('does not invalidate shared ARM tokens when the Graph subscription changes', async () => {
+    const otherSubscription = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const otherTenant = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    subscriptionTenants[subscriptionId] = tenantId;
+    subscriptionTenants[otherSubscription] = otherTenant;
+    await searchAzureADUsers('Alice', subscriptionId);
+
+    const command = mocks.command.getMockImplementation()!;
+    let releaseArm!: (value: ReturnType<typeof output>) => void;
+    mocks.command.mockImplementation((executable: string, args: string[]) => {
+      if (
+        args[0] === 'account' &&
+        args[1] === 'get-access-token' &&
+        args[3] === ARM_SCOPE
+      ) {
+        return new Promise(resolve => {
+          releaseArm = resolve;
+        });
+      }
+      return command(executable, args);
+    });
+    const armToken = getSubscriptionCredential(subscriptionId).getToken(ARM_SCOPE);
+    await vi.waitFor(() => expect(releaseArm).toBeTypeOf('function'));
+
+    await searchAzureADUsers('Alice', otherSubscription);
+    releaseArm(
+      output({
+        accessToken: 'arm-token',
+        expires_on: Math.floor(Date.now() / 1000) + 3600,
+        tenant: tenantId,
+      })
+    );
+
+    await expect(armToken).resolves.toMatchObject({ token: 'arm-token' });
   });
 
   test('immediately replaces credentials on external user changes in the same subscription and tenant', async () => {

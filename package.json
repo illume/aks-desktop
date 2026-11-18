@@ -181,7 +181,8 @@
           "authority": "https://login.microsoftonline.com",
           "scopes": [
             "https://management.core.windows.net//.default",
-            "https://graph.microsoft.com/.default"
+            "https://graph.microsoft.com/.default",
+            "https://prometheus.monitor.azure.com/.default"
           ]
         },
         {

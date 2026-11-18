@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   nativeSession: vi.fn(() => false),
   nativeError: vi.fn<() => string | undefined>(() => undefined),
   signedOut: vi.fn(() => false),
+  updateNativeAccountTenant: vi.fn(() => true),
 }));
 
 vi.mock('../shared/runCommandAsync', () => ({
@@ -31,6 +32,7 @@ vi.mock('./native-auth', () => ({
   getNativeLoginError: mocks.nativeError,
   hasNativeSession: mocks.nativeSession,
   isAzureExplicitlySignedOut: mocks.signedOut,
+  updateNativeAccountTenant: mocks.updateNativeAccountTenant,
 }));
 
 import {
@@ -341,13 +343,15 @@ describe('runAzCommand', () => {
     test('reconciles a verified login to another discovered tenant only', async () => {
       let selectedTenant = 'tenant-a';
       const discoveredTenants = new Set(['tenant-a', 'tenant-b']);
+      const canReconcile = vi.fn((_subscriptionId: string, tenantId: string) =>
+        discoveredTenants.has(tenantId)
+      );
       const reconcile = vi.fn((_subscriptionId: string, tenantId: string) => {
-        if (!discoveredTenants.has(tenantId)) return false;
         selectedTenant = tenantId;
         return true;
       });
       acceptNative();
-      registerNativeSubscriptionTenantLookup(() => selectedTenant, reconcile);
+      registerNativeSubscriptionTenantLookup(() => selectedTenant, canReconcile, reconcile);
       mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
         if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
         if (args[0] === 'account') {
@@ -366,15 +370,17 @@ describe('runAzCommand', () => {
         stdout: '[{}]',
         stderr: '',
       });
+      expect(canReconcile).toHaveBeenCalledWith('sub', 'tenant-b');
       expect(reconcile).toHaveBeenCalledWith('sub', 'tenant-b');
       expect(selectedTenant).toBe('tenant-b');
     });
 
     test('rejects a verified login tenant absent from discovery', async () => {
       const selectedTenant = 'tenant-a';
-      const reconcile = vi.fn(() => false);
+      const canReconcile = vi.fn(() => false);
+      const reconcile = vi.fn(() => true);
       acceptNative();
-      registerNativeSubscriptionTenantLookup(() => selectedTenant, reconcile);
+      registerNativeSubscriptionTenantLookup(() => selectedTenant, canReconcile, reconcile);
       mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
         if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
         if (args[0] === 'account') {
@@ -390,8 +396,106 @@ describe('runAzCommand', () => {
       });
 
       await expect(runCommandAsync('az', ['login'])).resolves.toEqual(denied);
-      expect(reconcile).toHaveBeenCalledWith('sub', 'unknown-tenant');
+      expect(canReconcile).toHaveBeenCalledWith('sub', 'unknown-tenant');
+      expect(reconcile).not.toHaveBeenCalled();
       expect(selectedTenant).toBe('tenant-a');
+    });
+
+    test.each([
+      [{ ...account, tenantId: 'tenant-b', user: { name: 'other@example.com' } }, { name: 'AzureCloud' }],
+      [{ ...account, tenantId: 'tenant-b' }, { name: 'AzureUSGovernment' }],
+    ])(
+      'does not reconcile a rejected login identity',
+      async (cliAccount, cloud) => {
+        const canReconcile = vi.fn(() => true);
+        const reconcile = vi.fn(() => true);
+        acceptNative();
+        registerNativeSubscriptionTenantLookup(() => 'tenant-a', canReconcile, reconcile);
+        mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+          if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+          if (args[0] === 'account') {
+            return Promise.resolve({ stdout: JSON.stringify(cliAccount), stderr: '' });
+          }
+          if (args[0] === 'cloud') {
+            return Promise.resolve({ stdout: JSON.stringify(cloud), stderr: '' });
+          }
+          return Promise.resolve(commandResult);
+        });
+
+        await expect(runCommandAsync('az', ['login'])).resolves.toEqual(denied);
+        expect(reconcile).not.toHaveBeenCalled();
+      }
+    );
+
+    test('does not reconcile after the native generation changes during login verification', async () => {
+      const canReconcile = vi.fn(() => true);
+      const reconcile = vi.fn(() => true);
+      acceptNative();
+      registerNativeSubscriptionTenantLookup(() => 'tenant-a', canReconcile, reconcile);
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+        if (args[0] === 'account') {
+          return Promise.resolve({
+            stdout: JSON.stringify({ ...account, tenantId: 'tenant-b' }),
+            stderr: '',
+          });
+        }
+        if (args[0] === 'cloud') {
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+      mocks.generation.mockReturnValueOnce(0).mockReturnValue(1);
+
+      await expect(runCommandAsync('az', ['login'])).resolves.toEqual(denied);
+      expect(canReconcile).toHaveBeenCalledWith('sub', 'tenant-b');
+      expect(reconcile).not.toHaveBeenCalled();
+    });
+
+    test('reconciles the effective binding and selected native account together', async () => {
+      const { getAzureAccountGeneration, getNativeSubscriptionTenant, setNativeSubscriptionTenants } =
+        await import('./az-token');
+      const subscriptionId = '11111111-2222-3333-4444-555555555555';
+      const tenantA = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+      const tenantB = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
+      mocks.native.mockReturnValue({
+        ...native,
+        subscriptionId,
+        tenantId: tenantA,
+      });
+      mocks.nativeSession.mockReturnValue(true);
+      allowCliOperations();
+      expect(
+        setNativeSubscriptionTenants(
+          [{ id: subscriptionId, tenant: tenantA, tenants: [tenantA, tenantB] }],
+          getAzureAccountGeneration()
+        )
+      ).toBe(true);
+      mocks.updateNativeAccountTenant.mockClear();
+      mocks.execCommand.mockImplementation((_command: string, args: string[]) => {
+        if (args[0] === 'login') return Promise.resolve({ stdout: '[{}]', stderr: '' });
+        if (args[0] === 'account') {
+          return Promise.resolve({
+            stdout: JSON.stringify({
+              ...account,
+              id: subscriptionId,
+              tenantId: tenantB,
+            }),
+            stderr: '',
+          });
+        }
+        if (args[0] === 'cloud') {
+          return Promise.resolve({ stdout: '{"name":"AzureCloud"}', stderr: '' });
+        }
+        return Promise.resolve(commandResult);
+      });
+
+      await expect(runCommandAsync('az', ['login'])).resolves.toEqual({
+        stdout: '[{}]',
+        stderr: '',
+      });
+      expect(getNativeSubscriptionTenant(subscriptionId)).toBe(tenantB);
+      expect(mocks.updateNativeAccountTenant).toHaveBeenCalledWith(subscriptionId, tenantB);
     });
 
     test('uses real token discovery bindings and rejects removed or stale mappings', async () => {

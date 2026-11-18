@@ -195,6 +195,17 @@ describe('native authentication facade', () => {
     });
   });
 
+  test('updates only the selected account tenant after verified reconciliation', async () => {
+    const { auth } = await establishSession();
+
+    expect(auth.updateNativeAccountTenant('other-subscription', 'other-tenant')).toBe(false);
+    expect(auth.updateNativeAccountTenant('SUBSCRIPTION-ID', 'reconciled-tenant')).toBe(true);
+    expect(auth.getNativeAccount()).toMatchObject({
+      subscriptionId: 'subscription-id',
+      tenantId: 'reconciled-tenant',
+    });
+  });
+
   test('records a terminal main-process login failure', async () => {
     capability({
       getAzureLoginStatus: vi.fn().mockResolvedValue({
