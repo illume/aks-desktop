@@ -139,6 +139,21 @@ describe('getClusterInfo', () => {
       tenantId: '00000000-0000-0000-0000-000000000005',
     });
   });
+
+  test('does not fall back to the active tenant when the registered tenant is unknown', async () => {
+    mocks.getClusterSettings.mockReturnValue({
+      azureRegistration: {
+        subscriptionId: '00000000-0000-0000-0000-000000000003',
+        resourceGroup: 'persisted-rg',
+      },
+    });
+    mocks.getSubscriptions.mockResolvedValue([]);
+
+    await expect(getClusterInfo('persisted-cluster')).rejects.toThrow(
+      'No tenant is known for the registered Azure subscription'
+    );
+    expect(mocks.getClusterResourceGroupViaGraph).not.toHaveBeenCalled();
+  });
 });
 
 describe('getConnectedClusters', () => {

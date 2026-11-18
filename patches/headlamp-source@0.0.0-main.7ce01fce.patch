@@ -938,10 +938,10 @@ index 874134a8384a772eacc5046065f939179160d83d..bb30d0b401236ac30a8bf69166524e3d
 +});
 diff --git a/source/app/electron/azureOAuth.test.ts b/source/app/electron/azureOAuth.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7b7be43b5
+index 0000000000000000000000000000000000000000..da8ea34b998779bbc2db9d451021836705286de6
 --- /dev/null
 +++ b/source/app/electron/azureOAuth.test.ts
-@@ -0,0 +1,470 @@
+@@ -0,0 +1,473 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -1218,7 +1218,9 @@ index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7
 +    expect(String(fetchMock.mock.calls[2][1].body)).toContain('refresh_token=refresh-token');
 +  });
 +
-+  it('keeps a guest-tenant interaction error scoped to that request', async () => {
++  it.each([['guest-tenant'], [undefined]])(
++    'keeps a resource interaction error scoped to the %s request',
++    async tenantId => {
 +    const window = fakeWindow();
 +    setup(window);
 +    fetchMock
@@ -1243,7 +1245,7 @@ index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7
 +        response(
 +          {
 +            error: 'interaction_required',
-+            error_description: 'Guest tenant requires interaction',
++            error_description: 'Resource requires interaction',
 +          },
 +          400
 +        )
@@ -1260,7 +1262,7 @@ index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7
 +      capability: CAPABILITY,
 +      sessionId: SESSION_ID,
 +      scope: GRAPH_SCOPE,
-+      tenantId: 'guest-tenant',
++      tenantId,
 +    });
 +    expect(failed).toMatchObject({ success: false });
 +    expect(failed).not.toHaveProperty('sessionExpired');
@@ -1273,7 +1275,8 @@ index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7
 +      success: true,
 +      pending: false,
 +    });
-+  });
++    }
++  );
 +
 +  it('invalidates every tenant after token-wide refresh expiry', async () => {
 +    const window = fakeWindow();
@@ -1414,10 +1417,10 @@ index 0000000000000000000000000000000000000000..8bc3fbdb232b17f9bc02f04b99fccba7
 +});
 diff --git a/source/app/electron/azureOAuth.ts b/source/app/electron/azureOAuth.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..a218be0ce3473f1a941acb2c5d9b4c132f4cb863
+index 0000000000000000000000000000000000000000..2cde792fabfe5521f797bdbf01907e5e5e5e1972
 --- /dev/null
 +++ b/source/app/electron/azureOAuth.ts
-@@ -0,0 +1,597 @@
+@@ -0,0 +1,592 @@
 +/*
 + * Copyright 2025 The Kubernetes Authors
 + *
@@ -1913,12 +1916,7 @@ index 0000000000000000000000000000000000000000..a218be0ce3473f1a941acb2c5d9b4c13
 +              !session.homeTenantId ||
 +              tenantId.toLowerCase() === session.homeTenantId.toLowerCase();
 +            if (
-+              [
-+                'invalid_grant',
-+                'invalid_client',
-+                'interaction_required',
-+                'login_required',
-+              ].includes(error.code ?? '') &&
++              ['invalid_grant', 'invalid_client'].includes(error.code ?? '') &&
 +              (homeRequest || isTokenWideFailure(error))
 +            ) {
 +              session.refreshToken = undefined;

@@ -435,6 +435,11 @@ export async function getClusterInfo(clusterName?: string): Promise<{
           );
           tenantId = typeof subscription?.tenant === 'string' ? subscription.tenant : undefined;
         }
+        if (!tenantId) {
+          throw new Error(
+            `No tenant is known for the registered Azure subscription ${registration.subscriptionId}. Refresh Azure sign-in and try again.`
+          );
+        }
         return {
           clusterName,
           subscriptionId: registration.subscriptionId,
@@ -604,7 +609,8 @@ export async function getClusterInfo(clusterName?: string): Promise<{
     if (
       error instanceof Error &&
       (error.message.includes('re-authentication') ||
-        error.message.includes('No Azure subscriptions'))
+        error.message.includes('No Azure subscriptions') ||
+        error.message.includes('No tenant is known'))
     ) {
       throw error;
     }
