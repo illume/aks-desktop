@@ -18,6 +18,10 @@ npm install --prefix .config/npm --package-lock-only --ignore-scripts --no-audit
 node --test build/windows-ci.test.cjs
 ```
 
+Knip is pinned to `6.45.1` because the 1ES npm mirror does not currently provide
+`6.46.x`. Before updating the pin, verify that the new version's tarball downloads
+from both npmjs and `https://packagefeedproxy.microsoft.io/npm/`.
+
 ## Windows installer ASLR
 
 Windows distributable builds use the ASLR-capable NSIS 3.04 Unicode/non-solid
@@ -73,9 +77,12 @@ The current stack is rebased onto Headlamp main at
 | --- | --- | --- |
 | `0080` | AKS Desktop compatibility marker | Downstream-only; context rebased for series order |
 | `7505` | [Cluster pre-open hooks and proxy lifecycle, PR #7505](https://github.com/kubernetes-sigs/headlamp/pull/7505) | `0df913771474f27a00552cc55951612d70ac072f` (rebased carried range, including upstream quit fix `d28a80377719e35b232eee7ba91aebbe08b21f49`) |
+| `7605` | [Activity resize guard from Headlamp PR #7605](https://github.com/kubernetes-sigs/headlamp/pull/7605) | `02b96b773e3b8453ea4961f286acb269751f82a9` only |
 | `7683` | [Legacy GitHub token migration, PR #7683](https://github.com/kubernetes-sigs/headlamp/pull/7683) | `1a60fa08ae7651b898a243280f3742d769255134` |
 | `8147` | [Private GitHub browser OAuth, PR #8147](https://github.com/kubernetes-sigs/headlamp/pull/8147) | `1146185af190ec0d0426f81f06f5d664bc8d1c3d` |
 | `8329` | [Activity renderer test timer isolation, kubernetes-sigs/headlamp#8329](https://github.com/kubernetes-sigs/headlamp/pull/8329) | `6f0a49b49cd701b10408e19c8c5d820636e6e8f5` |
+| `8518` | [Kubeconfig null contexts, PR #8518](https://github.com/kubernetes-sigs/headlamp/pull/8518) | `946c24c7b0541c1ddabb1691e58a9c07ee87d99d` (merged upstream in `1cd5ad766eae562129942927e9e252aea3ae2a9c`, after the pin) |
+| `8519` | [Plugin cluster delete handler, PR #8519](https://github.com/kubernetes-sigs/headlamp/pull/8519) | `ad4ef506e0762f892153f53fedb01cd5922fbbc5` (rebased onto `7505`, which keeps the built-in Delete beside plugin menu items) |
 
 Patches `0072` (PR #7958), `7685`, `7712`, `7726`, `7727`, `7731`, `7744`, and
 `7746` are included in this pin and no longer carried. Keep each numbered
@@ -89,6 +96,10 @@ later changes from that PR. Its context is rebased after the downstream-only
 The follow-up resumes quit on a new event-loop turn after cleanup.
 Keep this ordering when refreshing the patch: an immediately resolved cleanup
 must not re-enter Electron's original prevented `before-quit` dispatch.
+
+Patch `7605` carries only the missing-window guard for delayed activity resize
+callbacks, not the resource-map feature from that PR. It prevents callbacks that
+outlive a frontend test window from throwing during teardown.
 
 ### Update the Headlamp commit
 

@@ -65,6 +65,40 @@ test('the installed package is a complete pinned source distribution', () => {
   }
 });
 
+test('installed activity resize callbacks tolerate a torn-down window', () => {
+  const activityModule = path.join(
+    HEADLAMP_SOURCE_DIR, 'frontend/src/components/activity/activitySlice.tsx'
+  );
+  const result = spawnSync(process.execPath, ['--import', 'tsx', '--eval', `
+    const assert = require('node:assert/strict');
+    const { mock } = require('node:test');
+    const { activitySlice } = require(${JSON.stringify(activityModule)});
+    const callbacks = [];
+    mock.method(globalThis, 'setTimeout', callback => callbacks.push(callback));
+    const flush = () => callbacks.splice(0).forEach(callback => callback());
+    const browserWindow = new EventTarget();
+    Object.defineProperty(browserWindow, 'innerWidth', { value: 1920 });
+    globalThis.window = browserWindow;
+    let resized = 0;
+    browserWindow.addEventListener('resize', () => resized++);
+    const activity = { id: 'resize', content: null, location: 'split-right' };
+    const { actions, reducer } = activitySlice;
+    let state = reducer(undefined, actions.launchActivity(activity));
+    flush();
+    assert.equal(resized, 1);
+    state = reducer(state, actions.update({ id: activity.id, title: 'Updated' }));
+    flush();
+    assert.equal(resized, 2);
+    state = reducer(state, actions.launchActivity(activity));
+    reducer(state, actions.update({ id: activity.id, minimized: true }));
+    delete globalThis.window;
+    assert.doesNotThrow(flush);
+    assert.equal(resized, 2);
+  `], { cwd: ROOT_DIR, encoding: 'utf8' });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test('upstream Headlamp source is materialized instead of tracked', () => {
   const result = spawnSync(
     'git',
@@ -90,9 +124,11 @@ test('the install workflow owns and verifies the Headlamp patch', () => {
   assert.equal(lockEntry.version, VERSION);
   assert.equal(lockEntry.resolved, 'file:packages/headlamp-source');
   const patch = fs.readFileSync(path.join(ROOT_DIR, patchPath));
+  const composedPatch = composePatchSeries(ROOT_DIR);
   assert.equal(
-    patch.equals(composePatchSeries(ROOT_DIR)),
-    true
+    patch.equals(composedPatch),
+    true,
+    `stored patch length ${patch.length}, composed patch length ${composedPatch.length}`
   );
   assert.doesNotMatch(
     patch.toString('utf8'),
@@ -240,6 +276,26 @@ test('AKS supplies GitHub OAuth identity through its generated product manifest'
     const manifest = validateBuildManifest(createProductTemplate(rootManifest, platform));
     assert.deepEqual(manifest.githubOAuth, configuration);
     assert.equal(manifest.product.protocols.schemes[0], 'aks-desktop');
+  }
+});
+
+test('AKS supplies its Azure OAuth scopes through the generated product manifest', () => {
+  const { createProductTemplate } = require(
+    path.join(PACKAGE_DIR, 'src', 'lib', 'product-manifest.ts')
+  );
+  const { validateBuildManifest } = require(
+    path.join(HEADLAMP_SOURCE_DIR, 'app', 'scripts', 'build-manifest.ts')
+  );
+  const configuration = rootManifest.headlamp.azureOAuth;
+  const publicCloud = configuration.clouds.find(cloud => cloud.name === 'AzureCloud');
+  const chinaCloud = configuration.clouds.find(cloud => cloud.name === 'AzureChinaCloud');
+  assert.ok(publicCloud);
+  assert.ok(chinaCloud);
+  assert.ok(publicCloud.scopes.includes('https://prometheus.monitor.azure.com/.default'));
+  assert.ok(chinaCloud.scopes.includes('https://prometheus.monitor.azure.cn/.default'));
+  for (const platform of ['linux', 'darwin', 'win32']) {
+    const manifest = validateBuildManifest(createProductTemplate(rootManifest, platform));
+    assert.deepEqual(manifest.azureOAuth, configuration);
   }
 });
 
@@ -666,10 +722,9 @@ test('package targets have verified external tool runtimes', () => {
   const azureCli = rootManifest.config.externalTools.azureCli;
   assert.equal(azureCli.version, '2.90.0');
   assert.deepEqual(azureCli.extensionVersions, {
-    alertsmanagement: '1.0.0b2',
     connectedk8s: '1.11.3',
   });
-  assert.deepEqual(azureCli.extensions, ['alertsmanagement', 'connectedk8s']);
+  assert.deepEqual(azureCli.extensions, ['connectedk8s']);
   assert.equal(rootManifest.config.externalTools.python.version, '3.14');
   for (const [extension, version] of Object.entries(azureCli.extensionVersions) as [string, string][]) {
     const extensionPackage = azureCli.extensionPackages[extension];
@@ -754,7 +809,8 @@ test('AKS product policy owns development and production command grants', () => 
   );
   assert.equal(aksDesktop.capabilities, undefined);
   assert.equal(aksDesktopManifest.headlamp.runCommands, undefined);
-  const policies: any[] = rootManifest.headlamp.runCommands;
+  assert.equal(rootManifest.headlamp.runCommands.length, 6);
+  const policies: any[] = rootManifest.headlamp.runCommands.slice(0, 4);
   assert.deepEqual(
     policies.map(policy => ({
       environment: policy.environment,
@@ -800,7 +856,18 @@ test('AKS product policy owns development and production command grants', () => 
     ),
     'Missing az identity command grant'
   );
-  for (const group of ['ad', 'config', 'extension', 'feature', 'graph', 'group', 'rest', 'version', 'vm']) {
+  for (const group of [
+    'ad',
+    'alerts-management',
+    'config',
+    'extension',
+    'feature',
+    'graph',
+    'group',
+    'monitor',
+    'rest',
+    'vm',
+  ]) {
     assert.equal(
       productGrants.some(grant => grant.tool === 'az' && grant.args[0] === group),
       false,
@@ -832,6 +899,57 @@ test('AKS product policy owns development and production command grants', () => 
       ],
     },
   ]);
+});
+
+test('standalone local plugin owns its CLI without adding a shipped plugin or public catalog grant', () => {
+  const policies: any[] = rootManifest.headlamp.runCommands.slice(4);
+  assert.deepEqual(policies.map(policy => policy.environment), ['development', 'production']);
+  assert.deepEqual(policies[0].commands, policies[1].commands);
+  for (const policy of policies) {
+    assert.deepEqual(policy.targets, ['win32-x64']);
+    assert.equal(policy.pluginLocation, 'development');
+    assert.deepEqual(policy.plugins, [
+      { bundleName: 'developer-cluster', packageName: '@headlamp-k8s/developer-cluster' },
+    ]);
+    assert.deepEqual(policy.approvedCommands, policy.commands);
+    assert.equal(policy.artifactHub, undefined);
+    assert.deepEqual(policy.pluginExecutables, [{ tool: 'aks-devctl' }]);
+    // The plugin checks the platform itself; AKS Desktop registers no local provider.
+    assert.equal(policy.clusterRegistrationProviders, undefined);
+    assert.deepEqual(
+      policy.commands.map((grant: any) => [
+        grant.tool,
+        grant.args.slice(0, 2).join(' '),
+        !!grant.allowTrailingArgs,
+      ]),
+      [
+        ['aks-devctl', 'cluster get-versions', false],
+        ['aks-devctl', 'cluster show', false],
+        ['aks-devctl', 'cluster create', true],
+        ['aks-devctl', 'cluster delete', true],
+        ['wsl', '--status', false],
+        ['reg', 'query HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', false],
+      ]
+    );
+  }
+  assert.doesNotMatch(JSON.stringify(rootManifest.headlamp.plugins), /developer-cluster/);
+  assert.doesNotMatch(JSON.stringify(rootManifest.headlamp.build.externalTools), /developer-cluster/);
+  assert.doesNotMatch(JSON.stringify(rootManifest.config.externalTools), /developer-cluster/);
+  assert.doesNotMatch(
+    JSON.stringify(rootManifest.headlamp.runCommands.slice(0, 4)),
+    /developer-cluster/
+  );
+  // The local CLI `aks-devctl` is granted only to the Developer Cluster plugin.
+  assert.ok(
+    !rootManifest.headlamp.build.externalTools.some((tool: any) => tool.id === 'aks-devctl')
+  );
+  assert.equal(rootManifest.config.externalTools['aks-devctl'], undefined);
+  assert.ok(
+    !rootManifest.headlamp.runCommands
+      .slice(0, 4)
+      .flatMap((policy: any) => [...(policy.commands ?? []), ...(policy.approvedCommands ?? [])])
+      .some((grant: any) => grant.tool === 'aks-devctl')
+  );
 });
 
 test('container builds do not require repository metadata', () => {

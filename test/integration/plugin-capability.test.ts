@@ -16,6 +16,9 @@ const { productPluginCommandPolicies } = require(
 const { isRunCommandAllowed } = require(
   path.join(HEADLAMP_SOURCE_DIR, 'app', 'electron', 'runCommandPolicy.ts')
 );
+const { createProductTemplate } = require(
+  path.join(ROOT_DIR, 'packages', 'headlamp-source', 'src', 'lib', 'product-manifest.ts')
+);
 const { getStartClusterProxyCapability } = require(
   path.join(
     ROOT_DIR,
@@ -27,6 +30,17 @@ const { getStartClusterProxyCapability } = require(
     'clusterProxyCapability.ts'
   )
 );
+
+/**
+ * The product manifest a Windows x64 build generates, which includes the target-limited policies.
+ * The generator removes the build-only `targets` field that Headlamp's manifest validation rejects.
+ *
+ * @returns The runtime product manifest generated from the repository's package.json.
+ */
+function productManifest() {
+  const project = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
+  return createProductTemplate(project, 'win32', 'x64');
+}
 
 const integrationGlobal = globalThis as typeof globalThis & {
   __aksProxyCapability?: (target: unknown) => Promise<unknown>;
@@ -91,9 +105,7 @@ test('the Headlamp loader does not expose a capability it did not inject', () =>
 });
 
 test('the product grants AI assistant auto-detect commands in every app environment', () => {
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8')
-  ).headlamp;
+  const manifest = productManifest();
 
   for (const environment of ['development', 'production'] as const) {
     const policy = productPluginCommandPolicies(manifest, environment).find(
@@ -127,7 +139,7 @@ test('the product grants AI assistant auto-detect commands in every app environm
 });
 
 test('AKS command policies retain only current CLI consumers', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8')).headlamp;
+  const manifest = productManifest();
   for (const environment of ['development', 'production'] as const) {
     const policy = productPluginCommandPolicies(manifest, environment).find(
       (candidate: { packageName: string }) => candidate.packageName === 'aks-desktop'
@@ -135,14 +147,13 @@ test('AKS command policies retain only current CLI consumers', () => {
     assert.ok(policy, `Missing ${environment} AKS command policy`);
     assert.equal(policy.bundleName, 'aks-desktop');
     const prefixes = [
+      'version',
       'login',
       'logout',
       'aks',
       'account',
       'cloud',
       'acr',
-      'alerts-management',
-      'monitor',
     ];
     assert.deepEqual(policy.approvedCommands, [
       ...prefixes.map(prefix => ({
@@ -155,6 +166,7 @@ test('AKS command policies retain only current CLI consumers', () => {
     assert.equal(policy.consent, undefined);
     assert.equal(policy.source, environment === 'development' ? 'development' : 'shipped');
     for (const args of [
+      ['version'],
       ['account', 'show', '-o', 'json'],
       ['aks', 'namespace', 'show'],
       ['acr', 'list'],
@@ -177,13 +189,15 @@ test('AKS command policies retain only current CLI consumers', () => {
       assert.equal(isRunCommandAllowed(grants, 'az', ['cloud', 'register', '--name', 'Other']), false);
       for (const args of [
         [],
-        ['version'],
+        ['--version'],
         ['config', 'set'],
         ['extension', 'list'],
         ['graph', 'query'],
         ['rest'],
         ['role', 'assignment', 'create'],
         ['role', 'assignment', 'list'],
+        ['alerts-management', 'prometheus-rule-group', 'list'],
+        ['monitor', 'account', 'show'],
         ['ad', 'user', 'list'],
         ['feature', 'show'],
         ['group', 'list'],
@@ -204,7 +218,7 @@ test('AKS command policies retain only current CLI consumers', () => {
 });
 
 test('AKS project directory commands remain denied after the REST migration', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8')).headlamp;
+  const manifest = productManifest();
   for (const environment of ['development', 'production'] as const) {
     const policies = productPluginCommandPolicies(manifest, environment);
     const policy = policies.find((candidate: { packageName: string }) => candidate.packageName === 'aks-desktop');

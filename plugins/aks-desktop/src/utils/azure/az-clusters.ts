@@ -1,14 +1,20 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the Apache 2.0.
 import type { ClusterCapabilities } from '../../types/ClusterCapabilities';
-import { getLoginStatus } from './az-auth';
-import { debugLog, getErrorMessage, isAzError, needsRelogin, runCommandAsync } from './az-cli-core';
+import { getClusterSettings } from '../shared/clusterSettings';
+import { getLoginStatus, getSubscriptionLoginStatus } from './az-auth';
+import { debugLog, getErrorMessage, runCommandAsync } from './az-cli-core';
 import { getAzureCloudEndpoints } from './az-cloud';
 import { azListAll } from './az-http';
 import { type AksClusterReadOptions, getManagedClusterDetails } from './az-managed-clusters';
+import {
+  type EnableClusterAddonOptions,
+  enableClusterAddonsViaRest,
+} from './az-prometheus-provisioning';
 import { getClusterResourceGroupViaGraph, getClustersViaGraph } from './az-resource-graph';
 import { getSubscriptions } from './az-subscriptions';
-import { AzTokenError, getSubscriptionCredential } from './az-token';
+import { AzTokenError, getNativeSubscriptionTenant, getSubscriptionCredential } from './az-token';
+import { hasNativeSession } from './native-auth';
 
 /** Fields consumed from ARM managedClusters lists; CLI responses flatten properties. */
 interface ManagedClusterResource {
@@ -289,63 +295,14 @@ export async function getClusterCapabilities(
 export type AddonKey = 'azure-monitor-metrics' | 'keda' | 'vpa';
 
 /**
- * Enables one or more addons in a single, non-blocking Azure CLI update.
- * @param options - Target subscription GUID, resource group, cluster name and addon(s) to enable.
- * @returns Whether the update was accepted, with an error for invalid addons or CLI failures.
+ * Enables one or more addons via ARM REST (`2026-01-01`).
+ * @param options - Target subscription GUID, resource group, cluster name, addon(s), and optional REST overrides.
+ * @returns Whether the update was accepted, with an error for invalid addons or REST/auth failures.
  */
-export async function enableClusterAddon(options: {
-  subscriptionId: string;
-  resourceGroup: string;
-  clusterName: string;
-  addon: AddonKey | AddonKey[];
-}): Promise<{ success: boolean; error?: string }> {
-  const { subscriptionId, resourceGroup, clusterName, addon } = options;
-
-  const addons = Array.isArray(addon) ? addon : [addon];
-
-  if (addons.length === 0) {
-    return { success: false, error: 'No addons specified' };
-  }
-
-  const addonFlags: Partial<Record<AddonKey, string[]>> = {
-    'azure-monitor-metrics': ['--enable-azure-monitor-metrics'],
-    keda: ['--enable-keda'],
-    vpa: ['--enable-vpa'],
-  };
-
-  const flags: string[] = [];
-  for (const a of addons) {
-    const f = addonFlags[a];
-    if (!f) {
-      return { success: false, error: `Unknown addon: ${a}` };
-    }
-    flags.push(...f);
-  }
-
-  const args = [
-    'aks',
-    'update',
-    '--subscription',
-    subscriptionId,
-    '--resource-group',
-    resourceGroup,
-    '--name',
-    clusterName,
-    ...flags,
-    '--no-wait',
-  ];
-
-  const { stderr } = await runCommandAsync('az', args);
-
-  if (stderr && needsRelogin(stderr)) {
-    return { success: false, error: 'Authentication required. Please log in to Azure CLI.' };
-  }
-
-  if (stderr && isAzError(stderr)) {
-    return { success: false, error: `Failed to enable addons (${addons.join(', ')}): ${stderr}` };
-  }
-
-  return { success: true };
+export async function enableClusterAddon(
+  options: EnableClusterAddonOptions
+): Promise<{ success: boolean; error?: string }> {
+  return enableClusterAddonsViaRest(options);
 }
 
 /**
@@ -358,14 +315,68 @@ export async function getClusterInfo(clusterName?: string): Promise<{
   clusterName?: string;
   resourceGroup?: string;
   subscriptionId?: string;
+  tenantId?: string;
 }> {
   const result: {
     clusterName?: string;
     resourceGroup?: string;
     subscriptionId?: string;
+    tenantId?: string;
   } = {};
 
   try {
+    if (clusterName) {
+      const settings = getClusterSettings(clusterName);
+      const arcRegistration =
+        typeof settings.subscriptionId === 'string' && typeof settings.resourceGroup === 'string'
+          ? {
+              subscriptionId: settings.subscriptionId,
+              resourceGroup: settings.resourceGroup,
+            }
+          : undefined;
+      const registration =
+        settings.clusterType === 'aksarc'
+          ? arcRegistration
+          : settings.azureRegistration ?? arcRegistration;
+      if (
+        typeof registration?.subscriptionId === 'string' &&
+        registration.subscriptionId &&
+        typeof registration.resourceGroup === 'string' &&
+        registration.resourceGroup
+      ) {
+        let tenantId = getNativeSubscriptionTenant(registration.subscriptionId);
+        if (!tenantId) {
+          if (hasNativeSession()) {
+            const subscriptions = await getSubscriptions();
+            const subscription = subscriptions.find(
+              value =>
+                typeof value.id === 'string' &&
+                value.id.toLowerCase() === registration.subscriptionId.toLowerCase()
+            );
+            tenantId = typeof subscription?.tenant === 'string' ? subscription.tenant : undefined;
+          } else {
+            const status = await getSubscriptionLoginStatus(registration.subscriptionId);
+            tenantId =
+              status.isLoggedIn &&
+              status.subscriptionId?.toLowerCase() === registration.subscriptionId.toLowerCase()
+                ? status.tenantId
+                : undefined;
+          }
+        }
+        if (!tenantId) {
+          throw new Error(
+            `No tenant is known for the registered Azure subscription ${registration.subscriptionId}. Refresh Azure sign-in and try again.`
+          );
+        }
+        return {
+          clusterName,
+          subscriptionId: registration.subscriptionId,
+          resourceGroup: registration.resourceGroup,
+          tenantId,
+        };
+      }
+    }
+
     const account = await getLoginStatus();
     const accountError = account.error ?? '';
     if (!account.isLoggedIn) {
@@ -387,6 +398,7 @@ export async function getClusterInfo(clusterName?: string): Promise<{
       return result;
     }
     result.subscriptionId = account.subscriptionId;
+    result.tenantId = account.tenantId;
 
     if (!result.subscriptionId) {
       console.warn('No subscription ID found, cannot query cluster info');
@@ -474,7 +486,8 @@ export async function getClusterInfo(clusterName?: string): Promise<{
     if (
       error instanceof Error &&
       (error.message.includes('re-authentication') ||
-        error.message.includes('No Azure subscriptions'))
+        error.message.includes('No Azure subscriptions') ||
+        error.message.includes('No tenant is known'))
     ) {
       throw error;
     }

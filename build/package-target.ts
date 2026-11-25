@@ -106,7 +106,8 @@ export function packageEnvironment(
     APP_VERSION: project.version,
     GOARCH: target.arch === 'x64' ? 'amd64' : target.arch,
     HEADLAMP_BUILD_MANIFEST: BUILD_MANIFEST,
-    HEADLAMP_REUSE_PLUGIN_DEPENDENCIES: 'aks-desktop,aks-desktop-theme,plugin-catalog',
+    HEADLAMP_REUSE_PLUGIN_DEPENDENCIES:
+      'aks-desktop,aks-desktop-theme,plugin-catalog',
     npm_config_arch: target.arch,
     npm_config_platform: target.platform,
     npm_config_target_arch: target.arch,
@@ -196,8 +197,9 @@ export function packageTarget(
     runTimedStep('stage external tools', () =>
       runStep(['run', 'headlamp:tools', '--', ...targetArgs], rootDir)
     );
+    // The manifest's run-command policies depend on the target architecture.
     runTimedStep('generate product manifest', () =>
-      runStep(['run', 'headlamp:manifest'], rootDir)
+      runStep(['run', 'headlamp:manifest'], rootDir, buildEnv)
     );
     if (!options.reusePreparedAssets) {
       runTimedStep('install release plugins', () =>

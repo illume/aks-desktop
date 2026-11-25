@@ -40,8 +40,12 @@
     "test:e2e:azure": "tsx test/e2e/run-azure.ts",
     "test:e2e:acr": "npm run test:e2e:azure -- --suite acr",
     "test:headlamp-package": "npm --prefix packages/headlamp-source run test:package && tsx --test test/integration/headlamp-package.test.ts",
-    "test:headlamp-patches": "npm run headlamp:patches -- --check && npm run test:headlamp-package",
+    "test:headlamp-patches": "npm run headlamp:patches -- --check && npm run test:headlamp-package && npm run test:azure-auth",
+    "test:azure-auth": "node node_modules/@headlamp-k8s/headlamp-source/source/app/node_modules/vitest/vitest.mjs run --config test/integration/azure-auth.vitest.config.mts",
+    "test:local-plugin": "node node_modules/@headlamp-k8s/headlamp-source/source/app/node_modules/vitest/vitest.mjs run --config test/integration/local-plugin.vitest.config.mts",
+    "test:local-discovery": "node node_modules/@headlamp-k8s/headlamp-source/source/app/node_modules/vitest/vitest.mjs run --config test/integration/local-discovery.vitest.config.mts",
     "test:i18n": "node --test Localize/translation-manager.test.mjs",
+    "test:live:azure-auth": "cross-env AZ_LIVE_TESTS=1 npm --prefix node_modules/@headlamp-k8s/headlamp-source/source/app test -- --maxWorkers=2 electron/azureOAuth.live.test.ts && cross-env AZ_LIVE_TESTS=1 npm --prefix plugins/aks-desktop run test:unit -- --maxWorkers=2 src/utils/azure/az-auth.live.test.ts src/utils/azure/azure-auth-consumers.live.test.ts src/components/AzureAuth/AzureProfilePage.live.test.tsx",
     "test:azure:list": "tsx test/live/list-azure-resources.ts",
     "test:release-signing": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test build/sign-release.test.ts",
     "test:post-build": "tsx ./build/verify-bundled-tools.ts",
@@ -115,18 +119,12 @@
       "azureCli": {
         "version": "2.90.0",
         "extensions": [
-          "alertsmanagement",
           "connectedk8s"
         ],
         "extensionVersions": {
-          "alertsmanagement": "1.0.0b2",
           "connectedk8s": "1.11.3"
         },
         "extensionPackages": {
-          "alertsmanagement": {
-            "url": "https://azcliprod.blob.core.windows.net/cli-extensions/alertsmanagement-1.0.0b2-py3-none-any.whl",
-            "checksum": "37f376234f8047df93d7c5355cc864f35ec195f6c7babe148f57349303af6696"
-          },
           "connectedk8s": {
             "url": "https://azcliprod.blob.core.windows.net/cli-extensions/connectedk8s-1.11.3-py2.py3-none-any.whl",
             "checksum": "18b2087ed7f70d621a6259ad2ce14836a57b215ab71c03aed52296a05a609c1f"
@@ -172,6 +170,37 @@
   },
   "headlamp": {
     "commandEnvironment": "external-tools/aks-tool-environment.cjs",
+    "azureOAuth": {
+      "clientId": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+      "clouds": [
+        {
+          "name": "AzureCloud",
+          "authority": "https://login.microsoftonline.com",
+          "scopes": [
+            "https://management.core.windows.net//.default",
+            "https://graph.microsoft.com/.default",
+            "https://prometheus.monitor.azure.com/.default"
+          ]
+        },
+        {
+          "name": "AzureUSGovernment",
+          "authority": "https://login.microsoftonline.us",
+          "scopes": [
+            "https://management.core.usgovcloudapi.net//.default",
+            "https://graph.microsoft.us/.default"
+          ]
+        },
+        {
+          "name": "AzureChinaCloud",
+          "authority": "https://login.chinacloudapi.cn",
+          "scopes": [
+            "https://management.core.chinacloudapi.cn//.default",
+            "https://microsoftgraph.chinacloudapi.cn/.default",
+            "https://prometheus.monitor.azure.cn/.default"
+          ]
+        }
+      ]
+    },
     "githubOAuth": {
       "clientId": "Iv23liWWbvrfIrA6WWj5",
       "clientSecret": "5a066cc6ca8d2c6f201c45f24f2f4e62905b5d95"
@@ -200,9 +229,26 @@
     },
     "targets": {
       "linux": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64", "arm64"] },
-        { "target": "tar.gz", "arch": ["x64", "arm64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "checkForUpdates": false,
@@ -333,8 +379,16 @@
       {
         "environment": "development",
         "pluginLocation": "development",
+        "azureOAuth": true,
         "githubOAuth": true,
         "approvedCommands": [
+          {
+            "tool": "az",
+            "args": [
+              "version"
+            ],
+            "allowTrailingArgs": true
+          },
           {
             "tool": "az",
             "args": [
@@ -375,20 +429,6 @@
             "tool": "az",
             "args": [
               "acr"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
-              "alerts-management"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
-              "monitor"
             ],
             "allowTrailingArgs": true
           },
@@ -421,6 +461,13 @@
           {
             "tool": "az",
             "args": [
+              "version"
+            ],
+            "allowTrailingArgs": true
+          },
+          {
+            "tool": "az",
+            "args": [
               "account"
             ],
             "allowTrailingArgs": true
@@ -450,13 +497,6 @@
           {
             "tool": "az",
             "args": [
-              "alerts-management"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
               "identity"
             ],
             "allowTrailingArgs": true
@@ -472,13 +512,6 @@
             "tool": "az",
             "args": [
               "logout"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
-              "monitor"
             ],
             "allowTrailingArgs": true
           },
@@ -549,8 +582,16 @@
       {
         "environment": "production",
         "pluginLocation": "shipped",
+        "azureOAuth": true,
         "githubOAuth": true,
         "approvedCommands": [
+          {
+            "tool": "az",
+            "args": [
+              "version"
+            ],
+            "allowTrailingArgs": true
+          },
           {
             "tool": "az",
             "args": [
@@ -591,20 +632,6 @@
             "tool": "az",
             "args": [
               "acr"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
-              "alerts-management"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
-              "monitor"
             ],
             "allowTrailingArgs": true
           },
@@ -637,6 +664,13 @@
           {
             "tool": "az",
             "args": [
+              "version"
+            ],
+            "allowTrailingArgs": true
+          },
+          {
+            "tool": "az",
+            "args": [
               "account"
             ],
             "allowTrailingArgs": true
@@ -666,13 +700,6 @@
           {
             "tool": "az",
             "args": [
-              "alerts-management"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
               "identity"
             ],
             "allowTrailingArgs": true
@@ -688,13 +715,6 @@
             "tool": "az",
             "args": [
               "logout"
-            ],
-            "allowTrailingArgs": true
-          },
-          {
-            "tool": "az",
-            "args": [
-              "monitor"
             ],
             "allowTrailingArgs": true
           },
@@ -761,6 +781,262 @@
             ]
           }
         ]
+      },
+      {
+        "targets": [
+          "win32-x64"
+        ],
+        "environment": "development",
+        "pluginLocation": "development",
+        "approvedCommands": [
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "get-versions",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "show",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "create",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "delete",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "wsl",
+            "args": [
+              "--status"
+            ]
+          },
+          {
+            "tool": "reg",
+            "args": [
+              "query",
+              "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss",
+              "/v",
+              "DefaultVersion"
+            ]
+          }
+        ],
+        "plugins": [
+          {
+            "bundleName": "developer-cluster",
+            "packageName": "@headlamp-k8s/developer-cluster"
+          }
+        ],
+        "pluginExecutables": [
+          {
+            "tool": "aks-devctl"
+          }
+        ],
+        "commands": [
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "get-versions",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "show",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "create",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "delete",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "wsl",
+            "args": [
+              "--status"
+            ]
+          },
+          {
+            "tool": "reg",
+            "args": [
+              "query",
+              "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss",
+              "/v",
+              "DefaultVersion"
+            ]
+          }
+        ]
+      },
+      {
+        "targets": [
+          "win32-x64"
+        ],
+        "environment": "production",
+        "pluginLocation": "development",
+        "approvedCommands": [
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "get-versions",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "show",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "create",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "delete",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "wsl",
+            "args": [
+              "--status"
+            ]
+          },
+          {
+            "tool": "reg",
+            "args": [
+              "query",
+              "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss",
+              "/v",
+              "DefaultVersion"
+            ]
+          }
+        ],
+        "plugins": [
+          {
+            "bundleName": "developer-cluster",
+            "packageName": "@headlamp-k8s/developer-cluster"
+          }
+        ],
+        "pluginExecutables": [
+          {
+            "tool": "aks-devctl"
+          }
+        ],
+        "commands": [
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "get-versions",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "args": [
+              "cluster",
+              "show",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "create",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "aks-devctl",
+            "allowTrailingArgs": true,
+            "args": [
+              "cluster",
+              "delete",
+              "--output",
+              "json"
+            ]
+          },
+          {
+            "tool": "wsl",
+            "args": [
+              "--status"
+            ]
+          },
+          {
+            "tool": "reg",
+            "args": [
+              "query",
+              "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss",
+              "/v",
+              "DefaultVersion"
+            ]
+          }
+        ]
       }
     ],
     "plugins": [
@@ -807,14 +1083,14 @@
     "cross-env": "10.1.0",
     "husky": "^9.0.0",
     "insights-plugin": "file:plugins/insights-plugin",
-    "knip": "^6.46.1",
+    "knip": "6.45.1",
     "lint-staged": "^17.6.1",
     "tsx": "^4.23.1",
     "typescript": "^6.0.3"
   },
   "headlampPatch": {
     "path": "patches/headlamp-source@0.0.0-main.7ce01fce.patch",
-    "integrity": "sha512-x0OG3S6qDaLjSEYxcvpIeBF/snuKoU1qMYY2skjnKnl+9mGqvcNJgrsDx8eW/Bo2jhIbo/SKHki1CMcoZ0Jtwg=="
+    "integrity": "sha512-EmPyaVRkw0UG7yIJzVWKS56x5p5rnPPmLmevfuFhsgjRr1mlRl90t3oA9X6wQNm+aWMbbKB6jLRx/+StuyXkXw=="
   },
   "lint-staged": {
     "plugins/aks-desktop/**/*.{js,jsx,ts,tsx}": [
